@@ -1,0 +1,9 @@
+[submodule "reference/mara-app"]
+	path = reference/mara-app
+	url = https://github.com/youngmbg21-cmyk/mara-app.git
+[submodule "reference/apex-proxy"]
+	path = reference/apex-proxy
+	url = https://github.com/youngmbg21-cmyk/apex-proxy.git
+[submodule "reference/Financial-Planner"]
+	path = reference/Financial-Planner
+	url = https://github.com/youngmbg21-cmyk/Financial-Planner.git
