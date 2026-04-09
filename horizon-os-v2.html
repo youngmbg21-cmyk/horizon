@@ -1,0 +1,2044 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>HORIZON OS v2</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=JetBrains+Mono:wght@300;400;500;600&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"/>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-database-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
+<style>
+:root{
+  --bg0:#060810;--bg1:#0a0d17;--bg2:#0f1422;--bg3:#151c2e;--bg4:#1c2640;
+  --border:#1e2d4a;--border2:#2d4070;
+  --text:#e8edf8;--text2:#8a9bbf;--text3:#4a5a7a;
+  --green:#00e8a0;--green-dim:#00e8a015;
+  --amber:#f5a623;--amber-dim:#f5a62315;
+  --blue:#4d8fff;--blue-dim:#4d8fff15;
+  --cyan:#00d4ff;--cyan-dim:#00d4ff12;
+  --red:#ff4d6d;--red-dim:#ff4d6d15;
+  --violet:#8b5cf6;--violet-dim:#8b5cf615;
+  --pink:#ec4899;
+  --glow-g:0 0 24px #00e8a025;--glow-a:0 0 24px #f5a62325;--glow-b:0 0 24px #4d8fff25;
+  --r:10px;--rl:16px;
+  --fd:'Syne',sans-serif;--fb:'DM Sans',sans-serif;--fm:'JetBrains Mono',monospace;
+}
+body.light{
+  --bg0:#eef1f8;--bg1:#f5f7fc;--bg2:#ffffff;--bg3:#f0f4fc;--bg4:#e4eaf8;
+  --border:#d0daf0;--border2:#a8bce0;
+  --text:#0f1a35;--text2:#3a4d70;--text3:#6a7a9a;
+  --glow-g:0 2px 12px #00e8a018;--glow-a:0 2px 12px #f5a62318;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{height:100%;overflow:hidden}
+body{font-family:var(--fb);background:var(--bg0);color:var(--text)}
+input,select,button,textarea{font-family:inherit}
+
+/* ── SCROLLBARS ── */
+::-webkit-scrollbar{width:4px;height:4px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:var(--border2);border-radius:2px}
+
+/* ── LAYOUT ── */
+.app{display:flex;flex-direction:column;height:100vh}
+.ticker-bar{height:34px;background:var(--bg0);border-bottom:1px solid var(--border);overflow:hidden;display:flex;align-items:center;flex-shrink:0;position:relative}
+.ticker-track{display:flex;animation:tkScroll 45s linear infinite;white-space:nowrap}
+@keyframes tkScroll{0%{transform:translateX(0)}100%{transform:translateX(-50%)}}
+.tk{display:inline-flex;align-items:center;gap:5px;padding:0 16px;height:34px;border-right:1px solid var(--border);font-family:var(--fm);font-size:11px}
+.tks{color:var(--text);font-weight:600}.tkv{color:var(--text2)}.tkc{padding:1px 5px;border-radius:3px;font-size:10px;font-weight:700}
+.tkc.up{background:var(--green-dim);color:var(--green)}.tkc.dn{background:var(--red-dim);color:var(--red)}
+.ticker-sync{position:absolute;right:8px;top:50%;transform:translateY(-50%);font-family:var(--fm);font-size:9px;color:var(--text3);background:var(--bg1);padding:2px 6px;border-radius:3px;border:1px solid var(--border)}
+
+.topbar{display:flex;align-items:center;justify-content:space-between;padding:0 20px;height:52px;background:var(--bg1);border-bottom:1px solid var(--border);flex-shrink:0}
+.logo{font-family:var(--fd);font-size:17px;font-weight:800;letter-spacing:.05em;display:flex;align-items:center;gap:9px}
+.logo-mark{width:30px;height:30px;border-radius:7px;background:linear-gradient(135deg,var(--green),var(--cyan));display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:800;color:#000}
+.topbar-right{display:flex;align-items:center;gap:7px}
+.iBtn{width:34px;height:34px;border-radius:7px;border:1px solid var(--border);background:var(--bg2);color:var(--text2);display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:14px;transition:all .2s}
+.iBtn:hover{border-color:var(--green);color:var(--green)}
+.key-badge{font-family:var(--fm);font-size:10px;padding:4px 9px;border-radius:6px;border:1px solid var(--border);background:var(--bg2);color:var(--text2);cursor:pointer;transition:all .2s}
+.key-badge.active{border-color:var(--green);color:var(--green);background:var(--green-dim)}
+.sync-badge{font-family:var(--fm);font-size:10px;padding:4px 9px;border-radius:6px;border:1px solid var(--border);background:var(--bg2);color:var(--text3)}
+.sync-badge.synced{border-color:var(--blue);color:var(--blue);background:var(--blue-dim)}
+.sync-badge.saving{color:var(--amber)}
+
+.main-row{display:flex;flex:1;overflow:hidden}
+
+/* ── SIDEBAR ── */
+.sidebar{width:210px;flex-shrink:0;background:var(--bg1);border-right:1px solid var(--border);display:flex;flex-direction:column;overflow-y:auto}
+.sb-section{padding:14px 12px 6px;font-size:9px;letter-spacing:.14em;color:var(--text3);font-weight:700}
+.nav-item{display:flex;align-items:center;gap:9px;padding:8px 13px;margin:1px 7px;border-radius:8px;cursor:pointer;color:var(--text2);font-size:13px;font-weight:500;transition:all .18s;border:1px solid transparent}
+.nav-item:hover{background:var(--bg3);color:var(--text)}
+.nav-item.active{background:var(--bg4);color:var(--green);border-color:var(--border2)}
+.nav-icon{font-size:15px;width:20px;text-align:center}
+.sb-sep{height:1px;background:var(--border);margin:7px 11px}
+.sb-bot{margin-top:auto;padding:12px}
+.sb-mini{background:var(--bg2);border:1px solid var(--border);border-radius:10px;padding:11px}
+.sb-mini-label{font-size:9px;color:var(--text3);letter-spacing:.1em;font-weight:700;margin-bottom:3px}
+.sb-mini-val{font-family:var(--fm);font-size:15px;font-weight:600;color:var(--green)}
+.sb-mini-sub{font-size:10px;color:var(--text2);margin-top:2px}
+
+/* ── CONTENT ── */
+.content{flex:1;overflow-y:auto}
+.panel{display:none;padding:22px;max-width:1260px;margin:0 auto;animation:fadeIn .22s ease}
+.panel.active{display:block}
+@keyframes fadeIn{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:translateY(0)}}
+
+/* ── PAGE HEADER ── */
+.ph{margin-bottom:20px}
+.ph-tag{font-size:9px;font-weight:700;letter-spacing:.16em;color:var(--green);margin-bottom:5px}
+.ph-title{font-family:var(--fd);font-size:26px;font-weight:800;margin-bottom:5px}
+.ph-sub{color:var(--text2);font-size:13px}
+
+/* ── CARDS ── */
+.card{background:var(--bg2);border:1px solid var(--border);border-radius:var(--rl);padding:20px;margin-bottom:14px}
+.card-title{font-family:var(--fd);font-size:15px;font-weight:700;margin-bottom:14px;display:flex;align-items:center;gap:7px}
+.card-actions{margin-left:auto;display:flex;gap:6px}
+
+/* ── KPI GRID ── */
+.kpi-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;margin-bottom:16px}
+.kpi{background:var(--bg2);border:1px solid var(--border);border-radius:var(--rl);padding:16px 18px;transition:border-color .2s;cursor:default}
+.kpi:hover{border-color:var(--border2)}
+.kpi-lbl{font-size:10px;color:var(--text3);letter-spacing:.07em;font-weight:600;margin-bottom:5px}
+.kpi-val{font-family:var(--fm);font-size:20px;font-weight:600}
+.kpi-sub{font-size:11px;color:var(--text2);margin-top:3px}
+.kpi-icon{font-size:22px;margin-bottom:6px}
+
+/* ── GRIDS ── */
+.two-col{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.three-col{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px}
+
+/* ── BUTTONS ── */
+.btn{display:inline-flex;align-items:center;gap:6px;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;transition:all .2s;border:none;padding:9px 18px}
+.btn-g{background:var(--green);color:#000}
+.btn-g:hover{filter:brightness(1.08);transform:translateY(-1px)}
+.btn-o{background:var(--bg4);color:var(--text);border:1px solid var(--border2)}
+.btn-o:hover{border-color:var(--green);color:var(--green)}
+.btn-apex{background:linear-gradient(135deg,#080610,#120820);color:var(--amber);border:1px solid var(--amber);font-family:var(--fm);font-size:11px;letter-spacing:.08em}
+.btn-apex:hover{box-shadow:var(--glow-a)}
+.btn-sm{padding:6px 13px;font-size:12px}
+.btn-xs{padding:4px 9px;font-size:11px}
+.btn-danger{background:var(--red-dim);color:var(--red);border:1px solid #ff4d6d40;padding:7px 14px;font-size:12px;border-radius:7px;cursor:pointer;transition:all .2s}
+.btn-danger:hover{background:#ff4d6d30}
+
+/* ── INPUTS ── */
+.field{margin-bottom:12px}
+.field label{display:block;font-size:11px;color:var(--text2);margin-bottom:4px;letter-spacing:.04em}
+.field input,.field select,.field textarea{width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:7px;padding:8px 11px;color:var(--text);font-size:13px;outline:none;transition:border-color .2s}
+.field input:focus,.field select:focus,.field textarea:focus{border-color:var(--green)}
+.field textarea{resize:vertical;min-height:72px;line-height:1.5}
+.field select{appearance:none;cursor:pointer}
+.mono{font-family:var(--fm)}
+
+/* ── LINE ITEMS ── */
+.line-item{display:flex;align-items:center;gap:7px;margin-bottom:6px}
+.li-name{flex:1;background:var(--bg3);border:1px solid var(--border);border-radius:7px;padding:7px 10px;color:var(--text);font-size:13px;outline:none}
+.li-name:focus{border-color:var(--green)}
+.li-wrap{display:flex;align-items:center;gap:3px;background:var(--bg3);border:1px solid var(--border);border-radius:7px;padding:0 10px}
+.li-cur{color:var(--text3);font-size:10px;font-family:var(--fm)}
+.li-amt{width:88px;background:transparent;border:none;color:var(--text);font-family:var(--fm);font-size:13px;padding:7px 0;outline:none}
+.li-paid-wrap{display:flex;align-items:center}
+.li-paid{appearance:none;-webkit-appearance:none;width:16px;height:16px;border:1.5px solid var(--border2);border-radius:3px;background:var(--bg3);cursor:pointer;position:relative;transition:all .2s}
+.li-paid:checked{background:var(--green);border-color:var(--green)}
+.li-paid:checked::after{content:'✓';position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);color:#000;font-size:9px;font-weight:900;line-height:1}
+.line-item.paid{opacity:.35;filter:grayscale(.4)}
+.line-item.paid *:not(.li-paid){pointer-events:none}
+.li-rm{background:transparent;border:none;color:var(--red);font-size:16px;cursor:pointer;opacity:.45;transition:opacity .2s;padding:4px 7px}
+.li-rm:hover{opacity:1}
+.btn-add-line{background:transparent;border:1px dashed var(--border);color:var(--text3);padding:7px 13px;border-radius:7px;font-size:12px;cursor:pointer;width:100%;text-align:center;margin-top:3px;transition:all .2s}
+.btn-add-line:hover{border-color:var(--green);color:var(--green)}
+
+/* ── MONTH PILLS ── */
+.month-strip{display:flex;gap:5px;overflow-x:auto;padding-bottom:10px;margin-bottom:16px}
+.mpill{background:var(--bg3);border:1px solid var(--border);border-radius:7px;padding:8px 12px;color:var(--text2);font-size:12px;cursor:pointer;white-space:nowrap;transition:all .18s;flex-shrink:0;position:relative}
+.mpill.current{border-color:var(--amber);color:var(--amber)}
+.mpill.selected{background:var(--green);color:#000;border-color:var(--green);font-weight:700}
+.mpill.has-override::after{content:'';position:absolute;top:3px;right:3px;width:5px;height:5px;border-radius:50%;background:var(--violet)}
+
+/* ── INNER TABS ── */
+.itabs{display:flex;gap:2px;background:var(--bg3);border-radius:8px;padding:3px;margin-bottom:16px;width:fit-content}
+.itab{background:transparent;border:none;color:var(--text3);padding:6px 14px;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;transition:all .2s}
+.itab.active{background:var(--bg2);color:var(--green);box-shadow:0 1px 4px #00000030}
+
+/* ── TAGS ── */
+.tag{display:inline-flex;align-items:center;gap:3px;font-size:9px;font-weight:700;letter-spacing:.07em;padding:2px 7px;border-radius:4px}
+.tg{background:var(--green-dim);color:var(--green)}
+.ta{background:var(--amber-dim);color:var(--amber)}
+.tb{background:var(--blue-dim);color:var(--blue)}
+.tr{background:var(--red-dim);color:var(--red)}
+.tv{background:var(--violet-dim);color:var(--violet)}
+.tc{background:var(--cyan-dim);color:var(--cyan)}
+
+/* ── CF ROWS ── */
+.cf-row{display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid var(--border);font-size:13px}
+.cf-row:last-child{border:none}
+.cf-amt{font-family:var(--fm);font-weight:600}
+.pos{color:var(--green)}.neg{color:var(--red)}.neu{color:var(--amber)}.bv{color:var(--blue)}.vv{color:var(--violet)}
+
+/* ── TOGGLE ── */
+.toggle{position:relative;width:40px;height:22px;display:inline-block}
+.toggle input{opacity:0;width:0;height:0}
+.toggle-track{position:absolute;cursor:pointer;inset:0;background:var(--bg4);border-radius:22px;transition:.3s;border:1px solid var(--border2)}
+.toggle-track:before{content:'';position:absolute;width:16px;height:16px;left:2px;bottom:2px;background:var(--text3);border-radius:50%;transition:.3s}
+.toggle input:checked+.toggle-track{background:var(--green-dim);border-color:var(--green)}
+.toggle input:checked+.toggle-track:before{background:var(--green);transform:translateX(18px)}
+
+/* ── PROGRESS BARS ── */
+.pbar{height:7px;background:var(--bg4);border-radius:4px;overflow:hidden;margin:6px 0}
+.pbar-fill{height:100%;border-radius:4px;transition:width .7s ease}
+
+/* ── AI BOX ── */
+.ai-box{background:linear-gradient(135deg,var(--bg2),#080e1c);border:1px solid var(--border2);border-radius:var(--rl);padding:18px;margin-top:14px;position:relative;overflow:hidden}
+.ai-box::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,var(--green),var(--cyan),var(--blue))}
+.ai-hdr{display:flex;align-items:center;gap:7px;margin-bottom:10px;font-size:10px;font-weight:700;letter-spacing:.1em;color:var(--cyan)}
+.ai-dot{width:6px;height:6px;border-radius:50%;background:var(--green);animation:pulse 1.5s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+.ai-content{font-size:13px;line-height:1.75;color:var(--text)}
+.ai-content h3{font-family:var(--fd);font-size:15px;color:var(--green);margin:12px 0 5px}
+.ai-content h4{font-size:13px;color:var(--amber);margin:9px 0 4px}
+.ai-content ul{padding-left:16px;margin:5px 0}
+.ai-content li{margin-bottom:3px}
+.ai-content strong{color:var(--text)}
+.ai-loading{display:flex;align-items:center;gap:9px;color:var(--text2);font-family:var(--fm);font-size:12px}
+.spinner{width:15px;height:15px;border:2px solid var(--border2);border-top-color:var(--green);border-radius:50%;animation:spin .7s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* ── VACATION ── */
+.vac-tier-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:11px;margin-bottom:16px}
+.vac-tier{background:var(--bg3);border:1px solid var(--border);border-radius:var(--r);padding:13px;cursor:pointer;transition:all .2s;position:relative;overflow:hidden}
+.vac-tier:hover{border-color:var(--border2);transform:translateY(-2px)}
+.vac-tier.selected{border-color:var(--green);box-shadow:var(--glow-g)}
+.vac-glow{position:absolute;top:0;left:0;right:0;height:2px}
+.tier-b .vac-glow{background:var(--blue)}
+.tier-m .vac-glow{background:var(--green)}
+.tier-l .vac-glow{background:var(--amber)}
+.fund-tl{display:flex;gap:7px;overflow-x:auto;padding-bottom:8px}
+.fund-mo{background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:9px 11px;min-width:82px;text-align:center;flex-shrink:0}
+.fund-mo.hl{border-color:var(--green);background:var(--green-dim)}
+.fund-mo-name{font-size:9px;color:var(--text3);margin-bottom:3px;letter-spacing:.06em}
+.fund-mo-val{font-family:var(--fm);font-size:13px;font-weight:600}
+.fund-mo.hl .fund-mo-val{color:var(--green)}
+.pulse-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:9px;margin-bottom:14px}
+.pulse-card{background:var(--bg3);border:1px solid var(--border);border-radius:var(--r);padding:13px;cursor:pointer;transition:all .2s}
+.pulse-card:hover{border-color:var(--cyan);transform:translateY(-2px)}
+.pulse-flag{font-size:22px;margin-bottom:5px}
+.pulse-dest{font-weight:700;font-size:14px}
+.pulse-why{font-size:11px;color:var(--text2);margin-top:2px}
+.pulse-cost{font-family:var(--fm);font-size:12px;color:var(--green);margin-top:4px}
+
+/* ── TRIP BUILDER ── */
+.trip-budget-row{display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border);font-size:13px}
+.trip-budget-row:last-child{border:none}
+.tbi{width:90px;background:var(--bg3);border:1px solid var(--border);border-radius:6px;padding:5px 8px;color:var(--text);font-family:var(--fm);font-size:12px;text-align:right;outline:none}
+.tbi:focus{border-color:var(--green)}
+
+/* ── MAP ── */
+#vacMap,#retMap{width:100%;height:360px;border-radius:12px;overflow:hidden;border:1px solid var(--border)}
+.leaflet-tile{filter:brightness(.55) saturate(.6) hue-rotate(190deg)}
+body.light .leaflet-tile{filter:brightness(.95) saturate(.9)}
+.leaflet-container{background:#0a0d17}
+body.light .leaflet-container{background:#e8f0ff}
+.leaflet-popup-content-wrapper{background:var(--bg3)!important;border:1px solid var(--border2)!important;border-radius:10px!important;color:var(--text)!important}
+.leaflet-popup-content{font-family:var(--fm);font-size:11px;margin:9px 13px!important}
+.leaflet-popup-tip{background:var(--bg3)!important}
+
+/* ── RETIREMENT ── */
+.dream-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:9px;margin-bottom:14px}
+.dream-chip{background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:11px;cursor:pointer;transition:all .2s;text-align:center}
+.dream-chip:hover{border-color:var(--border2)}
+.dream-chip.sel{border-color:var(--violet);background:var(--violet-dim)}
+.dest-cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:11px;margin-top:12px}
+.dest-card{background:var(--bg3);border:1px solid var(--border);border-radius:var(--r);padding:14px;transition:all .2s;cursor:pointer}
+.dest-card:hover{border-color:var(--violet);transform:translateY(-2px)}
+.dest-card.sel{border-color:var(--violet);box-shadow:0 0 20px #8b5cf620}
+.dest-tags{display:flex;flex-wrap:wrap;gap:4px;margin-top:7px}
+.dt-warm{background:#f5a62318;color:var(--amber)}
+.dt-safe{background:var(--green-dim);color:var(--green)}
+.dt-visa{background:var(--blue-dim);color:var(--blue)}
+.dt-ret{background:var(--violet-dim);color:var(--violet)}
+
+/* ── SCENARIO COMPARE ── */
+.scenario-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px}
+.scenario-card{background:var(--bg3);border:1px solid var(--border);border-radius:var(--r);padding:14px;transition:all .2s}
+.scenario-card.best{border-color:var(--green);box-shadow:var(--glow-g)}
+
+/* ── APEX TERMINAL ── */
+.apex-shell{background:linear-gradient(135deg,#02050e,#05091a);border:1px solid var(--amber);border-radius:var(--rl);overflow:hidden;margin-top:18px}
+.apex-hdr{display:flex;align-items:center;gap:11px;padding:13px 18px;border-bottom:1px solid #2a1a00;background:linear-gradient(90deg,#080600,#04081a)}
+.apex-logo{font-family:var(--fd);font-size:15px;font-weight:800;color:var(--amber);letter-spacing:.12em}
+.apex-logo span{color:var(--text3);font-weight:400;font-size:11px}
+.apex-status{margin-left:auto;font-family:var(--fm);font-size:9px;letter-spacing:.1em;padding:3px 9px;border-radius:4px;border:1px solid var(--amber);color:var(--amber)}
+.apex-status.running{border-color:var(--cyan);color:var(--cyan);animation:blink .8s infinite}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.3}}
+.apex-status.pass{border-color:var(--green);color:var(--green)}
+.apex-status.fail{border-color:var(--red);color:var(--red)}
+.apex-body{padding:18px}
+.apex-mods{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:9px;margin-bottom:16px}
+.apex-mod{background:#040810;border:1px solid #0f1830;border-radius:8px;padding:11px 13px}
+.apex-mod-name{font-size:9px;letter-spacing:.1em;color:var(--text3);margin-bottom:5px;font-weight:700}
+.apex-mod-val{font-family:var(--fm);font-size:13px;font-weight:700}
+.apex-mod-val.pass{color:var(--green)}.apex-mod-val.warn{color:var(--amber)}.apex-mod-val.fail{color:var(--red)}
+.apex-verdict{border:1px solid;border-radius:10px;padding:14px 18px;text-align:center;font-family:var(--fd);font-size:18px;font-weight:800;letter-spacing:.08em;margin-top:11px}
+.apex-verdict.FEASIBLE{border-color:var(--green);color:var(--green);background:var(--green-dim)}
+.apex-verdict.CONDITIONAL{border-color:var(--amber);color:var(--amber);background:var(--amber-dim)}
+.apex-verdict.NOT_FEASIBLE{border-color:var(--red);color:var(--red);background:var(--red-dim)}
+.apex-out{font-family:var(--fm);font-size:11.5px;line-height:1.85;color:var(--text2);margin-top:11px}
+
+/* ── MIGRATION TIMELINE ── */
+.mig-timeline{display:flex;flex-direction:column;gap:0;margin-top:14px;position:relative}
+.mig-timeline::before{content:'';position:absolute;left:18px;top:0;bottom:0;width:2px;background:var(--border2)}
+.mig-step{display:flex;gap:14px;padding:12px 0;position:relative}
+.mig-dot{width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:12px;font-weight:700;font-family:var(--fm);z-index:1}
+.mig-dot.done{background:var(--green);color:#000}
+.mig-dot.next{background:var(--amber-dim);border:2px solid var(--amber);color:var(--amber)}
+.mig-dot.future{background:var(--bg3);border:2px solid var(--border2);color:var(--text3)}
+.mig-body{flex:1}
+.mig-year{font-size:10px;color:var(--text3);font-family:var(--fm);margin-bottom:2px;letter-spacing:.06em}
+.mig-title{font-weight:700;font-size:13px;margin-bottom:3px}
+.mig-desc{font-size:12px;color:var(--text2);line-height:1.5}
+
+/* ── NET WORTH ── */
+.nw-row{display:flex;align-items:center;justify-content:space-between;padding:7px 0;border-bottom:1px solid var(--border);font-size:13px}
+.nw-row:last-child{border:none}
+.nw-bar-bg{height:5px;background:var(--bg4);border-radius:3px;margin-top:3px;overflow:hidden;width:80px}
+.nw-bar-fill{height:100%;border-radius:3px}
+
+/* ── SETTINGS ── */
+.setting-row{display:flex;align-items:center;justify-content:space-between;padding:11px 0;border-bottom:1px solid var(--border)}
+.setting-row:last-child{border:none}
+.s-lbl{font-size:13px}
+.s-sub{font-size:11px;color:var(--text3);margin-top:2px}
+.s-ctrl input,.s-ctrl select{background:var(--bg3);border:1px solid var(--border);border-radius:7px;padding:6px 10px;color:var(--text);font-family:var(--fm);font-size:13px;width:115px;text-align:right;outline:none}
+.s-ctrl input:focus,.s-ctrl select:focus{border-color:var(--green)}
+
+/* ── MODALS ── */
+.modal-ov{position:fixed;inset:0;background:#00000092;display:none;align-items:center;justify-content:center;z-index:9999}
+.modal-ov.open{display:flex}
+.modal-box{background:var(--bg2);border:1px solid var(--border2);border-radius:var(--rl);padding:26px;width:440px;max-width:92vw;animation:fadeIn .2s ease}
+.modal-title{font-family:var(--fd);font-size:17px;font-weight:700;margin-bottom:5px}
+.modal-sub{font-size:13px;color:var(--text2);margin-bottom:18px}
+.modal-acts{display:flex;gap:7px;margin-top:14px}
+.modal-input{width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:7px;padding:9px 12px;color:var(--text);font-family:var(--fm);font-size:13px;outline:none}
+.modal-input:focus{border-color:var(--green)}
+
+/* ── AI CHAT FAB ── */
+.ai-fab{position:fixed;bottom:72px;right:20px;width:52px;height:52px;border-radius:50%;background:linear-gradient(135deg,var(--green),var(--cyan));border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:22px;box-shadow:0 4px 20px #00e8a040;z-index:900;transition:all .2s}
+.ai-fab:hover{transform:scale(1.1);box-shadow:0 6px 28px #00e8a060}
+.ai-panel{position:fixed;bottom:140px;right:20px;width:360px;max-width:calc(100vw - 40px);background:var(--bg2);border:1px solid var(--border2);border-radius:var(--rl);z-index:900;display:none;flex-direction:column;box-shadow:0 8px 40px #00000070;max-height:60vh}
+.ai-panel.open{display:flex}
+.ai-panel-hdr{padding:14px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px;flex-shrink:0}
+.ai-panel-hdr-title{font-family:var(--fd);font-size:14px;font-weight:700;flex:1}
+.ai-panel-msgs{flex:1;overflow-y:auto;padding:12px;display:flex;flex-direction:column;gap:10px}
+.ai-msg{max-width:88%;font-size:12px;line-height:1.6;padding:9px 12px;border-radius:10px}
+.ai-msg.user{background:var(--green-dim);border:1px solid var(--green);color:var(--text);align-self:flex-end;border-radius:10px 10px 2px 10px}
+.ai-msg.bot{background:var(--bg3);border:1px solid var(--border2);color:var(--text);align-self:flex-start;border-radius:10px 10px 10px 2px}
+.ai-panel-input{display:flex;gap:7px;padding:10px;border-top:1px solid var(--border);flex-shrink:0}
+.ai-panel-input input{flex:1;background:var(--bg3);border:1px solid var(--border);border-radius:7px;padding:8px 11px;color:var(--text);font-size:12px;outline:none}
+.ai-panel-input input:focus{border-color:var(--green)}
+
+/* ── MOBILE BOTTOM NAV ── */
+.mob-nav{display:none;position:fixed;bottom:0;left:0;right:0;background:var(--bg1);border-top:1px solid var(--border);height:56px;z-index:800;padding:0 8px}
+.mob-nav-inner{display:flex;height:100%;align-items:center;justify-content:space-around}
+.mob-nav-item{display:flex;flex-direction:column;align-items:center;gap:2px;cursor:pointer;color:var(--text3);padding:4px 10px;border-radius:7px;transition:all .18s;min-width:52px}
+.mob-nav-item.active{color:var(--green)}
+.mob-nav-item .mn-icon{font-size:18px}
+.mob-nav-item .mn-label{font-size:9px;font-weight:600;letter-spacing:.04em}
+
+@media(max-width:768px){
+  .sidebar{display:none}
+  .mob-nav{display:flex}
+  .content{padding-bottom:56px}
+  .panel{padding:14px}
+  .topbar{padding:0 12px}
+  .vac-tier-grid,.dream-grid{grid-template-columns:1fr 1fr}
+  .two-col,.three-col{grid-template-columns:1fr}
+  .apex-mods{grid-template-columns:1fr 1fr}
+  #vacMap,#retMap{height:220px}
+  .ai-panel{bottom:70px;right:8px;width:calc(100vw - 16px)}
+  .ai-fab{bottom:68px;right:8px}
+  .kpi-row{grid-template-columns:1fr 1fr}
+}
+</style>
+</head>
+<body class="dark" id="body">
+
+<!-- ── MODALS ── -->
+<div class="modal-ov" id="keyModal">
+  <div class="modal-box">
+    <div class="modal-title">⚡ Claude API Key</div>
+    <div class="modal-sub">Powers all AI features — vacation ideas, retirement analysis, APEX feasibility. Stored in localStorage only, never sent anywhere else.</div>
+    <input class="modal-input mono" id="keyInput" type="password" placeholder="sk-ant-api03-...">
+    <div id="keyStatus" style="font-size:11px;margin-top:6px;font-family:var(--fm);color:var(--text3)"></div>
+    <div class="modal-acts">
+      <button class="btn btn-g" onclick="saveKey()">Save Key</button>
+      <button class="btn btn-o" onclick="closeModal('keyModal')">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-ov" id="tripModal">
+  <div class="modal-box">
+    <div class="modal-title">✈ Trip Budget Builder</div>
+    <div class="modal-sub">Plan a specific trip and see exactly what it does to your fun fund.</div>
+    <div class="field"><label>Destination</label><input id="tb-dest" placeholder="e.g. Cape Town, South Africa"></div>
+    <div class="two-col">
+      <div class="field"><label>When (Month/Year)</label><input id="tb-when" placeholder="e.g. Dec 2025"></div>
+      <div class="field"><label>Duration (nights)</label><input type="number" id="tb-nights" value="10" class="mono"></div>
+    </div>
+    <div class="field"><label>Total Budget (SEK)</label><input type="number" id="tb-budget" class="mono" placeholder="60000" oninput="updateTripCalc()"></div>
+    <div id="tb-calc" style="margin-top:10px;background:var(--bg3);border-radius:8px;padding:12px;font-size:12px;line-height:1.7;font-family:var(--fm);color:var(--text2)">Enter a budget above to see your affordability timeline.</div>
+    <div class="modal-acts">
+      <button class="btn btn-g" onclick="saveTrip()">Save Trip</button>
+      <button class="btn btn-o btn-sm" onclick="aiTripBreakdown()">✦ AI Breakdown</button>
+      <button class="btn btn-o" onclick="closeModal('tripModal')">Cancel</button>
+    </div>
+    <div id="tb-ai" style="margin-top:12px"></div>
+  </div>
+</div>
+
+<div class="modal-ov" id="netWorthModal">
+  <div class="modal-box">
+    <div class="modal-title">◈ Net Worth</div>
+    <div class="modal-sub">Assets minus liabilities = true wealth position.</div>
+    <div class="field"><label>Property Value (SEK)</label><input type="number" id="nw-property" class="mono" oninput="updateNWCalc()"></div>
+    <div class="field"><label>Mortgage Outstanding (SEK)</label><input type="number" id="nw-mortgage" class="mono" oninput="updateNWCalc()"></div>
+    <div class="field"><label>Other Debt (SEK)</label><input type="number" id="nw-debt" class="mono" oninput="updateNWCalc()"></div>
+    <div id="nw-calc" style="margin-top:10px;background:var(--bg3);border-radius:8px;padding:12px"></div>
+    <div class="modal-acts">
+      <button class="btn btn-g" onclick="saveNetWorth()">Save</button>
+      <button class="btn btn-o" onclick="closeModal('netWorthModal')">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── APP ── -->
+<div class="app">
+  <div class="ticker-bar">
+    <div class="ticker-track" id="tickerTrack"></div>
+    <div class="ticker-sync" id="tickerSync">●LIVE</div>
+  </div>
+  <div class="topbar">
+    <div class="logo">
+      <div class="logo-mark">H</div>
+      <span style="color:var(--text)">HORIZON</span>&nbsp;<span style="color:var(--green)">OS</span>&nbsp;<span style="font-size:10px;color:var(--text3);font-weight:400;font-family:var(--fm)">v2</span>
+    </div>
+    <div class="topbar-right">
+      <span class="sync-badge" id="syncBadge">LOCAL</span>
+      <span class="key-badge" id="keyBadge" onclick="openModal('keyModal')">⚡ API KEY</span>
+      <button class="iBtn" onclick="exportData()" title="Export backup">⬇</button>
+      <input type="file" id="importFile" style="display:none" accept=".json" onchange="importData(this)">
+      <button class="iBtn" onclick="document.getElementById('importFile').click()" title="Import backup">⬆</button>
+      <button class="iBtn" id="themeBtn" onclick="toggleTheme()">🌙</button>
+    </div>
+  </div>
+
+  <div class="main-row">
+    <div class="sidebar">
+      <div class="sb-section">FINANCIAL CORE</div>
+      <div class="nav-item active" id="nav-dashboard" onclick="showPanel('dashboard')"><span class="nav-icon">◈</span>Dashboard</div>
+      <div class="nav-item" id="nav-cashflow" onclick="showPanel('cashflow')"><span class="nav-icon">⇄</span>Cash Flow</div>
+      <div class="nav-item" id="nav-networth" onclick="showPanel('networth')"><span class="nav-icon">◆</span>Net Worth</div>
+      <div class="nav-item" id="nav-assets" onclick="showPanel('assets')"><span class="nav-icon">📈</span>Assets & Nest Egg</div>
+      <div class="sb-sep"></div>
+      <div class="sb-section">LIFESTYLE PLANNING</div>
+      <div class="nav-item" id="nav-vacation" onclick="showPanel('vacation')"><span class="nav-icon">✈</span>Fun Fund Planner</div>
+      <div class="nav-item" id="nav-retirement" onclick="showPanel('retirement')"><span class="nav-icon">🌅</span>Retire Anywhere</div>
+      <div class="sb-sep"></div>
+      <div class="sb-section">SYSTEM</div>
+      <div class="nav-item" id="nav-settings" onclick="showPanel('settings')"><span class="nav-icon">⚙</span>Settings</div>
+      <div class="sb-bot">
+        <div class="sb-mini">
+          <div class="sb-mini-label">MONTHLY SURPLUS</div>
+          <div class="sb-mini-val" id="sbSurplus">—</div>
+          <div class="sb-mini-sub" id="sbFunFund">Fun Fund: —</div>
+          <div class="sb-mini-sub" id="sbSyncTime" style="color:var(--text3)"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="content">
+
+      <!-- ════════════════ DASHBOARD ════════════════ -->
+      <div class="panel active" id="panel-dashboard">
+        <div class="ph">
+          <div class="ph-tag">FINANCIAL OVERVIEW</div>
+          <div class="ph-title">Your Money at a Glance</div>
+          <div class="ph-sub">Live position · <span id="dash-month-label" style="color:var(--amber)"></span></div>
+        </div>
+        <div class="kpi-row" id="dashKpis"></div>
+        <div class="two-col">
+          <div class="card">
+            <div class="card-title">⇄ Cash Flow
+              <div class="card-actions">
+                <div class="itabs" style="margin:0">
+                  <button class="itab active" onclick="setCFView('summary',this)">Summary</button>
+                  <button class="itab" onclick="setCFView('12mo',this)">12-Month</button>
+                </div>
+              </div>
+            </div>
+            <div id="dashCF"></div>
+          </div>
+          <div class="card">
+            <div class="card-title">📊 Savings Trend</div>
+            <canvas id="dashChart" height="185"></canvas>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-title">◈ Nest Egg Milestones
+            <div class="card-actions">
+              <label class="toggle" style="margin-left:8px" title="Real (inflation-adjusted) values">
+                <input type="checkbox" id="nestRealToggle" onchange="state.nestEggReal=this.checked;save();renderDashboard()">
+                <div class="toggle-track"></div>
+              </label>
+              <span style="font-size:11px;color:var(--text3);margin-left:4px">Real</span>
+            </div>
+          </div>
+          <div id="dashNestEgg"></div>
+        </div>
+      </div>
+
+      <!-- ════════════════ CASH FLOW ════════════════ -->
+      <div class="panel" id="panel-cashflow">
+        <div class="ph">
+          <div class="ph-tag">MONTHLY BUDGET</div>
+          <div class="ph-title">Income &amp; Expenses</div>
+          <div class="ph-sub">Edit baseline or override any specific month.</div>
+        </div>
+        <div class="month-strip" id="monthStrip"></div>
+        <div id="cfMonthBadge" style="margin-bottom:14px"></div>
+        <div class="two-col">
+          <div class="card">
+            <div class="card-title">💰 Income <div class="card-actions"><button class="btn btn-o btn-xs" onclick="addLine('income')">+ Add</button></div></div>
+            <div id="incomeLines"></div>
+          </div>
+          <div class="card">
+            <div class="card-title">📤 Expenses <div class="card-actions"><button class="btn btn-o btn-xs" onclick="addLine('expense')">+ Add</button></div></div>
+            <div id="expenseLines"></div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-title">🏦 Savings Allocation</div>
+          <div class="two-col">
+            <div class="field"><label>Monthly Savings (SEK)</label><input type="number" class="mono" id="baseSavingsInput" oninput="updateSavings(+this.value)"></div>
+            <div class="field"><label>Fun Fund (auto-calculated)</label><input type="text" class="mono" id="funFundDisplay" readonly style="opacity:.7"></div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-title">📋 12-Month Expense Breakdown</div>
+          <div style="overflow-x:auto"><table id="exp12table" style="width:100%;border-collapse:collapse;font-size:11px;font-family:var(--fm)"></table></div>
+        </div>
+      </div>
+
+      <!-- ════════════════ NET WORTH ════════════════ -->
+      <div class="panel" id="panel-networth">
+        <div class="ph">
+          <div class="ph-tag">WEALTH POSITION</div>
+          <div class="ph-title">Net Worth</div>
+          <div class="ph-sub">Total assets minus all liabilities — your true wealth number.</div>
+        </div>
+        <div class="kpi-row" id="nwKpis"></div>
+        <div class="two-col">
+          <div class="card">
+            <div class="card-title">◆ Assets <div class="card-actions"><button class="btn btn-o btn-xs" onclick="openModal('netWorthModal')">Edit Property/Debt</button></div></div>
+            <div id="nwAssets"></div>
+          </div>
+          <div class="card">
+            <div class="card-title">📉 Liabilities</div>
+            <div id="nwLiabilities"></div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-title">📈 Net Worth Projection</div>
+          <canvas id="nwChart" height="200"></canvas>
+        </div>
+      </div>
+
+      <!-- ════════════════ ASSETS ════════════════ -->
+      <div class="panel" id="panel-assets">
+        <div class="ph">
+          <div class="ph-tag">INVESTMENT PORTFOLIO</div>
+          <div class="ph-title">Assets &amp; Nest Egg</div>
+          <div class="ph-sub">All investment vehicles projected to retirement at age <span id="retAgeInline">65</span>.</div>
+        </div>
+        <div class="kpi-row" id="assetKpis"></div>
+        <div class="card">
+          <div class="card-title">◆ Investment Assets <div class="card-actions"><button class="btn btn-o btn-xs" onclick="addAsset()">+ Add</button></div></div>
+          <div id="assetLines"></div>
+        </div>
+        <div class="card">
+          <div class="card-title">📈 Nest Egg Growth to Retirement
+            <div class="card-actions">
+              <label class="toggle" title="Inflation-adjusted">
+                <input type="checkbox" id="assetRealToggle" onchange="state.nestEggReal=this.checked;save();renderAssets()">
+                <div class="toggle-track"></div>
+              </label>
+              <span style="font-size:11px;color:var(--text3);margin-left:4px">Real</span>
+            </div>
+          </div>
+          <canvas id="nestChart" height="200"></canvas>
+        </div>
+      </div>
+
+      <!-- ════════════════ VACATION ════════════════ -->
+      <div class="panel" id="panel-vacation">
+        <div class="ph">
+          <div class="ph-tag">LIFESTYLE · FUN FUND</div>
+          <div class="ph-title">Vacation Planner</div>
+          <div class="ph-sub">Project your discretionary fund forward and plan your next trip.</div>
+        </div>
+        <div class="kpi-row" id="vacKpis"></div>
+        <div class="two-col">
+          <div class="card">
+            <div class="card-title">✦ What Can You Afford?</div>
+            <div class="vac-tier-grid" id="vacTiers"></div>
+            <div style="display:flex;align-items:center;gap:10px;margin-top:4px">
+              <span style="font-size:12px;color:var(--text3);font-family:var(--fm)">Months to save:</span>
+              <input type="range" id="vacMonths" min="1" max="24" value="6" oninput="updateVacTiers()" style="flex:1;accent-color:var(--green)">
+              <span id="vacMonthsVal" style="font-family:var(--fm);font-size:12px;color:var(--green);min-width:30px"></span>
+            </div>
+            <div id="vacBudgetLine" style="font-size:12px;color:var(--text2);margin-top:6px;font-family:var(--fm)"></div>
+          </div>
+          <div class="card">
+            <div class="card-title">🎯 When Can I Afford It?
+              <div class="card-actions"><button class="btn btn-g btn-xs" onclick="openModal('tripModal')">Plan a Trip</button></div>
+            </div>
+            <div class="field"><label>Target trip budget (SEK)</label><input type="number" class="mono" id="targetBudget" placeholder="60000" oninput="updateAffordCalc()"></div>
+            <div id="affordCalc"></div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-title">📅 Fun Fund Accumulation Timeline</div>
+          <div class="fund-tl" id="fundTimeline"></div>
+        </div>
+        <div class="card">
+          <div class="card-title">💼 Saved Trips</div>
+          <div id="savedTrips"><div style="color:var(--text3);font-size:13px">No trips planned yet. Use "Plan a Trip" to get started.</div></div>
+        </div>
+        <div class="card">
+          <div class="card-title">🌍 Destination Pulse
+            <div class="card-actions">
+              <select id="vacVibe" onchange="renderPulseGrid()" style="background:var(--bg3);border:1px solid var(--border);border-radius:6px;padding:4px 8px;color:var(--text);font-size:11px;outline:none">
+                <option>Any Vibe</option><option>Beach & Relaxation</option><option>City & Culture</option>
+                <option>Adventure & Nature</option><option>Food & Wine</option><option>Safari & Wildlife</option>
+                <option>Luxury Escape</option>
+              </select>
+              <select id="vacSeason" style="background:var(--bg3);border:1px solid var(--border);border-radius:6px;padding:4px 8px;color:var(--text);font-size:11px;outline:none">
+                <option>Any Season</option><option>Summer (Jun–Aug)</option><option>Winter (Dec–Feb)</option>
+                <option>Spring (Mar–May)</option><option>Autumn (Sep–Nov)</option>
+              </select>
+              <button class="btn btn-g btn-xs" onclick="runVacAI()">✦ AI Ideas</button>
+            </div>
+          </div>
+          <div class="pulse-grid" id="pulseGrid"></div>
+          <div id="vacAIBox"></div>
+        </div>
+        <div class="card">
+          <div class="card-title">🗺 Destination Map</div>
+          <div id="vacMap"></div>
+        </div>
+      </div>
+
+      <!-- ════════════════ RETIREMENT ════════════════ -->
+      <div class="panel" id="panel-retirement">
+        <div class="ph">
+          <div class="ph-tag">LIFESTYLE · RETIREMENT</div>
+          <div class="ph-title">Retire Anywhere</div>
+          <div class="ph-sub">Your dream retirement, wherever in the world that may be.</div>
+        </div>
+        <div class="kpi-row" id="retKpis"></div>
+
+        <!-- Scenario compare -->
+        <div class="card">
+          <div class="card-title">🔀 Retirement Scenarios — What-If</div>
+          <div class="scenario-grid" id="scenarioGrid"></div>
+        </div>
+
+        <!-- Pension integration -->
+        <div class="card">
+          <div class="card-title">🏛 Swedish Pension Integration</div>
+          <div class="three-col">
+            <div class="field"><label>Allmänpension est. (SEK/mo at 65)</label><input type="number" class="mono" id="penAllman" oninput="state.penAllman=+this.value;save();renderRetirement()" placeholder="12000"></div>
+            <div class="field"><label>ITP/Tjänstepension est. (SEK/mo)</label><input type="number" class="mono" id="penITP" oninput="state.penITP=+this.value;save();renderRetirement()" placeholder="18000"></div>
+            <div class="field"><label>Other pension/annuity (SEK/mo)</label><input type="number" class="mono" id="penOther" oninput="state.penOther=+this.value;save();renderRetirement()" placeholder="0"></div>
+          </div>
+          <div id="penSummary"></div>
+        </div>
+
+        <!-- Dream picker -->
+        <div class="card">
+          <div class="card-title">💭 Your Dream Retirement</div>
+          <div class="dream-grid" id="dreamGrid"></div>
+          <div class="field" style="margin-top:10px"><label>Describe it in your own words</label>
+            <textarea id="retDreamText" placeholder="e.g. Warm coastal, great healthcare, expat community, affordable luxury..."></textarea>
+          </div>
+          <div class="field"><label>Custom destination to analyse (or leave blank for AI suggestions)</label>
+            <input id="customDest" placeholder="e.g. Mombasa, Kenya or Medellín, Colombia">
+          </div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:6px">
+            <button class="btn btn-g" onclick="runRetirementAI()">✦ Find My Destinations</button>
+            <button class="btn btn-apex btn-sm" onclick="runAPEX()">⚡ APEX CHECK</button>
+          </div>
+        </div>
+
+        <div id="retAIBox"></div>
+
+        <!-- Destination picker -->
+        <div class="card" id="retDestPicker" style="display:none">
+          <div class="card-title">📍 Select Destination for APEX Analysis</div>
+          <div class="dest-cards" id="destCards"></div>
+        </div>
+
+        <!-- Retirement expense model -->
+        <div class="card">
+          <div class="card-title">🧮 Retirement Expense Model</div>
+          <div class="field" style="max-width:200px"><label>Target destination cost level</label>
+            <select id="retCostLevel" onchange="updateRetExpenses()">
+              <option value="low">Low Cost (SEK 12K/mo)</option>
+              <option value="mid" selected>Mid Range (SEK 20K/mo)</option>
+              <option value="high">High Standard (SEK 35K/mo)</option>
+              <option value="luxury">Luxury (SEK 55K/mo)</option>
+            </select>
+          </div>
+          <div id="retExpModel"></div>
+        </div>
+
+        <!-- Map -->
+        <div class="card">
+          <div class="card-title">🗺 Retirement World Map</div>
+          <div id="retMap"></div>
+        </div>
+
+        <!-- APEX Terminal -->
+        <div class="apex-shell" id="apexShell" style="display:none">
+          <div class="apex-hdr">
+            <div class="apex-logo">APEX <span>RETIREMENT FEASIBILITY TERMINAL v2</span></div>
+            <div class="apex-status" id="apexStatus">STANDBY</div>
+          </div>
+          <div class="apex-body">
+            <div class="apex-mods" id="apexMods"></div>
+            <div id="apexVerdict"></div>
+            <div class="apex-out" id="apexOut"></div>
+            <!-- Migration Timeline -->
+            <div id="migTimeline"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ════════════════ SETTINGS ════════════════ -->
+      <div class="panel" id="panel-settings">
+        <div class="ph">
+          <div class="ph-tag">CONFIGURATION</div>
+          <div class="ph-title">Settings</div>
+        </div>
+        <div class="two-col">
+          <div class="card">
+            <div class="card-title">👤 Profile</div>
+            <div class="setting-row"><div><div class="s-lbl">Current Age</div></div><div class="s-ctrl"><input type="number" id="setAge" oninput="state.currentAge=+this.value;save();renderAll()"></div></div>
+            <div class="setting-row"><div><div class="s-lbl">Retirement Age</div></div><div class="s-ctrl"><input type="number" id="setRetAge" oninput="state.retirementAge=+this.value;save();renderAll()"></div></div>
+            <div class="setting-row"><div><div class="s-lbl">Life Expectancy</div></div><div class="s-ctrl"><input type="number" id="setLifeExp" oninput="state.lifeExp=+this.value;save();renderAll()"></div></div>
+            <div class="setting-row"><div><div class="s-lbl">Portfolio Growth (%)</div></div><div class="s-ctrl"><input type="number" id="setGrowth" step=".5" oninput="state.growthRate=+this.value;save();renderAll()"></div></div>
+            <div class="setting-row"><div><div class="s-lbl">Inflation Rate (%)</div></div><div class="s-ctrl"><input type="number" id="setInflation" step=".5" oninput="state.inflationRate=+this.value;save();renderAll()"></div></div>
+            <div class="setting-row"><div><div class="s-lbl">Post-Retirement Growth (%)</div></div><div class="s-ctrl"><input type="number" id="setPostGrowth" step=".5" oninput="state.postRetGrowth=+this.value;save();renderAll()"></div></div>
+            <div class="setting-row"><div><div class="s-lbl">Withdrawal Tax Rate (%)</div></div><div class="s-ctrl"><input type="number" id="setTaxRate" oninput="state.withdrawTaxRate=+this.value;save();renderAll()"></div></div>
+          </div>
+          <div class="card">
+            <div class="card-title">🖥 Display</div>
+            <div class="setting-row"><div><div class="s-lbl">Currency</div></div><div class="s-ctrl"><select id="setCurrency" onchange="state.currency=this.value;save();renderAll()"><option value="SEK">SEK kr</option><option value="USD">USD $</option><option value="EUR">EUR €</option><option value="KES">KES KSh</option></select></div></div>
+            <div class="setting-row"><div><div class="s-lbl">Dark Mode</div></div><div class="s-ctrl"><label class="toggle"><input type="checkbox" id="setDark" onchange="state.darkMode=this.checked;applyTheme();save()"><div class="toggle-track"></div></label></div></div>
+            <div class="setting-row"><div><div class="s-lbl">Ticker Quote</div></div><div class="s-ctrl"><input id="setQuote" style="width:200px;text-align:left" oninput="state.tickerQuote=this.value;save();renderTicker()"></div></div>
+            <div class="card-title" style="margin-top:16px">💱 Exchange Rates (base SEK 1)</div>
+            <div class="three-col">
+              <div class="field"><label>USD</label><input type="number" id="rateUSD" step=".001" class="mono" oninput="state.exchangeRates.USD=+this.value;save();renderAll()"></div>
+              <div class="field"><label>EUR</label><input type="number" id="rateEUR" step=".001" class="mono" oninput="state.exchangeRates.EUR=+this.value;save();renderAll()"></div>
+              <div class="field"><label>KES</label><input type="number" id="rateKES" step=".01" class="mono" oninput="state.exchangeRates.KES=+this.value;save();renderAll()"></div>
+            </div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-title">☁ Cloud Sync (Firebase)</div>
+          <div class="three-col">
+            <div class="field"><label>Firebase DB URL</label><input id="fbUrl" placeholder="https://xxx-default-rtdb.europe-west1.firebasedatabase.app"></div>
+            <div class="field"><label>Firebase API Key</label><input type="password" id="fbKey" placeholder="AIza..."></div>
+            <div class="field"><label>User Email / ID</label><input id="fbUser" placeholder="your@email.com"></div>
+          </div>
+          <div style="display:flex;gap:8px;margin-top:4px">
+            <button class="btn btn-g btn-sm" onclick="connectFirebase()">Connect Firebase</button>
+            <div id="fbStatus" style="font-size:12px;color:var(--text3);display:flex;align-items:center;gap:6px;font-family:var(--fm)"></div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-title">💾 Data Management</div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap">
+            <button class="btn btn-o btn-sm" onclick="exportData()">⬇ Export JSON Backup</button>
+            <button class="btn btn-o btn-sm" onclick="document.getElementById('importFile').click()">⬆ Import Backup</button>
+            <button class="btn-danger" onclick="if(confirm('Reset all data?')){localStorage.removeItem(STORAGE_KEY);location.reload()}">⚠ Reset All Data</button>
+          </div>
+        </div>
+      </div>
+
+    </div><!-- /content -->
+  </div><!-- /main-row -->
+</div><!-- /app -->
+
+<!-- MOBILE NAV -->
+<div class="mob-nav">
+  <div class="mob-nav-inner">
+    <div class="mob-nav-item active" id="mn-dashboard" onclick="showPanel('dashboard')"><div class="mn-icon">◈</div><div class="mn-label">HOME</div></div>
+    <div class="mob-nav-item" id="mn-cashflow" onclick="showPanel('cashflow')"><div class="mn-icon">⇄</div><div class="mn-label">BUDGET</div></div>
+    <div class="mob-nav-item" id="mn-vacation" onclick="showPanel('vacation')"><div class="mn-icon">✈</div><div class="mn-label">TRIPS</div></div>
+    <div class="mob-nav-item" id="mn-retirement" onclick="showPanel('retirement')"><div class="mn-icon">🌅</div><div class="mn-label">RETIRE</div></div>
+    <div class="mob-nav-item" id="mn-settings" onclick="showPanel('settings')"><div class="mn-icon">⚙</div><div class="mn-label">SETTINGS</div></div>
+  </div>
+</div>
+
+<!-- AI FLOATING CHAT -->
+<button class="ai-fab" id="aiFab" onclick="toggleAIPanel()" title="Ask AI anything about your finances">✦</button>
+<div class="ai-panel" id="aiPanel">
+  <div class="ai-panel-hdr">
+    <div class="ai-dot"></div>
+    <div class="ai-panel-hdr-title">HORIZON AI Assistant</div>
+    <button class="iBtn" style="width:28px;height:28px;font-size:12px" onclick="toggleAIPanel()">✕</button>
+  </div>
+  <div class="ai-panel-msgs" id="aiMsgs">
+    <div class="ai-msg bot">Hi! I'm your HORIZON AI. Ask me anything about your finances, vacation planning, or retirement strategy. I have full context of your financial data.</div>
+  </div>
+  <div class="ai-panel-input">
+    <input id="aiChatInput" placeholder="Ask about your finances..." onkeydown="if(event.key==='Enter')sendAIChat()">
+    <button class="btn btn-g btn-xs" onclick="sendAIChat()">→</button>
+  </div>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════════════════════════
+// CONSTANTS & STATE
+// ═══════════════════════════════════════════════════════════════════
+const STORAGE_KEY='horizon-os-v2';
+const MN=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+const CSYM={SEK:'kr',USD:'$',EUR:'€',KES:'KSh'};
+const PULSE_DESTS=[
+  {dest:'Nairobi + Safari',flag:'🇰🇪',why:'East Africa peak season',cost:'SEK 25–45K',lat:-1.29,lng:36.82,vibe:'Safari & Wildlife',col:'#00e8a0'},
+  {dest:'Cape Town',flag:'🇿🇦',why:'World-class and affordable',cost:'SEK 20–40K',lat:-33.93,lng:18.42,vibe:'City & Culture',col:'#4d8fff'},
+  {dest:'Lisbon',flag:'🇵🇹',why:'Best value in Western Europe',cost:'SEK 15–28K',lat:38.72,lng:-9.14,vibe:'City & Culture',col:'#00d4ff'},
+  {dest:'Bali',flag:'🇮🇩',why:'Luxury on a budget',cost:'SEK 18–35K',lat:-8.34,lng:115.09,vibe:'Beach & Relaxation',col:'#f5a623'},
+  {dest:'Istanbul',flag:'🇹🇷',why:'Culture, food, incredible value',cost:'SEK 12–22K',lat:41.01,lng:28.98,vibe:'Food & Wine',col:'#8b5cf6'},
+  {dest:'Maldives',flag:'🇲🇻',why:'Ultimate couples luxury',cost:'SEK 60–120K',lat:3.2,lng:73.22,vibe:'Luxury Escape',col:'#ec4899'},
+  {dest:'Paris',flag:'🇫🇷',why:'Romance & culture',cost:'SEK 25–50K',lat:48.85,lng:2.35,vibe:'City & Culture',col:'#ff4d6d'},
+  {dest:'Chicago',flag:'🇺🇸',why:'City break, great food scene',cost:'SEK 30–55K',lat:41.88,lng:-87.63,vibe:'City & Culture',col:'#00e8a0'},
+];
+const RET_DESTS=[
+  {flag:'🇵🇹',name:'Lisbon',country:'Portugal',costK:18,lat:38.72,lng:-9.14,tags:['dt-warm','dt-safe','dt-visa','dt-ret'],tl:['Warm','Safe','EU Visa','NHR Tax']},
+  {flag:'🇲🇹',name:'Malta',country:'Malta',costK:20,lat:35.9,lng:14.5,tags:['dt-warm','dt-safe','dt-visa'],tl:['Warm','Safe','EU Visa']},
+  {flag:'🇲🇽',name:'Mexico City',country:'Mexico',costK:14,lat:19.43,lng:-99.13,tags:['dt-warm','dt-ret'],tl:['Warm','Retire Visa']},
+  {flag:'🇹🇭',name:'Chiang Mai',country:'Thailand',costK:10,lat:18.79,lng:98.99,tags:['dt-warm','dt-ret'],tl:['Warm','LTR Visa']},
+  {flag:'🇰🇪',name:'Nairobi',country:'Kenya',costK:12,lat:-1.29,lng:36.82,tags:['dt-warm','dt-ret'],tl:['Warm','Expat Hub']},
+  {flag:'🇪🇸',name:'Valencia',country:'Spain',costK:16,lat:39.47,lng:-0.38,tags:['dt-warm','dt-safe','dt-visa'],tl:['Warm','Safe','EU Visa']},
+  {flag:'🇺🇾',name:'Montevideo',country:'Uruguay',costK:15,lat:-34.9,lng:-56.19,tags:['dt-safe','dt-ret'],tl:['Safe','Retire Visa']},
+  {flag:'🇬🇷',name:'Athens',country:'Greece',costK:15,lat:37.98,lng:23.73,tags:['dt-warm','dt-safe','dt-visa'],tl:['Warm','Safe','EU Visa']},
+  {flag:'🇲🇦',name:'Marrakech',country:'Morocco',costK:9,lat:31.63,lng:-8.0,tags:['dt-warm','dt-ret'],tl:['Warm','Affordable']},
+];
+const DREAM_TYPES=[
+  {id:'coastal',icon:'🏖',name:'Coastal'},
+  {id:'city',icon:'🏙',name:'City Life'},
+  {id:'nature',icon:'🌿',name:'Nature'},
+  {id:'warm',icon:'☀️',name:'Warm Climate'},
+  {id:'culture',icon:'🎭',name:'Arts & Culture'},
+  {id:'family',icon:'👨‍👩‍👧',name:'Family Hub'},
+  {id:'luxury',icon:'🥂',name:'Luxury'},
+  {id:'adventure',icon:'🧗',name:'Adventure'},
+  {id:'peaceful',icon:'🕊',name:'Peaceful'},
+];
+const RET_EXP_MODELS={
+  low:{housing:5000,food:2500,health:1500,transport:800,leisure:1200,misc:1000},
+  mid:{housing:9000,food:4000,health:2500,transport:1500,leisure:2500,misc:1500},
+  high:{housing:16000,food:6000,health:4000,transport:2500,leisure:5000,misc:2500},
+  luxury:{housing:25000,food:9000,health:6000,transport:4000,leisure:10000,misc:5000},
+};
+
+let state={};
+let charts={};
+let vacMap=null,retMap=null;
+let selectedDreams=[];
+let selectedRetDest=null;
+let apiKey=localStorage.getItem('horizon-key')||'';
+let cfView='summary';
+let chatHistory=[];
+let fbDb=null,fbRef=null,fbReady=false;
+let saveTimeout=null;
+
+const DEFAULT_STATE={
+  currency:'SEK',darkMode:true,
+  currentAge:44,retirementAge:69,lifeExp:90,
+  growthRate:7,inflationRate:2,postRetGrowth:4,withdrawTaxRate:20,
+  nestEggReal:false,
+  tickerQuote:'Come rain or shine, I will retire under the sun.',
+  exchangeRates:{SEK:1,USD:0.11,EUR:0.09,KES:14.27},
+  penAllman:0,penITP:0,penOther:0,
+  income:[
+    {id:'i1',name:'Young',amount:98000,paid:false},
+    {id:'i2',name:'Guliz',amount:31000,paid:false}
+  ],
+  expenses:[
+    {id:'e1',name:'Mortgage',amount:27000,paid:false},
+    {id:'e2',name:'Groceries',amount:7000,paid:false},
+    {id:'e3',name:'Avgift',amount:7250,paid:false},
+    {id:'e4',name:'Cleaning',amount:2000,paid:false},
+    {id:'e5',name:'Insurance',amount:1380,paid:false},
+    {id:'e6',name:'AKASSA',amount:900,paid:false},
+    {id:'e7',name:'Madre',amount:9500,paid:false},
+    {id:'e8',name:'Guliz Bills',amount:4415,paid:false},
+    {id:'e9',name:'Guliz Allowance',amount:10000,paid:false},
+    {id:'e10',name:'Young Bills',amount:2000,paid:false},
+    {id:'e11',name:'Young Allowance',amount:10000,paid:false},
+    {id:'e12',name:'Chase',amount:55000,paid:false}
+  ],
+  baseSavings:27000,
+  monthlyOverrides:{},
+  externalAssets:[
+    {id:'a1',name:'ITP1',balance:1400000,growthRate:4,monthlyContribution:32000},
+    {id:'a2',name:'Vanguard',balance:1400000,growthRate:7,monthlyContribution:0},
+    {id:'a3',name:'Royal London',balance:700000,growthRate:7,monthlyContribution:0}
+  ],
+  netWorth:{property:0,mortgage:0,otherDebt:0},
+  savedTrips:[],
+  selectedMonth: `${new Date().getFullYear()}-${String(new Date().getMonth()+1).padStart(2,'0')}`,
+};
+
+// ═══════════════════════════════════════════════════════════════════
+// STATE & STORAGE
+// ═══════════════════════════════════════════════════════════════════
+function loadState(){
+  try{
+    const s=localStorage.getItem(STORAGE_KEY);
+    state=s?Object.assign({},DEFAULT_STATE,JSON.parse(s)):{...DEFAULT_STATE};
+  }catch(e){state={...DEFAULT_STATE}}
+}
+function save(){
+  clearTimeout(saveTimeout);
+  saveTimeout=setTimeout(()=>{
+    localStorage.setItem(STORAGE_KEY,JSON.stringify(state));
+    if(fbRef){
+      fbRef.set(state).then(()=>{
+        setSyncBadge('synced','☁ SYNCED');
+        document.getElementById('sbSyncTime').textContent='Synced '+new Date().toLocaleTimeString();
+      }).catch(()=>setSyncBadge('','LOCAL'));
+    }
+  },600);
+  setSyncBadge('saving','● SAVING');
+}
+function setSyncBadge(cls,txt){
+  const b=document.getElementById('syncBadge');
+  b.className='sync-badge'+( cls?' '+cls:'');
+  b.textContent=txt;
+}
+function exportData(){
+  const a=document.createElement('a');
+  a.href='data:application/json,'+encodeURIComponent(JSON.stringify(state,null,2));
+  a.download='horizon-os-backup-'+new Date().toISOString().slice(0,10)+'.json';
+  a.click();
+}
+function importData(input){
+  const f=input.files[0]; if(!f)return;
+  const r=new FileReader();
+  r.onload=e=>{try{Object.assign(state,JSON.parse(e.target.result));save();renderAll();alert('Import successful')}catch(ex){alert('Invalid file: '+ex.message)}};
+  r.readAsText(f);
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// FIREBASE
+// ═══════════════════════════════════════════════════════════════════
+function connectFirebase(){
+  const url=document.getElementById('fbUrl').value.trim();
+  const key=document.getElementById('fbKey').value.trim();
+  const user=document.getElementById('fbUser').value.trim();
+  if(!url||!key){document.getElementById('fbStatus').textContent='⚠ Enter DB URL and API key';return}
+  try{
+    const app=firebase.apps.length?firebase.app():firebase.initializeApp({apiKey:key,databaseURL:url,projectId:'horizon-os'});
+    fbDb=firebase.database(app);
+    fbRef=fbDb.ref('users/'+(user||'default')+'/state');
+    fbRef.once('value',snap=>{
+      if(snap.val()){Object.assign(state,snap.val());renderAll()}
+      fbRef.on('value',s=>{if(s.val())Object.assign(state,s.val())});
+      document.getElementById('fbStatus').innerHTML='<span style="color:var(--green)">✓ Connected</span>';
+      setSyncBadge('synced','☁ SYNCED');
+      fbReady=true;
+    }).catch(e=>{document.getElementById('fbStatus').innerHTML='<span style="color:var(--red)">✕ '+e.message+'</span>'});
+  }catch(e){document.getElementById('fbStatus').innerHTML='<span style="color:var(--red)">✕ '+e.message+'</span>'}
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// CALCS
+// ═══════════════════════════════════════════════════════════════════
+function getMonthData(key){
+  const ov=state.monthlyOverrides[key];
+  const inc=ov?.income||state.income;
+  const exp=ov?.expenses||state.expenses;
+  const sav=ov?.savings!==undefined?ov.savings:state.baseSavings;
+  const totInc=inc.reduce((s,i)=>s+i.amount,0);
+  const totExp=exp.reduce((s,i)=>s+i.amount,0);
+  return{income:inc,expenses:exp,savings:sav,totInc,totExp,disposable:totInc-totExp,funFund:Math.max(0,totInc-totExp-sav)};
+}
+function totalIncome(){return state.income.reduce((s,i)=>s+i.amount,0)}
+function totalExpenses(){return state.expenses.reduce((s,i)=>s+i.amount,0)}
+function disposable(){return totalIncome()-totalExpenses()}
+function funFund(){return Math.max(0,disposable()-state.baseSavings)}
+function futureValue(P,PMT,rate,years){
+  if(years<=0)return P;
+  const r=rate/100,n=12,nt=n*years,rn=r/n;
+  if(rn===0)return P+PMT*nt;
+  const cf=Math.pow(1+rn,nt);
+  return P*cf+PMT*((cf-1)/rn);
+}
+function nestEgg(ytr){
+  ytr=ytr!==undefined?ytr:state.retirementAge-state.currentAge;
+  let t=0;
+  t+=futureValue(0,state.baseSavings,state.growthRate,ytr);
+  (state.externalAssets||[]).forEach(a=>t+=futureValue(a.balance,a.monthlyContribution||0,a.growthRate||state.growthRate,ytr));
+  return t;
+}
+function realVal(nominal,years){return nominal/Math.pow(1+state.inflationRate/100,years)}
+function totalPension(){return(state.penAllman||0)+(state.penITP||0)+(state.penOther||0)}
+function monthlyDraw(ne_val){
+  const gross=(ne_val*0.04)/12;
+  return gross*(1-state.withdrawTaxRate/100);
+}
+function fmt(val,cur){
+  cur=cur||state.currency;
+  const rates={SEK:1,...state.exchangeRates};
+  const c=val*(rates[cur]||1);
+  const s=CSYM[cur]||'kr';
+  if(cur==='SEK')return`${Math.round(c).toLocaleString('sv-SE')} ${s}`;
+  if(cur==='KES')return`${s} ${Math.round(c).toLocaleString()}`;
+  return`${s}${Math.round(c).toLocaleString()}`;
+}
+function fmtC(v){
+  if(v>=1e6)return`${(v/1e6).toFixed(1)}M SEK`;
+  if(v>=1e3)return`${Math.round(v/1e3)}K SEK`;
+  return`${Math.round(v).toLocaleString()} SEK`;
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// THEME & KEY
+// ═══════════════════════════════════════════════════════════════════
+function applyTheme(){
+  document.getElementById('body').className=state.darkMode?'dark':'light';
+  document.getElementById('themeBtn').textContent=state.darkMode?'🌙':'☀️';
+  const cb=document.getElementById('setDark');if(cb)cb.checked=state.darkMode;
+}
+function toggleTheme(){state.darkMode=!state.darkMode;applyTheme();save()}
+function openModal(id){document.getElementById(id).classList.add('open')}
+function closeModal(id){document.getElementById(id).classList.remove('open')}
+document.querySelectorAll('.modal-ov').forEach(m=>m.addEventListener('click',e=>{if(e.target===m)m.classList.remove('open')}));
+function saveKey(){
+  apiKey=document.getElementById('keyInput').value.trim();
+  localStorage.setItem('horizon-key',apiKey);
+  const s=document.getElementById('keyStatus');
+  s.textContent=apiKey?'✓ Key saved':'Key cleared';
+  s.style.color=apiKey?'var(--green)':'var(--text3)';
+  updateKeyBadge();
+  closeModal('keyModal');
+}
+function updateKeyBadge(){
+  const b=document.getElementById('keyBadge');
+  if(apiKey){b.className='key-badge active';b.textContent='⚡ AI ACTIVE'}
+  else{b.className='key-badge';b.textContent='⚡ API KEY'}
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// NAV
+// ═══════════════════════════════════════════════════════════════════
+function showPanel(id){
+  document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.nav-item,.mob-nav-item').forEach(n=>n.classList.remove('active'));
+  document.getElementById('panel-'+id).classList.add('active');
+  const ni=document.getElementById('nav-'+id);if(ni)ni.classList.add('active');
+  const mi=document.getElementById('mn-'+id);if(mi)mi.classList.add('active');
+  if(id==='vacation')setTimeout(initVacMap,100);
+  if(id==='retirement')setTimeout(initRetMap,100);
+  renderPanelContent(id);
+}
+function renderPanelContent(id){
+  if(id==='dashboard')renderDashboard();
+  else if(id==='cashflow')renderCashflow();
+  else if(id==='networth')renderNetWorth();
+  else if(id==='assets')renderAssets();
+  else if(id==='vacation')renderVacation();
+  else if(id==='retirement')renderRetirement();
+  else if(id==='settings')renderSettings();
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// TICKER
+// ═══════════════════════════════════════════════════════════════════
+function renderTicker(){
+  const ne=nestEgg();
+  const ytr=state.retirementAge-state.currentAge;
+  const ff=funFund();
+  const draw=monthlyDraw(ne)+totalPension();
+  const items=[
+    {s:'FUND',v:fmtC(ff),c:'+/mo',up:true},
+    {s:'NEST EGG',v:fmtC(ne),c:'nominal',up:true},
+    {s:'RETIRE DRAW',v:fmtC(draw),c:'after-tax/mo',up:true},
+    {s:'YTR',v:ytr+'Y',c:'Age '+state.retirementAge,up:true},
+    {s:'INCOME',v:fmtC(totalIncome()),c:'gross',up:true},
+    {s:'SURPLUS',v:fmtC(disposable()),c:'net',up:disposable()>0},
+    {s:'NET WORTH',v:fmtC(calcNetWorthTotal()),c:'total',up:true},
+    {s:'"',v:state.tickerQuote||'Retire well.',c:'',up:true},
+  ];
+  const html=items.map(i=>`<div class="tk"><span class="tks">${i.s}</span>${i.s==='"'?`<span style="color:var(--amber);font-style:italic;font-size:10px">${i.v}</span>`:`<span class="tkv">${i.v}</span><span class="tkc ${i.up?'up':'dn'}">${i.c}</span>`}</div>`).join('');
+  document.getElementById('tickerTrack').innerHTML=html+html;
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// DASHBOARD
+// ═══════════════════════════════════════════════════════════════════
+function setCFView(v,btn){
+  cfView=v;
+  document.querySelectorAll('.itab').forEach(t=>t.classList.remove('active'));
+  btn.classList.add('active');
+  renderDashboard();
+}
+function renderDashboard(){
+  const now=new Date();
+  document.getElementById('dash-month-label').textContent=MN[now.getMonth()]+' '+now.getFullYear();
+  const md=getMonthData(state.selectedMonth||`${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`);
+  const ne=nestEgg();
+  const ytr=state.retirementAge-state.currentAge;
+  const draw=monthlyDraw(ne)+totalPension();
+
+  document.getElementById('dashKpis').innerHTML=`
+    <div class="kpi"><div class="kpi-icon">💰</div><div class="kpi-lbl">TOTAL INCOME</div><div class="kpi-val pos">${fmt(md.totInc)}</div><div class="kpi-sub">Monthly gross</div></div>
+    <div class="kpi"><div class="kpi-icon">📤</div><div class="kpi-lbl">TOTAL EXPENSES</div><div class="kpi-val neg">${fmt(md.totExp)}</div><div class="kpi-sub">Monthly committed</div></div>
+    <div class="kpi"><div class="kpi-icon">🏦</div><div class="kpi-lbl">PLANNED SAVINGS</div><div class="kpi-val bv">${fmt(md.savings)}</div><div class="kpi-sub">${md.totInc?((md.savings/md.totInc)*100).toFixed(1)+'% of income':'-'}</div></div>
+    <div class="kpi"><div class="kpi-icon">✦</div><div class="kpi-lbl">FUN FUND</div><div class="kpi-val neu">${fmt(md.funFund)}</div><div class="kpi-sub">Free after savings</div></div>
+    <div class="kpi"><div class="kpi-icon">◈</div><div class="kpi-lbl">NEST EGG</div><div class="kpi-val vv">${fmtC(ne)}</div><div class="kpi-sub">${state.nestEggReal?'Real (inflation-adj)':'Nominal'} · age ${state.retirementAge}</div></div>
+    <div class="kpi"><div class="kpi-icon">💵</div><div class="kpi-lbl">RETIREMENT DRAW</div><div class="kpi-val pos">${fmtC(draw)}</div><div class="kpi-sub">After tax · inc. pension</div></div>
+  `;
+
+  // CF
+  if(cfView==='summary'){
+    document.getElementById('dashCF').innerHTML=`
+      <div class="cf-row"><span>Gross Income</span><span class="cf-amt pos">${fmt(md.totInc)}</span></div>
+      <div class="cf-row"><span>Total Expenses</span><span class="cf-amt neg">${fmt(md.totExp)}</span></div>
+      <div class="cf-row"><span>Disposable</span><span class="cf-amt neu">${fmt(md.disposable)}</span></div>
+      <div class="cf-row"><span>Savings</span><span class="cf-amt bv">${fmt(md.savings)}</span></div>
+      <div class="cf-row" style="font-weight:700"><span>Fun Fund</span><span class="cf-amt pos">${fmt(md.funFund)}</span></div>
+      <div class="pbar" style="margin-top:10px"><div class="pbar-fill" style="width:${Math.min(md.totExp/md.totInc*100,100)}%;background:var(--red);opacity:.7"></div></div>
+      <div style="display:flex;justify-content:space-between;font-size:10px;color:var(--text3);margin-top:3px;font-family:var(--fm)">
+        <span>Exp ${md.totInc?(md.totExp/md.totInc*100).toFixed(0):0}%</span><span>Sav ${md.totInc?(md.savings/md.totInc*100).toFixed(0):0}%</span><span>Fun ${md.totInc?(md.funFund/md.totInc*100).toFixed(0):0}%</span>
+      </div>`;
+  } else {
+    let rows='<div style="overflow-x:auto"><table style="width:100%;font-size:11px;font-family:var(--fm);border-collapse:collapse">';
+    rows+='<tr style="color:var(--text3)"><th style="text-align:left;padding:4px 6px">Month</th><th style="padding:4px 6px">Income</th><th style="padding:4px 6px">Expenses</th><th style="padding:4px 6px">Savings</th><th style="padding:4px 6px">Fun Fund</th></tr>';
+    for(let i=0;i<12;i++){
+      const d=new Date(now); d.setMonth(now.getMonth()+i);
+      const k=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+      const m=getMonthData(k);
+      const isCur=i===0;
+      rows+=`<tr style="${isCur?'background:var(--bg3);':''}border-bottom:1px solid var(--border)">
+        <td style="padding:5px 6px;color:${isCur?'var(--amber)':'var(--text2)'}">${MN[d.getMonth()]} '${String(d.getFullYear()).slice(2)}</td>
+        <td style="padding:5px 6px;color:var(--green);text-align:right">${fmtC(m.totInc)}</td>
+        <td style="padding:5px 6px;color:var(--red);text-align:right">${fmtC(m.totExp)}</td>
+        <td style="padding:5px 6px;color:var(--blue);text-align:right">${fmtC(m.savings)}</td>
+        <td style="padding:5px 6px;color:var(--amber);text-align:right">${fmtC(m.funFund)}</td>
+      </tr>`;
+    }
+    document.getElementById('dashCF').innerHTML=rows+'</table></div>';
+  }
+
+  // Savings chart
+  const labs=[],sdata=[],fdata=[];
+  for(let i=0;i<12;i++){
+    const d=new Date(now);d.setMonth(now.getMonth()+i);
+    const k=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+    const m=getMonthData(k);
+    labs.push(MN[d.getMonth()]+" '"+(d.getFullYear()%100));
+    sdata.push(m.savings); fdata.push(m.funFund);
+  }
+  const ctx=document.getElementById('dashChart');
+  if(charts.dash)charts.dash.destroy();
+  charts.dash=new Chart(ctx,{type:'bar',data:{labels:labs,datasets:[
+    {label:'Savings',data:sdata,backgroundColor:'#4d8fff50',borderColor:'#4d8fff',borderWidth:1},
+    {label:'Fun Fund',data:fdata,backgroundColor:'#f5a62340',borderColor:'#f5a623',borderWidth:1}
+  ]},options:{plugins:{legend:{labels:{color:'#8a9bbf',font:{size:10}}}},scales:{x:{ticks:{color:'#4a5a7a',font:{size:10}}},y:{ticks:{color:'#4a5a7a',font:{size:10},callback:v=>fmtC(v)}}},responsive:true}});
+
+  // Nest Egg milestones
+  const checkpoints=[0,5,10,ytr];
+  let html='<div style="display:flex;gap:10px;flex-wrap:wrap">';
+  checkpoints.forEach(y=>{
+    let ne2=nestEgg(y);
+    if(state.nestEggReal)ne2=realVal(ne2,y);
+    const d2=monthlyDraw(ne2)+totalPension();
+    html+=`<div class="kpi" style="flex:1;min-width:140px"><div class="kpi-lbl">+${y} YEARS · AGE ${state.currentAge+y}</div><div class="kpi-val vv" style="font-size:16px">${fmtC(ne2)}</div><div class="kpi-sub pos">${fmtC(d2)}/mo draw</div></div>`;
+  });
+  document.getElementById('dashNestEgg').innerHTML=html+'</div>';
+  document.getElementById('nestRealToggle').checked=state.nestEggReal;
+  document.getElementById('sbSurplus').textContent=fmt(disposable());
+  document.getElementById('sbFunFund').textContent='Fun Fund: '+fmt(funFund());
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// CASH FLOW
+// ═══════════════════════════════════════════════════════════════════
+function renderCashflow(){
+  const now=new Date();
+  // Month strip
+  let pills='';
+  for(let i=0;i<12;i++){
+    const d=new Date(now);d.setMonth(now.getMonth()+i);
+    const k=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+    const isCur=i===0,isSel=k===state.selectedMonth;
+    const hasOv=!!state.monthlyOverrides[k];
+    pills+=`<div class="mpill ${isCur?'current':''} ${isSel?'selected':''} ${hasOv?'has-override':''}" onclick="selectMonth('${k}')">${MN[d.getMonth()]} '${String(d.getFullYear()).slice(2)}</div>`;
+  }
+  document.getElementById('monthStrip').innerHTML=pills;
+
+  const sm=state.selectedMonth;
+  const hasOv=!!state.monthlyOverrides[sm];
+  const md=getMonthData(sm);
+  const [yr,mo]=sm.split('-');
+  document.getElementById('cfMonthBadge').innerHTML=`
+    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+      <span style="font-family:var(--fm);font-size:12px;color:var(--amber)">${MN[parseInt(mo)-1]} ${yr}</span>
+      ${hasOv?'<span class="tag tv">MONTHLY OVERRIDE</span>':'<span class="tag tb">BASELINE</span>'}
+      ${hasOv?`<button class="btn-danger" style="padding:3px 9px;font-size:11px" onclick="clearOverride('${sm}')">✕ Clear Override</button>`:''}
+      <span style="font-size:12px;color:var(--text3);margin-left:auto">Disposable: <strong style="color:var(--amber)">${fmt(md.disposable)}</strong> · Fun Fund: <strong style="color:var(--green)">${fmt(md.funFund)}</strong></span>
+    </div>`;
+
+  const inc=md.income,exp=md.expenses;
+  let iHtml='',eHtml='';
+  inc.forEach(item=>{
+    iHtml+=lineHTML('income',item);
+  });
+  exp.forEach(item=>{
+    eHtml+=lineHTML('expense',item);
+  });
+  document.getElementById('incomeLines').innerHTML=iHtml;
+  document.getElementById('expenseLines').innerHTML=eHtml;
+  document.getElementById('baseSavingsInput').value=md.savings;
+  document.getElementById('funFundDisplay').value=fmt(md.funFund)+' / mo';
+
+  // 12-mo expense table
+  render12MoTable();
+}
+
+function lineHTML(type,item){
+  return`<div class="line-item ${item.paid?'paid':''}" id="li-${item.id}">
+    <div class="li-paid-wrap"><input type="checkbox" class="li-paid" ${item.paid?'checked':''} onchange="togglePaid('${type}','${item.id}',this.checked)"></div>
+    <input class="li-name" value="${item.name}" oninput="updateLine('${type}','${item.id}','name',this.value)">
+    <div class="li-wrap"><span class="li-cur">SEK</span><input class="li-amt" type="number" value="${item.amount}" oninput="updateLine('${type}','${item.id}','amount',+this.value)"></div>
+    <button class="li-rm" onclick="removeLine('${type}','${item.id}')">×</button>
+  </div>`;
+}
+
+function render12MoTable(){
+  const now=new Date();
+  const expNames=[...new Set([...state.expenses.map(e=>e.name)])];
+  let html=`<tr style="color:var(--text3)"><th style="text-align:left;padding:5px 8px;min-width:120px;white-space:nowrap">Expense</th>`;
+  for(let i=0;i<12;i++){const d=new Date(now);d.setMonth(now.getMonth()+i);html+=`<th style="padding:5px 8px;text-align:right;white-space:nowrap">${MN[d.getMonth()]}</th>`}
+  html+='<th style="padding:5px 8px;text-align:right">Total</th></tr>';
+  expNames.forEach(name=>{
+    html+=`<tr style="border-top:1px solid var(--border)"><td style="padding:5px 8px;color:var(--text2)">${name}</td>`;
+    let rowTotal=0;
+    for(let i=0;i<12;i++){
+      const d=new Date(now);d.setMonth(now.getMonth()+i);
+      const k=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+      const md=getMonthData(k);
+      const exp=md.expenses.find(e=>e.name===name);
+      const v=exp?exp.amount:0;
+      rowTotal+=v;
+      html+=`<td style="padding:5px 8px;text-align:right;color:var(--text);font-family:var(--fm)">${v?fmtC(v):'—'}</td>`;
+    }
+    html+=`<td style="padding:5px 8px;text-align:right;color:var(--amber);font-family:var(--fm);font-weight:700">${fmtC(rowTotal)}</td></tr>`;
+  });
+  // Totals row
+  html+=`<tr style="border-top:2px solid var(--border2);font-weight:700"><td style="padding:5px 8px;color:var(--text)">TOTAL</td>`;
+  let grandTotal=0;
+  for(let i=0;i<12;i++){
+    const d=new Date(now);d.setMonth(now.getMonth()+i);
+    const k=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+    const md=getMonthData(k);
+    grandTotal+=md.totExp;
+    html+=`<td style="padding:5px 8px;text-align:right;color:var(--red);font-family:var(--fm)">${fmtC(md.totExp)}</td>`;
+  }
+  html+=`<td style="padding:5px 8px;text-align:right;color:var(--red);font-family:var(--fm)">${fmtC(grandTotal)}</td></tr>`;
+  document.getElementById('exp12table').innerHTML=html;
+}
+
+function selectMonth(k){
+  state.selectedMonth=k;
+  save();
+  renderCashflow();
+}
+function clearOverride(k){
+  delete state.monthlyOverrides[k];
+  save();renderCashflow();
+}
+function getOrCreateOverride(month){
+  if(!state.monthlyOverrides[month]){
+    const md=getMonthData(month);
+    state.monthlyOverrides[month]={
+      income:JSON.parse(JSON.stringify(md.income)),
+      expenses:JSON.parse(JSON.stringify(md.expenses)),
+      savings:md.savings
+    };
+  }
+  return state.monthlyOverrides[month];
+}
+function updateLine(type,id,field,val){
+  const sm=state.selectedMonth;
+  const ov=getOrCreateOverride(sm);
+  const arr=type==='income'?ov.income:ov.expenses;
+  const item=arr.find(i=>i.id===id);
+  if(item){item[field]=val;save();renderCashflow();}
+}
+function removeLine(type,id){
+  const sm=state.selectedMonth;
+  const ov=getOrCreateOverride(sm);
+  if(type==='income')ov.income=ov.income.filter(i=>i.id!==id);
+  else ov.expenses=ov.expenses.filter(i=>i.id!==id);
+  save();renderCashflow();
+}
+function addLine(type){
+  const sm=state.selectedMonth;
+  const ov=getOrCreateOverride(sm);
+  const id='x'+Math.random().toString(36).slice(2,9);
+  if(type==='income')ov.income.push({id,name:'Income',amount:0,paid:false});
+  else ov.expenses.push({id,name:'Expense',amount:0,paid:false});
+  save();renderCashflow();
+}
+function togglePaid(type,id,checked){
+  const sm=state.selectedMonth;
+  const ov=getOrCreateOverride(sm);
+  const arr=type==='income'?ov.income:ov.expenses;
+  const item=arr.find(i=>i.id===id);
+  if(item){item.paid=checked;save();renderCashflow();}
+}
+function updateSavings(val){
+  const sm=state.selectedMonth;
+  const ov=getOrCreateOverride(sm);
+  ov.savings=val;
+  state.baseSavings=val;
+  save();renderCashflow();
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// NET WORTH
+// ═══════════════════════════════════════════════════════════════════
+function calcNetWorthTotal(){
+  const nw=state.netWorth||{};
+  const assetVal=(state.externalAssets||[]).reduce((s,a)=>s+a.balance,0);
+  return(nw.property||0)+assetVal-(nw.mortgage||0)-(nw.otherDebt||0);
+}
+function openNWModal(){
+  const nw=state.netWorth||{};
+  document.getElementById('nw-property').value=nw.property||0;
+  document.getElementById('nw-mortgage').value=nw.mortgage||0;
+  document.getElementById('nw-debt').value=nw.otherDebt||0;
+  updateNWCalc();
+  openModal('netWorthModal');
+}
+function updateNWCalc(){
+  const p=+document.getElementById('nw-property').value||0;
+  const m=+document.getElementById('nw-mortgage').value||0;
+  const d=+document.getElementById('nw-debt').value||0;
+  const assetVal=(state.externalAssets||[]).reduce((s,a)=>s+a.balance,0);
+  const nw=p+assetVal-m-d;
+  document.getElementById('nw-calc').innerHTML=`
+    <div class="cf-row"><span>Property</span><span class="cf-amt pos">${fmtC(p)}</span></div>
+    <div class="cf-row"><span>Investment Assets</span><span class="cf-amt pos">${fmtC(assetVal)}</span></div>
+    <div class="cf-row"><span>Mortgage</span><span class="cf-amt neg">-${fmtC(m)}</span></div>
+    <div class="cf-row"><span>Other Debt</span><span class="cf-amt neg">-${fmtC(d)}</span></div>
+    <div class="cf-row" style="font-weight:700;font-size:15px"><span>Net Worth</span><span class="cf-amt ${nw>=0?'pos':'neg'}">${fmtC(nw)}</span></div>`;
+}
+function saveNetWorth(){
+  state.netWorth={
+    property:+document.getElementById('nw-property').value||0,
+    mortgage:+document.getElementById('nw-mortgage').value||0,
+    otherDebt:+document.getElementById('nw-debt').value||0
+  };
+  save();renderNetWorth();closeModal('netWorthModal');
+}
+function renderNetWorth(){
+  const nw=state.netWorth||{};
+  const assetVal=(state.externalAssets||[]).reduce((s,a)=>s+a.balance,0);
+  const prop=nw.property||0;
+  const mort=nw.mortgage||0;
+  const debt=nw.otherDebt||0;
+  const total=prop+assetVal-mort-debt;
+  const ytr=state.retirementAge-state.currentAge;
+
+  document.getElementById('nwKpis').innerHTML=`
+    <div class="kpi"><div class="kpi-icon">◈</div><div class="kpi-lbl">NET WORTH TODAY</div><div class="kpi-val ${total>=0?'pos':'neg'}">${fmtC(total)}</div><div class="kpi-sub">Assets − Liabilities</div></div>
+    <div class="kpi"><div class="kpi-icon">🏠</div><div class="kpi-lbl">PROPERTY</div><div class="kpi-val pos">${fmtC(prop)}</div><div class="kpi-sub">Equity: ${fmtC(prop-mort)}</div></div>
+    <div class="kpi"><div class="kpi-icon">◆</div><div class="kpi-lbl">INVESTMENT ASSETS</div><div class="kpi-val pos">${fmtC(assetVal)}</div><div class="kpi-sub">ITP1 + Vanguard + Royal London</div></div>
+    <div class="kpi"><div class="kpi-icon">📉</div><div class="kpi-lbl">TOTAL LIABILITIES</div><div class="kpi-val neg">${fmtC(mort+debt)}</div><div class="kpi-sub">Mortgage + debt</div></div>
+  `;
+
+  document.getElementById('nwAssets').innerHTML=`
+    <div class="nw-row"><span>Property Value</span><span class="cf-amt pos">${fmtC(prop)}</span></div>
+    ${(state.externalAssets||[]).map(a=>`<div class="nw-row"><span>${a.name}</span><span class="cf-amt pos">${fmtC(a.balance)}</span></div>`).join('')}
+    <div class="nw-row" style="font-weight:700"><span>Total Assets</span><span class="cf-amt pos">${fmtC(prop+assetVal)}</span></div>
+    <div style="margin-top:10px"><button class="btn btn-o btn-sm" onclick="openNWModal()">Edit Property & Debt</button></div>`;
+
+  document.getElementById('nwLiabilities').innerHTML=`
+    <div class="nw-row"><span>Mortgage</span><span class="cf-amt neg">${fmtC(mort)}</span></div>
+    <div class="nw-row"><span>Other Debt</span><span class="cf-amt neg">${fmtC(debt)}</span></div>
+    <div class="nw-row" style="font-weight:700"><span>Total Liabilities</span><span class="cf-amt neg">${fmtC(mort+debt)}</span></div>`;
+
+  // NW projection chart
+  const labs=[],nwData=[];
+  for(let y=0;y<=ytr;y+=Math.max(1,Math.floor(ytr/15))){
+    const ne2=nestEgg(y);
+    const propGrowth=prop*Math.pow(1+(state.inflationRate||2)/100,y);
+    const mortRemaining=Math.max(0,mort-state.baseSavings*12*y*0.1);
+    nwData.push(Math.round((propGrowth+ne2-mortRemaining-debt)/1e6*10)/10);
+    labs.push('Age '+(state.currentAge+y));
+  }
+  const ctx=document.getElementById('nwChart');
+  if(charts.nw)charts.nw.destroy();
+  charts.nw=new Chart(ctx,{type:'line',data:{labels:labs,datasets:[{label:'Net Worth (MSEK)',data:nwData,borderColor:'#00e8a0',backgroundColor:'#00e8a015',fill:true,tension:.4}]},options:{plugins:{legend:{display:false}},scales:{x:{ticks:{color:'#4a5a7a',font:{size:10}}},y:{ticks:{color:'#4a5a7a',font:{size:10},callback:v=>v+'M SEK'}}},responsive:true}});
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// ASSETS
+// ═══════════════════════════════════════════════════════════════════
+function renderAssets(){
+  const ytr=state.retirementAge-state.currentAge;
+  const ne=nestEgg();
+  const totalNow=(state.externalAssets||[]).reduce((s,a)=>s+a.balance,0);
+  const totalMo=(state.externalAssets||[]).reduce((s,a)=>s+(a.monthlyContribution||0),0)+state.baseSavings;
+  document.getElementById('retAgeInline').textContent=state.retirementAge;
+  document.getElementById('assetKpis').innerHTML=`
+    <div class="kpi"><div class="kpi-icon">◆</div><div class="kpi-lbl">CURRENT ASSETS</div><div class="kpi-val">${fmtC(totalNow)}</div></div>
+    <div class="kpi"><div class="kpi-icon">📥</div><div class="kpi-lbl">MONTHLY CONTRIBUTIONS</div><div class="kpi-val bv">${fmt(totalMo)}</div></div>
+    <div class="kpi"><div class="kpi-icon">◈</div><div class="kpi-lbl">PROJECTED NEST EGG</div><div class="kpi-val vv">${fmtC(ne)}</div><div class="kpi-sub">${state.nestEggReal?'Real values':'Nominal'}</div></div>
+    <div class="kpi"><div class="kpi-icon">📅</div><div class="kpi-lbl">YEARS TO GO</div><div class="kpi-val neu">${ytr}Y</div><div class="kpi-sub">Retire at ${state.retirementAge}</div></div>
+  `;
+  const colors=['#00e8a0','#4d8fff','#f5a623','#8b5cf6','#00d4ff','#ec4899'];
+  let html='';
+  (state.externalAssets||[]).forEach((a,i)=>{
+    const proj=futureValue(a.balance,a.monthlyContribution||0,a.growthRate||state.growthRate,ytr);
+    const rProj=state.nestEggReal?realVal(proj,ytr):proj;
+    html+=`<div class="asset-row" style="display:flex;align-items:flex-start;gap:10px;padding:10px 0;border-bottom:1px solid var(--border)">
+      <div style="width:10px;height:10px;border-radius:50%;background:${colors[i%colors.length]};margin-top:4px;flex-shrink:0"></div>
+      <div style="flex:1">
+        <input class="li-name" style="margin-bottom:4px;width:100%" value="${a.name}" oninput="updateAsset('${a.id}','name',this.value)">
+        <div style="display:flex;gap:12px;flex-wrap:wrap;font-size:11px;color:var(--text3)">
+          <span>Balance: <input style="width:85px;background:transparent;border:none;border-bottom:1px solid var(--border);color:var(--text2);font-family:var(--fm);font-size:11px;padding:1px 0" type="number" value="${a.balance}" oninput="updateAsset('${a.id}','balance',+this.value)"> SEK</span>
+          <span>+<input style="width:70px;background:transparent;border:none;border-bottom:1px solid var(--border);color:var(--text2);font-family:var(--fm);font-size:11px;padding:1px 0" type="number" value="${a.monthlyContribution||0}" oninput="updateAsset('${a.id}','monthlyContribution',+this.value)">/mo</span>
+          <span><input style="width:35px;background:transparent;border:none;border-bottom:1px solid var(--border);color:var(--text2);font-family:var(--fm);font-size:11px;padding:1px 0" type="number" value="${a.growthRate||state.growthRate}" oninput="updateAsset('${a.id}','growthRate',+this.value)">% growth</span>
+        </div>
+      </div>
+      <div style="text-align:right;flex-shrink:0">
+        <div style="font-family:var(--fm);font-weight:700;color:${colors[i%colors.length]}">${fmtC(rProj)}</div>
+        <div style="font-size:10px;color:var(--text3)">at retirement</div>
+      </div>
+      <button class="li-rm" onclick="removeAsset('${a.id}')">×</button>
+    </div>`;
+  });
+  document.getElementById('assetLines').innerHTML=html;
+
+  // Chart
+  const labs=[],totals=[];
+  for(let y=0;y<=ytr;y+=Math.max(1,Math.floor(ytr/20))){
+    let t=nestEgg(y);
+    if(state.nestEggReal)t=realVal(t,y);
+    totals.push(Math.round(t/1e6*10)/10);
+    labs.push('Age '+(state.currentAge+y));
+  }
+  const ctx=document.getElementById('nestChart');
+  if(charts.nest)charts.nest.destroy();
+  charts.nest=new Chart(ctx,{type:'line',data:{labels:labs,datasets:[{label:'Nest Egg (MSEK)',data:totals,borderColor:'#8b5cf6',backgroundColor:'#8b5cf615',fill:true,tension:.4}]},options:{plugins:{legend:{display:false}},scales:{x:{ticks:{color:'#4a5a7a',font:{size:10}}},y:{ticks:{color:'#4a5a7a',font:{size:10},callback:v=>v+'M SEK'}}},responsive:true}});
+  document.getElementById('assetRealToggle').checked=state.nestEggReal;
+}
+function updateAsset(id,field,val){const a=(state.externalAssets||[]).find(x=>x.id===id);if(a){a[field]=val;save();renderAll()}}
+function removeAsset(id){state.externalAssets=(state.externalAssets||[]).filter(a=>a.id!==id);save();renderAll()}
+function addAsset(){const id='a'+Math.random().toString(36).slice(2,9);(state.externalAssets=state.externalAssets||[]).push({id,name:'New Asset',balance:0,growthRate:state.growthRate,monthlyContribution:0});save();renderAll()}
+
+// ═══════════════════════════════════════════════════════════════════
+// VACATION
+// ═══════════════════════════════════════════════════════════════════
+function renderVacation(){
+  const ff=funFund();
+  document.getElementById('vacKpis').innerHTML=`
+    <div class="kpi"><div class="kpi-icon">✦</div><div class="kpi-lbl">MONTHLY FUN FUND</div><div class="kpi-val neu">${fmt(ff)}</div><div class="kpi-sub">After income, expenses, savings</div></div>
+    <div class="kpi"><div class="kpi-icon">📅</div><div class="kpi-lbl">ANNUAL FUN FUND</div><div class="kpi-val pos">${fmt(ff*12)}</div><div class="kpi-sub">12 months accumulated</div></div>
+    <div class="kpi"><div class="kpi-icon">🗓</div><div class="kpi-lbl">6-MONTH STACK</div><div class="kpi-val" style="color:var(--cyan)">${fmt(ff*6)}</div><div class="kpi-sub">Typical planning window</div></div>
+    <div class="kpi"><div class="kpi-icon">💼</div><div class="kpi-lbl">SAVED TRIPS</div><div class="kpi-val bv">${(state.savedTrips||[]).length}</div><div class="kpi-sub">Planned adventures</div></div>
+  `;
+  updateVacTiers();
+  renderFundTimeline();
+  renderPulseGrid();
+  updateAffordCalc();
+  renderSavedTrips();
+}
+
+function updateVacTiers(){
+  const ff=funFund();
+  const months=parseInt(document.getElementById('vacMonths')?.value)||6;
+  const budget=ff*months;
+  document.getElementById('vacMonthsVal').textContent=months;
+  document.getElementById('vacBudgetLine').textContent=`${months} months = ${fmt(budget)} vacation budget`;
+  const tiers=[
+    {cls:'tier-b',icon:'🎒',name:'Budget Explorer',max:20000,desc:'Hostels, local transport, street food'},
+    {cls:'tier-m',icon:'🏨',name:'Mid-Range Comfort',max:60000,desc:'3★ hotels, flights, dining out'},
+    {cls:'tier-l',icon:'🥂',name:'Luxury Experience',max:Infinity,desc:'5★ resorts, business class, fine dining'},
+  ];
+  const sel=budget>=60000?2:budget>=20000?1:0;
+  document.getElementById('vacTiers').innerHTML=tiers.map((t,i)=>`
+    <div class="vac-tier ${t.cls} ${i===sel?'selected':''}">
+      <div class="vac-glow"></div>
+      <div style="font-size:20px;margin-bottom:5px">${t.icon}</div>
+      <div style="font-weight:700;font-size:13px;margin-bottom:2px">${t.name}</div>
+      <div style="font-size:10px;color:var(--text3)">${t.desc}</div>
+      ${i===sel?'<div style="margin-top:6px"><span class="tag tg">YOUR RANGE</span></div>':''}
+    </div>`).join('');
+}
+
+function updateAffordCalc(){
+  const ff=funFund();
+  const target=+document.getElementById('targetBudget')?.value||0;
+  if(!target||ff<=0){document.getElementById('affordCalc').innerHTML='<div style="color:var(--text3);font-size:12px">Enter a target budget above.</div>';return}
+  const months=Math.ceil(target/ff);
+  const now=new Date();
+  const ready=new Date(now);ready.setMonth(now.getMonth()+months);
+  const alreadyCanAfford=ff*1>=target;
+  document.getElementById('affordCalc').innerHTML=`
+    <div style="font-family:var(--fm);font-size:12px;line-height:2">
+      <div>Target: <strong style="color:var(--amber)">${fmt(target)}</strong></div>
+      <div>Monthly fund: <strong style="color:var(--green)">${fmt(ff)}</strong></div>
+      <div>Months to save: <strong style="color:var(--cyan)">${months} months</strong></div>
+      <div>Ready by: <strong style="color:var(--green)">${alreadyCanAfford?'NOW ✓':MN[ready.getMonth()]+' '+ready.getFullYear()}</strong></div>
+      <div style="margin-top:8px">
+        <div class="pbar"><div class="pbar-fill" style="width:${Math.min(ff/target*100*months,100)}%;background:var(--green)"></div></div>
+        <div style="font-size:10px;color:var(--text3);margin-top:2px">${Math.min(100,Math.round(ff/target*100))}% funded today</div>
+      </div>
+    </div>`;
+}
+
+function renderFundTimeline(){
+  const ff=funFund();
+  let cum=0,html='';
+  const now=new Date();
+  for(let i=0;i<12;i++){
+    cum+=ff;
+    const d=new Date(now);d.setMonth(now.getMonth()+i);
+    const hl=i===5||i===11;
+    html+=`<div class="fund-mo ${hl?'hl':''}">
+      <div class="fund-mo-name">${MN[d.getMonth()]}</div>
+      <div class="fund-mo-val">${fmtC(cum)}</div>
+      <div style="font-size:9px;color:${hl?'var(--green)':'var(--text3)'}">+${i+1}mo</div>
+    </div>`;
+  }
+  document.getElementById('fundTimeline').innerHTML=html;
+}
+
+function renderPulseGrid(){
+  const vibe=document.getElementById('vacVibe')?.value||'Any Vibe';
+  const ff=funFund()*6;
+  let dests=[...PULSE_DESTS];
+  if(vibe!=='Any Vibe')dests.sort((a,b)=>a.vibe===vibe?-1:b.vibe===vibe?1:0);
+  document.getElementById('pulseGrid').innerHTML=dests.slice(0,6).map(d=>{
+    const affordable=parseInt(d.cost.replace(/[^0-9]/g,''))*1000<=ff;
+    return`<div class="pulse-card" onclick="vacMapFocus(${d.lat},${d.lng})">
+      <div class="pulse-flag">${d.flag}</div>
+      <div class="pulse-dest">${d.dest}</div>
+      <div class="pulse-why">${d.why}</div>
+      <div class="pulse-cost">${d.cost}</div>
+      <div style="margin-top:5px;display:flex;gap:4px">
+        <span class="tag tc">${d.vibe}</span>
+        ${affordable?'<span class="tag tg">IN BUDGET</span>':'<span class="tag ta">STRETCH</span>'}
+      </div>
+    </div>`}).join('');
+}
+
+function vacMapFocus(lat,lng){if(vacMap)vacMap.setView([lat,lng],5)}
+
+function initVacMap(){
+  if(vacMap)return;
+  vacMap=L.map('vacMap').setView([20,20],2);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(vacMap);
+  const ff=funFund()*6;
+  PULSE_DESTS.forEach(d=>{
+    const col=d.col||'#00e8a0';
+    const m=L.circleMarker([d.lat,d.lng],{radius:9,fillColor:col,color:col,fillOpacity:.8,weight:2});
+    m.bindPopup(`<strong>${d.flag} ${d.dest}</strong><br>${d.cost}<br><em>${d.vibe}</em>`);
+    m.addTo(vacMap);
+  });
+}
+
+// Trip Builder
+function updateTripCalc(){
+  const budget=+document.getElementById('tb-budget')?.value||0;
+  const ff=funFund();
+  if(!budget||ff<=0)return;
+  const months=Math.ceil(budget/ff);
+  const now=new Date();
+  const ready=new Date(now);ready.setMonth(now.getMonth()+months);
+  document.getElementById('tb-calc').innerHTML=`
+    Budget: <strong style="color:var(--amber)">${fmtC(budget)}</strong> &nbsp;·&nbsp;
+    Fun Fund: <strong style="color:var(--green)">${fmtC(ff)}/mo</strong> &nbsp;·&nbsp;
+    Save for <strong style="color:var(--cyan)">${months} months</strong> &nbsp;·&nbsp;
+    Ready: <strong style="color:var(--green)">${MN[ready.getMonth()]} ${ready.getFullYear()}</strong>`;
+}
+
+async function aiTripBreakdown(){
+  if(!apiKey){openModal('keyModal');return}
+  const dest=document.getElementById('tb-dest').value||'Unknown';
+  const budget=+document.getElementById('tb-budget').value||50000;
+  const nights=+document.getElementById('tb-nights').value||7;
+  const box=document.getElementById('tb-ai');
+  box.innerHTML=`<div class="ai-box"><div class="ai-hdr"><div class="ai-dot"></div>AI TRIP BREAKDOWN</div><div class="ai-loading"><div class="spinner"></div>Analysing...</div></div>`;
+  const prompt=`For a trip to ${dest}, ${nights} nights, total budget SEK ${budget.toLocaleString()}, departing from Stockholm:
+  Give a budget breakdown: flights, accommodation per night, food/day, activities, misc.
+  Format as a clean breakdown with SEK amounts. Include 3 accommodation options (budget/mid/luxury).
+  End with "Verdict: [ACHIEVABLE/STRETCH/SPLURGE]" based on the budget.`;
+  try{
+    const res=await callClaude(prompt,600);
+    box.innerHTML=`<div class="ai-box"><div class="ai-hdr"><div class="ai-dot"></div>TRIP ANALYSIS · ${dest}</div><div class="ai-content">${mdParse(res)}</div></div>`;
+  }catch(e){box.innerHTML=`<div style="color:var(--red);font-size:12px">${e.message}</div>`}
+}
+
+function saveTrip(){
+  const dest=document.getElementById('tb-dest').value;
+  const when=document.getElementById('tb-when').value;
+  const budget=+document.getElementById('tb-budget').value||0;
+  const nights=+document.getElementById('tb-nights').value||0;
+  if(!dest){alert('Enter a destination');return}
+  state.savedTrips=state.savedTrips||[];
+  state.savedTrips.push({id:'t'+Date.now(),dest,when,budget,nights,saved:new Date().toISOString().slice(0,10)});
+  save();renderVacation();closeModal('tripModal');
+}
+
+function renderSavedTrips(){
+  const trips=state.savedTrips||[];
+  if(!trips.length){document.getElementById('savedTrips').innerHTML='<div style="color:var(--text3);font-size:13px">No trips planned yet.</div>';return}
+  document.getElementById('savedTrips').innerHTML=trips.map(t=>`
+    <div style="display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--border)">
+      <div style="font-size:22px">✈</div>
+      <div style="flex:1">
+        <div style="font-weight:700;font-size:13px">${t.dest}</div>
+        <div style="font-size:11px;color:var(--text2)">${t.when||'No date'} · ${t.nights} nights</div>
+      </div>
+      <div style="text-align:right">
+        <div style="font-family:var(--fm);font-weight:600;color:var(--amber)">${fmtC(t.budget)}</div>
+        <div style="font-size:10px;color:var(--text3)">budget</div>
+      </div>
+      <button class="li-rm" onclick="removeTrip('${t.id}')">×</button>
+    </div>`).join('');
+}
+function removeTrip(id){state.savedTrips=(state.savedTrips||[]).filter(t=>t.id!==id);save();renderVacation()}
+
+async function runVacAI(){
+  if(!apiKey){openModal('keyModal');return}
+  const ff=funFund();
+  const months=parseInt(document.getElementById('vacMonths').value)||6;
+  const budget=ff*months;
+  const vibe=document.getElementById('vacVibe').value;
+  const season=document.getElementById('vacSeason').value;
+  const box=document.getElementById('vacAIBox');
+  box.innerHTML=`<div class="ai-box"><div class="ai-hdr"><div class="ai-dot"></div>AI GENERATING IDEAS</div><div class="ai-loading"><div class="spinner"></div>Analysing your budget & preferences...</div></div>`;
+  const prompt=`You are a travel intelligence system. User has SEK ${Math.round(budget).toLocaleString()} vacation budget (${months} months of SEK ${Math.round(ff).toLocaleString()}/mo fun fund). Travel vibe: ${vibe}. Season: ${season}. Based in Stockholm.
+Give 4 destination recommendations. Each: flag + name as H3, cost estimate for 2 (flights + accommodation + spending), why it matches, best time, insider tip, affordability tag (Budget/Mid-Range/Luxury).
+End with one-line summary of what they can realistically afford.`;
+  try{
+    const res=await callClaude(prompt,1000);
+    box.innerHTML=`<div class="ai-box"><div class="ai-hdr"><div class="ai-dot"></div>AI TRAVEL INTELLIGENCE</div><div class="ai-content">${mdParse(res)}</div></div>`;
+  }catch(e){box.innerHTML=`<div class="ai-box"><div style="color:var(--red)">${e.message}</div></div>`}
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// RETIREMENT
+// ═══════════════════════════════════════════════════════════════════
+function renderRetirement(){
+  const ne=nestEgg();
+  const ytr=state.retirementAge-state.currentAge;
+  const draw=monthlyDraw(ne);
+  const pen=totalPension();
+  const totalMo=draw+pen;
+
+  document.getElementById('retKpis').innerHTML=`
+    <div class="kpi"><div class="kpi-icon">◈</div><div class="kpi-lbl">PROJECTED NEST EGG</div><div class="kpi-val vv">${fmtC(ne)}</div><div class="kpi-sub">At age ${state.retirementAge}</div></div>
+    <div class="kpi"><div class="kpi-icon">💵</div><div class="kpi-lbl">PORTFOLIO DRAW (4%)</div><div class="kpi-val pos">${fmtC(draw)}</div><div class="kpi-sub">After ${state.withdrawTaxRate}% tax</div></div>
+    <div class="kpi"><div class="kpi-icon">🏛</div><div class="kpi-lbl">PENSION INCOME</div><div class="kpi-val bv">${fmtC(pen)}</div><div class="kpi-sub">Allmänpension + ITP + other</div></div>
+    <div class="kpi"><div class="kpi-icon">✦</div><div class="kpi-lbl">TOTAL MONTHLY INCOME</div><div class="kpi-val pos">${fmtC(totalMo)}</div><div class="kpi-sub">Portfolio draw + pension</div></div>
+    <div class="kpi"><div class="kpi-icon">🌍</div><div class="kpi-lbl">CITIES IN BUDGET</div><div class="kpi-val" style="color:var(--cyan)">${RET_DESTS.filter(d=>d.costK*1000<=totalMo).length}/${RET_DESTS.length}</div><div class="kpi-sub">From curated list</div></div>
+    <div class="kpi"><div class="kpi-icon">📅</div><div class="kpi-lbl">YEARS TO RETIREMENT</div><div class="kpi-val neu">${ytr}Y</div><div class="kpi-sub">Age ${state.currentAge} → ${state.retirementAge}</div></div>
+  `;
+
+  // Scenario comparison
+  const scenarios=[
+    {age:60,label:'Early 60'},
+    {age:65,label:'Standard 65'},
+    {age:state.retirementAge,label:`Target ${state.retirementAge}`},
+    {age:70,label:'Late 70'},
+  ];
+  document.getElementById('scenarioGrid').innerHTML=scenarios.map(s=>{
+    const ytr2=s.age-state.currentAge;
+    if(ytr2<0)return'';
+    const ne2=nestEgg(ytr2);
+    const d2=monthlyDraw(ne2)+totalPension();
+    const isBest=d2===Math.max(...scenarios.filter(x=>x.age>=state.currentAge).map(x=>monthlyDraw(nestEgg(x.age-state.currentAge))+totalPension()));
+    return`<div class="scenario-card ${isBest?'best':''}">
+      ${isBest?'<span class="tag tg" style="margin-bottom:8px;display:inline-flex">OPTIMAL</span>':''}
+      <div style="font-family:var(--fd);font-size:15px;font-weight:800;margin-bottom:4px">${s.label}</div>
+      <div style="font-family:var(--fm);font-size:18px;color:var(--violet);margin-bottom:3px">${fmtC(ne2)}</div>
+      <div style="font-size:11px;color:var(--text2)">Nest egg</div>
+      <div style="font-family:var(--fm);font-size:14px;color:var(--green);margin-top:6px">${fmtC(d2)}/mo</div>
+      <div style="font-size:11px;color:var(--text2)">Total income</div>
+    </div>`;
+  }).join('');
+
+  // Pension inputs
+  document.getElementById('penAllman').value=state.penAllman||0;
+  document.getElementById('penITP').value=state.penITP||0;
+  document.getElementById('penOther').value=state.penOther||0;
+  document.getElementById('penSummary').innerHTML=`
+    <div style="background:var(--bg3);border-radius:8px;padding:12px;font-size:12px;font-family:var(--fm);display:flex;gap:16px;flex-wrap:wrap">
+      <div>Allmänpension: <strong style="color:var(--blue)">${fmtC(state.penAllman||0)}/mo</strong></div>
+      <div>ITP/Tjänste: <strong style="color:var(--green)">${fmtC(state.penITP||0)}/mo</strong></div>
+      <div>Other: <strong style="color:var(--amber)">${fmtC(state.penOther||0)}/mo</strong></div>
+      <div style="border-left:1px solid var(--border2);padding-left:16px">Total pension: <strong style="color:var(--green)">${fmtC(pen)}/mo</strong></div>
+    </div>`;
+
+  // Dream grid
+  document.getElementById('dreamGrid').innerHTML=DREAM_TYPES.map(d=>`
+    <div class="dream-chip ${selectedDreams.includes(d.id)?'sel':''}" onclick="toggleDream('${d.id}')">
+      <div style="font-size:20px;margin-bottom:4px">${d.icon}</div>
+      <div style="font-size:12px;font-weight:600">${d.name}</div>
+    </div>`).join('');
+
+  // Retirement expense model
+  updateRetExpenses();
+}
+
+function toggleDream(id){
+  const i=selectedDreams.indexOf(id);
+  if(i>-1)selectedDreams.splice(i,1);else selectedDreams.push(id);
+  renderRetirement();
+}
+
+function updateRetExpenses(){
+  const level=document.getElementById('retCostLevel')?.value||'mid';
+  const m=RET_EXP_MODELS[level];
+  const total=Object.values(m).reduce((s,v)=>s+v,0);
+  const ne=nestEgg();
+  const draw=monthlyDraw(ne)+totalPension();
+  const surplus=draw-total;
+  const cats=[
+    {name:'Housing',icon:'🏠',val:m.housing},
+    {name:'Food & Groceries',icon:'🛒',val:m.food},
+    {name:'Healthcare',icon:'🏥',val:m.health},
+    {name:'Transport',icon:'🚗',val:m.transport},
+    {name:'Leisure',icon:'🎭',val:m.leisure},
+    {name:'Miscellaneous',icon:'📦',val:m.misc},
+  ];
+  document.getElementById('retExpModel').innerHTML=`
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px;margin-bottom:14px">
+      ${cats.map(c=>`<div style="background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:10px">
+        <div style="font-size:16px;margin-bottom:4px">${c.icon}</div>
+        <div style="font-size:11px;color:var(--text3);margin-bottom:3px">${c.name}</div>
+        <div style="font-family:var(--fm);font-size:13px;font-weight:600">${fmtC(c.val)}</div>
+        <div class="pbar" style="margin-top:6px"><div class="pbar-fill" style="width:${(c.val/total*100).toFixed(0)}%;background:var(--violet)"></div></div>
+      </div>`).join('')}
+    </div>
+    <div style="display:flex;gap:16px;font-family:var(--fm);font-size:12px;flex-wrap:wrap;background:var(--bg3);border-radius:8px;padding:12px">
+      <div>Monthly need: <strong style="color:var(--amber)">${fmtC(total)}</strong></div>
+      <div>Your draw: <strong style="color:var(--green)">${fmtC(draw)}</strong></div>
+      <div>Surplus/Deficit: <strong style="color:${surplus>=0?'var(--green)':'var(--red)'}">${surplus>=0?'+':''}${fmtC(surplus)}</strong></div>
+      <div>${surplus>=0?'<span class="tag tg">SUSTAINABLE ✓</span>':'<span class="tag tr">SHORTFALL ⚠</span>'}</div>
+    </div>`;
+}
+
+function renderDestCards(){
+  const draw=monthlyDraw(nestEgg())+totalPension();
+  document.getElementById('destCards').innerHTML=RET_DESTS.map(d=>`
+    <div class="dest-card ${selectedRetDest===d.name?'sel':''}" onclick="selectDest('${d.name}')">
+      <div style="font-size:26px;margin-bottom:7px">${d.flag}</div>
+      <div style="font-weight:700;font-size:14px;margin-bottom:2px">${d.name}</div>
+      <div style="font-size:11px;color:var(--text3);margin-bottom:7px">${d.country}</div>
+      <div style="font-family:var(--fm);font-size:13px;color:var(--green)">${d.costK}K SEK<div style="font-size:10px;color:var(--text3)">per month</div></div>
+      <div class="dest-tags">${d.tags.map((t,i)=>`<span class="dest-tag ${t} tag">${d.tl[i]}</span>`).join('')}</div>
+      ${d.costK*1000<=draw?'<div style="margin-top:8px"><span class="tag tg">WITHIN BUDGET ✓</span></div>':'<div style="margin-top:8px"><span class="tag ta">STRETCH</span></div>'}
+    </div>`).join('');
+}
+function selectDest(name){selectedRetDest=name;renderDestCards()}
+
+function initRetMap(){
+  if(retMap)return;
+  retMap=L.map('retMap').setView([20,10],2);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(retMap);
+  const draw=monthlyDraw(nestEgg())+totalPension();
+  RET_DESTS.forEach(d=>{
+    const col=d.costK*1000<=draw?'#00e8a0':'#f5a623';
+    const m=L.circleMarker([d.lat,d.lng],{radius:10,fillColor:col,color:col,fillOpacity:.8,weight:2});
+    m.bindPopup(`<strong>${d.flag} ${d.name}</strong><br>${d.costK}K SEK/mo<br>${d.tl.join(' · ')}`);
+    m.addTo(retMap);
+  });
+}
+
+async function runRetirementAI(){
+  if(!apiKey){openModal('keyModal');return}
+  const ne=nestEgg();
+  const draw=monthlyDraw(ne)+totalPension();
+  const ytr=state.retirementAge-state.currentAge;
+  const dreams=selectedDreams.map(id=>DREAM_TYPES.find(d=>d.id===id)?.name).filter(Boolean).join(', ')||'General retirement';
+  const custom=document.getElementById('retDreamText').value;
+  const customDest=document.getElementById('customDest').value;
+  const box=document.getElementById('retAIBox');
+  box.innerHTML=`<div class="card"><div class="ai-box"><div class="ai-hdr"><div class="ai-dot"></div>AI ANALYSING SCENARIOS</div><div class="ai-loading"><div class="spinner"></div>Finding your perfect destinations...</div></div></div>`;
+
+  const prompt=`You are a retirement migration intelligence system for a Swedish expat planning retirement.
+
+FINANCIAL PROFILE:
+- Nest egg at retirement: SEK ${Math.round(ne/1e6*10)/10}M
+- Monthly draw (4% after ${state.withdrawTaxRate}% tax): SEK ${Math.round(monthlyDraw(ne)).toLocaleString()}
+- Swedish pension: SEK ${Math.round(totalPension()).toLocaleString()}/mo
+- Total monthly income: SEK ${Math.round(draw).toLocaleString()}/mo
+- Years to retirement: ${ytr} · Retiring at age ${state.retirementAge}
+- Nationality: Swedish (EU citizen) · Based: Stockholm
+
+LIFESTYLE: ${dreams}${custom?'\nPersonal description: '+custom:''}
+${customDest?'FOCUS ON: '+customDest:''}
+
+For ${customDest?'the requested destination and 2 alternatives':'4-5 top destinations'}, provide each as:
+## [Flag] [City, Country]
+**Monthly Budget Fit:** [X]K SEK/mo · Uses [X]% of your draw  
+**Why It Works:** [2 sentences matching lifestyle]  
+**Migration Pathway:** [Step-by-step from Sweden, realistic 12-36 month timeline]  
+**Legal & Tax:** [Visa type, Swedish pension treaty, tax treatment, healthcare]  
+**APEX Scores:** Financial [X]/10 · Legal [X]/10 · Healthcare [X]/10 · Lifestyle [X]/10  
+**Key Risk:** [One main challenge]
+
+End with ranked shortlist top 3.`;
+
+  try{
+    const res=await callClaude(prompt,2000);
+    box.innerHTML=`<div class="card"><div class="ai-box"><div class="ai-hdr"><div class="ai-dot"></div>RETIREMENT INTELLIGENCE</div><div class="ai-content">${mdParse(res)}</div></div></div>`;
+    document.getElementById('retDestPicker').style.display='block';
+    renderDestCards();
+  }catch(e){box.innerHTML=`<div class="card"><div class="ai-box"><div style="color:var(--red)">${e.message}</div></div></div>`}
+}
+
+async function runAPEX(){
+  if(!apiKey){openModal('keyModal');return}
+  const ne=nestEgg();
+  const draw=monthlyDraw(ne)+totalPension();
+  const ytr=state.retirementAge-state.currentAge;
+  const dest=document.getElementById('customDest').value||selectedRetDest||'Lisbon, Portugal';
+  const dreams=selectedDreams.map(id=>DREAM_TYPES.find(d=>d.id===id)?.name).filter(Boolean).join(', ')||'General';
+  const custom=document.getElementById('retDreamText').value;
+  const costLevel=document.getElementById('retCostLevel').value;
+  const expModel=RET_EXP_MODELS[costLevel];
+  const monthlyNeed=Object.values(expModel).reduce((s,v)=>s+v,0);
+
+  document.getElementById('apexShell').style.display='block';
+  document.getElementById('apexShell').scrollIntoView({behavior:'smooth'});
+  document.getElementById('apexStatus').textContent='RUNNING';
+  document.getElementById('apexStatus').className='apex-status running';
+  document.getElementById('apexMods').innerHTML='<div style="color:var(--text3);font-family:var(--fm);font-size:11px">Initialising APEX v2 feasibility check...</div>';
+  document.getElementById('apexVerdict').innerHTML='';
+  document.getElementById('apexOut').innerHTML='';
+  document.getElementById('migTimeline').innerHTML='';
+
+  const prompt=`You are APEX v2 — elite retirement feasibility terminal. Run comprehensive feasibility check.
+
+SUBJECT:
+- Age: ${state.currentAge} → Retire: ${state.retirementAge} (${ytr}Y)
+- Nest egg: SEK ${Math.round(ne/1e6*10)/10}M
+- Portfolio draw (after tax): SEK ${Math.round(monthlyDraw(ne)).toLocaleString()}/mo
+- Swedish pension: SEK ${Math.round(totalPension()).toLocaleString()}/mo
+- Total monthly income: SEK ${Math.round(draw).toLocaleString()}/mo
+- Required monthly budget: SEK ${monthlyNeed.toLocaleString()}
+- Surplus/deficit: SEK ${Math.round(draw-monthlyNeed).toLocaleString()}/mo
+- Income: SEK ${Math.round(totalIncome()).toLocaleString()}/mo · Savings: SEK ${state.baseSavings.toLocaleString()}/mo
+- Swedish citizen, based Stockholm
+
+TARGET: ${dest}
+LIFESTYLE: ${dreams}
+${custom?'Context: '+custom:''}
+
+Return ONLY valid JSON:
+{
+  "modules": [
+    {"name":"FINANCIAL READINESS","score":XX,"status":"pass|warn|fail","detail":"one line"},
+    {"name":"LEGAL PATHWAY","score":XX,"status":"pass|warn|fail","detail":"one line"},
+    {"name":"HEALTHCARE ACCESS","score":XX,"status":"pass|warn|fail","detail":"one line"},
+    {"name":"COST FIT","score":XX,"status":"pass|warn|fail","detail":"one line"},
+    {"name":"TAX EFFICIENCY","score":XX,"status":"pass|warn|fail","detail":"one line"},
+    {"name":"LIFESTYLE MATCH","score":XX,"status":"pass|warn|fail","detail":"one line"},
+    {"name":"EXPAT COMMUNITY","score":XX,"status":"pass|warn|fail","detail":"one line"},
+    {"name":"TIMELINE VIABILITY","score":XX,"status":"pass|warn|fail","detail":"one line"},
+    {"name":"PENSION TREATY","score":XX,"status":"pass|warn|fail","detail":"Swedish pension portability"},
+    {"name":"RUNWAY (YRS)","score":XX,"status":"pass|warn|fail","detail":"how many years sustainable at this burn rate"}
+  ],
+  "verdict": "FEASIBLE|CONDITIONAL|NOT_FEASIBLE",
+  "verdict_sub": "one sentence",
+  "analysis": "3 paragraphs covering financial sustainability, legal pathway, key risks. Use **bold** for key terms.",
+  "action_steps": [
+    {"year":"Now–Year 1","title":"Step title","desc":"What to do"},
+    {"year":"Year 1–2","title":"Step title","desc":"What to do"},
+    {"year":"Year 2–3","title":"Step title","desc":"What to do"},
+    {"year":"Year 3–${ytr}","title":"Step title","desc":"What to do"},
+    {"year":"Year ${ytr}","title":"Step title","desc":"Final migration"}
+  ]
+}`;
+
+  try{
+    const res=await callClaude(prompt,1800);
+    const clean=res.replace(/```json|```/g,'').trim();
+    const parsed=JSON.parse(clean);
+
+    document.getElementById('apexMods').innerHTML=parsed.modules.map(m=>`
+      <div class="apex-mod">
+        <div class="apex-mod-name">${m.name}</div>
+        <div class="apex-mod-val ${m.status}">${m.score}/100</div>
+        <div style="font-size:9px;color:var(--text3);margin-top:3px;font-family:var(--fm);line-height:1.4">${m.detail}</div>
+        <div class="pbar" style="margin-top:5px"><div class="pbar-fill" style="width:${m.score}%;background:${m.status==='pass'?'var(--green)':m.status==='warn'?'var(--amber)':'var(--red)'}"></div></div>
+      </div>`).join('');
+
+    const vc=parsed.verdict==='FEASIBLE'?'FEASIBLE':parsed.verdict==='CONDITIONAL'?'CONDITIONAL':'NOT_FEASIBLE';
+    document.getElementById('apexVerdict').innerHTML=`
+      <div class="apex-verdict ${vc}">${parsed.verdict} — ${dest}</div>
+      <div style="text-align:center;color:var(--text2);font-size:11px;margin-top:5px;font-family:var(--fm)">${parsed.verdict_sub||''}</div>`;
+
+    document.getElementById('apexOut').innerHTML=`<div style="color:var(--text);font-size:12px;line-height:1.85;margin-bottom:12px">${(parsed.analysis||'').replace(/\*\*(.*?)\*\*/g,'<strong style="color:var(--amber)">$1</strong>').replace(/\n/g,'<br>')}</div>`;
+
+    // Migration Timeline
+    if(parsed.action_steps?.length){
+      const currentYear=new Date().getFullYear();
+      const tl='<div style="margin-top:16px"><div style="font-size:10px;letter-spacing:.12em;font-weight:700;color:var(--amber);margin-bottom:12px;font-family:var(--fm)">MIGRATION ROADMAP</div><div class="mig-timeline">'+
+        parsed.action_steps.map((s,i)=>{
+          const dotCls=i===0?'done':i===1?'next':'future';
+          return`<div class="mig-step">
+            <div class="mig-dot ${dotCls}">${i+1}</div>
+            <div class="mig-body">
+              <div class="mig-year">${s.year||'Phase '+(i+1)}</div>
+              <div class="mig-title">${s.title}</div>
+              <div class="mig-desc">${s.desc}</div>
+            </div>
+          </div>`}).join('')+'</div></div>';
+      document.getElementById('migTimeline').innerHTML=tl;
+    }
+
+    document.getElementById('apexStatus').textContent=parsed.verdict;
+    document.getElementById('apexStatus').className=`apex-status ${parsed.verdict==='FEASIBLE'?'pass':parsed.verdict==='CONDITIONAL'?'':' fail'}`;
+  }catch(e){
+    document.getElementById('apexStatus').textContent='ERROR';
+    document.getElementById('apexStatus').className='apex-status fail';
+    document.getElementById('apexOut').innerHTML=`<span style="color:var(--red)">${e.message}</span>`;
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// SETTINGS
+// ═══════════════════════════════════════════════════════════════════
+function renderSettings(){
+  document.getElementById('setAge').value=state.currentAge;
+  document.getElementById('setRetAge').value=state.retirementAge;
+  document.getElementById('setLifeExp').value=state.lifeExp||90;
+  document.getElementById('setGrowth').value=state.growthRate;
+  document.getElementById('setInflation').value=state.inflationRate;
+  document.getElementById('setPostGrowth').value=state.postRetGrowth||4;
+  document.getElementById('setTaxRate').value=state.withdrawTaxRate||20;
+  document.getElementById('setCurrency').value=state.currency;
+  document.getElementById('setDark').checked=state.darkMode;
+  document.getElementById('setQuote').value=state.tickerQuote||'';
+  document.getElementById('rateUSD').value=state.exchangeRates?.USD||0.11;
+  document.getElementById('rateEUR').value=state.exchangeRates?.EUR||0.09;
+  document.getElementById('rateKES').value=state.exchangeRates?.KES||14.27;
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// AI CHAT PANEL
+// ═══════════════════════════════════════════════════════════════════
+function toggleAIPanel(){document.getElementById('aiPanel').classList.toggle('open')}
+async function sendAIChat(){
+  if(!apiKey){openModal('keyModal');return}
+  const inp=document.getElementById('aiChatInput');
+  const msg=inp.value.trim();if(!msg)return;
+  inp.value='';
+  addChatMsg('user',msg);
+  const ne=nestEgg();
+  const draw=monthlyDraw(ne)+totalPension();
+  const system=`You are HORIZON OS AI — a personal finance and life planning assistant. 
+User financial context: Income: SEK ${Math.round(totalIncome()).toLocaleString()}/mo, Expenses: SEK ${Math.round(totalExpenses()).toLocaleString()}/mo, Savings: SEK ${state.baseSavings.toLocaleString()}/mo, Fun Fund: SEK ${Math.round(funFund()).toLocaleString()}/mo, Nest Egg at retirement: SEK ${Math.round(ne/1e6*10)/10}M, Monthly retirement income: SEK ${Math.round(draw).toLocaleString()}/mo. Age: ${state.currentAge}, retiring at ${state.retirementAge}. Be concise, direct, and specific to their numbers.`;
+  chatHistory.push({role:'user',content:msg});
+  const thinkingEl=document.createElement('div');
+  thinkingEl.className='ai-msg bot';thinkingEl.innerHTML='<div class="ai-loading"><div class="spinner"></div>Thinking...</div>';
+  document.getElementById('aiMsgs').appendChild(thinkingEl);
+  document.getElementById('aiMsgs').scrollTop=99999;
+  try{
+    const res=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'Content-Type':'application/json','x-api-key':apiKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:500,system,messages:chatHistory.slice(-6)})});
+    const data=await res.json();
+    const reply=data.content?.map(c=>c.text||'').join('')||'No response';
+    chatHistory.push({role:'assistant',content:reply});
+    thinkingEl.innerHTML=mdParse(reply);
+  }catch(e){thinkingEl.innerHTML=`<span style="color:var(--red)">${e.message}</span>`}
+  document.getElementById('aiMsgs').scrollTop=99999;
+}
+function addChatMsg(role,text){
+  const el=document.createElement('div');
+  el.className=`ai-msg ${role}`;el.textContent=text;
+  document.getElementById('aiMsgs').appendChild(el);
+  document.getElementById('aiMsgs').scrollTop=99999;
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// CLAUDE API HELPER
+// ═══════════════════════════════════════════════════════════════════
+async function callClaude(prompt,maxTokens=1000){
+  if(!apiKey)throw new Error('No API key. Click ⚡ API KEY to add yours.');
+  const res=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'Content-Type':'application/json','x-api-key':apiKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:maxTokens,messages:[{role:'user',content:prompt}]})});
+  if(res.status===401)throw new Error('Invalid API key');
+  if(!res.ok)throw new Error('API error '+res.status);
+  const data=await res.json();
+  return data.content?.map(c=>c.text||'').join('')||'No response';
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// MARKDOWN PARSER
+// ═══════════════════════════════════════════════════════════════════
+function mdParse(t){
+  return t
+    .replace(/^## (.+)$/gm,'<h3>$1</h3>')
+    .replace(/^### (.+)$/gm,'<h4>$1</h4>')
+    .replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>')
+    .replace(/\*(.+?)\*/g,'<em>$1</em>')
+    .replace(/^[-•] (.+)$/gm,'<li>$1</li>')
+    .replace(/(<li>[\s\S]*?<\/li>)/g,'<ul>$1</ul>')
+    .replace(/\n\n/g,'</p><p>')
+    .replace(/\n/g,'<br>');
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// RENDER ALL
+// ═══════════════════════════════════════════════════════════════════
+function renderAll(){
+  renderTicker();
+  document.getElementById('sbSurplus').textContent=fmt(disposable());
+  document.getElementById('sbFunFund').textContent='Fun Fund: '+fmt(funFund());
+  const active=document.querySelector('.panel.active');
+  if(!active)return;
+  renderPanelContent(active.id.replace('panel-',''));
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// INIT
+// ═══════════════════════════════════════════════════════════════════
+loadState();
+applyTheme();
+updateKeyBadge();
+renderAll();
+renderDashboard();
+
+// Enter key on chat
+document.getElementById('aiChatInput').addEventListener('keydown',e=>{if(e.key==='Enter')sendAIChat()});
+// Live ticker refresh every 30s
+setInterval(renderTicker,30000);
+</script>
+</body>
+</html>

@@ -1,0 +1,899 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PropIQ — Kenya & Sweden Property Intelligence</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#0a0f1a;--bg2:#111827;--bg3:#1a2236;
+  --border:rgba(255,255,255,0.08);--border2:rgba(255,255,255,0.15);
+  --text:#e2e8f0;--text2:#94a3b8;--text3:#4b5563;
+  --green:#10b981;--green-pale:rgba(16,185,129,0.12);--green-text:#6ee7b7;
+  --amber:#f59e0b;--amber-pale:rgba(245,158,11,0.12);--amber-text:#fcd34d;
+  --red:#ef4444;--red-pale:rgba(239,68,68,0.12);--red-text:#fca5a5;
+  --blue:#3b82f6;--blue-pale:rgba(59,130,246,0.12);--blue-text:#93c5fd;
+  --ke:#006600;--ke-pale:rgba(0,102,0,0.15);--ke-text:#86efac;
+  --se:#006AA7;--se-pale:rgba(0,106,167,0.15);--se-text:#93c5fd;
+  --mono:'DM Mono',monospace;--sans:'DM Sans',sans-serif;
+  --r:12px;--rs:8px;
+}
+body{font-family:var(--sans);background:var(--bg);color:var(--text);min-height:100vh;font-size:14px;line-height:1.6}
+
+/* ── SETUP ── */
+#setup{display:flex;align-items:center;justify-content:center;min-height:100vh;padding:24px}
+.setup-card{background:var(--bg2);border:1px solid var(--border2);border-radius:16px;padding:40px;max-width:500px;width:100%}
+.setup-logo{font-family:var(--mono);font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:var(--green);margin-bottom:24px}
+.setup-title{font-size:26px;font-weight:600;margin-bottom:8px;letter-spacing:-.02em}
+.setup-sub{font-size:13px;color:var(--text2);margin-bottom:28px;line-height:1.6}
+.field{margin-bottom:16px}
+.field label{display:block;font-family:var(--mono);font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--text2);margin-bottom:6px}
+.field input{width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:var(--rs);padding:10px 14px;color:var(--text);font-family:var(--mono);font-size:12px;outline:none;transition:border .15s}
+.field input:focus{border-color:var(--green)}
+.field input::placeholder{color:var(--text3)}
+.btn-primary{width:100%;background:var(--green);color:#fff;border:none;border-radius:var(--rs);padding:12px;font-family:var(--sans);font-size:14px;font-weight:600;cursor:pointer;margin-top:8px;transition:opacity .15s}
+.btn-primary:hover{opacity:.9}
+.btn-primary:disabled{opacity:.4;cursor:not-allowed}
+.setup-note{font-size:11px;color:var(--text3);margin-top:14px;text-align:center;font-family:var(--mono)}
+.test-row{display:flex;gap:8px;margin-top:8px}
+.btn-test{flex:1;background:transparent;border:1px solid var(--border);border-radius:var(--rs);padding:8px;font-size:11px;font-family:var(--mono);color:var(--text2);cursor:pointer;transition:all .15s;letter-spacing:.04em}
+.btn-test:hover{border-color:var(--border2);color:var(--text)}
+.btn-test:disabled{opacity:.4;cursor:not-allowed}
+.key-status{display:flex;align-items:center;gap:6px;font-family:var(--mono);font-size:10px;margin-top:6px;min-height:16px;letter-spacing:.04em}
+.ks-dot{width:6px;height:6px;border-radius:50%;flex-shrink:0}
+.ks-ok{color:var(--green-text)}.ks-ok .ks-dot{background:var(--green)}
+.ks-fail{color:var(--red-text)}.ks-fail .ks-dot{background:var(--red)}
+.ks-testing{color:var(--text3)}.ks-testing .ks-dot{background:var(--text3);animation:blink 1s infinite}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.3}}
+
+/* demo box */
+.demo-box{background:var(--bg3);border:1px solid var(--border);border-radius:var(--rs);padding:14px 16px;margin-bottom:24px}
+.demo-box-label{font-family:var(--mono);font-size:9px;letter-spacing:.16em;text-transform:uppercase;color:var(--text3);margin-bottom:8px}
+.demo-row{display:flex;gap:8px;flex-wrap:wrap}
+.demo-tag{background:var(--bg2);border:1px solid var(--border);border-radius:20px;padding:4px 10px;font-size:11px;color:var(--text2);font-family:var(--mono)}
+
+/* ── APP SHELL ── */
+#app{display:none;flex-direction:column;min-height:100vh}
+.topbar{height:56px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;padding:0 16px;background:var(--bg);position:sticky;top:0;z-index:200}
+.brand{display:flex;align-items:center;gap:10px}
+.brand-mark{width:32px;height:32px;border-radius:8px;background:var(--green);display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.brand-mark svg{width:16px;height:16px;fill:none;stroke:#fff;stroke-width:2.5}
+.brand-name{font-weight:600;font-size:15px;letter-spacing:-.01em}
+.brand-sub{font-family:var(--mono);font-size:9px;letter-spacing:.12em;text-transform:uppercase;color:var(--text3);margin-top:1px}
+.topbar-right{display:flex;align-items:center;gap:8px;flex-wrap:wrap;justify-content:flex-end}
+.market-toggle{display:flex;background:var(--bg3);border:1px solid var(--border);border-radius:20px;padding:3px;gap:2px}
+.mtog{display:flex;align-items:center;gap:5px;padding:4px 12px;border-radius:16px;font-size:12px;font-weight:500;cursor:pointer;border:none;background:transparent;color:var(--text2);transition:all .2s;font-family:var(--sans)}
+.mtog.ke.on{background:var(--ke-pale);color:var(--ke-text)}
+.mtog.se.on{background:var(--se-pale);color:var(--se-text)}
+.live-pill{display:flex;align-items:center;gap:5px;background:var(--green-pale);border:1px solid rgba(16,185,129,0.2);border-radius:20px;padding:4px 10px;font-family:var(--mono);font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--green-text)}
+.live-dot{width:5px;height:5px;border-radius:50%;background:var(--green);animation:blink 2s infinite}
+.icon-btn{background:var(--bg3);border:1px solid var(--border);border-radius:var(--rs);padding:6px 10px;color:var(--text2);font-size:12px;cursor:pointer;font-family:var(--sans);white-space:nowrap;transition:all .15s}
+.icon-btn:hover{border-color:var(--border2);color:var(--text)}
+
+/* market banner */
+.market-banner{padding:8px 16px;font-family:var(--mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px}
+.market-banner.ke{background:var(--ke-pale);color:var(--ke-text)}
+.market-banner.se{background:var(--se-pale);color:var(--se-text)}
+
+/* disclaimer banner */
+.disclaimer{background:rgba(245,158,11,0.08);border-bottom:1px solid rgba(245,158,11,0.2);padding:8px 16px;font-size:11px;color:var(--amber-text);display:flex;align-items:center;gap:8px;font-family:var(--mono);letter-spacing:.02em}
+.disclaimer svg{flex-shrink:0}
+
+/* ── LAYOUT ── */
+.app-body{display:flex;flex:1;overflow:hidden}
+.sidebar{width:260px;border-right:1px solid var(--border);background:var(--bg2);display:flex;flex-direction:column;overflow-y:auto;flex-shrink:0}
+.main{flex:1;padding:20px 20px;overflow-y:auto}
+
+/* sidebar */
+.sidebar-section{padding:12px 14px 4px;font-family:var(--mono);font-size:9px;letter-spacing:.18em;text-transform:uppercase;color:var(--text3)}
+.history-item{padding:10px 14px;cursor:pointer;border-bottom:1px solid var(--border);transition:background .1s}
+.history-item:hover{background:var(--bg3)}
+.history-item.active{background:var(--bg3);border-left:2px solid var(--green)}
+.hi-query{font-size:12px;font-weight:500;color:var(--text);margin-bottom:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.hi-meta{font-family:var(--mono);font-size:10px;color:var(--text3);display:flex;gap:8px;align-items:center}
+.hi-flag{font-size:11px}
+.hi-verdict{font-size:9px;padding:1px 5px;border-radius:3px;font-weight:500}
+.hv-buy{background:var(--green-pale);color:var(--green-text)}
+.hv-hold{background:var(--amber-pale);color:var(--amber-text)}
+.hv-avoid{background:var(--red-pale);color:var(--red-text)}
+.sidebar-empty{padding:20px 14px;font-size:12px;color:var(--text3);line-height:1.6;font-family:var(--mono)}
+.sidebar-clear{margin:8px 14px;background:transparent;border:1px solid var(--border);border-radius:var(--rs);padding:6px;width:calc(100% - 28px);color:var(--text3);font-size:11px;cursor:pointer;font-family:var(--mono);transition:all .15s}
+.sidebar-clear:hover{border-color:var(--red);color:var(--red-text)}
+
+/* compare button */
+.compare-bar{display:flex;align-items:center;gap:8px;padding:8px 14px;border-bottom:1px solid var(--border);background:var(--bg3)}
+.compare-bar span{font-size:11px;color:var(--text2);font-family:var(--mono);flex:1}
+.btn-compare{background:var(--blue-pale);border:1px solid rgba(59,130,246,0.3);border-radius:var(--rs);padding:5px 10px;color:var(--blue-text);font-size:11px;cursor:pointer;font-family:var(--mono);transition:all .15s}
+.btn-compare:hover{background:rgba(59,130,246,0.2)}
+
+/* ── SEARCH ── */
+.search-label{font-family:var(--mono);font-size:9px;letter-spacing:.18em;text-transform:uppercase;color:var(--text3);margin-bottom:8px}
+.search-row{display:flex;gap:8px;margin-bottom:8px}
+.search-input{flex:1;background:var(--bg2);border:1px solid var(--border);border-radius:var(--rs);padding:11px 14px;color:var(--text);font-family:var(--sans);font-size:14px;outline:none;transition:border .15s}
+.search-input:focus{border-color:var(--green)}
+.search-input::placeholder{color:var(--text3)}
+.search-btn{background:var(--green);color:#fff;border:none;border-radius:var(--rs);padding:11px 18px;font-weight:600;cursor:pointer;font-size:13px;font-family:var(--sans);white-space:nowrap;transition:opacity .15s;min-width:100px}
+.search-btn:hover{opacity:.9}
+.search-btn:disabled{opacity:.4;cursor:not-allowed}
+.quick-tags{display:flex;gap:6px;margin-bottom:20px;flex-wrap:wrap}
+.qtag{background:var(--bg3);border:1px solid var(--border);border-radius:20px;padding:3px 10px;font-size:11px;color:var(--text2);cursor:pointer;transition:all .15s;font-family:var(--mono)}
+.qtag:hover{border-color:var(--green);color:var(--green-text)}
+
+/* ── PROGRESS BAR ── */
+.progress-wrap{margin-bottom:20px;display:none}
+.progress-wrap.on{display:block}
+.progress-label{font-family:var(--mono);font-size:10px;color:var(--text2);margin-bottom:6px;letter-spacing:.06em}
+.progress-track{height:3px;background:var(--bg3);border-radius:2px;overflow:hidden}
+.progress-fill{height:100%;background:var(--green);border-radius:2px;transition:width .4s ease;width:0%}
+.progress-steps{display:flex;gap:12px;margin-top:8px;flex-wrap:wrap}
+.pstep{font-family:var(--mono);font-size:10px;color:var(--text3);display:flex;align-items:center;gap:5px}
+.pstep.done{color:var(--green-text)}
+.pstep.active{color:var(--text2)}
+.pstep-dot{width:5px;height:5px;border-radius:50%;background:var(--text3);flex-shrink:0}
+.pstep.done .pstep-dot{background:var(--green)}
+.pstep.active .pstep-dot{background:var(--amber);animation:blink .8s infinite}
+
+/* ── TABS ── */
+.tabs{display:flex;border-bottom:1px solid var(--border);margin-bottom:20px;overflow-x:auto}
+.tab{font-family:var(--sans);font-size:13px;font-weight:500;padding:10px 16px;border:none;background:none;color:var(--text2);cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1px;transition:all .15s;white-space:nowrap}
+.tab:hover{color:var(--text)}
+.tab.on{color:var(--green);border-bottom-color:var(--green)}
+
+/* ── PANELS ── */
+.panel{background:var(--bg2);border:1px solid var(--border);border-radius:var(--r);overflow:hidden;margin-bottom:14px}
+.panel-header{padding:12px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px}
+.panel-icon{width:26px;height:26px;border-radius:6px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.panel-title{font-weight:600;font-size:13px}
+.panel-sub{font-size:11px;color:var(--text2);font-family:var(--mono);letter-spacing:.03em}
+.panel-body{padding:14px 16px}
+
+/* ── KPIS ── */
+.kpi-row{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-bottom:16px}
+.kpi{background:var(--bg3);border-radius:var(--rs);padding:12px 14px}
+.kpi-label{font-family:var(--mono);font-size:9px;letter-spacing:.12em;text-transform:uppercase;color:var(--text3);margin-bottom:5px}
+.kpi-value{font-size:18px;font-weight:600;letter-spacing:-.02em;line-height:1.1}
+.kpi-sub{font-size:10px;color:var(--text2);margin-top:3px}
+
+/* ── AI BOX ── */
+.ai-box{background:var(--bg3);border:1px solid rgba(16,185,129,0.2);border-radius:var(--rs);padding:14px;margin-bottom:12px}
+.ai-box-label{font-family:var(--mono);font-size:9px;letter-spacing:.16em;text-transform:uppercase;color:var(--green);margin-bottom:7px}
+.ai-box-content{font-size:13px;line-height:1.7;color:var(--text)}
+
+/* ── VERDICT ── */
+.verdict-row{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:12px}
+.verdict-card{background:var(--bg2);border:1px solid var(--border);border-radius:var(--rs);padding:12px;text-align:center}
+.verdict-label{font-family:var(--mono);font-size:9px;letter-spacing:.12em;text-transform:uppercase;color:var(--text3);margin-bottom:5px}
+.verdict-value{font-weight:600;font-size:14px}
+.v-buy{color:var(--green-text)}.v-hold{color:var(--amber-text)}.v-avoid{color:var(--red-text)}
+
+/* ── FLAGS ── */
+.flags{display:flex;flex-direction:column;gap:8px}
+.flag{display:flex;align-items:flex-start;gap:10px;padding:10px 12px;border-radius:var(--rs);border:1px solid}
+.flag.ok{background:var(--green-pale);border-color:rgba(16,185,129,0.2)}
+.flag.warn{background:var(--amber-pale);border-color:rgba(245,158,11,0.2)}
+.flag.danger{background:var(--red-pale);border-color:rgba(239,68,68,0.2)}
+.flag-dot{width:6px;height:6px;border-radius:50%;margin-top:5px;flex-shrink:0}
+.flag.ok .flag-dot{background:var(--green)}.flag.warn .flag-dot{background:var(--amber)}.flag.danger .flag-dot{background:var(--red)}
+.flag-title{font-weight:600;font-size:12px;margin-bottom:2px}
+.flag.ok .flag-title{color:var(--green-text)}.flag.warn .flag-title{color:var(--amber-text)}.flag.danger .flag-title{color:var(--red-text)}
+.flag-text{font-size:12px;line-height:1.5;color:var(--text2)}
+
+/* ── SIGNALS ── */
+.signal-item{display:flex;align-items:flex-start;gap:10px;padding:10px 0;border-bottom:1px solid var(--border)}
+.signal-item:last-child{border-bottom:none}
+.signal-dot{width:6px;height:6px;border-radius:50%;margin-top:5px;flex-shrink:0}
+.signal-text{font-size:12px;line-height:1.55;color:var(--text)}
+.signal-meta{font-family:var(--mono);font-size:10px;color:var(--text3);margin-top:3px}
+
+/* ── TABLE ── */
+.dt{width:100%;border-collapse:collapse}
+.dt thead th{font-family:var(--mono);font-size:9px;letter-spacing:.12em;text-transform:uppercase;color:var(--text3);text-align:left;padding:8px 10px;border-bottom:1px solid var(--border);background:var(--bg3)}
+.dt tbody tr{border-bottom:1px solid var(--border);transition:background .1s}
+.dt tbody tr:last-child{border-bottom:none}
+.dt tbody tr:hover{background:var(--bg3)}
+.dt td{padding:9px 10px;font-size:12px;vertical-align:middle}
+.sbadge{display:inline-flex;padding:2px 7px;border-radius:3px;font-family:var(--mono);font-size:9px;letter-spacing:.06em;text-transform:uppercase;font-weight:500}
+.sb-plan{background:var(--blue-pale);color:var(--blue-text)}
+.sb-appr{background:var(--amber-pale);color:var(--amber-text)}
+.sb-cons{background:var(--green-pale);color:var(--green-text)}
+.sb-done{background:rgba(100,100,100,0.12);color:var(--text2)}
+
+/* ── MORTGAGE CALCULATOR ── */
+.calc-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px}
+.calc-field label{display:block;font-family:var(--mono);font-size:9px;letter-spacing:.14em;text-transform:uppercase;color:var(--text3);margin-bottom:5px}
+.calc-field input,.calc-field select{width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:var(--rs);padding:9px 12px;color:var(--text);font-family:var(--mono);font-size:12px;outline:none;transition:border .15s}
+.calc-field input:focus,.calc-field select:focus{border-color:var(--green)}
+.calc-field select option{background:var(--bg2)}
+.calc-result{background:var(--bg3);border:1px solid rgba(16,185,129,0.25);border-radius:var(--rs);padding:16px;display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+.cr-item{text-align:center}
+.cr-label{font-family:var(--mono);font-size:9px;letter-spacing:.12em;text-transform:uppercase;color:var(--text3);margin-bottom:5px}
+.cr-value{font-size:20px;font-weight:600;color:var(--green)}
+.cr-sub{font-size:10px;color:var(--text2);margin-top:2px}
+
+/* ── CURRENCY CONVERTER ── */
+.fx-row{display:flex;align-items:center;gap:10px;background:var(--bg3);border-radius:var(--rs);padding:14px}
+.fx-field{flex:1}
+.fx-field label{display:block;font-family:var(--mono);font-size:9px;letter-spacing:.12em;text-transform:uppercase;color:var(--text3);margin-bottom:5px}
+.fx-field input{width:100%;background:var(--bg2);border:1px solid var(--border);border-radius:var(--rs);padding:8px 12px;color:var(--text);font-family:var(--mono);font-size:13px;outline:none}
+.fx-field input:focus{border-color:var(--green)}
+.fx-arrow{color:var(--text3);font-size:18px;flex-shrink:0;margin-top:14px}
+.fx-select{background:var(--bg2);border:1px solid var(--border);border-radius:var(--rs);padding:8px 10px;color:var(--text);font-family:var(--mono);font-size:12px;outline:none;margin-top:20px;cursor:pointer}
+.fx-select option{background:var(--bg2)}
+.fx-rate{font-family:var(--mono);font-size:10px;color:var(--text3);margin-top:10px;text-align:center}
+
+/* ── COMPARE ── */
+.compare-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.compare-card{background:var(--bg3);border:1px solid var(--border);border-radius:var(--rs);padding:14px}
+.cc-header{font-weight:600;font-size:13px;margin-bottom:10px;color:var(--text)}
+.cc-row{display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--border);font-size:12px}
+.cc-row:last-child{border-bottom:none}
+.cc-label{color:var(--text2)}
+.cc-val{font-family:var(--mono);font-size:11px;color:var(--text);font-weight:500}
+.cc-verdict{display:inline-flex;padding:2px 8px;border-radius:4px;font-family:var(--mono);font-size:10px;font-weight:600;margin-top:8px}
+
+/* ── SHARE / EXPORT ── */
+.share-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:14px}
+.share-btn{background:var(--bg3);border:1px solid var(--border);border-radius:var(--rs);padding:14px 10px;text-align:center;cursor:pointer;transition:all .15s;font-family:var(--sans)}
+.share-btn:hover{border-color:var(--border2);background:var(--bg2)}
+.share-icon{font-size:20px;margin-bottom:6px}
+.share-label{font-size:12px;font-weight:500;color:var(--text)}
+.share-sub{font-size:10px;color:var(--text3);margin-top:2px;font-family:var(--mono)}
+.copy-toast{background:var(--green);color:#fff;border-radius:var(--rs);padding:8px 14px;font-size:12px;font-family:var(--mono);text-align:center;margin-top:10px;display:none}
+.feedback-row{display:flex;gap:8px;margin-top:14px;align-items:center}
+.feedback-label{font-family:var(--mono);font-size:10px;color:var(--text3);letter-spacing:.08em}
+.fb-btn{background:transparent;border:1px solid var(--border);border-radius:var(--rs);padding:6px 14px;font-size:12px;cursor:pointer;font-family:var(--sans);color:var(--text2);transition:all .15s}
+.fb-btn:hover{border-color:var(--border2)}
+.fb-btn.up:hover{border-color:var(--green);color:var(--green-text)}
+.fb-btn.down:hover{border-color:var(--red);color:var(--red-text)}
+.fb-btn.selected-up{background:var(--green-pale);border-color:var(--green);color:var(--green-text)}
+.fb-btn.selected-down{background:var(--red-pale);border-color:var(--red);color:var(--red-text)}
+
+/* ── LEGAL NOTE ── */
+.legal-note{margin-top:14px;padding:12px;background:var(--bg3);border-radius:var(--rs);font-size:11px;color:var(--text3);line-height:1.6;font-family:var(--mono)}
+
+/* ── EMPTY / LOADING ── */
+.empty{padding:40px 20px;text-align:center;color:var(--text3)}
+.empty-title{font-size:14px;font-weight:500;margin-bottom:6px;color:var(--text2)}
+.empty-sub{font-size:12px;line-height:1.7}
+.pane{display:none}.pane.on{display:block}
+.error-box{background:var(--red-pale);border:1px solid rgba(239,68,68,0.25);border-radius:var(--rs);padding:14px;margin-bottom:14px}
+.error-title{color:var(--red-text);font-weight:600;font-size:13px;margin-bottom:4px}
+.error-msg{font-size:12px;color:var(--text2);margin-bottom:10px;line-height:1.5}
+.retry-btn{background:var(--red-pale);border:1px solid rgba(239,68,68,0.3);border-radius:var(--rs);padding:6px 14px;color:var(--red-text);font-size:12px;cursor:pointer;font-family:var(--mono)}
+.retry-btn:hover{background:rgba(239,68,68,0.2)}
+
+/* ── RESPONSIVE ── */
+@media(max-width:900px){
+  .sidebar{display:none}
+  .kpi-row{grid-template-columns:repeat(3,1fr)}
+}
+@media(max-width:640px){
+  .kpi-row{grid-template-columns:repeat(2,1fr)}
+  .verdict-row{grid-template-columns:1fr}
+  .calc-grid{grid-template-columns:1fr}
+  .share-grid{grid-template-columns:repeat(2,1fr)}
+  .compare-grid{grid-template-columns:1fr}
+  .main{padding:14px}
+  .topbar{padding:0 10px}
+  .brand-sub{display:none}
+  .market-toggle{scale:.85;transform-origin:right}
+  .fx-row{flex-direction:column}
+  .fx-arrow{transform:rotate(90deg);margin-top:0}
+}
+@keyframes spin{to{transform:rotate(360deg)}}
+</style>
+</head>
+<body>
+
+<!-- ══ SETUP ══ -->
+<div id="setup">
+  <div class="setup-card">
+    <div class="setup-logo">PropIQ — Property Intelligence</div>
+    <div class="setup-title">Kenya & Sweden</div>
+    <div class="setup-sub">AI-powered property market analysis. Live signals, investment thesis, mortgage calculator, and legal risk scoring — in one place. Enter your API keys to begin.</div>
+
+    <div class="demo-box">
+      <div class="demo-box-label">What you can search</div>
+      <div class="demo-row">
+        <span class="demo-tag">🇰🇪 Westlands 2BR</span>
+        <span class="demo-tag">🇰🇪 Karen villa</span>
+        <span class="demo-tag">🇸🇪 Östermalm lägenhet</span>
+        <span class="demo-tag">🇸🇪 Lidingö villa</span>
+        <span class="demo-tag">🇰🇪 Kilimani off-plan</span>
+        <span class="demo-tag">🇸🇪 Nacka bostadsrätt</span>
+      </div>
+    </div>
+
+    <div class="field">
+      <label>Anthropic API Key</label>
+      <input type="password" id="anthropic-key" placeholder="sk-ant-..." autocomplete="off" oninput="clearStatus('ak-status')">
+      <div class="test-row"><button class="btn-test" id="test-ak-btn" onclick="testAnthropic()">Test Anthropic key</button></div>
+      <div class="key-status" id="ak-status"></div>
+    </div>
+    <div class="field">
+      <label>Perplexity API Key <span style="color:var(--text3);font-size:10px">(optional — enhances live data)</span></label>
+      <input type="password" id="perplexity-key" placeholder="pplx-..." autocomplete="off" oninput="clearStatus('pk-status')">
+      <div class="test-row"><button class="btn-test" id="test-pk-btn" onclick="testPerplexity()">Test Perplexity key</button></div>
+      <div class="key-status" id="pk-status"></div>
+    </div>
+    <button class="btn-primary" onclick="startApp()">Launch PropIQ</button>
+    <div class="setup-note">Keys stored in localStorage only · Never sent to any server · Clear browser data to remove</div>
+  </div>
+</div>
+
+<!-- ══ APP ══ -->
+<div id="app">
+  <div class="topbar">
+    <div class="brand">
+      <div class="brand-mark"><svg viewBox="0 0 16 16"><path d="M8 2L2 6v8h4v-4h4v4h4V6L8 2z"/></svg></div>
+      <div>
+        <div class="brand-name">PropIQ</div>
+        <div class="brand-sub">Property Intelligence</div>
+      </div>
+    </div>
+    <div class="topbar-right">
+      <div class="market-toggle">
+        <button class="mtog ke on" id="tog-ke" onclick="setMarket('ke')">🇰🇪 Kenya</button>
+        <button class="mtog se" id="tog-se" onclick="setMarket('se')">🇸🇪 Sweden</button>
+      </div>
+      <div class="live-pill"><div class="live-dot"></div>Live</div>
+      <button class="icon-btn" onclick="resetKeys()">Keys</button>
+    </div>
+  </div>
+
+  <div class="disclaimer">
+    <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><circle cx="8" cy="8" r="6"/><line x1="8" y1="5" x2="8" y2="8"/><circle cx="8" cy="11" r=".5" fill="currentColor"/></svg>
+    AI-generated analysis only. Not financial or legal advice. Always verify with a licensed professional before making any property purchase decision.
+  </div>
+
+  <div class="market-banner ke" id="market-banner">🇰🇪 &nbsp; Kenya market · Prices in KES · Nairobi focus</div>
+
+  <div class="app-body">
+    <!-- SIDEBAR: search history -->
+    <div class="sidebar">
+      <div class="sidebar-section">Search History</div>
+      <div id="history-list"><div class="sidebar-empty">No searches yet.<br>Results saved automatically.</div></div>
+      <button class="sidebar-clear" id="clear-history-btn" onclick="clearHistory()" style="display:none">Clear history</button>
+    </div>
+
+    <!-- MAIN CONTENT -->
+    <div class="main">
+      <div class="search-label" id="search-label">Search any Nairobi location or property type</div>
+      <div class="search-row">
+        <input class="search-input" id="search-input" placeholder="e.g. Westlands 2BR apartment..." onkeydown="if(event.key==='Enter')runSearch()">
+        <button class="search-btn" id="search-btn" onclick="runSearch()">Analyse</button>
+      </div>
+      <div class="quick-tags" id="quick-tags"></div>
+
+      <!-- PROGRESS -->
+      <div class="progress-wrap" id="progress-wrap">
+        <div class="progress-label" id="progress-label">Fetching live signals...</div>
+        <div class="progress-track"><div class="progress-fill" id="progress-fill"></div></div>
+        <div class="progress-steps" id="progress-steps"></div>
+      </div>
+
+      <div id="results-area">
+        <div class="empty">
+          <div class="empty-title" id="empty-title">Search a location to begin</div>
+          <div class="empty-sub">PropIQ fetches live signals, generates an investment thesis,<br>calculates mortgage payments, and flags legal risks — all in one place.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+let ANTHROPIC_KEY = '', PERPLEXITY_KEY = '', MARKET = 'ke';
+let history = [], currentResult = null, lastQuery = '';
+
+const MC = {
+  ke:{name:'Kenya',flag:'🇰🇪',currency:'KES',locale:'en-KE',
+    banner:'🇰🇪 &nbsp; Kenya market · Prices in KES · Nairobi focus',
+    searchLabel:'Search any Nairobi location or property type',
+    placeholder:'e.g. Westlands 2BR, Karen villa, Kilimani off-plan...',
+    tags:['Westlands','Kilimani','Karen','Kileleshwa','Lavington','Runda','Parklands','Nairobi CBD'],
+    mortgageRates:[{label:'KCB (13.5%)',val:13.5},{label:'Equity Bank (14%)',val:14},{label:'Stanbic (13%)',val:13},{label:'NCBA (14.5%)',val:14.5}],
+    mortgageTerm:[{label:'20 years',val:240},{label:'25 years',val:300},{label:'15 years',val:180}],
+    mortgageDeposit:20,
+    legalNote:'Always conduct an official title search at Ardhi House (Lands Registry, Upper Hill, Nairobi) before paying any deposit. Official search costs KES 500 and takes 3–5 working days. Instruct a Kenya-registered advocate to conduct the search on your behalf.',
+    contextPrompt:`You are a Kenya real estate analyst. Research: "{q}" in Nairobi, Kenya.
+Provide: prices in KES, price per sqm, rental yields (%), recent transactions, comparable properties, infrastructure nearby, and market risks/positives. Focus on 2024–2025 data.`,
+    analysisPrompt:`You are PropIQ Kenya — AI property investment analyst for Nairobi. Query: "{q}". Research: {signals}
+Return ONLY valid JSON:
+{"summary":"2-3 sentence overview","priceRange":"e.g. KES 8M–15M","pricePerSqm":"e.g. KES 95,000/m²","rentalYield":"e.g. 5.8%","capitalAppreciation":"e.g. 8–12% annually","verdict":"BUY|HOLD|AVOID","verdictReason":"one sentence","investmentThesis":"3-4 sentences","signals":[{"sentiment":"positive|negative|neutral","text":"text","source":"source"}],"pipeline":[{"name":"name","developer":"dev","units":50,"status":"Planning|Approved|Under Construction|Complete","completion":"Q4 2025","priceFrom":"KES 9M"}],"titleRisks":[{"level":"ok|warn|danger","title":"title","detail":"detail"}],"kpis":{"avgPrice":"KES 12M","yield":"5.8%","appreciation":"9%","liquidity":"Medium"}}`
+  },
+  se:{name:'Sweden',flag:'🇸🇪',currency:'SEK',locale:'sv-SE',
+    banner:'🇸🇪 &nbsp; Swedish market · Prices in SEK · Stockholm & major cities',
+    searchLabel:'Search any Swedish location or property type',
+    placeholder:'e.g. Östermalm lägenhet, Lidingö villa, Nacka bostadsrätt...',
+    tags:['Östermalm','Lidingö','Nacka','Bromma','Djursholm','Solna','Gothenburg','Malmö'],
+    mortgageRates:[{label:'Riksbank rate + 1% (4.5%)',val:4.5},{label:'Swedbank (4.2%)',val:4.2},{label:'SEB (4.4%)',val:4.4},{label:'Handelsbanken (4.3%)',val:4.3}],
+    mortgageTerm:[{label:'30 years',val:360},{label:'25 years',val:300},{label:'15 years',val:180}],
+    mortgageDeposit:15,
+    legalNote:'Engage a licensed Swedish fastighetsmäklare and conduct a full Lantmäteriregistret search before signing. Confirm pantbrev status and inteckningar with the seller. For bostadsrätt, review the bostadsrättsföreningens årsredovisning and check the association debt (skuld per andel). An energideklaration is required by law.',
+    contextPrompt:`You are a Swedish real estate analyst. Research: "{q}" in Sweden.
+Provide: prices in SEK (including SEK/m²), HOX/Valueguard trends, rental yields, Riksbank rate impact, nyproduktion nearby, comparables with SEK prices, risks and positives. Focus on 2024–2025 Swedish housing data.`,
+    analysisPrompt:`You are PropIQ Sweden — AI property investment analyst for Swedish real estate. Query: "{q}". Research: {signals}
+Return ONLY valid JSON:
+{"summary":"2-3 sentence overview","priceRange":"e.g. SEK 4M–8M","pricePerSqm":"e.g. SEK 85,000/m²","rentalYield":"e.g. 2.8%","capitalAppreciation":"e.g. 3–5% annually","verdict":"BUY|HOLD|AVOID","verdictReason":"one sentence","investmentThesis":"3-4 sentences including Riksbank context","signals":[{"sentiment":"positive|negative|neutral","text":"text","source":"Hemnet|Valueguard|Riksbank|etc"}],"pipeline":[{"name":"name","developer":"dev","units":60,"status":"Bygglov ansökt|Bygglov beviljat|Byggnation pågår|Klart","completion":"2026","priceFrom":"SEK 5.5M"}],"titleRisks":[{"level":"ok|warn|danger","title":"title","detail":"Sweden-specific legal detail about lagfart, pantbrev, bostadsrätt etc"}],"kpis":{"avgPrice":"SEK 6M","yield":"2.8%","appreciation":"4%","liquidity":"High"}}`
+  }
+};
+
+// ── MARKET TOGGLE ──
+function setMarket(m) {
+  MARKET = m;
+  const cfg = MC[m];
+  document.getElementById('tog-ke').classList.toggle('on', m==='ke');
+  document.getElementById('tog-se').classList.toggle('on', m==='se');
+  const banner = document.getElementById('market-banner');
+  banner.className = 'market-banner '+m;
+  banner.innerHTML = cfg.banner;
+  document.getElementById('search-label').textContent = cfg.searchLabel;
+  document.getElementById('search-input').placeholder = cfg.placeholder;
+  renderQuickTags();
+  showEmpty();
+}
+
+function renderQuickTags() {
+  document.getElementById('quick-tags').innerHTML = MC[MARKET].tags.map(t=>
+    `<span class="qtag" onclick="quickSearch('${t}')">${t}</span>`).join('');
+}
+
+function showEmpty() {
+  document.getElementById('results-area').innerHTML = `<div class="empty"><div class="empty-title">Search a ${MC[MARKET].name} location to begin</div><div class="empty-sub">Live signals · Investment analysis · Mortgage calculator · Legal risk</div></div>`;
+}
+
+// ── KEY TESTING ──
+function setStatus(id,state,msg){const el=document.getElementById(id);el.className='key-status ks-'+state;el.innerHTML=`<div class="ks-dot"></div>${msg}`}
+function clearStatus(id){const el=document.getElementById(id);el.className='key-status';el.innerHTML=''}
+
+async function testAnthropic() {
+  const key = document.getElementById('anthropic-key').value.trim();
+  if (!key){setStatus('ak-status','fail','Enter a key first');return}
+  const btn=document.getElementById('test-ak-btn');
+  btn.disabled=true;btn.textContent='Testing...';
+  setStatus('ak-status','testing','Connecting to Anthropic...');
+  try {
+    const res = await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'x-api-key':key,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true','Content-Type':'application/json'},body:JSON.stringify({model:'claude-haiku-4-5-20251001',max_tokens:10,messages:[{role:'user',content:'Say OK'}]})});
+    if(res.ok) setStatus('ak-status','ok','Key valid — Anthropic connected');
+    else{const e=await res.json();setStatus('ak-status','fail',e.error?.message||'Invalid key')}
+  }catch(e){setStatus('ak-status','fail','Connection failed — check key format')}
+  btn.disabled=false;btn.textContent='Test Anthropic key';
+}
+
+async function testPerplexity() {
+  const key = document.getElementById('perplexity-key').value.trim();
+  if (!key){setStatus('pk-status','fail','Enter a key first');return}
+  const btn=document.getElementById('test-pk-btn');
+  btn.disabled=true;btn.textContent='Testing...';
+  setStatus('pk-status','testing','Connecting to Perplexity...');
+  try {
+    const res = await fetch('https://api.perplexity.ai/chat/completions',{method:'POST',headers:{'Authorization':`Bearer ${key}`,'Content-Type':'application/json'},body:JSON.stringify({model:'llama-3.1-sonar-small-128k-online',messages:[{role:'user',content:'Say OK'}],max_tokens:5})});
+    if(res.ok) setStatus('pk-status','ok','Key valid — Perplexity connected');
+    else{const e=await res.json();setStatus('pk-status','fail',e.error?.message||'Invalid key')}
+  }catch(e){setStatus('pk-status','fail','CORS blocked from local file — host on Netlify to test')}
+  btn.disabled=false;btn.textContent='Test Perplexity key';
+}
+
+// ── AUTH ──
+function startApp() {
+  const ak=document.getElementById('anthropic-key').value.trim();
+  const pk=document.getElementById('perplexity-key').value.trim();
+  if(!ak){alert('Anthropic API key required.');return}
+  if(!ak.startsWith('sk-ant-')){alert('Anthropic key should start with sk-ant-');return}
+  ANTHROPIC_KEY=ak; PERPLEXITY_KEY=pk;
+  localStorage.setItem('propiq_ak',ak);
+  if(pk) localStorage.setItem('propiq_pk',pk);
+  loadHistory();
+  document.getElementById('setup').style.display='none';
+  document.getElementById('app').style.display='flex';
+  renderQuickTags();
+}
+
+function resetKeys() {
+  localStorage.removeItem('propiq_ak');localStorage.removeItem('propiq_pk');
+  document.getElementById('setup').style.display='flex';
+  document.getElementById('app').style.display='none';
+  document.getElementById('anthropic-key').value='';
+  document.getElementById('perplexity-key').value='';
+}
+
+window.addEventListener('DOMContentLoaded',()=>{
+  const ak=localStorage.getItem('propiq_ak');
+  if(ak){
+    ANTHROPIC_KEY=ak;PERPLEXITY_KEY=localStorage.getItem('propiq_pk')||'';
+    loadHistory();
+    document.getElementById('setup').style.display='none';
+    document.getElementById('app').style.display='flex';
+    renderQuickTags();
+  }
+});
+
+// ── HISTORY ──
+function loadHistory(){
+  const saved=localStorage.getItem('propiq_history');
+  history=saved?JSON.parse(saved):[];
+  renderHistory();
+}
+
+function saveToHistory(query,market,result){
+  const item={id:Date.now(),query,market,verdict:result.verdict,priceRange:result.priceRange,summary:result.summary,result,timestamp:new Date().toISOString()};
+  history.unshift(item);
+  if(history.length>20) history=history.slice(0,20);
+  localStorage.setItem('propiq_history',JSON.stringify(history));
+  renderHistory();
+}
+
+function renderHistory(){
+  const el=document.getElementById('history-list');
+  const clearBtn=document.getElementById('clear-history-btn');
+  if(!history.length){el.innerHTML='<div class="sidebar-empty">No searches yet.<br>Results saved automatically.</div>';clearBtn.style.display='none';return}
+  clearBtn.style.display='block';
+  el.innerHTML=history.map((h,i)=>{
+    const vClass=h.verdict==='BUY'?'hv-buy':h.verdict==='AVOID'?'hv-avoid':'hv-hold';
+    const flag=MC[h.market]?.flag||'';
+    const time=new Date(h.timestamp).toLocaleDateString('en-GB',{day:'numeric',month:'short'});
+    return `<div class="history-item ${i===0&&currentResult?'active':''}" onclick="loadHistoryItem(${i})">
+      <div class="hi-query">${h.query}</div>
+      <div class="hi-meta"><span class="hi-flag">${flag}</span><span>${time}</span>${h.verdict?`<span class="hi-verdict ${vClass}">${h.verdict}</span>`:''}</div>
+    </div>`;
+  }).join('');
+}
+
+function loadHistoryItem(i){
+  const item=history[i];
+  MARKET=item.market;
+  document.getElementById('tog-ke').classList.toggle('on',item.market==='ke');
+  document.getElementById('tog-se').classList.toggle('on',item.market==='se');
+  const banner=document.getElementById('market-banner');
+  banner.className='market-banner '+item.market;
+  banner.innerHTML=MC[item.market].banner;
+  document.getElementById('search-input').value=item.query;
+  currentResult=item.result;
+  lastQuery=item.query;
+  renderResults(item.query,item.result,MC[item.market]);
+  document.querySelectorAll('.history-item').forEach((el,idx)=>el.classList.toggle('active',idx===i));
+}
+
+function clearHistory(){
+  if(!confirm('Clear all search history?')) return;
+  history=[];localStorage.removeItem('propiq_history');
+  currentResult=null;renderHistory();showEmpty();
+}
+
+// ── PROGRESS ──
+const STEPS=['Fetching live signals','Analysing market data','Generating investment thesis','Scoring legal risks'];
+let progressTimer=null;
+
+function startProgress(){
+  const wrap=document.getElementById('progress-wrap');
+  const fill=document.getElementById('progress-fill');
+  const label=document.getElementById('progress-label');
+  const steps=document.getElementById('progress-steps');
+  wrap.classList.add('on');
+  fill.style.width='0%';
+  steps.innerHTML=STEPS.map((s,i)=>`<div class="pstep${i===0?' active':''}" id="pstep-${i}"><div class="pstep-dot"></div>${s}</div>`).join('');
+  let pct=0,step=0;
+  label.textContent=STEPS[0]+'...';
+  progressTimer=setInterval(()=>{
+    pct+=Math.random()*8+2;
+    if(pct>92) pct=92;
+    fill.style.width=pct+'%';
+    const newStep=pct<30?0:pct<55?1:pct<78?2:3;
+    if(newStep!==step){
+      document.getElementById('pstep-'+step)?.classList.replace('active','done');
+      step=newStep;
+      const el=document.getElementById('pstep-'+step);
+      if(el){el.classList.add('active');label.textContent=STEPS[step]+'...'}
+    }
+  },400);
+}
+
+function finishProgress(){
+  clearInterval(progressTimer);
+  const fill=document.getElementById('progress-fill');
+  const label=document.getElementById('progress-label');
+  fill.style.width='100%';
+  label.textContent='Analysis complete';
+  STEPS.forEach((_,i)=>document.getElementById('pstep-'+i)?.classList.replace('active','done'));
+  setTimeout(()=>document.getElementById('progress-wrap').classList.remove('on'),800);
+}
+
+// ── SEARCH ──
+function quickSearch(q){document.getElementById('search-input').value=q;runSearch()}
+
+async function runSearch(){
+  const q=document.getElementById('search-input').value.trim();
+  if(!q) return;
+  lastQuery=q;
+  const btn=document.getElementById('search-btn');
+  btn.disabled=true;btn.textContent='Analysing...';
+  const cfg=MC[MARKET];
+  document.getElementById('results-area').innerHTML='';
+  startProgress();
+  try {
+    const signals=await fetchSignals(q,cfg);
+    const analysis=await fetchAnalysis(q,signals,cfg);
+    finishProgress();
+    currentResult=analysis;
+    saveToHistory(q,MARKET,analysis);
+    renderResults(q,analysis,cfg);
+  }catch(e){
+    finishProgress();
+    document.getElementById('results-area').innerHTML=`
+      <div class="error-box">
+        <div class="error-title">Analysis failed</div>
+        <div class="error-msg">${e.message}<br><br>Common fixes: check your API key is valid · if using Perplexity from a local file, host on Netlify · ensure you have API credits remaining</div>
+        <button class="retry-btn" onclick="runSearch()">Retry</button>
+      </div>`;
+  }
+  btn.disabled=false;btn.textContent='Analyse';
+}
+
+async function fetchSignals(query,cfg){
+  const prompt=cfg.contextPrompt.replace('{q}',query);
+  if(PERPLEXITY_KEY){
+    try{
+      const res=await fetch('https://api.perplexity.ai/chat/completions',{method:'POST',headers:{'Authorization':`Bearer ${PERPLEXITY_KEY}`,'Content-Type':'application/json'},body:JSON.stringify({model:'llama-3.1-sonar-large-128k-online',messages:[{role:'user',content:prompt}],max_tokens:1500})});
+      if(res.ok){const d=await res.json();return d.choices[0].message.content}
+    }catch(e){}
+  }
+  const res=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'x-api-key':ANTHROPIC_KEY,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true','Content-Type':'application/json'},body:JSON.stringify({model:'claude-sonnet-4-6',max_tokens:1500,tools:[{type:'web_search_20250305',name:'web_search'}],messages:[{role:'user',content:prompt}]})});
+  if(!res.ok){const e=await res.json();throw new Error(e.error?.message||`API error ${res.status}`)}
+  const d=await res.json();
+  return d.content.filter(b=>b.type==='text').map(b=>b.text).join('\n');
+}
+
+async function fetchAnalysis(query,signals,cfg){
+  const prompt=cfg.analysisPrompt.replace('{q}',query).replace('{signals}',signals);
+  const res=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'x-api-key':ANTHROPIC_KEY,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true','Content-Type':'application/json'},body:JSON.stringify({model:'claude-sonnet-4-6',max_tokens:2500,messages:[{role:'user',content:prompt}]})});
+  if(!res.ok){const e=await res.json();throw new Error(e.error?.message||`Claude error ${res.status}`)}
+  const d=await res.json();
+  const text=d.content[0].text.trim().replace(/^```json\n?/,'').replace(/\n?```$/,'');
+  return JSON.parse(text);
+}
+
+// ── MORTGAGE CALCULATOR ──
+function calcMortgage(){
+  const cfg=MC[MARKET];
+  const priceStr=document.getElementById('mc-price').value.replace(/[^0-9.]/g,'');
+  const price=parseFloat(priceStr)||0;
+  const deposit=parseFloat(document.getElementById('mc-deposit').value)||cfg.mortgageDeposit;
+  const rate=parseFloat(document.getElementById('mc-rate').value)||cfg.mortgageRates[0].val;
+  const months=parseInt(document.getElementById('mc-term').value)||cfg.mortgageTerm[0].val;
+  if(!price){document.getElementById('mc-result').innerHTML='<div style="color:var(--text3);font-size:12px;font-family:var(--mono)">Enter a property price above</div>';return}
+  const loan=price*(1-deposit/100);
+  const mr=rate/100/12;
+  const monthly=mr?loan*mr*Math.pow(1+mr,months)/(Math.pow(1+mr,months)-1):loan/months;
+  const total=monthly*months;
+  const interest=total-loan;
+  const fmt=n=>Math.round(n).toLocaleString(cfg.locale);
+  document.getElementById('mc-result').innerHTML=`
+    <div class="calc-result">
+      <div class="cr-item"><div class="cr-label">Monthly payment</div><div class="cr-value">${cfg.currency} ${fmt(monthly)}</div><div class="cr-sub">Per month</div></div>
+      <div class="cr-item"><div class="cr-label">Loan amount</div><div class="cr-value" style="font-size:16px;color:var(--blue-text)">${cfg.currency} ${fmt(loan)}</div><div class="cr-sub">${100-deposit}% LTV</div></div>
+      <div class="cr-item"><div class="cr-label">Total interest</div><div class="cr-value" style="font-size:16px;color:var(--amber-text)">${cfg.currency} ${fmt(interest)}</div><div class="cr-sub">Over ${Math.round(months/12)} years</div></div>
+    </div>`;
+}
+
+// ── CURRENCY CONVERTER ──
+const FX_RATES={KESKES:1,SEKSEK:1,KESUSD:0.0077,USDKES:129.5,SEKSEK:1,SEKUSD:0.093,USDSEK:10.75,KESSEK:0.12,SEKKES:8.33,KESEUR:0.0071,SEKEUR:0.086,EURKES:140.5,EURSEK:11.6};
+function getFX(from,to){return FX_RATES[from+to]||FX_RATES[to+from]?1/(FX_RATES[to+from]||1):1}
+function convertFX(){
+  const amt=parseFloat(document.getElementById('fx-amount').value)||0;
+  const from=document.getElementById('fx-from').value;
+  const to=document.getElementById('fx-to').value;
+  const rate=FX_RATES[from+to]||(FX_RATES[to+from]?1/FX_RATES[to+from]:1);
+  const result=amt*rate;
+  document.getElementById('fx-result').value=result?result.toLocaleString(undefined,{maximumFractionDigits:2}):'';
+  document.getElementById('fx-rate-label').textContent=`1 ${from} = ${rate.toFixed(4)} ${to} · Indicative rates`;
+}
+
+// ── SHARE & EXPORT ──
+function copyReport(){
+  if(!currentResult) return;
+  const cfg=MC[MARKET];
+  const text=`PropIQ Analysis: ${lastQuery}\nMarket: ${cfg.name} (${cfg.currency})\nVerdict: ${currentResult.verdict}\nPrice Range: ${currentResult.priceRange}\nRental Yield: ${currentResult.rentalYield}\nAppreciation: ${currentResult.capitalAppreciation}\n\nSummary: ${currentResult.summary}\n\nInvestment Thesis: ${currentResult.investmentThesis}\n\nGenerated by PropIQ · AI-generated analysis only, not financial advice.`;
+  navigator.clipboard.writeText(text).then(()=>{
+    const t=document.getElementById('copy-toast');
+    t.style.display='block';t.textContent='Copied to clipboard';
+    setTimeout(()=>t.style.display='none',2500);
+  });
+}
+
+function printReport(){window.print()}
+
+function shareWhatsApp(){
+  if(!currentResult) return;
+  const text=`PropIQ: ${lastQuery} — Verdict: ${currentResult.verdict}. ${currentResult.summary} Price: ${currentResult.priceRange}. Yield: ${currentResult.rentalYield}. Full analysis via PropIQ.`;
+  window.open(`https://wa.me/?text=${encodeURIComponent(text)}`);
+}
+
+function submitFeedback(type){
+  document.querySelectorAll('.fb-btn').forEach(b=>b.classList.remove('selected-up','selected-down'));
+  document.getElementById('fb-'+type).classList.add(type==='up'?'selected-up':'selected-down');
+  const toast=document.getElementById('copy-toast');
+  toast.style.display='block';toast.textContent=type==='up'?'Thanks — feedback recorded':'Thanks — we\'ll improve this';
+  setTimeout(()=>toast.style.display='none',2000);
+}
+
+// ── COMPARE ──
+function compareSearches(){
+  if(history.length<2){alert('You need at least 2 searches to compare. Run another search first.');return}
+  const cfg=MC[MARKET];
+  const items=history.slice(0,4);
+  let html=`<div class="panel"><div class="panel-header"><div class="panel-title">Property Comparison</div><div class="panel-sub">Your last ${items.length} searches · ${cfg.flag} ${cfg.name}</div></div><div class="panel-body"><div class="compare-grid">`;
+  items.forEach(h=>{
+    const vClass=h.verdict==='BUY'?'hv-buy':h.verdict==='AVOID'?'hv-avoid':'hv-hold';
+    const vColor=h.verdict==='BUY'?'var(--green-text)':h.verdict==='AVOID'?'var(--red-text)':'var(--amber-text)';
+    const r=h.result;
+    html+=`<div class="compare-card">
+      <div class="cc-header">${h.query}</div>
+      <div class="cc-row"><span class="cc-label">Price range</span><span class="cc-val">${r.priceRange||'—'}</span></div>
+      <div class="cc-row"><span class="cc-label">Per sqm</span><span class="cc-val">${r.pricePerSqm||'—'}</span></div>
+      <div class="cc-row"><span class="cc-label">Rental yield</span><span class="cc-val">${r.rentalYield||'—'}</span></div>
+      <div class="cc-row"><span class="cc-label">Appreciation</span><span class="cc-val">${r.capitalAppreciation||'—'}</span></div>
+      <div class="cc-row"><span class="cc-label">Liquidity</span><span class="cc-val">${r.kpis?.liquidity||'—'}</span></div>
+      <div style="margin-top:8px"><span class="cc-verdict ${vClass}" style="color:${vColor}">${h.verdict}</span></div>
+    </div>`;
+  });
+  html+='</div></div></div>';
+  document.getElementById('results-area').innerHTML=html;
+}
+
+// ── RENDER RESULTS ──
+function sbClass(s){const m={'planning':'sb-plan','approved':'sb-appr','under construction':'sb-cons','complete':'sb-done','bygglov ansökt':'sb-plan','bygglov beviljat':'sb-appr','byggnation pågår':'sb-cons','klart':'sb-done'};return m[s.toLowerCase()]||'sb-plan'}
+
+function renderResults(query,a,cfg){
+  const pipeRows=(a.pipeline||[]).map(p=>`<tr><td style="font-weight:500;color:var(--text)">${p.name}</td><td style="color:var(--text2)">${p.developer}</td><td style="color:var(--text2)">${p.units}</td><td><span class="sbadge ${sbClass(p.status)}">${p.status}</span></td><td style="color:var(--text2);font-family:var(--mono);font-size:11px">${p.completion}</td><td style="color:var(--green-text);font-family:var(--mono);font-size:11px">${p.priceFrom}</td></tr>`).join('');
+  const flagsHtml=(a.titleRisks||[]).map(f=>`<div class="flag ${f.level}"><div class="flag-dot"></div><div><div class="flag-title">${f.title}</div><div class="flag-text">${f.detail}</div></div></div>`).join('');
+  const signalsHtml=(a.signals||[]).map(s=>`<div class="signal-item"><div class="signal-dot" style="background:${s.sentiment==='positive'?'var(--green)':s.sentiment==='negative'?'var(--red)':'var(--amber)'}"></div><div><div class="signal-text">${s.text}</div><div class="signal-meta">${s.source||'Market data'}</div></div></div>`).join('');
+  const vClass=a.verdict==='BUY'?'v-buy':a.verdict==='AVOID'?'v-avoid':'v-hold';
+  const vIcon=a.verdict==='BUY'?'▲':a.verdict==='AVOID'?'▼':'►';
+  const rateOpts=cfg.mortgageRates.map(r=>`<option value="${r.val}">${r.label}</option>`).join('');
+  const termOpts=cfg.mortgageTerm.map(t=>`<option value="${t.val}">${t.label}</option>`).join('');
+  const compareBtn=history.length>=2?`<button class="btn-compare" onclick="compareSearches()">Compare searches (${Math.min(history.length,4)})</button>`:'';
+
+  document.getElementById('results-area').innerHTML=`
+    <div class="compare-bar">
+      <span>${cfg.flag} ${query} · ${new Date().toLocaleDateString(cfg.locale,{day:'numeric',month:'short',year:'numeric'})}</span>
+      ${compareBtn}
+    </div>
+
+    <div class="kpi-row" style="margin-top:14px">
+      <div class="kpi"><div class="kpi-label">Avg price</div><div class="kpi-value" style="font-size:14px;color:var(--text)">${a.kpis?.avgPrice||a.priceRange||'—'}</div><div class="kpi-sub">${query}</div></div>
+      <div class="kpi"><div class="kpi-label">Price / m²</div><div class="kpi-value" style="font-size:13px;color:var(--text2)">${a.pricePerSqm||'—'}</div><div class="kpi-sub">${cfg.currency}/sqm</div></div>
+      <div class="kpi"><div class="kpi-label">Rental yield</div><div class="kpi-value" style="color:var(--green)">${a.kpis?.yield||a.rentalYield||'—'}</div><div class="kpi-sub">Gross annual</div></div>
+      <div class="kpi"><div class="kpi-label">Appreciation</div><div class="kpi-value" style="color:var(--blue);font-size:15px">${a.kpis?.appreciation||'—'}</div><div class="kpi-sub">Annual est.</div></div>
+      <div class="kpi"><div class="kpi-label">Liquidity</div><div class="kpi-value" style="font-size:14px;color:var(--text)">${a.kpis?.liquidity||'—'}</div><div class="kpi-sub">Market depth</div></div>
+    </div>
+
+    <div class="tabs">
+      <button class="tab on" onclick="switchTab('inv',this)">Investment</button>
+      <button class="tab" onclick="switchTab('mortgage',this)">Mortgage</button>
+      <button class="tab" onclick="switchTab('pipe',this)">Pipeline</button>
+      <button class="tab" onclick="switchTab('sig',this)">Signals</button>
+      <button class="tab" onclick="switchTab('title',this)">Legal Risk</button>
+      <button class="tab" onclick="switchTab('fx',this)">Currency</button>
+      <button class="tab" onclick="switchTab('share',this)">Share</button>
+    </div>
+
+    <div id="pane-inv" class="pane on">
+      <div class="panel">
+        <div class="panel-header"><div class="panel-icon" style="background:var(--green-pale)"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="var(--green)" stroke-width="2"><polyline points="2,12 6,7 9,10 14,4"/></svg></div><div><div class="panel-title">AI Investment Analysis</div><div class="panel-sub">Claude · Live signals · ${cfg.flag} ${cfg.name}</div></div></div>
+        <div class="panel-body">
+          <div class="ai-box"><div class="ai-box-label">Executive Summary</div><div class="ai-box-content">${a.summary}</div></div>
+          <div class="ai-box"><div class="ai-box-label">Investment Thesis</div><div class="ai-box-content">${a.investmentThesis}</div></div>
+          <div class="verdict-row">
+            <div class="verdict-card"><div class="verdict-label">Price Range</div><div class="verdict-value" style="color:var(--text);font-size:12px">${a.priceRange}</div></div>
+            <div class="verdict-card"><div class="verdict-label">Verdict</div><div class="verdict-value ${vClass}" style="font-size:22px">${vIcon} ${a.verdict}</div></div>
+            <div class="verdict-card"><div class="verdict-label">Rationale</div><div class="verdict-value" style="color:var(--text2);font-size:11px;font-weight:400;line-height:1.4">${a.verdictReason}</div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div id="pane-mortgage" class="pane">
+      <div class="panel">
+        <div class="panel-header"><div class="panel-icon" style="background:var(--green-pale)"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="var(--green)" stroke-width="2"><rect x="1" y="4" width="14" height="10" rx="1"/><line x1="1" y1="8" x2="15" y2="8"/></svg></div><div><div class="panel-title">Mortgage Calculator</div><div class="panel-sub">${cfg.currency} · ${cfg.flag} ${cfg.name} market rates</div></div></div>
+        <div class="panel-body">
+          <div class="calc-grid">
+            <div class="calc-field"><label>Property price (${cfg.currency})</label><input id="mc-price" type="number" placeholder="e.g. ${cfg.currency==='KES'?'12000000':'6000000'}" oninput="calcMortgage()"></div>
+            <div class="calc-field"><label>Deposit (%)</label><input id="mc-deposit" type="number" value="${cfg.mortgageDeposit}" min="5" max="90" oninput="calcMortgage()"></div>
+            <div class="calc-field"><label>Interest rate</label><select id="mc-rate" onchange="calcMortgage()">${rateOpts}</select></div>
+            <div class="calc-field"><label>Loan term</label><select id="mc-term" onchange="calcMortgage()">${termOpts}</select></div>
+          </div>
+          <div id="mc-result"><div style="color:var(--text3);font-size:12px;font-family:var(--mono)">Enter a property price above to calculate payments</div></div>
+        </div>
+      </div>
+    </div>
+
+    <div id="pane-pipe" class="pane">
+      <div class="panel">
+        <div class="panel-header"><div class="panel-icon" style="background:var(--blue-pale)"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="var(--blue)" stroke-width="2"><rect x="1" y="3" width="14" height="10" rx="1"/><line x1="5" y1="3" x2="5" y2="13"/><line x1="11" y1="3" x2="11" y2="13"/></svg></div><div><div class="panel-title">Development Pipeline</div><div class="panel-sub">${cfg.currency==='SEK'?'Nyproduktion and byggprojekt':'Active and planned developments'} · ${query}</div></div></div>
+        <div class="panel-body" style="padding:0">${pipeRows?`<div style="overflow-x:auto"><table class="dt"><thead><tr><th>Project</th><th>Developer</th><th>Units</th><th>Status</th><th>Completion</th><th>Price from</th></tr></thead><tbody>${pipeRows}</tbody></table></div>`:'<div class="empty" style="padding:24px"><div class="empty-sub">No pipeline data for this query</div></div>'}</div>
+      </div>
+    </div>
+
+    <div id="pane-sig" class="pane">
+      <div class="panel">
+        <div class="panel-header"><div class="panel-icon" style="background:var(--amber-pale)"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="var(--amber)" stroke-width="2"><circle cx="8" cy="8" r="6"/><line x1="8" y1="4" x2="8" y2="8"/><circle cx="8" cy="11" r=".5" fill="var(--amber)"/></svg></div><div><div class="panel-title">Market Signals</div><div class="panel-sub">Live intelligence · ${cfg.flag} ${cfg.name}</div></div></div>
+        <div class="panel-body">${signalsHtml||'<div class="empty-sub" style="color:var(--text3);font-size:12px">No signals returned</div>'}</div>
+      </div>
+    </div>
+
+    <div id="pane-title" class="pane">
+      <div class="panel">
+        <div class="panel-header"><div class="panel-icon" style="background:var(--red-pale)"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="var(--red)" stroke-width="2"><path d="M8 2L2 6v8h4v-4h4v4h4V6L8 2z"/><line x1="8" y1="7" x2="8" y2="9"/><circle cx="8" cy="11" r=".5" fill="var(--red)"/></svg></div><div><div class="panel-title">${cfg.currency==='SEK'?'Legal & Title Risk':'Title Risk Assessment'}</div><div class="panel-sub">${cfg.flag} ${cfg.name} · ${query}</div></div></div>
+        <div class="panel-body"><div class="flags">${flagsHtml}</div><div class="legal-note">${cfg.legalNote}</div></div>
+      </div>
+    </div>
+
+    <div id="pane-fx" class="pane">
+      <div class="panel">
+        <div class="panel-header"><div class="panel-icon" style="background:var(--blue-pale)"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="var(--blue)" stroke-width="2"><circle cx="8" cy="8" r="6"/><path d="M6 5h4M6 11h4M8 3v2M8 11v2"/></svg></div><div><div class="panel-title">Currency Converter</div><div class="panel-sub">KES · SEK · USD · EUR · Indicative rates</div></div></div>
+        <div class="panel-body">
+          <div class="fx-row">
+            <div class="fx-field"><label>Amount</label><input id="fx-amount" type="number" placeholder="Enter amount" oninput="convertFX()" value=""></div>
+            <div>
+              <select class="fx-select" id="fx-from" onchange="convertFX()">
+                <option value="KES">KES — Kenyan Shilling</option>
+                <option value="SEK">SEK — Swedish Krona</option>
+                <option value="USD">USD — US Dollar</option>
+                <option value="EUR">EUR — Euro</option>
+              </select>
+            </div>
+            <div class="fx-arrow">→</div>
+            <div class="fx-field"><label>Converted</label><input id="fx-result" type="text" readonly placeholder="Result" style="color:var(--green-text)"></div>
+            <div>
+              <select class="fx-select" id="fx-to" onchange="convertFX()">
+                <option value="USD">USD — US Dollar</option>
+                <option value="SEK">SEK — Swedish Krona</option>
+                <option value="KES">KES — Kenyan Shilling</option>
+                <option value="EUR">EUR — Euro</option>
+              </select>
+            </div>
+          </div>
+          <div class="fx-rate" id="fx-rate-label">Select currencies and enter an amount</div>
+          <div style="margin-top:12px;padding:10px;background:var(--bg3);border-radius:var(--rs);font-size:11px;color:var(--text3);font-family:var(--mono)">Quick reference: KES 1M ≈ USD 7,700 ≈ SEK 120,000 · KES 10M ≈ USD 77,000 ≈ SEK 1.2M · Rates are indicative only</div>
+        </div>
+      </div>
+    </div>
+
+    <div id="pane-share" class="pane">
+      <div class="panel">
+        <div class="panel-header"><div class="panel-icon" style="background:var(--green-pale)"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="var(--green)" stroke-width="2"><circle cx="12" cy="4" r="2"/><circle cx="4" cy="8" r="2"/><circle cx="12" cy="12" r="2"/><line x1="6" y1="7" x2="10" y2="5"/><line x1="6" y1="9" x2="10" y2="11"/></svg></div><div><div class="panel-title">Share & Export</div><div class="panel-sub">Share this analysis with your agent, lawyer, or family</div></div></div>
+        <div class="panel-body">
+          <div class="share-grid">
+            <div class="share-btn" onclick="copyReport()"><div class="share-icon">📋</div><div class="share-label">Copy report</div><div class="share-sub">Copy full text</div></div>
+            <div class="share-btn" onclick="shareWhatsApp()"><div class="share-icon">💬</div><div class="share-label">WhatsApp</div><div class="share-sub">Share summary</div></div>
+            <div class="share-btn" onclick="printReport()"><div class="share-icon">🖨️</div><div class="share-label">Print / PDF</div><div class="share-sub">Save as PDF</div></div>
+          </div>
+          <div class="copy-toast" id="copy-toast"></div>
+          <div style="background:var(--bg3);border-radius:var(--rs);padding:12px;font-size:12px;color:var(--text2);line-height:1.6;margin-top:4px">
+            <strong style="color:var(--text)">Analysis summary</strong><br>
+            ${cfg.flag} <strong>${query}</strong> · Verdict: <strong class="${vClass}">${a.verdict}</strong><br>
+            Price: ${a.priceRange} · Yield: ${a.rentalYield} · Appreciation: ${a.capitalAppreciation}<br>
+            <span style="color:var(--text3);font-size:11px">${a.summary}</span>
+          </div>
+          <div class="feedback-row">
+            <span class="feedback-label">Was this analysis accurate?</span>
+            <button class="fb-btn up" id="fb-up" onclick="submitFeedback('up')">👍 Yes</button>
+            <button class="fb-btn down" id="fb-down" onclick="submitFeedback('down')">👎 No</button>
+          </div>
+        </div>
+      </div>
+    </div>`;
+}
+
+function switchTab(name,el){
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('on'));
+  document.querySelectorAll('.pane').forEach(p=>p.classList.remove('on'));
+  el.classList.add('on');
+  document.getElementById('pane-'+name).classList.add('on');
+}
+</script>
+</body>
+</html>
