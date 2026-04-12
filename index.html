@@ -23,6 +23,23 @@
   --red:#ff4d6d; --red-dim:#ff4d6d12;
   --violet:#8b5cf6; --violet-dim:#8b5cf612;
   --pink:#ec4899;
+  /* Semantic tokens — use these in new components so intent is portable
+     across themes and accents without touching every call site. */
+  --accent-positive:var(--green);
+  --accent-positive-dim:var(--green-dim);
+  --accent-warning:var(--amber);
+  --accent-warning-dim:var(--amber-dim);
+  --accent-critical:var(--red);
+  --accent-critical-dim:var(--red-dim);
+  --accent-info:var(--blue);
+  --accent-info-dim:var(--blue-dim);
+  --accent-premium:var(--violet);
+  --accent-premium-dim:var(--violet-dim);
+  --accent-highlight:var(--cyan);
+  --accent-highlight-dim:var(--cyan-dim);
+  --focus-ring:0 0 0 2px rgba(0,232,160,0.35);
+  --card-shadow:0 1px 0 rgba(255,255,255,0.02) inset;
+  --card-shadow-hover:0 8px 24px -12px rgba(0,0,0,0.55);
   --ff:'Syne',sans-serif; --fb:'DM Sans',sans-serif; --fm:'JetBrains Mono',monospace;
   --r:10px; --rl:14px;
   --sidebar-w:220px;
@@ -38,6 +55,9 @@ body.light {
   --red:#c0392b; --red-dim:rgba(192,57,43,0.10);
   --violet:#6d3fad; --violet-dim:rgba(109,63,173,0.10);
   --green-glow:0 2px 14px rgba(0,168,112,0.15);
+  --focus-ring:0 0 0 2px rgba(0,168,112,0.35);
+  --card-shadow:0 1px 0 rgba(255,255,255,0.4) inset;
+  --card-shadow-hover:0 6px 20px -10px rgba(60,40,10,0.18);
 }
 * { margin:0; padding:0; box-sizing:border-box; }
 html,body { height:100%; overflow:hidden; }
@@ -99,6 +119,38 @@ input[type="number"] { -moz-appearance:textfield; }
 .panel { display:none; padding:20px 24px 36px; max-width:1320px; margin:0 auto; animation:fadeIn .25s ease; }
 .panel.active { display:block; }
 @media (max-width:720px){ .panel { padding:16px 14px 28px; } }
+
+/* ── BREADCRUMB ──────────────────────────────────────── */
+.breadcrumb { display:flex; align-items:center; gap:6px; font-family:var(--fm); font-size:10px; color:var(--text3); letter-spacing:.06em; margin-bottom:8px; text-transform:uppercase; flex-wrap:wrap; }
+.breadcrumb a,.breadcrumb button { color:var(--text3); background:none; border:none; padding:0; cursor:pointer; font:inherit; letter-spacing:inherit; text-transform:inherit; transition:color .15s; }
+.breadcrumb a:hover,.breadcrumb button:hover { color:var(--accent-positive); }
+.breadcrumb .bc-sep { color:var(--text3); opacity:.5; }
+.breadcrumb .bc-current { color:var(--text2); }
+
+/* ── RELATED ROW (cross-panel drill-through) ─────────── */
+.related-row { margin-top:22px; padding-top:14px; border-top:1px dashed var(--border); display:flex; gap:10px; flex-wrap:wrap; align-items:center; }
+.related-row-lbl { font-family:var(--fm); font-size:10px; letter-spacing:.1em; text-transform:uppercase; color:var(--text3); padding-right:4px; }
+.related-link { display:inline-flex; align-items:center; gap:8px; background:var(--bg2); border:1px solid var(--border); border-radius:8px; padding:8px 12px; color:var(--text2); font-size:12px; cursor:pointer; transition:all .18s; font-family:inherit; }
+.related-link:hover { border-color:var(--accent-positive); color:var(--text); transform:translateY(-1px); box-shadow:var(--card-shadow-hover); }
+.related-link .rl-icon { font-size:14px; line-height:1; }
+.related-link .rl-arrow { color:var(--text3); font-size:11px; margin-left:auto; transition:transform .18s, color .18s; }
+.related-link:hover .rl-arrow { color:var(--accent-positive); transform:translateX(2px); }
+
+/* ── SCOPE CHIP (topbar persistent time) ─────────────── */
+.scope-chip { display:inline-flex; align-items:center; gap:4px; background:var(--bg0); border:1px solid var(--border); border-radius:7px; padding:4px 6px; font-family:var(--fm); font-size:10px; color:var(--text2); letter-spacing:.04em; cursor:pointer; transition:all .18s; user-select:none; }
+.scope-chip:hover { border-color:var(--accent-positive); color:var(--text); }
+.scope-chip .sc-arrow { background:transparent; border:none; color:var(--text3); font-size:10px; cursor:pointer; padding:2px 4px; border-radius:3px; transition:color .15s, background .15s; }
+.scope-chip .sc-arrow:hover { color:var(--accent-positive); background:var(--bg3); }
+.scope-chip .sc-label { padding:0 4px; font-weight:600; min-width:86px; text-align:center; }
+.scope-chip.is-year .sc-label { min-width:54px; }
+
+/* ── SECTION PULSE (deep-link highlight) ─────────────── */
+.section-pulse { animation:sectionPulse 1.4s ease-out; }
+@keyframes sectionPulse {
+  0% { box-shadow:0 0 0 0 rgba(0,232,160,0.0), 0 0 0 0 rgba(0,232,160,0.0); }
+  15% { box-shadow:0 0 0 3px rgba(0,232,160,0.45), 0 0 24px 2px rgba(0,232,160,0.25); }
+  100% { box-shadow:0 0 0 0 rgba(0,232,160,0.0), 0 0 0 0 rgba(0,232,160,0.0); }
+}
 @keyframes fadeIn { from{opacity:0;transform:translateY(4px)} to{opacity:1;transform:translateY(0)} }
 
 /* ── PAGE HEADER ─────────────────────────────────────── */
@@ -694,6 +746,11 @@ input[type="number"] { -moz-appearance:textfield; }
       <div class="logo-text">HORIZON <span>FINANCE OS</span></div>
     </div>
     <div class="topbar-right">
+      <div class="scope-chip" id="scope-chip" title="Current time scope — click to jump to relevant panel" onclick="scopeChipClick()">
+        <button class="sc-arrow" onclick="event.stopPropagation();scopeShift(-1)" title="Previous">◀</button>
+        <span class="sc-label" id="sc-label">—</span>
+        <button class="sc-arrow" onclick="event.stopPropagation();scopeShift(1)" title="Next">▶</button>
+      </div>
       <div class="cur-toggle" id="cur-toggle"></div>
       <span class="save-badge" id="save-badge" style="display:none"></span>
       <button class="iBtn" id="theme-btn" onclick="toggleTheme()" title="Toggle theme">☀</button>
@@ -1162,8 +1219,20 @@ function scoreLocation(loc) {
 }
 
 // ─── NAVIGATION ─────────────────────────────────────────────────────────────
-function nav(panel) {
+// Hash routing: #panel or #panel/section — panel drives nav(), section is
+// remembered so downstream renderers can scroll / pulse a target card.
+const VALID_PANELS = ['dashboard','transactions','monthly','yearly','retirement','funfund','retireanywhere','propiq','settings'];
+let _navFromHash = false;
+function parseHash() {
+  const raw = (location.hash||'').replace(/^#/,'');
+  if(!raw) return {panel:null, section:null};
+  const [panel, section] = raw.split('/');
+  return { panel: VALID_PANELS.includes(panel)?panel:null, section: section||null };
+}
+function nav(panel, opts) {
+  if(!VALID_PANELS.includes(panel)) return;
   state.activePanel=panel;
+  state.activeSection = (opts&&opts.section)||null;
   document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
   document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
   const p=document.getElementById('panel-'+panel);
@@ -1171,7 +1240,44 @@ function nav(panel) {
   const n=document.querySelector(`.nav-item[data-panel="${panel}"]`);
   if(n) n.classList.add('active');
   renderPanel(panel);
+  // Post-render chrome (breadcrumb + related-row)
+  if(typeof decoratePanel==='function') decoratePanel(panel);
+  // Context-aware AI chips
+  if(typeof renderAIPChips==='function') renderAIPChips();
+  // Scope chip reflects the panel's time dimension
+  if(typeof updateScopeChip==='function') updateScopeChip();
+  // Scroll to top of content on nav
+  const content=document.querySelector('.content'); if(content) content.scrollTop=0;
+  // Push hash (without triggering recursion via hashchange listener)
+  if(!_navFromHash){
+    const target = '#'+panel + (state.activeSection?('/'+state.activeSection):'');
+    if(location.hash!==target) {
+      _navFromHash = true;
+      location.hash = target;
+      _navFromHash = false;
+    }
+  }
+  // Scroll/pulse target section after render settles
+  if(state.activeSection) setTimeout(()=>pulseSection(state.activeSection), 120);
 }
+function pulseSection(section){
+  const el = document.querySelector(`[data-section="${section}"]`);
+  if(!el) return;
+  el.scrollIntoView({behavior:'smooth', block:'start'});
+  el.classList.add('section-pulse');
+  setTimeout(()=>el.classList.remove('section-pulse'), 1400);
+}
+window.addEventListener('hashchange', ()=>{
+  const {panel, section} = parseHash();
+  if(panel && panel!==state.activePanel){
+    _navFromHash = true;
+    nav(panel, {section});
+    _navFromHash = false;
+  } else if(panel && section && section!==state.activeSection){
+    state.activeSection = section;
+    pulseSection(section);
+  }
+});
 
 function renderPanel(panel) {
   const fns = {
@@ -1188,11 +1294,117 @@ function renderPanel(panel) {
   if(fns[panel]) fns[panel]();
 }
 
+// ─── PANEL META (labels, breadcrumbs, related cross-links) ──────────────────
+const PANEL_META = {
+  dashboard:      {label:'Dashboard',        group:'Overview',          icon:'◉'},
+  transactions:   {label:'Bank & Transactions', group:'Personal Finances', icon:'🏦'},
+  monthly:        {label:'Monthly Review',   group:'Personal Finances', icon:'☰'},
+  yearly:         {label:'Yearly Forecast',  group:'Personal Finances', icon:'▦'},
+  retirement:     {label:'Retirement Plan',  group:'Personal Finances', icon:'🌅'},
+  funfund:        {label:'Fun Fund',         group:'Planning',          icon:'✦'},
+  retireanywhere: {label:'Retire Anywhere',  group:'Planning',          icon:'🌍'},
+  propiq:         {label:'Property IQ',      group:'Planning',          icon:'🏠'},
+  settings:       {label:'Settings',         group:'System',            icon:'⚙'},
+};
+// Hand-curated cross-links: "if you're here, you might next want..."
+const RELATED_MAP = {
+  dashboard:      ['monthly','retirement','retireanywhere'],
+  transactions:   ['monthly','funfund','dashboard'],
+  monthly:        ['yearly','funfund','retirement'],
+  yearly:         ['retirement','monthly','funfund'],
+  retirement:     ['retireanywhere','yearly','funfund'],
+  funfund:        ['monthly','retireanywhere','dashboard'],
+  retireanywhere: ['retirement','propiq','funfund'],
+  propiq:         ['retireanywhere','retirement','dashboard'],
+  settings:       ['dashboard','retirement','transactions'],
+};
+function esc2(str){const d=document.createElement('div');d.textContent=str;return d.innerHTML;}
+function decoratePanel(panel){
+  const meta = PANEL_META[panel]; if(!meta) return;
+  const panelEl = document.getElementById('panel-'+panel); if(!panelEl) return;
+  // 1) Breadcrumb: prepend inside the .ph header (or before first child).
+  const ph = panelEl.querySelector('.ph');
+  const crumb = document.createElement('div');
+  crumb.className = 'breadcrumb';
+  crumb.innerHTML = `
+    <button onclick="nav('dashboard')">Horizon</button>
+    <span class="bc-sep">›</span>
+    <span class="bc-current">${esc2(meta.group)}</span>
+    <span class="bc-sep">›</span>
+    <span class="bc-current" style="color:var(--text)">${esc2(meta.label)}</span>`;
+  if(ph) ph.insertBefore(crumb, ph.firstChild);
+  else panelEl.insertBefore(crumb, panelEl.firstChild);
+  // 2) Related row appended to bottom
+  const related = (RELATED_MAP[panel]||[]).filter(k=>k!==panel && PANEL_META[k]);
+  if(related.length){
+    const row = document.createElement('div');
+    row.className = 'related-row';
+    row.innerHTML = `<span class="related-row-lbl">Next ↗</span>` + related.map(k=>{
+      const m = PANEL_META[k];
+      return `<button class="related-link" onclick="nav('${k}')">
+        <span class="rl-icon">${m.icon}</span>
+        <span>${esc2(m.label)}</span>
+        <span class="rl-arrow">→</span>
+      </button>`;
+    }).join('');
+    panelEl.appendChild(row);
+  }
+}
+
+// ─── SCOPE CHIP (persistent time indicator) ─────────────────────────────────
+function updateScopeChip(){
+  const label = document.getElementById('sc-label');
+  const chip = document.getElementById('scope-chip');
+  if(!label||!chip) return;
+  const panel = state.activePanel||'dashboard';
+  chip.classList.toggle('is-year', panel==='yearly');
+  if(panel==='yearly'){
+    label.textContent = String(state.selectedYear||CY);
+  } else {
+    // default: show selectedMonth (Monthly) or current month otherwise
+    const key = state.selectedMonth || `${CY}-${String(new Date().getMonth()+1).padStart(2,'0')}`;
+    const [y,m] = key.split('-').map(Number);
+    const monthName = MONTH_NAMES[(m-1)]||'';
+    label.textContent = `${monthName} ${y}`;
+  }
+}
+function scopeShift(dir){
+  const panel = state.activePanel||'dashboard';
+  if(panel==='yearly'){
+    state.selectedYear = Math.max(CY, (state.selectedYear||CY+1) + dir);
+    save(); renderAll();
+  } else {
+    // advance selectedMonth; clamp into the 12-month forward window
+    const months = get12Months();
+    const cur = state.selectedMonth || months[0].key;
+    let idx = months.findIndex(m=>m.key===cur);
+    if(idx<0) idx=0;
+    idx = Math.max(0, Math.min(months.length-1, idx+dir));
+    state.selectedMonth = months[idx].key;
+    save();
+    // Re-render only if we're on a panel that cares about the month.
+    if(panel==='monthly'||panel==='dashboard'||panel==='funfund') renderAll();
+    else updateScopeChip();
+  }
+}
+function scopeChipClick(){
+  const panel = state.activePanel||'dashboard';
+  // Yearly panel handles year scope; everything else delegates to Monthly
+  if(panel==='yearly') nav('yearly');
+  else nav('monthly');
+}
+
 function renderAll() {
   renderTicker();
   renderCurrencyToggle();
   updateSidebar();
-  renderPanel(state.activePanel||'dashboard');
+  const panel=state.activePanel||'dashboard';
+  renderPanel(panel);
+  // Decorate the panel with breadcrumb + related-row, and refresh the
+  // topbar scope chip + AI chips so they always reflect the active panel.
+  if(typeof decoratePanel==='function') decoratePanel(panel);
+  if(typeof updateScopeChip==='function') updateScopeChip();
+  if(typeof renderAIPChips==='function') renderAIPChips();
 }
 
 function updateSidebar() {
@@ -1269,6 +1481,38 @@ function chartDefaults() {
     tooltipTitle: isLight()?'#0c1628':'#e4ecf7',
     tooltipBody: isLight()?'#3a4d6e':'#7a8fb0',
   };
+}
+// Shared Chart.js options preset — single source of truth for padding,
+// tooltip styling, legend, and axis defaults. Individual renderers can
+// override any key by deep-merging their own options on top.
+function chartPreset(overrides){
+  const cd = chartDefaults();
+  const base = {
+    responsive:true,
+    maintainAspectRatio:false,
+    interaction:{mode:'index',intersect:false},
+    layout:{padding:{top:4,right:4,bottom:2,left:2}},
+    plugins:{
+      legend:{labels:{color:cd.legendColor,font:cd.tickFont,boxWidth:10,padding:10,usePointStyle:true}},
+      tooltip:{
+        backgroundColor:cd.tooltipBg,borderColor:cd.tooltipBorder,borderWidth:1,
+        titleColor:cd.tooltipTitle,bodyColor:cd.tooltipBody,
+        bodyFont:{family:'JetBrains Mono',size:11},padding:10,
+        callbacks:{label:c=>'  '+c.dataset.label+': '+fmt(c.raw)}
+      }
+    },
+    scales:{
+      x:{ticks:{color:cd.textColor,font:cd.tickFont},grid:{color:cd.gridColor}},
+      y:{ticks:{color:cd.textColor,callback:v=>fmtC(v),font:cd.tickFont,maxTicksLimit:6},grid:{color:cd.gridColor}}
+    }
+  };
+  // Shallow-deep merge for the two known nested shapes (plugins, scales).
+  if(overrides){
+    if(overrides.plugins) base.plugins = {...base.plugins, ...overrides.plugins};
+    if(overrides.scales)  base.scales  = {...base.scales,  ...overrides.scales};
+    for(const k of Object.keys(overrides)) if(k!=='plugins'&&k!=='scales') base[k]=overrides[k];
+  }
+  return base;
 }
 function destroyChart(key) { if(charts[key]){charts[key].destroy();delete charts[key];} }
 
@@ -1371,14 +1615,14 @@ function renderDashboard() {
 
     <div class="two-col">
       <!-- 12-month cash flow chart -->
-      <div class="card">
+      <div class="card" data-section="cashflow">
         <div class="card-title">📈 12-Month Cash Flow
           <div class="ct-actions"><span class="conn-badge demo">PROJECTION</span></div>
         </div>
         <div class="chart-wrap sm"><canvas id="dash-cashflow-chart"></canvas></div>
       </div>
       <!-- Nest Egg Projection -->
-      <div class="card">
+      <div class="card" data-section="nestegg">
         <div class="card-title">🎯 Nest Egg Growth Curve</div>
         <div class="chart-wrap sm"><canvas id="dash-nestegg-chart"></canvas></div>
       </div>
@@ -1411,7 +1655,6 @@ function renderDashboard() {
     destroyChart('dash-cf');
     const cf=document.getElementById('dash-cashflow-chart');
     if(cf) {
-      const cd=chartDefaults();
       charts['dash-cf']=new Chart(cf.getContext('2d'),{
         type:'line',
         data:{
@@ -1422,7 +1665,7 @@ function renderDashboard() {
             {label:'Fun Fund',data:months.map(m=>m.funFund),borderColor:'#00d4ff',fill:false,tension:.35,pointRadius:2,borderWidth:1.5,borderDash:[4,3]},
           ]
         },
-        options:{responsive:true,maintainAspectRatio:false,interaction:{mode:'index',intersect:false},plugins:{legend:{labels:{color:cd.legendColor,font:cd.tickFont,boxWidth:10,padding:10}},tooltip:{backgroundColor:cd.tooltipBg,borderColor:cd.tooltipBorder,borderWidth:1,titleColor:cd.tooltipTitle,bodyColor:cd.tooltipBody,bodyFont:{family:'JetBrains Mono',size:11},callbacks:{label:c=>'  '+c.dataset.label+': '+fmt(c.raw)}}},layout:{padding:{top:4,right:4,bottom:2,left:2}},scales:{x:{ticks:{color:cd.textColor,font:cd.tickFont},grid:{color:cd.gridColor}},y:{ticks:{color:cd.textColor,callback:v=>fmtC(v),font:cd.tickFont,maxTicksLimit:6},grid:{color:cd.gridColor}}}}
+        options:chartPreset()
       });
     }
     destroyChart('dash-ne');
@@ -1439,7 +1682,10 @@ function renderDashboard() {
             {label:"Today's Money",data:proj.map(p=>p.realTotal),borderColor:'#4d9fff',fill:false,tension:.3,pointRadius:0,borderWidth:1.5,borderDash:[4,3]},
           ]
         },
-        options:{responsive:true,maintainAspectRatio:false,interaction:{mode:'index',intersect:false},plugins:{legend:{labels:{color:cd.legendColor,font:cd.tickFont,boxWidth:10,padding:10}},tooltip:{backgroundColor:cd.tooltipBg,borderColor:cd.tooltipBorder,borderWidth:1,titleColor:cd.tooltipTitle,bodyColor:cd.tooltipBody,bodyFont:{family:'JetBrains Mono',size:11},callbacks:{label:c=>'  '+c.dataset.label+': '+fmt(c.raw)}}},layout:{padding:{top:4,right:4,bottom:2,left:2}},scales:{x:{ticks:{color:cd.textColor,font:cd.tickFont,maxTicksLimit:8},grid:{color:cd.gridColor}},y:{ticks:{color:cd.textColor,callback:v=>fmtC(v),font:cd.tickFont,maxTicksLimit:6},grid:{color:cd.gridColor}}}}
+        options:chartPreset({scales:{
+          x:{ticks:{color:cd.textColor,font:cd.tickFont,maxTicksLimit:8},grid:{color:cd.gridColor}},
+          y:{ticks:{color:cd.textColor,callback:v=>fmtC(v),font:cd.tickFont,maxTicksLimit:6},grid:{color:cd.gridColor}}
+        }})
       });
     }
   },50);
@@ -1554,7 +1800,6 @@ function renderTransactions() {
     destroyChart('tx');
     const ctx=document.getElementById('tx-chart');
     if(ctx){
-      const cd=chartDefaults();
       const months=MONTH_NAMES.slice(4).concat(MONTH_NAMES.slice(0,4));
       const income=[127000,127000,206000,131800,127000,127000,127000,127000,127000,127000,127000,127000];
       const expenses=[132500,178264,88545,91500,103500,91500,108636,63945,81636,91500,56590,107090];
@@ -1564,7 +1809,7 @@ function renderTransactions() {
           {label:'Income',data:income,backgroundColor:'#00e8a030',borderColor:'#00e8a0',borderWidth:1.5,borderRadius:3},
           {label:'Expenses',data:expenses,backgroundColor:'#ff4d6d20',borderColor:'#ff4d6d',borderWidth:1.5,borderRadius:3},
         ]},
-        options:{responsive:true,maintainAspectRatio:false,interaction:{mode:'index',intersect:false},plugins:{legend:{labels:{color:cd.legendColor,font:cd.tickFont,boxWidth:10,padding:10}},tooltip:{backgroundColor:cd.tooltipBg,borderColor:cd.tooltipBorder,borderWidth:1,titleColor:cd.tooltipTitle,bodyColor:cd.tooltipBody,bodyFont:{family:'JetBrains Mono',size:11},callbacks:{label:c=>'  '+c.dataset.label+': '+fmt(c.raw)}}},layout:{padding:{top:4,right:4,bottom:2,left:2}},scales:{x:{ticks:{color:cd.textColor,font:cd.tickFont},grid:{color:cd.gridColor}},y:{ticks:{color:cd.textColor,callback:v=>fmtC(v),font:cd.tickFont,maxTicksLimit:6},grid:{color:cd.gridColor}}}}
+        options:chartPreset()
       });
     }
   },50);
@@ -1633,15 +1878,15 @@ function renderMonthly() {
     destroyChart('mo');
     const ctx=document.getElementById('mo-chart');
     if(ctx){
-      const cd=chartDefaults();
       const all=get12Months();
       charts['mo']=new Chart(ctx.getContext('2d'),{type:'bar',data:{labels:all.map(m=>m.short),datasets:[
         {label:'Income',data:all.map(m=>m.income),backgroundColor:'#00e8a018',borderColor:'#00e8a0',borderWidth:1.5,borderRadius:3},
         {label:'Expenses',data:all.map(m=>m.expenses),backgroundColor:'#ff4d6d14',borderColor:'#ff4d6d',borderWidth:1.5,borderRadius:3},
         {label:'Fun Fund',data:all.map(m=>Math.max(0,m.funFund)),type:'line',borderColor:'#00d4ff',fill:false,tension:.3,pointRadius:2,borderWidth:1.5,yAxisID:'y'},
-      ]},options:{responsive:true,maintainAspectRatio:false,interaction:{mode:'index',intersect:false},plugins:{legend:{labels:{color:cd.legendColor,font:cd.tickFont,boxWidth:10,padding:10}},tooltip:{backgroundColor:cd.tooltipBg,borderColor:cd.tooltipBorder,borderWidth:1,titleColor:cd.tooltipTitle,bodyColor:cd.tooltipBody,bodyFont:{family:'JetBrains Mono',size:11},callbacks:{label:c=>'  '+c.dataset.label+': '+fmt(c.raw)}}},layout:{padding:{top:4,right:4,bottom:2,left:2}},scales:{x:{ticks:{color:cd.textColor,font:cd.tickFont},grid:{color:cd.gridColor}},y:{ticks:{color:cd.textColor,callback:v=>fmtC(v),font:cd.tickFont,maxTicksLimit:6},grid:{color:cd.gridColor}}}}});
+      ]},options:chartPreset()});
     }
   },50);
+  if(typeof updateScopeChip==='function') updateScopeChip();
 }
 window.addMonthlyItem=function(key,field){
   if(!state.monthlyOverrides[key]) state.monthlyOverrides[key]={};
@@ -1702,6 +1947,7 @@ function renderYearly() {
 
   renderYearlyLineItems('yr-inc',incItems,'income');
   renderYearlyLineItems('yr-exp',expItems,'expenses');
+  if(typeof updateScopeChip==='function') updateScopeChip();
 }
 function renderYearlyLineItems(cid,items,field){
   const el=document.getElementById(cid); if(!el) return;
@@ -1845,7 +2091,7 @@ function renderRetirement() {
 
   // ── SECTION 1: SUSTAINABILITY & RUNWAY ──────────────────────────────────────
   const s1 = `
-    <div class="sust-card" style="margin-bottom:0;border:none;padding:14px 16px 10px">
+    <div class="sust-card" data-section="runway" style="margin-bottom:0;border:none;padding:14px 16px 10px">
       <div class="sust-verdict" style="margin-bottom:10px">
         <div class="sust-verdict-icon">${nums.verdictIcon}</div>
         <div>
@@ -2248,13 +2494,12 @@ function renderFunFund() {
     destroyChart('ff');
     const ctx=document.getElementById('ff-chart');
     if(ctx){
-      const cd=chartDefaults();
       const tripByMonth={};
       state.trips.forEach(t=>{ const key=t.date.slice(0,7); tripByMonth[key]=(tripByMonth[key]||0)+t.budget; });
       charts['ff']=new Chart(ctx.getContext('2d'),{type:'bar',data:{labels:months.map(m=>m.short),datasets:[
         {label:'Fun Fund',data:months.map(m=>Math.max(0,m.funFund)),backgroundColor:'#00d4ff18',borderColor:'#00d4ff',borderWidth:1.5,borderRadius:3},
         {label:'Trip Budget',data:months.map(m=>tripByMonth[m.key]||0),backgroundColor:'#f5a62325',borderColor:'#f5a623',borderWidth:1.5,borderRadius:3},
-      ]},options:{responsive:true,maintainAspectRatio:false,interaction:{mode:'index',intersect:false},plugins:{legend:{labels:{color:cd.legendColor,font:cd.tickFont,boxWidth:10,padding:10}},tooltip:{backgroundColor:cd.tooltipBg,borderColor:cd.tooltipBorder,borderWidth:1,titleColor:cd.tooltipTitle,bodyColor:cd.tooltipBody,bodyFont:{family:'JetBrains Mono',size:11},callbacks:{label:c=>'  '+c.dataset.label+': '+fmt(c.raw)}}},layout:{padding:{top:4,right:4,bottom:2,left:2}},scales:{x:{ticks:{color:cd.textColor,font:cd.tickFont},grid:{color:cd.gridColor}},y:{ticks:{color:cd.textColor,callback:v=>fmtC(v),font:cd.tickFont,maxTicksLimit:6},grid:{color:cd.gridColor}}}}});
+      ]},options:chartPreset()});
     }
   },50);
 }
@@ -2300,7 +2545,7 @@ function renderRetireAnywhere() {
       <div class="kpi"><div class="kpi-icon">💰</div><div class="kpi-lbl">YOUR MONTHLY INCOME</div><div class="kpi-val">${fmt(monthlyIncome)}</div><div class="kpi-sub">At retirement age ${state.retirementAge}</div></div>
     </div>
 
-    <div id="retire-map"></div>
+    <div id="retire-map" data-section="map"></div>
 
     <div class="loc-grid">${locCards}</div>
 
@@ -2492,6 +2737,22 @@ window.importData=function(input){
 let aiChatHistory=[];
 let aipTyping=false;
 const AIP_CHIPS=['📊 Analyse my spending','🎯 Am I on track for retirement?','💡 Grow my nest egg','🌍 Where should I retire?','✈️ Can I afford my trips?','⚠️ Biggest financial risks?'];
+// Per-panel suggestion prompts — AI chips reflect the user's current view so
+// the conversation feels contextual rather than generic.
+const AIP_CHIPS_BY_PANEL = {
+  dashboard:      ['📊 Explain my current month','🎯 Am I on track for retirement?','⚠️ Biggest risks in my plan?','💡 What should I focus on next?'],
+  transactions:   ['📊 Where is my money going?','🔍 Unusual spending this month?','💰 How can I cut 10% of expenses?','📈 Compare vs last month'],
+  monthly:        ['📊 Is this month healthy?','💰 Can I raise my savings rate?','✈️ Can I fit a trip this month?','🎯 How does this hit retirement?'],
+  yearly:         ['📈 Project my next 3 years','💰 Best yearly savings target?','⚠️ Any cash-flow risks?','🎯 Stress-test my plan'],
+  retirement:     ['🎯 Can I retire 2 years earlier?','💡 Grow my nest egg','⚠️ What if markets drop 30%?','🔍 Review my withdrawal rate'],
+  funfund:        ['✈️ Can I afford my trips?','💡 Best months to travel?','💰 Stretch my Fun Fund','🎯 Prioritise my wishlist'],
+  retireanywhere: ['🌍 Where should I retire?','🔍 Compare my top 3 destinations','💰 Cheapest feasible option?','🎯 Tax-optimal choice'],
+  propiq:         ['🏠 Is this deal reasonable?','📊 Yield vs local average?','💰 Mortgage stress test','⚠️ What am I missing?'],
+  settings:       ['⚙️ Review my baseline','💡 Am I using sensible defaults?','🔍 Explain my assumptions','🎯 What should I tune?'],
+};
+function aipChipsFor(panel){
+  return AIP_CHIPS_BY_PANEL[panel] || AIP_CHIPS;
+}
 
 function _ai(){
   return {
@@ -2551,7 +2812,8 @@ function renderAIPChips(){
   const el=document.getElementById('aip-chips');
   if(!el) return;
   el.style.display=aiChatHistory.length>0?'none':'flex';
-  el.innerHTML=AIP_CHIPS.map(c=>`<button class="aip-chip" onclick="aipChip('${c.replace(/'/g,"\\'")}')">${c}</button>`).join('');
+  const chips=aipChipsFor(state.activePanel||'dashboard');
+  el.innerHTML=chips.map(c=>`<button class="aip-chip" onclick="aipChip('${c.replace(/'/g,"\\'")}')">${c}</button>`).join('');
 }
 
 function clearAIChat(){
@@ -2570,7 +2832,12 @@ function buildAIContext() {
   const months=get12Months(); const cm=months[0];
   const ti=sumArr(state.baseIncome,'amount'); const te=sumArr(state.baseExpenses,'amount');
   const scored=state.retireLocations.map(scoreLocation);
+  const panel=state.activePanel||'dashboard';
+  const viewLabel=(PANEL_META[panel]&&PANEL_META[panel].label)||panel;
+  const section=state.activeSection?` (focused on: ${state.activeSection})`:'';
   return `You are HORIZON AI — a personal finance and life planning assistant embedded in Horizon Finance OS.
+
+CURRENT VIEW: The user is looking at the "${viewLabel}" panel${section}. Tailor your answer to what's visible on this screen first, then zoom out if helpful.
 
 User's financial snapshot (SEK):
 - Monthly income: ${Math.round(ti).toLocaleString()} kr | Expenses: ${Math.round(te).toLocaleString()} kr | Savings: ${Math.round(state.baseSavings).toLocaleString()} kr/mo
@@ -2648,8 +2915,13 @@ renderAIPChips();
 // ══ INIT ═════════════════════════════════════════════════════════════════════
 loadState();
 applyTheme();
+// Honor deep-link hash on first load (#retirement or #retirement/runway).
+(()=>{
+  const {panel, section} = parseHash();
+  if(panel) { state.activePanel = panel; if(section) state.activeSection = section; }
+})();
 renderAll();
-renderAIPChips();
+if(state.activeSection) setTimeout(()=>pulseSection(state.activeSection), 200);
 
 // Keep Leaflet tiles correct after layout changes, and re-render active panel
 // so Chart.js updates legibly across viewport width changes.
