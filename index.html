@@ -1,0 +1,4630 @@
+<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"><title>Horizon</title></head>
+<body>
+
+<script>
+// ═══════════════════════════════════════════════════════════════════
+// CONSTANTS & DEFAULTS
+// ═══════════════════════════════════════════════════════════════════
+
+const STORAGE_KEY = 'horizon-unified-v1';
+
+const MN = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+
+const CSYM = { SEK:'kr', USD:'$', EUR:'\u20ac', KES:'KSh' };
+
+const PULSE_DESTS = [
+  {dest:'Nairobi + Safari',flag:'\ud83c\uddf0\ud83c\uddea',why:'East Africa peak season',cost:'SEK 25\u201345K',lat:-1.29,lng:36.82,vibe:'Safari & Wildlife',col:'#00e8a0'},
+  {dest:'Cape Town',flag:'\ud83c\uddff\ud83c\udde6',why:'World-class and affordable',cost:'SEK 20\u201340K',lat:-33.93,lng:18.42,vibe:'City & Culture',col:'#4d8fff'},
+  {dest:'Lisbon',flag:'\ud83c\uddf5\ud83c\uddf9',why:'Best value in Western Europe',cost:'SEK 15\u201328K',lat:38.72,lng:-9.14,vibe:'City & Culture',col:'#00d4ff'},
+  {dest:'Bali',flag:'\ud83c\uddee\ud83c\udde9',why:'Luxury on a budget',cost:'SEK 18\u201335K',lat:-8.34,lng:115.09,vibe:'Beach & Relaxation',col:'#f5a623'},
+  {dest:'Istanbul',flag:'\ud83c\uddf9\ud83c\uddf7',why:'Culture, food, incredible value',cost:'SEK 12\u201322K',lat:41.01,lng:28.98,vibe:'Food & Wine',col:'#8b5cf6'},
+  {dest:'Maldives',flag:'\ud83c\uddf2\ud83c\uddfb',why:'Ultimate couples luxury',cost:'SEK 60\u2013120K',lat:3.2,lng:73.22,vibe:'Luxury Escape',col:'#ec4899'},
+  {dest:'Paris',flag:'\ud83c\uddeb\ud83c\uddf7',why:'Romance & culture',cost:'SEK 25\u201350K',lat:48.85,lng:2.35,vibe:'City & Culture',col:'#ff4d6d'},
+  {dest:'Chicago',flag:'\ud83c\uddfa\ud83c\uddf8',why:'City break, great food scene',cost:'SEK 30\u201355K',lat:41.88,lng:-87.63,vibe:'City & Culture',col:'#00e8a0'},
+];
+
+const RET_DESTS = [
+  {flag:'\ud83c\uddf5\ud83c\uddf9',name:'Lisbon',country:'Portugal',costK:18,lat:38.72,lng:-9.14,tags:['dt-warm','dt-safe','dt-visa','dt-ret'],tl:['Warm','Safe','EU Visa','NHR Tax']},
+  {flag:'\ud83c\uddf2\ud83c\uddf9',name:'Malta',country:'Malta',costK:20,lat:35.9,lng:14.5,tags:['dt-warm','dt-safe','dt-visa'],tl:['Warm','Safe','EU Visa']},
+  {flag:'\ud83c\uddf2\ud83c\uddfd',name:'Mexico City',country:'Mexico',costK:14,lat:19.43,lng:-99.13,tags:['dt-warm','dt-ret'],tl:['Warm','Retire Visa']},
+  {flag:'\ud83c\uddf9\ud83c\udded',name:'Chiang Mai',country:'Thailand',costK:10,lat:18.79,lng:98.99,tags:['dt-warm','dt-ret'],tl:['Warm','LTR Visa']},
+  {flag:'\ud83c\uddf0\ud83c\uddea',name:'Nairobi',country:'Kenya',costK:12,lat:-1.29,lng:36.82,tags:['dt-warm','dt-ret'],tl:['Warm','Expat Hub']},
+  {flag:'\ud83c\uddea\ud83c\uddf8',name:'Valencia',country:'Spain',costK:16,lat:39.47,lng:-0.38,tags:['dt-warm','dt-safe','dt-visa'],tl:['Warm','Safe','EU Visa']},
+  {flag:'\ud83c\uddfa\ud83c\uddfe',name:'Montevideo',country:'Uruguay',costK:15,lat:-34.9,lng:-56.19,tags:['dt-safe','dt-ret'],tl:['Safe','Retire Visa']},
+  {flag:'\ud83c\uddec\ud83c\uddf7',name:'Athens',country:'Greece',costK:15,lat:37.98,lng:23.73,tags:['dt-warm','dt-safe','dt-visa'],tl:['Warm','Safe','EU Visa']},
+  {flag:'\ud83c\uddf2\ud83c\udde6',name:'Marrakech',country:'Morocco',costK:9,lat:31.63,lng:-8.0,tags:['dt-warm','dt-ret'],tl:['Warm','Affordable']},
+];
+
+const DREAM_TYPES = [
+  {id:'coastal',icon:'\ud83c\udfd6',name:'Coastal'},
+  {id:'city',icon:'\ud83c\udfd9',name:'City Life'},
+  {id:'nature',icon:'\ud83c\udf3f',name:'Nature'},
+  {id:'warm',icon:'\u2600\ufe0f',name:'Warm Climate'},
+  {id:'culture',icon:'\ud83c\udfad',name:'Arts & Culture'},
+  {id:'family',icon:'\ud83d\udc68\u200d\ud83d\udc69\u200d\ud83d\udc67',name:'Family Hub'},
+  {id:'luxury',icon:'\ud83e\udd42',name:'Luxury'},
+  {id:'adventure',icon:'\ud83e\uddd7',name:'Adventure'},
+  {id:'peaceful',icon:'\ud83d\udd4a',name:'Peaceful'},
+];
+
+const RET_EXP_MODELS = {
+  low:    {housing:5000,food:2500,health:1500,transport:800,leisure:1200,misc:1000},
+  mid:    {housing:9000,food:4000,health:2500,transport:1500,leisure:2500,misc:1500},
+  high:   {housing:16000,food:6000,health:4000,transport:2500,leisure:5000,misc:2500},
+  luxury: {housing:25000,food:9000,health:6000,transport:4000,leisure:10000,misc:5000},
+};
+
+const MC = {
+  ke:{name:'Kenya',flag:'\ud83c\uddf0\ud83c\uddea',currency:'KES',locale:'en-KE',
+    banner:'\ud83c\uddf0\ud83c\uddea &nbsp; Kenya market \u00b7 Prices in KES \u00b7 Nairobi focus',
+    searchLabel:'Search any Nairobi location or property type',
+    placeholder:'e.g. Westlands 2BR, Karen villa, Kilimani off-plan...',
+    tags:['Westlands','Kilimani','Karen','Kileleshwa','Lavington','Runda','Parklands','Nairobi CBD'],
+    mortgageRates:[{label:'KCB (13.5%)',val:13.5},{label:'Equity Bank (14%)',val:14},{label:'Stanbic (13%)',val:13},{label:'NCBA (14.5%)',val:14.5}],
+    mortgageTerm:[{label:'20 years',val:240},{label:'25 years',val:300},{label:'15 years',val:180}],
+    mortgageDeposit:20,
+    legalNote:'Always conduct an official title search at Ardhi House (Lands Registry, Upper Hill, Nairobi) before paying any deposit. Official search costs KES 500 and takes 3\u20135 working days. Instruct a Kenya-registered advocate to conduct the search on your behalf.'
+  },
+  se:{name:'Sweden',flag:'\ud83c\uddf8\ud83c\uddea',currency:'SEK',locale:'sv-SE',
+    banner:'\ud83c\uddf8\ud83c\uddea &nbsp; Swedish market \u00b7 Prices in SEK \u00b7 Stockholm & major cities',
+    searchLabel:'Search any Swedish location or property type',
+    placeholder:'e.g. \u00d6stermalm l\u00e4genhet, Liding\u00f6 villa, Nacka bostadsr\u00e4tt...',
+    tags:['\u00d6stermalm','Liding\u00f6','Nacka','Bromma','Djursholm','Solna','Gothenburg','Malm\u00f6'],
+    mortgageRates:[{label:'Riksbank rate + 1% (4.5%)',val:4.5},{label:'Swedbank (4.2%)',val:4.2},{label:'SEB (4.4%)',val:4.4},{label:'Handelsbanken (4.3%)',val:4.3}],
+    mortgageTerm:[{label:'30 years',val:360},{label:'25 years',val:300},{label:'15 years',val:180}],
+    mortgageDeposit:15,
+    legalNote:'Engage a licensed Swedish fastighetsm\u00e4klare and conduct a full Lantm\u00e4teriregistret search before signing. Confirm pantbrev status and inteckningar with the seller.'
+  }
+};
+
+const DEFAULT_STATE = {
+  // Money OS — profile
+  currency: 'SEK',
+  darkMode: true,
+  currentAge: 44,
+  retirementAge: 69,
+  lifeExp: 90,
+  growthRate: 7,
+  inflationRate: 2,
+  postRetGrowth: 4,
+  withdrawTaxRate: 20,
+  nestEggReal: false,
+  tickerQuote: 'Come rain or shine, I will retire under the sun.',
+  exchangeRates: { SEK:1, USD:0.11, EUR:0.09, KES:14.27 },
+
+  // Money OS — pension inputs
+  penAllman: 0,
+  penITP: 0,
+  penOther: 0,
+
+  // Money OS — income line items
+  income: [
+    {id:'i1',name:'Young',amount:98000,paid:false},
+    {id:'i2',name:'Guliz',amount:31000,paid:false}
+  ],
+
+  // Money OS — expense line items
+  expenses: [
+    {id:'e1',name:'Mortgage',amount:27000,paid:false},
+    {id:'e2',name:'Groceries',amount:7000,paid:false},
+    {id:'e3',name:'Avgift',amount:7250,paid:false},
+    {id:'e4',name:'Cleaning',amount:2000,paid:false},
+    {id:'e5',name:'Insurance',amount:1380,paid:false},
+    {id:'e6',name:'AKASSA',amount:900,paid:false},
+    {id:'e7',name:'Madre',amount:9500,paid:false},
+    {id:'e8',name:'Guliz Bills',amount:4415,paid:false},
+    {id:'e9',name:'Guliz Allowance',amount:10000,paid:false},
+    {id:'e10',name:'Young Bills',amount:2000,paid:false},
+    {id:'e11',name:'Young Allowance',amount:10000,paid:false},
+    {id:'e12',name:'Chase',amount:55000,paid:false}
+  ],
+
+  // Money OS — savings
+  baseSavings: 27000,
+  monthlyOverrides: {},
+
+  // Money OS — assets (external)
+  externalAssets: [
+    {id:'a1',name:'ITP1',balance:1400000,growthRate:4,monthlyContribution:32000},
+    {id:'a2',name:'Vanguard',balance:1400000,growthRate:7,monthlyContribution:0},
+    {id:'a3',name:'Royal London',balance:700000,growthRate:7,monthlyContribution:0}
+  ],
+
+  // Money OS — liabilities / net worth
+  netWorth: { property:0, mortgage:0, otherDebt:0 },
+
+  // Money OS — vacation trips
+  savedTrips: [],
+
+  // Money OS — retirement scenarios
+  selectedDreams: [],
+  selectedRetDest: null,
+
+  // Money OS — selected month
+  selectedMonth: `${new Date().getFullYear()}-${String(new Date().getMonth()+1).padStart(2,'0')}`,
+
+  // PropIQ
+  ppiMarket: 'ke',
+  ppiHistory: [],
+  ppiLastQuery: ''
+};
+
+// ═══════════════════════════════════════════════════════════════════
+// UNIFIED STATE OBJECT
+// ═══════════════════════════════════════════════════════════════════
+
+let state = {};
+let saveTimeout = null;
+
+function loadState() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    state = raw ? Object.assign({}, DEFAULT_STATE, JSON.parse(raw)) : { ...DEFAULT_STATE };
+  } catch (e) {
+    state = { ...DEFAULT_STATE };
+  }
+}
+
+function saveState() {
+  clearTimeout(saveTimeout);
+  saveTimeout = setTimeout(() => {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    if (fbRef) syncToFirebase();
+  }, 600);
+  setSyncBadge('saving', '\u25cf SAVING');
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// FIREBASE MODULE
+// ═══════════════════════════════════════════════════════════════════
+
+let fbDb = null, fbRef = null, fbReady = false;
+
+function initFirebase() {
+  const url = document.getElementById('fbUrl').value.trim();
+  const key = document.getElementById('fbKey').value.trim();
+  const user = document.getElementById('fbUser').value.trim();
+  if (!url || !key) {
+    document.getElementById('fbStatus').textContent = '\u26a0 Enter DB URL and API key';
+    return;
+  }
+  try {
+    const app = firebase.apps.length
+      ? firebase.app()
+      : firebase.initializeApp({ apiKey: key, databaseURL: url, projectId: 'horizon-os' });
+    fbDb = firebase.database(app);
+    fbRef = fbDb.ref('users/' + (user || 'default') + '/state');
+    fbRef.once('value', snap => {
+      if (snap.val()) { Object.assign(state, snap.val()); }
+      fbRef.on('value', s => { if (s.val()) Object.assign(state, s.val()); });
+      document.getElementById('fbStatus').innerHTML = '<span style="color:var(--green)">\u2713 Connected</span>';
+      setSyncBadge('synced', '\u2601 SYNCED');
+      fbReady = true;
+    }).catch(e => {
+      document.getElementById('fbStatus').innerHTML = '<span style="color:var(--red)">\u2715 ' + e.message + '</span>';
+    });
+  } catch (e) {
+    document.getElementById('fbStatus').innerHTML = '<span style="color:var(--red)">\u2715 ' + e.message + '</span>';
+  }
+}
+
+function syncToFirebase() {
+  if (!fbRef) return;
+  fbRef.set(state).then(() => {
+    setSyncBadge('synced', '\u2601 SYNCED');
+    const el = document.getElementById('sbSyncTime');
+    if (el) el.textContent = 'Synced ' + new Date().toLocaleTimeString();
+  }).catch(() => setSyncBadge('', 'LOCAL'));
+}
+
+function syncFromFirebase() {
+  if (!fbRef) return;
+  fbRef.once('value', snap => {
+    if (snap.val()) {
+      Object.assign(state, snap.val());
+      saveState();
+      setSyncBadge('synced', '\u2601 SYNCED');
+    }
+  });
+}
+
+function setSyncBadge(cls, txt) {
+  const b = document.getElementById('syncBadge');
+  if (!b) return;
+  b.className = 'sync-badge' + (cls ? ' ' + cls : '');
+  b.textContent = txt;
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// APP ROUTER
+// ═══════════════════════════════════════════════════════════════════
+
+let currentApp = 'money';
+let currentPanel = 'dashboard';
+let currentPiqView = 'search';
+
+function showApp(app) {
+  currentApp = app;
+  const moneyEl = document.getElementById('app-money');
+  const propEl = document.getElementById('app-property');
+  if (moneyEl) moneyEl.style.display = app === 'money' ? '' : 'none';
+  if (propEl) propEl.style.display = app === 'property' ? '' : 'none';
+  document.querySelectorAll('.app-tab').forEach(t => {
+    t.classList.toggle('active', t.dataset.app === app);
+  });
+  if (app === 'money') {
+    location.hash = '#/money/' + currentPanel;
+  } else {
+    location.hash = '#/property' + (currentPiqView !== 'search' ? '/' + currentPiqView : '');
+  }
+}
+
+function showPanel(panel) {
+  currentPanel = panel;
+  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-item,.mob-nav-item').forEach(n => n.classList.remove('active'));
+  const pe = document.getElementById('panel-' + panel);
+  if (pe) pe.classList.add('active');
+  const ni = document.getElementById('nav-' + panel);
+  if (ni) ni.classList.add('active');
+  const mi = document.getElementById('mn-' + panel);
+  if (mi) mi.classList.add('active');
+  if (currentApp !== 'money') showApp('money');
+  location.hash = '#/money/' + panel;
+}
+
+function showPiqPanel(view) {
+  currentPiqView = view;
+  document.querySelectorAll('.piq-view').forEach(v => v.classList.remove('active'));
+  const ve = document.getElementById('piq-' + view);
+  if (ve) ve.classList.add('active');
+  if (currentApp !== 'property') showApp('property');
+  location.hash = '#/property' + (view !== 'search' ? '/' + view : '');
+}
+
+function handleRoute() {
+  const hash = location.hash || '#/money/dashboard';
+  const parts = hash.replace('#/', '').split('/');
+  const app = parts[0] || 'money';
+  const sub = parts[1] || (app === 'money' ? 'dashboard' : 'search');
+
+  if (app === 'money') {
+    currentApp = 'money';
+    currentPanel = sub;
+    const moneyEl = document.getElementById('app-money');
+    const propEl = document.getElementById('app-property');
+    if (moneyEl) moneyEl.style.display = '';
+    if (propEl) propEl.style.display = 'none';
+    document.querySelectorAll('.app-tab').forEach(t => {
+      t.classList.toggle('active', t.dataset.app === 'money');
+    });
+    document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+    document.querySelectorAll('.nav-item,.mob-nav-item').forEach(n => n.classList.remove('active'));
+    const pe = document.getElementById('panel-' + sub);
+    if (pe) pe.classList.add('active');
+    const ni = document.getElementById('nav-' + sub);
+    if (ni) ni.classList.add('active');
+    const mi = document.getElementById('mn-' + sub);
+    if (mi) mi.classList.add('active');
+  } else if (app === 'property') {
+    currentApp = 'property';
+    currentPiqView = sub;
+    const moneyEl = document.getElementById('app-money');
+    const propEl = document.getElementById('app-property');
+    if (moneyEl) moneyEl.style.display = 'none';
+    if (propEl) propEl.style.display = '';
+    document.querySelectorAll('.app-tab').forEach(t => {
+      t.classList.toggle('active', t.dataset.app === 'property');
+    });
+    document.querySelectorAll('.piq-view').forEach(v => v.classList.remove('active'));
+    const ve = document.getElementById('piq-' + sub);
+    if (ve) ve.classList.add('active');
+  }
+}
+
+window.onhashchange = handleRoute;
+
+window.addEventListener('DOMContentLoaded', () => {
+  loadState();
+  if (location.hash) {
+    handleRoute();
+  } else {
+    location.hash = '#/money/dashboard';
+  }
+});
+</script>
+
+<script>
+// ═══════════════════════════════════════════════════════════════════
+// MONEY OS — CALCULATION ENGINE (pure math, no DOM access)
+// ═══════════════════════════════════════════════════════════════════
+
+function calcIncome(monthKey) {
+  const key = monthKey || state.selectedMonth;
+  const ov = state.monthlyOverrides[key];
+  const items = ov && ov.income ? ov.income : state.income;
+  const total = items.reduce((s, i) => s + i.amount, 0);
+  return { items, total, month: key, hasOverride: !!(ov && ov.income) };
+}
+
+function calcExpenses(monthKey) {
+  const key = monthKey || state.selectedMonth;
+  const ov = state.monthlyOverrides[key];
+  const items = ov && ov.expenses ? ov.expenses : state.expenses;
+  const total = items.reduce((s, i) => s + i.amount, 0);
+  const paid = items.filter(i => i.paid);
+  const unpaid = items.filter(i => !i.paid);
+  const paidTotal = paid.reduce((s, i) => s + i.amount, 0);
+  const unpaidTotal = unpaid.reduce((s, i) => s + i.amount, 0);
+  return { items, total, paid, unpaid, paidTotal, unpaidTotal, month: key, hasOverride: !!(ov && ov.expenses) };
+}
+
+function calcSavings(monthKey) {
+  const key = monthKey || state.selectedMonth;
+  const ov = state.monthlyOverrides[key];
+  const inc = calcIncome(key);
+  const exp = calcExpenses(key);
+  const baseSav = ov && ov.savings !== undefined ? ov.savings : state.baseSavings;
+  const surplus = inc.total - exp.total;
+  const savingsRate = inc.total > 0 ? (baseSav / inc.total) * 100 : 0;
+  const funFund = Math.max(0, surplus - baseSav);
+
+  // Split: 50% emergency, 30% nest egg, 20% fun fund (of base savings)
+  const emergency = baseSav * 0.5;
+  const nestEggAlloc = baseSav * 0.3;
+  const funAlloc = baseSav * 0.2;
+
+  return {
+    baseSavings: baseSav,
+    surplus,
+    savingsRate: Math.round(savingsRate * 10) / 10,
+    funFund,
+    allocation: { emergency, nestEgg: nestEggAlloc, funFund: funAlloc },
+    month: key
+  };
+}
+
+function calcCashFlow() {
+  const now = new Date();
+  const months = [];
+  let cumSavings = 0;
+
+  for (let i = 0; i < 12; i++) {
+    const d = new Date(now.getFullYear(), now.getMonth() - 11 + i, 1);
+    const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+    const inc = calcIncome(key);
+    const exp = calcExpenses(key);
+    const surplus = inc.total - exp.total;
+    cumSavings += surplus;
+    months.push({
+      month: key,
+      label: MN[d.getMonth()] + ' ' + d.getFullYear(),
+      income: inc.total,
+      expenses: exp.total,
+      surplus,
+      cumSavings
+    });
+  }
+
+  const avgIncome = months.reduce((s, m) => s + m.income, 0) / 12;
+  const avgExpenses = months.reduce((s, m) => s + m.expenses, 0) / 12;
+  const avgSurplus = months.reduce((s, m) => s + m.surplus, 0) / 12;
+
+  return { months, avgIncome, avgExpenses, avgSurplus, cumSavings };
+}
+
+function calcNetWorth() {
+  // Assets: external investment accounts
+  const assetItems = (state.externalAssets || []).map(a => ({
+    id: a.id,
+    name: a.name,
+    value: a.balance
+  }));
+  const totalAssets = assetItems.reduce((s, a) => s + a.value, 0);
+
+  // Property asset
+  const propertyValue = state.netWorth.property || 0;
+
+  // Liabilities
+  const mortgage = state.netWorth.mortgage || 0;
+  const otherDebt = state.netWorth.otherDebt || 0;
+  const totalLiabilities = mortgage + otherDebt;
+
+  // Net worth
+  const netWorth = totalAssets + propertyValue - totalLiabilities;
+
+  return {
+    assets: {
+      investments: { items: assetItems, total: totalAssets },
+      property: propertyValue,
+      total: totalAssets + propertyValue
+    },
+    liabilities: {
+      mortgage,
+      otherDebt,
+      total: totalLiabilities
+    },
+    netWorth
+  };
+}
+
+function calcNestEgg(yearsOverride) {
+  const years = yearsOverride !== undefined ? yearsOverride : (state.retirementAge - state.currentAge);
+  const inflRate = state.inflationRate / 100;
+  const projections = [];
+
+  // Per-asset projections
+  const assetProjections = (state.externalAssets || []).map(a => {
+    const r = (a.growthRate || state.growthRate) / 100;
+    const rn = r / 12;
+    const timeline = [];
+    let bal = a.balance;
+    for (let y = 0; y <= years; y++) {
+      const realBal = bal / Math.pow(1 + inflRate, y);
+      timeline.push({ year: y, nominal: Math.round(bal), real: Math.round(realBal) });
+      if (y < years) {
+        for (let m = 0; m < 12; m++) {
+          bal = bal * (1 + rn) + a.monthlyContribution;
+        }
+      }
+    }
+    return { id: a.id, name: a.name, timeline };
+  });
+
+  // Aggregate totals per year
+  for (let y = 0; y <= years; y++) {
+    let nominal = 0;
+    let real = 0;
+    assetProjections.forEach(ap => {
+      nominal += ap.timeline[y].nominal;
+      real += ap.timeline[y].real;
+    });
+    projections.push({ year: y, nominal, real });
+  }
+
+  // Also add monthly savings contribution as a separate growth line
+  const savRate = state.growthRate / 100;
+  const savRn = savRate / 12;
+  let savBal = 0;
+  const savingsTimeline = [];
+  for (let y = 0; y <= years; y++) {
+    const realBal = savBal / Math.pow(1 + inflRate, y);
+    savingsTimeline.push({ year: y, nominal: Math.round(savBal), real: Math.round(realBal) });
+    if (y < years) {
+      for (let m = 0; m < 12; m++) {
+        savBal = savBal * (1 + savRn) + state.baseSavings;
+      }
+    }
+  }
+
+  // Grand total = assets + savings contributions
+  const grandTotal = projections.map((p, i) => ({
+    year: p.year,
+    nominal: p.nominal + savingsTimeline[i].nominal,
+    real: p.real + savingsTimeline[i].real
+  }));
+
+  return {
+    years,
+    assetProjections,
+    savingsTimeline,
+    projections,
+    grandTotal,
+    finalNominal: grandTotal.length ? grandTotal[grandTotal.length - 1].nominal : 0,
+    finalReal: grandTotal.length ? grandTotal[grandTotal.length - 1].real : 0
+  };
+}
+
+function calcRetirement() {
+  const yearsToRet = state.retirementAge - state.currentAge;
+  const retYears = state.lifeExp - state.retirementAge;
+
+  // Swedish pension components (monthly)
+  const penAllman = state.penAllman || 0;
+  const penITP = state.penITP || 0;
+  const penOther = state.penOther || 0;
+  const monthlyPension = penAllman + penITP + penOther;
+
+  // Nest egg at retirement
+  const egg = calcNestEgg(yearsToRet);
+  const nestEggAtRet = state.nestEggReal ? egg.finalReal : egg.finalNominal;
+
+  // Monthly drawdown from nest egg over retirement years
+  const drawdownMonths = retYears * 12;
+  const postRetR = state.postRetGrowth / 100 / 12;
+  let monthlyDrawdown = 0;
+  if (drawdownMonths > 0) {
+    if (postRetR > 0) {
+      // PMT formula: PMT = PV * r / (1 - (1+r)^-n)
+      monthlyDrawdown = nestEggAtRet * postRetR / (1 - Math.pow(1 + postRetR, -drawdownMonths));
+    } else {
+      monthlyDrawdown = nestEggAtRet / drawdownMonths;
+    }
+  }
+
+  // After-tax drawdown
+  const taxRate = state.withdrawTaxRate / 100;
+  const monthlyDrawdownAfterTax = monthlyDrawdown * (1 - taxRate);
+
+  // Total monthly retirement income
+  const monthlyRetIncome = monthlyPension + monthlyDrawdownAfterTax;
+
+  // Current monthly expenses as baseline target
+  const currentExp = calcExpenses();
+  const monthlyTarget = currentExp.total;
+
+  // FIRE number: 25x annual expenses (4% rule)
+  const fireNumber = monthlyTarget * 12 * 25;
+
+  // Gap analysis
+  const gap = monthlyTarget - monthlyRetIncome;
+  const onTrack = gap <= 0;
+
+  return {
+    yearsToRetirement: yearsToRet,
+    retirementYears: retYears,
+    pension: {
+      allman: penAllman,
+      itp: penITP,
+      other: penOther,
+      monthlyTotal: monthlyPension
+    },
+    nestEggAtRetirement: Math.round(nestEggAtRet),
+    drawdownMonths,
+    monthlyDrawdownGross: Math.round(monthlyDrawdown),
+    monthlyDrawdownAfterTax: Math.round(monthlyDrawdownAfterTax),
+    monthlyRetirementIncome: Math.round(monthlyRetIncome),
+    monthlyTarget,
+    fireNumber: Math.round(fireNumber),
+    gap: Math.round(gap),
+    onTrack
+  };
+}
+
+function calcFunFund(monthKey) {
+  const sav = calcSavings(monthKey);
+  const balance = sav.funFund;
+
+  // Affordability tiers
+  const tiers = [
+    { name: 'Coffee date', amount: 500 },
+    { name: 'Nice dinner', amount: 2000 },
+    { name: 'Weekend trip', amount: 8000 },
+    { name: 'Short holiday', amount: 25000 },
+    { name: 'Big vacation', amount: 50000 }
+  ];
+
+  const tiersWithStatus = tiers.map(t => {
+    const affordable = balance >= t.amount;
+    const monthsToReach = !affordable && balance < t.amount && sav.funFund > 0
+      ? Math.ceil((t.amount - balance) / sav.funFund)
+      : affordable ? 0 : Infinity;
+    return { ...t, affordable, monthsToReach };
+  });
+
+  // Find the next unreached tier
+  const nextTier = tiersWithStatus.find(t => !t.affordable) || null;
+
+  return {
+    balance,
+    monthlySurplus: sav.funFund,
+    tiers: tiersWithStatus,
+    nextTier,
+    month: sav.month
+  };
+}
+</script>
+
+<script>
+// ═══════════════════════════════════════════════════════════════════
+// MONEY OS — PANEL RENDER FUNCTIONS
+// ═══════════════════════════════════════════════════════════════════
+
+let charts = {};
+let vacMap = null, retMap = null;
+
+// ── helpers ──
+function fmt(n) {
+  const sym = CSYM[state.currency] || 'kr';
+  if (Math.abs(n) >= 1e6) return sym + ' ' + (n / 1e6).toFixed(1) + 'M';
+  if (Math.abs(n) >= 1e3) return sym + ' ' + Math.round(n).toLocaleString('sv-SE');
+  return sym + ' ' + Math.round(n);
+}
+function pct(n) { return (Math.round(n * 10) / 10) + '%'; }
+function uid() { return '_' + Math.random().toString(36).slice(2, 9); }
+function el(id) { return document.getElementById(id); }
+
+// ─────────────────────────────────────────────────────────────────
+// renderDashboard
+// ─────────────────────────────────────────────────────────────────
+function renderDashboard() {
+  const inc = calcIncome();
+  const exp = calcExpenses();
+  const sav = calcSavings();
+  const cf = calcCashFlow();
+  const nw = calcNetWorth();
+  const egg = calcNestEgg();
+  const ret = calcRetirement();
+
+  // KPI grid
+  const kpi = el('dash-kpis');
+  if (kpi) kpi.innerHTML =
+    `<div class="kpi"><div class="kpi-label">Income</div><div class="kpi-value">${fmt(inc.total)}</div></div>` +
+    `<div class="kpi"><div class="kpi-label">Expenses</div><div class="kpi-value">${fmt(exp.total)}</div></div>` +
+    `<div class="kpi"><div class="kpi-label">Surplus</div><div class="kpi-value ${sav.surplus >= 0 ? 'positive' : 'negative'}">${fmt(sav.surplus)}</div></div>` +
+    `<div class="kpi"><div class="kpi-label">Net Worth</div><div class="kpi-value">${fmt(nw.netWorth)}</div></div>` +
+    `<div class="kpi"><div class="kpi-label">Savings Rate</div><div class="kpi-value">${pct(sav.savingsRate)}</div></div>` +
+    `<div class="kpi"><div class="kpi-label">Fun Fund</div><div class="kpi-value">${fmt(sav.funFund)}</div></div>`;
+
+  // Cash flow summary
+  const cfSummary = el('dash-cf-summary');
+  if (cfSummary) {
+    const mode = cfSummary.dataset.mode || 'month';
+    if (mode === 'month') {
+      cfSummary.innerHTML =
+        `<div class="cf-row"><span>Income</span><span>${fmt(inc.total)}</span></div>` +
+        `<div class="cf-row"><span>Expenses</span><span>${fmt(exp.total)}</span></div>` +
+        `<div class="cf-row total"><span>Surplus</span><span>${fmt(sav.surplus)}</span></div>`;
+    } else {
+      cfSummary.innerHTML =
+        `<div class="cf-row"><span>Avg Income</span><span>${fmt(cf.avgIncome)}</span></div>` +
+        `<div class="cf-row"><span>Avg Expenses</span><span>${fmt(cf.avgExpenses)}</span></div>` +
+        `<div class="cf-row total"><span>Avg Surplus</span><span>${fmt(cf.avgSurplus)}</span></div>`;
+    }
+  }
+
+  // Savings chart (Chart.js)
+  const savCanvas = el('dash-savings-chart');
+  if (savCanvas) {
+    if (charts.dashSav) charts.dashSav.destroy();
+    charts.dashSav = new Chart(savCanvas.getContext('2d'), {
+      type: 'bar',
+      data: {
+        labels: cf.months.map(m => m.label),
+        datasets: [
+          { label: 'Income', data: cf.months.map(m => m.income), backgroundColor: '#00e8a0' },
+          { label: 'Expenses', data: cf.months.map(m => m.expenses), backgroundColor: '#ff4d6d' }
+        ]
+      },
+      options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { labels: { color: '#aaa' } } }, scales: { x: { ticks: { color: '#888' } }, y: { ticks: { color: '#888' } } } }
+    });
+  }
+
+  // Nest egg milestones
+  const milestones = el('dash-milestones');
+  if (milestones) {
+    const final = egg.finalNominal;
+    const targets = [1e6, 5e6, 10e6, 20e6, 50e6];
+    milestones.innerHTML = targets.map(t => {
+      const p = Math.min(100, (final / t) * 100);
+      return `<div class="milestone"><div class="milestone-label">${fmt(t)}</div><div class="milestone-bar"><div class="milestone-fill" style="width:${p}%"></div></div><div class="milestone-pct">${pct(p)}</div></div>`;
+    }).join('');
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────
+// renderCashFlow
+// ─────────────────────────────────────────────────────────────────
+function renderCashFlow() {
+  const inc = calcIncome();
+  const exp = calcExpenses();
+  const sav = calcSavings();
+  const cf = calcCashFlow();
+
+  // Month strip
+  const strip = el('cf-month-strip');
+  if (strip) {
+    strip.innerHTML = cf.months.map(m =>
+      `<div class="month-chip${m.month === state.selectedMonth ? ' active' : ''}" onclick="state.selectedMonth='${m.month}';saveState();renderCashFlow()">${m.label.split(' ')[0]}</div>`
+    ).join('');
+  }
+
+  // Income line items
+  const incList = el('cf-income-list');
+  if (incList) {
+    incList.innerHTML = inc.items.map((it, idx) =>
+      `<div class="line-item">` +
+        `<input type="checkbox" ${it.paid ? 'checked' : ''} onchange="togglePaid('income',${idx},this.checked)">` +
+        `<input class="li-name" value="${it.name}" onchange="updateLineItem('income',${idx},'name',this.value)">` +
+        `<input class="li-amount" type="number" value="${it.amount}" onchange="updateLineItem('income',${idx},'amount',+this.value)">` +
+        `<button class="li-remove" onclick="removeLineItem('income',${idx})">✕</button>` +
+      `</div>`
+    ).join('');
+  }
+
+  const addInc = el('cf-add-income');
+  if (addInc) addInc.onclick = () => { state.income.push({ id: uid(), name: 'New Income', amount: 0, paid: false }); saveState(); renderCashFlow(); };
+
+  // Expense line items
+  const expList = el('cf-expense-list');
+  if (expList) {
+    expList.innerHTML = exp.items.map((it, idx) =>
+      `<div class="line-item${it.paid ? ' paid' : ''}">` +
+        `<input type="checkbox" ${it.paid ? 'checked' : ''} onchange="togglePaid('expenses',${idx},this.checked)">` +
+        `<input class="li-name" value="${it.name}" onchange="updateLineItem('expenses',${idx},'name',this.value)">` +
+        `<input class="li-amount" type="number" value="${it.amount}" onchange="updateLineItem('expenses',${idx},'amount',+this.value)">` +
+        `<button class="li-remove" onclick="removeLineItem('expenses',${idx})">✕</button>` +
+      `</div>`
+    ).join('');
+  }
+
+  const addExp = el('cf-add-expense');
+  if (addExp) addExp.onclick = () => { state.expenses.push({ id: uid(), name: 'New Expense', amount: 0, paid: false }); saveState(); renderCashFlow(); };
+
+  // Savings allocation slider
+  const savSlider = el('cf-savings-slider');
+  if (savSlider) {
+    savSlider.innerHTML =
+      `<div class="sav-control"><label>Monthly Savings Target</label>` +
+      `<input type="range" min="0" max="${Math.max(inc.total, 100000)}" value="${sav.baseSavings}" oninput="state.baseSavings=+this.value;saveState();renderCashFlow()">` +
+      `<span class="sav-val">${fmt(sav.baseSavings)}</span></div>` +
+      `<div class="sav-split">` +
+        `<div class="split-item"><span class="split-label">Emergency</span><span>${fmt(sav.allocation.emergency)}</span></div>` +
+        `<div class="split-item"><span class="split-label">Nest Egg</span><span>${fmt(sav.allocation.nestEgg)}</span></div>` +
+        `<div class="split-item"><span class="split-label">Fun Fund</span><span>${fmt(sav.allocation.funFund)}</span></div>` +
+      `</div>`;
+  }
+
+  // 12-month breakdown table
+  const cfTable = el('cf-table');
+  if (cfTable) {
+    cfTable.innerHTML =
+      `<table class="dt"><thead><tr><th>Month</th><th>Income</th><th>Expenses</th><th>Surplus</th><th>Cumulative</th></tr></thead><tbody>` +
+      cf.months.map(m =>
+        `<tr class="${m.month === state.selectedMonth ? 'active-row' : ''}"><td>${m.label}</td><td>${fmt(m.income)}</td><td>${fmt(m.expenses)}</td><td class="${m.surplus >= 0 ? 'positive' : 'negative'}">${fmt(m.surplus)}</td><td>${fmt(m.cumSavings)}</td></tr>`
+      ).join('') +
+      `</tbody></table>`;
+  }
+}
+
+// line item mutation helpers (minimal side effects: mutate state, save, re-render)
+function togglePaid(type, idx, val) { state[type][idx].paid = val; saveState(); renderCashFlow(); if (currentPanel === 'dashboard') renderDashboard(); }
+function updateLineItem(type, idx, field, val) { state[type][idx][field] = val; saveState(); renderCashFlow(); }
+function removeLineItem(type, idx) { state[type].splice(idx, 1); saveState(); renderCashFlow(); }
+
+// ─────────────────────────────────────────────────────────────────
+// renderNetWorth
+// ─────────────────────────────────────────────────────────────────
+function renderNetWorth() {
+  const nw = calcNetWorth();
+  const egg = calcNestEgg();
+
+  // KPI row
+  const kpiRow = el('nw-kpis');
+  if (kpiRow) kpiRow.innerHTML =
+    `<div class="kpi"><div class="kpi-label">Total Assets</div><div class="kpi-value">${fmt(nw.assets.total)}</div></div>` +
+    `<div class="kpi"><div class="kpi-label">Total Liabilities</div><div class="kpi-value negative">${fmt(nw.liabilities.total)}</div></div>` +
+    `<div class="kpi"><div class="kpi-label">Net Worth</div><div class="kpi-value ${nw.netWorth >= 0 ? 'positive' : 'negative'}">${fmt(nw.netWorth)}</div></div>`;
+
+  // Assets card list
+  const assetList = el('nw-assets');
+  if (assetList) {
+    let html = nw.assets.investments.items.map(a =>
+      `<div class="nw-card"><div class="nw-card-name">${a.name}</div><div class="nw-card-val">${fmt(a.value)}</div></div>`
+    ).join('');
+    if (nw.assets.property > 0) html += `<div class="nw-card"><div class="nw-card-name">Property</div><div class="nw-card-val">${fmt(nw.assets.property)}</div></div>`;
+    assetList.innerHTML = html;
+  }
+
+  // Liabilities card list
+  const liabList = el('nw-liabilities');
+  if (liabList) {
+    let html = '';
+    if (nw.liabilities.mortgage > 0) html += `<div class="nw-card"><div class="nw-card-name">Mortgage</div><div class="nw-card-val negative">${fmt(nw.liabilities.mortgage)}</div></div>`;
+    if (nw.liabilities.otherDebt > 0) html += `<div class="nw-card"><div class="nw-card-name">Other Debt</div><div class="nw-card-val negative">${fmt(nw.liabilities.otherDebt)}</div></div>`;
+    liabList.innerHTML = html || '<div class="nw-card"><div class="nw-card-name">No liabilities</div></div>';
+  }
+
+  // Net worth projection chart
+  const nwCanvas = el('nw-projection-chart');
+  if (nwCanvas) {
+    if (charts.nwProj) charts.nwProj.destroy();
+    charts.nwProj = new Chart(nwCanvas.getContext('2d'), {
+      type: 'line',
+      data: {
+        labels: egg.grandTotal.map(p => 'Year ' + p.year),
+        datasets: [
+          { label: 'Nominal', data: egg.grandTotal.map(p => p.nominal), borderColor: '#00e8a0', backgroundColor: 'rgba(0,232,160,0.1)', fill: true, tension: 0.3 },
+          { label: 'Real (inflation-adj)', data: egg.grandTotal.map(p => p.real), borderColor: '#4d8fff', backgroundColor: 'rgba(77,143,255,0.1)', fill: true, tension: 0.3 }
+        ]
+      },
+      options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { labels: { color: '#aaa' } } }, scales: { x: { ticks: { color: '#888', maxTicksLimit: 10 } }, y: { ticks: { color: '#888', callback: v => fmt(v) } } } }
+    });
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────
+// renderAssets
+// ─────────────────────────────────────────────────────────────────
+function renderAssets() {
+  const egg = calcNestEgg();
+
+  // Portfolio vehicle rows
+  const list = el('assets-list');
+  if (list) {
+    list.innerHTML = (state.externalAssets || []).map((a, idx) =>
+      `<div class="asset-row">` +
+        `<input class="li-name" value="${a.name}" onchange="state.externalAssets[${idx}].name=this.value;saveState();renderAssets()">` +
+        `<div class="asset-field"><label>Balance</label><input type="number" value="${a.balance}" onchange="state.externalAssets[${idx}].balance=+this.value;saveState();renderAssets()"></div>` +
+        `<div class="asset-field"><label>Growth %</label><input type="number" value="${a.growthRate}" step="0.1" onchange="state.externalAssets[${idx}].growthRate=+this.value;saveState();renderAssets()"></div>` +
+        `<div class="asset-field"><label>Monthly +</label><input type="number" value="${a.monthlyContribution}" onchange="state.externalAssets[${idx}].monthlyContribution=+this.value;saveState();renderAssets()"></div>` +
+        `<button class="li-remove" onclick="state.externalAssets.splice(${idx},1);saveState();renderAssets()">✕</button>` +
+      `</div>`
+    ).join('');
+  }
+
+  const addBtn = el('assets-add');
+  if (addBtn) addBtn.onclick = () => {
+    state.externalAssets.push({ id: uid(), name: 'New Asset', balance: 0, growthRate: state.growthRate, monthlyContribution: 0 });
+    saveState(); renderAssets();
+  };
+
+  // Real/nominal toggle
+  const toggleEl = el('assets-real-toggle');
+  if (toggleEl) {
+    toggleEl.innerHTML =
+      `<button class="itab${!state.nestEggReal ? ' active' : ''}" onclick="state.nestEggReal=false;saveState();renderAssets()">Nominal</button>` +
+      `<button class="itab${state.nestEggReal ? ' active' : ''}" onclick="state.nestEggReal=true;saveState();renderAssets()">Real</button>`;
+  }
+
+  // Summary KPIs
+  const assetKpis = el('assets-kpis');
+  if (assetKpis) {
+    const final = state.nestEggReal ? egg.finalReal : egg.finalNominal;
+    const totalBal = (state.externalAssets || []).reduce((s, a) => s + a.balance, 0);
+    assetKpis.innerHTML =
+      `<div class="kpi"><div class="kpi-label">Current Portfolio</div><div class="kpi-value">${fmt(totalBal)}</div></div>` +
+      `<div class="kpi"><div class="kpi-label">Nest Egg (${egg.years}y)</div><div class="kpi-value">${fmt(final)}</div></div>`;
+  }
+
+  // Nest egg growth chart
+  const eggCanvas = el('assets-egg-chart');
+  if (eggCanvas) {
+    if (charts.egg) charts.egg.destroy();
+    const useReal = state.nestEggReal;
+    const datasets = egg.assetProjections.map((ap, i) => ({
+      label: ap.name,
+      data: ap.timeline.map(p => useReal ? p.real : p.nominal),
+      borderColor: ['#00e8a0', '#4d8fff', '#f5a623', '#ec4899', '#8b5cf6'][i % 5],
+      fill: false,
+      tension: 0.3
+    }));
+    datasets.push({
+      label: 'Monthly Savings',
+      data: egg.savingsTimeline.map(p => useReal ? p.real : p.nominal),
+      borderColor: '#aaa',
+      borderDash: [5, 3],
+      fill: false,
+      tension: 0.3
+    });
+    charts.egg = new Chart(eggCanvas.getContext('2d'), {
+      type: 'line',
+      data: { labels: egg.grandTotal.map(p => p.year), datasets },
+      options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { labels: { color: '#aaa' } } }, scales: { x: { title: { display: true, text: 'Years', color: '#888' }, ticks: { color: '#888' } }, y: { ticks: { color: '#888', callback: v => fmt(v) } } } }
+    });
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────
+// renderFunFund (vacation panel)
+// ─────────────────────────────────────────────────────────────────
+function renderFunFund() {
+  const ff = calcFunFund();
+
+  // Tier grid
+  const tierGrid = el('vac-tier-grid');
+  if (tierGrid) {
+    tierGrid.innerHTML = ff.tiers.map(t =>
+      `<div class="tier-card${t.affordable ? ' affordable' : ''}">` +
+        `<div class="tier-name">${t.name}</div>` +
+        `<div class="tier-amount">${fmt(t.amount)}</div>` +
+        `<div class="tier-status">${t.affordable ? '✓ Affordable' : t.monthsToReach === Infinity ? 'Not yet' : t.monthsToReach + ' mo'}</div>` +
+      `</div>`
+    ).join('');
+  }
+
+  // Fund timeline bars
+  const timeline = el('vac-timeline');
+  if (timeline) {
+    const maxTier = ff.tiers[ff.tiers.length - 1].amount;
+    timeline.innerHTML = ff.tiers.map(t => {
+      const w = Math.min(100, (ff.balance / t.amount) * 100);
+      return `<div class="timeline-row"><span class="tl-label">${t.name}</span><div class="tl-bar"><div class="tl-fill${t.affordable ? ' full' : ''}" style="width:${w}%"></div></div></div>`;
+    }).join('');
+  }
+
+  // Saved trips list
+  const tripList = el('vac-trips');
+  if (tripList) {
+    if (state.savedTrips.length === 0) {
+      tripList.innerHTML = '<div class="empty-sub">No saved trips yet. Pick a destination below!</div>';
+    } else {
+      tripList.innerHTML = state.savedTrips.map((t, idx) =>
+        `<div class="trip-card"><div class="trip-dest">${t.flag || ''} ${t.dest}</div><div class="trip-cost">${t.cost || ''}</div><button class="li-remove" onclick="state.savedTrips.splice(${idx},1);saveState();renderFunFund()">✕</button></div>`
+      ).join('');
+    }
+  }
+
+  // Destination pulse grid with filters
+  const pulseGrid = el('vac-pulse-grid');
+  if (pulseGrid) {
+    const filter = pulseGrid.dataset.filter || '';
+    const dests = filter ? PULSE_DESTS.filter(d => d.vibe === filter) : PULSE_DESTS;
+    const vibes = [...new Set(PULSE_DESTS.map(d => d.vibe))];
+    let html = `<div class="pulse-filters"><button class="pfilt${!filter ? ' active' : ''}" onclick="el('vac-pulse-grid').dataset.filter='';renderFunFund()">All</button>`;
+    html += vibes.map(v => `<button class="pfilt${filter === v ? ' active' : ''}" onclick="el('vac-pulse-grid').dataset.filter='${v}';renderFunFund()">${v}</button>`).join('');
+    html += '</div><div class="pulse-cards">';
+    html += dests.map(d =>
+      `<div class="pulse-card" style="border-left:3px solid ${d.col}">` +
+        `<div class="pulse-flag">${d.flag}</div>` +
+        `<div class="pulse-info"><div class="pulse-dest">${d.dest}</div><div class="pulse-why">${d.why}</div><div class="pulse-cost">${d.cost}</div></div>` +
+        `<button class="btn-sm" onclick="state.savedTrips.push({dest:'${d.dest}',flag:'${d.flag}',cost:'${d.cost}'});saveState();renderFunFund()">+ Save</button>` +
+      `</div>`
+    ).join('');
+    html += '</div>';
+    pulseGrid.innerHTML = html;
+  }
+
+  // Leaflet map markers
+  const mapEl = el('vac-map');
+  if (mapEl && typeof L !== 'undefined') {
+    if (!vacMap) {
+      vacMap = L.map(mapEl).setView([20, 20], 2);
+      L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', { attribution: '© CartoDB' }).addTo(vacMap);
+    }
+    vacMap.eachLayer(l => { if (l instanceof L.Marker) vacMap.removeLayer(l); });
+    PULSE_DESTS.forEach(d => {
+      L.marker([d.lat, d.lng]).addTo(vacMap).bindPopup(`<b>${d.flag} ${d.dest}</b><br>${d.why}<br>${d.cost}`);
+    });
+    setTimeout(() => vacMap.invalidateSize(), 200);
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────
+// renderRetire
+// ─────────────────────────────────────────────────────────────────
+function renderRetire() {
+  const ret = calcRetirement();
+  const egg = calcNestEgg();
+
+  // Scenario cards
+  const scenarios = el('ret-scenarios');
+  if (scenarios) {
+    const ages = [55, 60, 65, 69, 75];
+    scenarios.innerHTML = ages.map(age => {
+      const ytr = age - state.currentAge;
+      if (ytr <= 0) return '';
+      const e = calcNestEgg(ytr);
+      const final = state.nestEggReal ? e.finalReal : e.finalNominal;
+      return `<div class="scenario-card${age === state.retirementAge ? ' active' : ''}" onclick="state.retirementAge=${age};saveState();renderRetire()">` +
+        `<div class="sc-age">Age ${age}</div><div class="sc-egg">${fmt(final)}</div><div class="sc-years">${ytr} years</div></div>`;
+    }).join('');
+  }
+
+  // Swedish pension inputs
+  const penInputs = el('ret-pension-inputs');
+  if (penInputs) {
+    penInputs.innerHTML =
+      `<div class="pen-field"><label>Allmän Pension (monthly)</label><input type="number" value="${state.penAllman}" onchange="state.penAllman=+this.value;saveState();renderRetire()"></div>` +
+      `<div class="pen-field"><label>ITP / Tjänstepension</label><input type="number" value="${state.penITP}" onchange="state.penITP=+this.value;saveState();renderRetire()"></div>` +
+      `<div class="pen-field"><label>Other Pension</label><input type="number" value="${state.penOther}" onchange="state.penOther=+this.value;saveState();renderRetire()"></div>`;
+  }
+
+  // Retirement KPIs
+  const retKpis = el('ret-kpis');
+  if (retKpis) retKpis.innerHTML =
+    `<div class="kpi"><div class="kpi-label">Monthly Pension</div><div class="kpi-value">${fmt(ret.pension.monthlyTotal)}</div></div>` +
+    `<div class="kpi"><div class="kpi-label">Nest Egg at Ret.</div><div class="kpi-value">${fmt(ret.nestEggAtRetirement)}</div></div>` +
+    `<div class="kpi"><div class="kpi-label">Monthly Drawdown</div><div class="kpi-value">${fmt(ret.monthlyDrawdownAfterTax)}</div></div>` +
+    `<div class="kpi"><div class="kpi-label">Total Ret. Income</div><div class="kpi-value">${fmt(ret.monthlyRetirementIncome)}</div></div>` +
+    `<div class="kpi"><div class="kpi-label">FIRE Number</div><div class="kpi-value">${fmt(ret.fireNumber)}</div></div>` +
+    `<div class="kpi"><div class="kpi-label">Gap</div><div class="kpi-value ${ret.onTrack ? 'positive' : 'negative'}">${ret.onTrack ? '✓ On track' : fmt(ret.gap) + '/mo'}</div></div>`;
+
+  // Dream chip selector
+  const dreamChips = el('ret-dream-chips');
+  if (dreamChips) {
+    dreamChips.innerHTML = DREAM_TYPES.map(d =>
+      `<button class="dream-chip${(state.selectedDreams || []).includes(d.id) ? ' active' : ''}" onclick="toggleDream('${d.id}')">${d.icon} ${d.name}</button>`
+    ).join('');
+  }
+
+  // Expense model rows
+  const expModels = el('ret-exp-models');
+  if (expModels) {
+    expModels.innerHTML = Object.entries(RET_EXP_MODELS).map(([k, v]) => {
+      const total = Object.values(v).reduce((s, n) => s + n, 0);
+      return `<div class="exp-model-row"><div class="em-tier">${k.charAt(0).toUpperCase() + k.slice(1)}</div>` +
+        Object.entries(v).map(([cat, amt]) => `<div class="em-cell"><div class="em-cat">${cat}</div><div class="em-amt">${fmt(amt)}</div></div>`).join('') +
+        `<div class="em-total">${fmt(total)}/mo</div></div>`;
+    }).join('');
+  }
+
+  // Destination cards
+  const destCards = el('ret-dest-cards');
+  if (destCards) {
+    destCards.innerHTML = RET_DESTS.map(d =>
+      `<div class="dest-card${state.selectedRetDest === d.name ? ' active' : ''}" onclick="state.selectedRetDest='${d.name}';saveState();renderRetire()">` +
+        `<div class="dc-flag">${d.flag}</div><div class="dc-name">${d.name}</div><div class="dc-country">${d.country}</div>` +
+        `<div class="dc-cost">${fmt(d.costK * 1000)}/mo</div>` +
+        `<div class="dc-tags">${d.tl.map(t => '<span class="dc-tag">' + t + '</span>').join('')}</div>` +
+      `</div>`
+    ).join('');
+  }
+
+  // Leaflet world map
+  const retMapEl = el('ret-map');
+  if (retMapEl && typeof L !== 'undefined') {
+    if (!retMap) {
+      retMap = L.map(retMapEl).setView([25, 10], 2);
+      L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', { attribution: '© CartoDB' }).addTo(retMap);
+    }
+    retMap.eachLayer(l => { if (l instanceof L.Marker) retMap.removeLayer(l); });
+    RET_DESTS.forEach(d => {
+      const marker = L.marker([d.lat, d.lng]).addTo(retMap)
+        .bindPopup(`<b>${d.flag} ${d.name}</b><br>${d.country}<br>${fmt(d.costK * 1000)}/mo`);
+      if (state.selectedRetDest === d.name) marker.openPopup();
+    });
+    setTimeout(() => retMap.invalidateSize(), 200);
+  }
+
+  // APEX terminal output area
+  const apex = el('ret-apex-terminal');
+  if (apex && !apex.dataset.init) {
+    apex.dataset.init = '1';
+    apex.innerHTML = '<div class="apex-line">APEX RETIREMENT PLANNER v2.0</div><div class="apex-line">Ready. Type a retirement scenario or question.</div>';
+  }
+}
+
+function toggleDream(id) {
+  const arr = state.selectedDreams || [];
+  const idx = arr.indexOf(id);
+  if (idx >= 0) arr.splice(idx, 1); else arr.push(id);
+  state.selectedDreams = arr;
+  saveState();
+  renderRetire();
+}
+
+// ─────────────────────────────────────────────────────────────────
+// renderSettings
+// ─────────────────────────────────────────────────────────────────
+function renderSettings() {
+  // Profile fields
+  const fields = [
+    { id: 'set-currency', key: 'currency', type: 'select', options: Object.keys(CSYM) },
+    { id: 'set-age', key: 'currentAge', type: 'number' },
+    { id: 'set-ret-age', key: 'retirementAge', type: 'number' },
+    { id: 'set-life-exp', key: 'lifeExp', type: 'number' },
+    { id: 'set-growth', key: 'growthRate', type: 'number', step: 0.1 },
+    { id: 'set-inflation', key: 'inflationRate', type: 'number', step: 0.1 },
+    { id: 'set-post-ret-growth', key: 'postRetGrowth', type: 'number', step: 0.1 },
+    { id: 'set-withdraw-tax', key: 'withdrawTaxRate', type: 'number', step: 1 },
+    { id: 'set-ticker', key: 'tickerQuote', type: 'text' }
+  ];
+  fields.forEach(f => {
+    const input = el(f.id);
+    if (!input) return;
+    if (f.type === 'select') {
+      input.innerHTML = f.options.map(o => `<option value="${o}"${state[f.key] === o ? ' selected' : ''}>${o} (${CSYM[o]})</option>`).join('');
+      input.onchange = () => { state[f.key] = input.value; saveState(); renderAll(); };
+    } else {
+      input.value = state[f.key];
+      input.onchange = () => { state[f.key] = f.type === 'number' ? +input.value : input.value; saveState(); renderAll(); };
+    }
+  });
+
+  // Dark mode toggle
+  const darkToggle = el('set-dark-mode');
+  if (darkToggle) {
+    darkToggle.checked = state.darkMode;
+    darkToggle.onchange = () => { state.darkMode = darkToggle.checked; saveState(); document.body.classList.toggle('light', !state.darkMode); };
+  }
+
+  // Nest egg real toggle
+  const realToggle = el('set-nest-real');
+  if (realToggle) {
+    realToggle.checked = state.nestEggReal;
+    realToggle.onchange = () => { state.nestEggReal = realToggle.checked; saveState(); renderAll(); };
+  }
+
+  // Exchange rate inputs
+  const exDiv = el('set-exchange-rates');
+  if (exDiv) {
+    exDiv.innerHTML = Object.entries(state.exchangeRates).map(([cur, rate]) =>
+      `<div class="ex-field"><label>${cur}</label><input type="number" step="0.01" value="${rate}" onchange="state.exchangeRates['${cur}']=+this.value;saveState()"></div>`
+    ).join('');
+  }
+
+  // Firebase status
+  const fbStatus = el('fbStatus');
+  if (fbStatus && fbReady) {
+    fbStatus.innerHTML = '<span style="color:var(--green)">✓ Connected</span>';
+  }
+
+  // Perplexity key field
+  const pxKey = el('set-perplexity-key');
+  if (pxKey) {
+    pxKey.value = localStorage.getItem('propiq_pk') || '';
+    pxKey.onchange = () => { localStorage.setItem('propiq_pk', pxKey.value); };
+  }
+
+  // Export/import buttons
+  const exportBtn = el('set-export');
+  if (exportBtn) exportBtn.onclick = () => {
+    const a = document.createElement('a');
+    a.href = 'data:application/json,' + encodeURIComponent(JSON.stringify(state, null, 2));
+    a.download = 'horizon-backup-' + new Date().toISOString().slice(0, 10) + '.json';
+    a.click();
+  };
+
+  const importInput = el('set-import');
+  if (importInput) importInput.onchange = () => {
+    const f = importInput.files[0];
+    if (!f) return;
+    const r = new FileReader();
+    r.onload = e => {
+      try {
+        Object.assign(state, JSON.parse(e.target.result));
+        saveState();
+        renderAll();
+      } catch (ex) { alert('Invalid file: ' + ex.message); }
+    };
+    r.readAsText(f);
+  };
+
+  // Reset button
+  const resetBtn = el('set-reset');
+  if (resetBtn) resetBtn.onclick = () => {
+    if (confirm('Reset all data? This cannot be undone.')) {
+      localStorage.removeItem(STORAGE_KEY);
+      location.reload();
+    }
+  };
+}
+
+// ─────────────────────────────────────────────────────────────────
+// Master render functions
+// ─────────────────────────────────────────────────────────────────
+function renderAll() {
+  renderDashboard();
+  renderCashFlow();
+  renderNetWorth();
+  renderAssets();
+  renderFunFund();
+  renderRetire();
+  renderSettings();
+}
+
+function renderActivePanel() {
+  const renderers = {
+    dashboard: renderDashboard,
+    cashflow: renderCashFlow,
+    networth: renderNetWorth,
+    assets: renderAssets,
+    vacation: renderFunFund,
+    retirement: renderRetire,
+    settings: renderSettings
+  };
+  const fn = renderers[currentPanel];
+  if (fn) fn();
+}
+</script>
+
+<script>
+// ═══════════════════════════════════════════════════════════════════
+// MONEY OS — PANEL RENDERERS (Part 3)
+// ═══════════════════════════════════════════════════════════════════
+
+let charts = {};
+let dashCfView = 'month'; // 'month' | '12mo'
+
+function fmtCur(n, cur) {
+  const c = cur || state.currency || 'SEK';
+  const sym = CSYM[c] || '';
+  const rate = state.exchangeRates[c] || 1;
+  const v = Math.round(n * rate);
+  return sym + ' ' + v.toLocaleString('en-US');
+}
+
+function setEl(id, html) {
+  const el = document.getElementById(id);
+  if (el) el.innerHTML = html;
+}
+
+function setVal(id, val) {
+  const el = document.getElementById(id);
+  if (el) el.value = val;
+}
+
+// ───────────────────────────────────────────────────────────────────
+// DASHBOARD
+// ───────────────────────────────────────────────────────────────────
+function renderDashboard() {
+  const inc = calcIncome();
+  const exp = calcExpenses();
+  const sav = calcSavings();
+  const nw = calcNetWorth();
+  const egg = calcNestEgg();
+  const cf = calcCashFlow();
+
+  // KPI grid
+  setEl('kpi-income', fmtCur(inc.total));
+  setEl('kpi-expenses', fmtCur(exp.total));
+  setEl('kpi-surplus', fmtCur(sav.surplus));
+  setEl('kpi-savings-rate', sav.savingsRate.toFixed(1) + '%');
+  setEl('kpi-networth', fmtCur(nw.netWorth));
+  setEl('kpi-nestegg', fmtCur(egg.finalNominal));
+  setEl('kpi-funfund', fmtCur(sav.funFund));
+  setEl('kpi-paid', exp.paid.length + '/' + exp.items.length);
+
+  // Ticker quote
+  setEl('dash-ticker', state.tickerQuote || '');
+
+  // Cash flow summary toggle (month vs 12-mo)
+  const cfSummary = document.getElementById('dash-cf-summary');
+  if (cfSummary) {
+    if (dashCfView === 'month') {
+      cfSummary.innerHTML = `
+        <div class="cf-row"><span>Income</span><b>${fmtCur(inc.total)}</b></div>
+        <div class="cf-row"><span>Expenses</span><b>${fmtCur(exp.total)}</b></div>
+        <div class="cf-row"><span>Surplus</span><b>${fmtCur(sav.surplus)}</b></div>
+        <div class="cf-row"><span>Fun Fund</span><b>${fmtCur(sav.funFund)}</b></div>
+      `;
+    } else {
+      cfSummary.innerHTML = `
+        <div class="cf-row"><span>Avg Income</span><b>${fmtCur(cf.avgIncome)}</b></div>
+        <div class="cf-row"><span>Avg Expenses</span><b>${fmtCur(cf.avgExpenses)}</b></div>
+        <div class="cf-row"><span>Avg Surplus</span><b>${fmtCur(cf.avgSurplus)}</b></div>
+        <div class="cf-row"><span>12-mo Saved</span><b>${fmtCur(cf.cumSavings)}</b></div>
+      `;
+    }
+  }
+
+  // Toggle buttons active state
+  document.querySelectorAll('.dash-cf-toggle').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.view === dashCfView);
+  });
+
+  // Savings chart (Chart.js)
+  const chartEl = document.getElementById('dash-savings-chart');
+  if (chartEl && typeof Chart !== 'undefined') {
+    if (charts.dashSavings) charts.dashSavings.destroy();
+    charts.dashSavings = new Chart(chartEl, {
+      type: 'line',
+      data: {
+        labels: cf.months.map(m => m.label),
+        datasets: [{
+          label: 'Cumulative Savings',
+          data: cf.months.map(m => m.cumSavings),
+          borderColor: '#00e8a0',
+          backgroundColor: 'rgba(0,232,160,0.1)',
+          tension: 0.3,
+          fill: true
+        }, {
+          label: 'Monthly Surplus',
+          data: cf.months.map(m => m.surplus),
+          borderColor: '#4d8fff',
+          backgroundColor: 'transparent',
+          tension: 0.3,
+          borderDash: [4, 4]
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { legend: { labels: { color: '#888', font: { size: 10 } } } },
+        scales: {
+          x: { ticks: { color: '#666', font: { size: 9 } }, grid: { color: '#ffffff08' } },
+          y: { ticks: { color: '#666', font: { size: 9 } }, grid: { color: '#ffffff08' } }
+        }
+      }
+    });
+  }
+
+  // Nest egg milestone progress bars
+  const milestones = [1000000, 2500000, 5000000, 10000000, 25000000];
+  const currentEgg = egg.finalNominal;
+  const milestonesEl = document.getElementById('dash-milestones');
+  if (milestonesEl) {
+    milestonesEl.innerHTML = milestones.map(m => {
+      const pct = Math.min(100, (currentEgg / m) * 100);
+      const reached = currentEgg >= m;
+      return `
+        <div class="milestone ${reached ? 'reached' : ''}">
+          <div class="milestone-label">
+            <span>${fmtCur(m)}</span>
+            <span>${pct.toFixed(0)}%</span>
+          </div>
+          <div class="milestone-bar">
+            <div class="milestone-fill" style="width:${pct}%"></div>
+          </div>
+        </div>
+      `;
+    }).join('');
+  }
+}
+
+function setDashCfView(view) {
+  dashCfView = view;
+  renderDashboard();
+}
+
+// ───────────────────────────────────────────────────────────────────
+// CASH FLOW
+// ───────────────────────────────────────────────────────────────────
+function renderCashFlow() {
+  const inc = calcIncome();
+  const exp = calcExpenses();
+  const sav = calcSavings();
+  const cf = calcCashFlow();
+
+  // Month strip — 12 months centered on current selection
+  const stripEl = document.getElementById('cf-month-strip');
+  if (stripEl) {
+    const [selY, selM] = state.selectedMonth.split('-').map(Number);
+    const strip = [];
+    for (let i = -6; i <= 5; i++) {
+      const d = new Date(selY, selM - 1 + i, 1);
+      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+      const active = key === state.selectedMonth;
+      strip.push(`
+        <div class="cf-month ${active ? 'active' : ''}" onclick="selectMonth('${key}')">
+          <div class="cf-month-mn">${MN[d.getMonth()]}</div>
+          <div class="cf-month-yr">${d.getFullYear()}</div>
+        </div>
+      `);
+    }
+    stripEl.innerHTML = strip.join('');
+  }
+
+  // Income line items with paid checkboxes + remove buttons
+  const incEl = document.getElementById('cf-income-list');
+  if (incEl) {
+    incEl.innerHTML = inc.items.map(i => `
+      <div class="line-item">
+        <input type="checkbox" ${i.paid ? 'checked' : ''} onchange="togglePaid('income','${i.id}')">
+        <input type="text" value="${i.name}" onchange="updateLineItem('income','${i.id}','name',this.value)">
+        <input type="number" value="${i.amount}" onchange="updateLineItem('income','${i.id}','amount',Number(this.value))">
+        <button class="btn-remove" onclick="removeLineItem('income','${i.id}')">\u2715</button>
+      </div>
+    `).join('') + `
+      <button class="btn-add" onclick="addLineItem('income')">+ Add income</button>
+    `;
+  }
+
+  // Expense line items
+  const expEl = document.getElementById('cf-expense-list');
+  if (expEl) {
+    expEl.innerHTML = exp.items.map(i => `
+      <div class="line-item ${i.paid ? 'is-paid' : ''}">
+        <input type="checkbox" ${i.paid ? 'checked' : ''} onchange="togglePaid('expenses','${i.id}')">
+        <input type="text" value="${i.name}" onchange="updateLineItem('expenses','${i.id}','name',this.value)">
+        <input type="number" value="${i.amount}" onchange="updateLineItem('expenses','${i.id}','amount',Number(this.value))">
+        <button class="btn-remove" onclick="removeLineItem('expenses','${i.id}')">\u2715</button>
+      </div>
+    `).join('') + `
+      <button class="btn-add" onclick="addLineItem('expenses')">+ Add expense</button>
+    `;
+  }
+
+  // Totals
+  setEl('cf-income-total', fmtCur(inc.total));
+  setEl('cf-expense-total', fmtCur(exp.total));
+  setEl('cf-surplus-total', fmtCur(sav.surplus));
+  setEl('cf-paid-total', fmtCur(exp.paidTotal));
+  setEl('cf-unpaid-total', fmtCur(exp.unpaidTotal));
+
+  // Savings allocation sliders
+  const allocEl = document.getElementById('cf-allocation');
+  if (allocEl) {
+    const total = sav.baseSavings;
+    const emPct = total > 0 ? (sav.allocation.emergency / total * 100) : 50;
+    const nePct = total > 0 ? (sav.allocation.nestEgg / total * 100) : 30;
+    const ffPct = total > 0 ? (sav.allocation.funFund / total * 100) : 20;
+    allocEl.innerHTML = `
+      <div class="alloc-row">
+        <label>Base savings</label>
+        <input type="number" value="${sav.baseSavings}" onchange="updateBaseSavings(Number(this.value))">
+        <span>${fmtCur(sav.baseSavings)}</span>
+      </div>
+      <div class="alloc-slider">
+        <label>Emergency (${emPct.toFixed(0)}%)</label>
+        <div class="slider-track"><div class="slider-fill" style="width:${emPct}%;background:#f5a623"></div></div>
+        <span>${fmtCur(sav.allocation.emergency)}</span>
+      </div>
+      <div class="alloc-slider">
+        <label>Nest Egg (${nePct.toFixed(0)}%)</label>
+        <div class="slider-track"><div class="slider-fill" style="width:${nePct}%;background:#00e8a0"></div></div>
+        <span>${fmtCur(sav.allocation.nestEgg)}</span>
+      </div>
+      <div class="alloc-slider">
+        <label>Fun Fund (${ffPct.toFixed(0)}%)</label>
+        <div class="slider-track"><div class="slider-fill" style="width:${ffPct}%;background:#4d8fff"></div></div>
+        <span>${fmtCur(sav.allocation.funFund)}</span>
+      </div>
+    `;
+  }
+
+  // 12-month breakdown table
+  const tblEl = document.getElementById('cf-12mo-table');
+  if (tblEl) {
+    tblEl.innerHTML = `
+      <table class="dt">
+        <thead>
+          <tr>
+            <th>Month</th>
+            <th>Income</th>
+            <th>Expenses</th>
+            <th>Surplus</th>
+            <th>Cumulative</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${cf.months.map(m => `
+            <tr>
+              <td>${m.label}</td>
+              <td>${fmtCur(m.income)}</td>
+              <td>${fmtCur(m.expenses)}</td>
+              <td class="${m.surplus >= 0 ? 'pos' : 'neg'}">${fmtCur(m.surplus)}</td>
+              <td>${fmtCur(m.cumSavings)}</td>
+            </tr>
+          `).join('')}
+          <tr class="tr-total">
+            <td><b>Avg</b></td>
+            <td><b>${fmtCur(cf.avgIncome)}</b></td>
+            <td><b>${fmtCur(cf.avgExpenses)}</b></td>
+            <td><b>${fmtCur(cf.avgSurplus)}</b></td>
+            <td><b>${fmtCur(cf.cumSavings)}</b></td>
+          </tr>
+        </tbody>
+      </table>
+    `;
+  }
+}
+
+function selectMonth(key) {
+  state.selectedMonth = key;
+  saveState();
+  renderCashFlow();
+}
+
+function togglePaid(kind, id) {
+  const list = state[kind];
+  const item = list.find(x => x.id === id);
+  if (item) { item.paid = !item.paid; saveState(); renderCashFlow(); }
+}
+
+function updateLineItem(kind, id, field, value) {
+  const list = state[kind];
+  const item = list.find(x => x.id === id);
+  if (item) { item[field] = value; saveState(); renderCashFlow(); }
+}
+
+function addLineItem(kind) {
+  const list = state[kind];
+  const prefix = kind === 'income' ? 'i' : 'e';
+  const id = prefix + (Date.now());
+  list.push({ id, name: 'New ' + kind, amount: 0, paid: false });
+  saveState();
+  renderCashFlow();
+}
+
+function removeLineItem(kind, id) {
+  state[kind] = state[kind].filter(x => x.id !== id);
+  saveState();
+  renderCashFlow();
+}
+
+function updateBaseSavings(val) {
+  state.baseSavings = val;
+  saveState();
+  renderCashFlow();
+}
+
+// ───────────────────────────────────────────────────────────────────
+// NET WORTH
+// ───────────────────────────────────────────────────────────────────
+function renderNetWorth() {
+  const nw = calcNetWorth();
+  const egg = calcNestEgg();
+
+  // KPI row
+  setEl('nw-total-assets', fmtCur(nw.assets.total));
+  setEl('nw-total-liabilities', fmtCur(nw.liabilities.total));
+  setEl('nw-net-worth', fmtCur(nw.netWorth));
+
+  // Assets card list (investments + property)
+  const assetsEl = document.getElementById('nw-assets-list');
+  if (assetsEl) {
+    const invCards = nw.assets.investments.items.map(a => `
+      <div class="nw-card asset">
+        <div class="nw-card-icon">\ud83d\udcc8</div>
+        <div class="nw-card-body">
+          <div class="nw-card-name">${a.name}</div>
+          <div class="nw-card-sub">Investment</div>
+        </div>
+        <div class="nw-card-val">${fmtCur(a.value)}</div>
+      </div>
+    `).join('');
+    const propCard = `
+      <div class="nw-card asset">
+        <div class="nw-card-icon">\ud83c\udfe0</div>
+        <div class="nw-card-body">
+          <div class="nw-card-name">Property</div>
+          <div class="nw-card-sub">
+            <input type="number" value="${state.netWorth.property || 0}"
+              onchange="updateNwField('property', Number(this.value))"
+              style="width:120px">
+          </div>
+        </div>
+        <div class="nw-card-val">${fmtCur(nw.assets.property)}</div>
+      </div>
+    `;
+    assetsEl.innerHTML = invCards + propCard;
+  }
+
+  // Liabilities card list
+  const liabEl = document.getElementById('nw-liabilities-list');
+  if (liabEl) {
+    liabEl.innerHTML = `
+      <div class="nw-card liability">
+        <div class="nw-card-icon">\ud83c\udfe6</div>
+        <div class="nw-card-body">
+          <div class="nw-card-name">Mortgage</div>
+          <div class="nw-card-sub">
+            <input type="number" value="${state.netWorth.mortgage || 0}"
+              onchange="updateNwField('mortgage', Number(this.value))"
+              style="width:120px">
+          </div>
+        </div>
+        <div class="nw-card-val">${fmtCur(nw.liabilities.mortgage)}</div>
+      </div>
+      <div class="nw-card liability">
+        <div class="nw-card-icon">\ud83d\udcb3</div>
+        <div class="nw-card-body">
+          <div class="nw-card-name">Other Debt</div>
+          <div class="nw-card-sub">
+            <input type="number" value="${state.netWorth.otherDebt || 0}"
+              onchange="updateNwField('otherDebt', Number(this.value))"
+              style="width:120px">
+          </div>
+        </div>
+        <div class="nw-card-val">${fmtCur(nw.liabilities.otherDebt)}</div>
+      </div>
+    `;
+  }
+
+  // Chart.js projection chart — net worth trajectory over years
+  const chartEl = document.getElementById('nw-projection-chart');
+  if (chartEl && typeof Chart !== 'undefined') {
+    if (charts.nwProjection) charts.nwProjection.destroy();
+    const labels = egg.grandTotal.map(p => 'Y' + p.year);
+    const netWorthSeries = egg.grandTotal.map(p => p.nominal + nw.assets.property - nw.liabilities.total);
+    charts.nwProjection = new Chart(chartEl, {
+      type: 'line',
+      data: {
+        labels,
+        datasets: [{
+          label: 'Projected Net Worth',
+          data: netWorthSeries,
+          borderColor: '#00e8a0',
+          backgroundColor: 'rgba(0,232,160,0.12)',
+          tension: 0.3,
+          fill: true
+        }, {
+          label: 'Investments only',
+          data: egg.grandTotal.map(p => p.nominal),
+          borderColor: '#4d8fff',
+          backgroundColor: 'transparent',
+          borderDash: [4, 4],
+          tension: 0.3
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { legend: { labels: { color: '#888', font: { size: 10 } } } },
+        scales: {
+          x: { ticks: { color: '#666', font: { size: 9 } }, grid: { color: '#ffffff08' } },
+          y: { ticks: { color: '#666', font: { size: 9 } }, grid: { color: '#ffffff08' } }
+        }
+      }
+    });
+  }
+}
+
+function updateNwField(field, val) {
+  state.netWorth[field] = val;
+  saveState();
+  renderNetWorth();
+}
+
+// ───────────────────────────────────────────────────────────────────
+// ASSETS & NEST EGG
+// ───────────────────────────────────────────────────────────────────
+let assetsRealView = false;
+
+function renderAssets() {
+  const egg = calcNestEgg();
+
+  // KPI summary
+  setEl('assets-total', fmtCur(egg.finalNominal));
+  setEl('assets-total-real', fmtCur(egg.finalReal));
+  setEl('assets-years', String(egg.years));
+
+  // Portfolio vehicle rows
+  const listEl = document.getElementById('assets-list');
+  if (listEl) {
+    listEl.innerHTML = (state.externalAssets || []).map(a => `
+      <div class="asset-row">
+        <input type="text" value="${a.name}"
+          onchange="updateAsset('${a.id}','name',this.value)"
+          class="asset-name">
+        <div class="asset-field">
+          <label>Balance</label>
+          <input type="number" value="${a.balance}"
+            onchange="updateAsset('${a.id}','balance',Number(this.value))">
+        </div>
+        <div class="asset-field">
+          <label>Growth %</label>
+          <input type="number" step="0.1" value="${a.growthRate}"
+            onchange="updateAsset('${a.id}','growthRate',Number(this.value))">
+        </div>
+        <div class="asset-field">
+          <label>Monthly</label>
+          <input type="number" value="${a.monthlyContribution}"
+            onchange="updateAsset('${a.id}','monthlyContribution',Number(this.value))">
+        </div>
+        <button class="btn-remove" onclick="removeAsset('${a.id}')">\u2715</button>
+      </div>
+    `).join('') + `
+      <button class="btn-add" onclick="addAsset()">+ Add vehicle</button>
+    `;
+  }
+
+  // Real/nominal toggle state
+  document.querySelectorAll('.assets-toggle').forEach(btn => {
+    btn.classList.toggle('active',
+      (btn.dataset.view === 'real') === assetsRealView);
+  });
+
+  // Chart.js nest egg growth chart — stacked per-asset
+  const chartEl = document.getElementById('assets-growth-chart');
+  if (chartEl && typeof Chart !== 'undefined') {
+    if (charts.assetsGrowth) charts.assetsGrowth.destroy();
+    const labels = [];
+    for (let y = 0; y <= egg.years; y++) labels.push('Y' + y);
+
+    const palette = ['#00e8a0', '#4d8fff', '#f5a623', '#8b5cf6', '#ec4899', '#00d4ff'];
+    const datasets = egg.assetProjections.map((ap, i) => ({
+      label: ap.name,
+      data: ap.timeline.map(t => assetsRealView ? t.real : t.nominal),
+      borderColor: palette[i % palette.length],
+      backgroundColor: palette[i % palette.length] + '33',
+      tension: 0.3,
+      fill: true
+    }));
+    // Add savings contribution line
+    datasets.push({
+      label: 'Monthly Savings',
+      data: egg.savingsTimeline.map(t => assetsRealView ? t.real : t.nominal),
+      borderColor: '#ffffff',
+      backgroundColor: 'rgba(255,255,255,0.08)',
+      tension: 0.3,
+      fill: true
+    });
+
+    charts.assetsGrowth = new Chart(chartEl, {
+      type: 'line',
+      data: { labels, datasets },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { labels: { color: '#888', font: { size: 10 } } },
+          title: {
+            display: true,
+            text: assetsRealView ? 'Real value (today\u2019s SEK)' : 'Nominal value',
+            color: '#888',
+            font: { size: 10 }
+          }
+        },
+        scales: {
+          x: { stacked: true, ticks: { color: '#666', font: { size: 9 } }, grid: { color: '#ffffff08' } },
+          y: { stacked: true, ticks: { color: '#666', font: { size: 9 } }, grid: { color: '#ffffff08' } }
+        }
+      }
+    });
+  }
+}
+
+function setAssetsView(real) {
+  assetsRealView = !!real;
+  renderAssets();
+}
+
+function updateAsset(id, field, val) {
+  const a = (state.externalAssets || []).find(x => x.id === id);
+  if (a) { a[field] = val; saveState(); renderAssets(); }
+}
+
+function addAsset() {
+  if (!state.externalAssets) state.externalAssets = [];
+  state.externalAssets.push({
+    id: 'a' + Date.now(),
+    name: 'New vehicle',
+    balance: 0,
+    growthRate: state.growthRate || 7,
+    monthlyContribution: 0
+  });
+  saveState();
+  renderAssets();
+}
+
+function removeAsset(id) {
+  state.externalAssets = (state.externalAssets || []).filter(x => x.id !== id);
+  saveState();
+  renderAssets();
+}
+
+// ───────────────────────────────────────────────────────────────────
+// FUN FUND / VACATION PLANNER
+// ───────────────────────────────────────────────────────────────────
+let vacMap = null;
+let vacFilter = 'all';
+
+function renderFunFund() {
+  const ff = calcFunFund();
+
+  // Headline
+  setEl('ff-balance', fmtCur(ff.balance));
+  setEl('ff-monthly', fmtCur(ff.monthlySurplus));
+
+  // Tier grid with affordability highlights
+  const tierEl = document.getElementById('ff-tier-grid');
+  if (tierEl) {
+    tierEl.innerHTML = ff.tiers.map(t => {
+      const pct = t.affordable ? 100 : Math.min(100, (ff.balance / t.amount) * 100);
+      const reachTxt = t.affordable
+        ? 'Affordable now'
+        : (t.monthsToReach === Infinity ? 'Out of reach' : t.monthsToReach + ' months');
+      return `
+        <div class="ff-tier ${t.affordable ? 'ok' : ''}">
+          <div class="ff-tier-name">${t.name}</div>
+          <div class="ff-tier-amt">${fmtCur(t.amount)}</div>
+          <div class="ff-tier-bar"><div class="ff-tier-fill" style="width:${pct}%"></div></div>
+          <div class="ff-tier-reach">${reachTxt}</div>
+        </div>
+      `;
+    }).join('');
+  }
+
+  // Next-tier focus card
+  const nextEl = document.getElementById('ff-next-tier');
+  if (nextEl) {
+    if (ff.nextTier) {
+      const need = ff.nextTier.amount - ff.balance;
+      nextEl.innerHTML = `
+        <div class="ff-next-name">Next: ${ff.nextTier.name}</div>
+        <div class="ff-next-need">${fmtCur(Math.max(0, need))} to go</div>
+        <div class="ff-next-months">${ff.nextTier.monthsToReach === Infinity ? '\u2014' : ff.nextTier.monthsToReach + ' months'}</div>
+      `;
+    } else {
+      nextEl.innerHTML = `<div class="ff-next-name">All tiers unlocked \ud83c\udf89</div>`;
+    }
+  }
+
+  // Fund timeline bars — projected fun fund accrual over 12 months
+  const tlEl = document.getElementById('ff-timeline');
+  if (tlEl) {
+    const bars = [];
+    const now = new Date();
+    let running = ff.balance;
+    const maxBar = ff.balance + ff.monthlySurplus * 12;
+    for (let i = 0; i < 12; i++) {
+      running += ff.monthlySurplus;
+      const d = new Date(now.getFullYear(), now.getMonth() + i + 1, 1);
+      const pct = maxBar > 0 ? (running / maxBar) * 100 : 0;
+      bars.push(`
+        <div class="ff-tl-bar">
+          <div class="ff-tl-fill" style="height:${pct}%"></div>
+          <div class="ff-tl-lbl">${MN[d.getMonth()]}</div>
+          <div class="ff-tl-val">${fmtCur(running)}</div>
+        </div>
+      `);
+    }
+    tlEl.innerHTML = bars.join('');
+  }
+
+  // Saved trips list
+  const tripsEl = document.getElementById('ff-saved-trips');
+  if (tripsEl) {
+    const trips = state.savedTrips || [];
+    if (trips.length === 0) {
+      tripsEl.innerHTML = '<div class="empty">No saved trips yet. Pick a destination below.</div>';
+    } else {
+      tripsEl.innerHTML = trips.map((t, i) => `
+        <div class="trip-card">
+          <div class="trip-flag">${t.flag || '\u2708'}</div>
+          <div class="trip-body">
+            <div class="trip-name">${t.dest}</div>
+            <div class="trip-cost">${t.cost}</div>
+          </div>
+          <button class="btn-remove" onclick="removeTrip(${i})">\u2715</button>
+        </div>
+      `).join('');
+    }
+  }
+
+  // Destination pulse grid with filters
+  const pulseEl = document.getElementById('ff-pulse-grid');
+  if (pulseEl) {
+    const filtered = vacFilter === 'all'
+      ? PULSE_DESTS
+      : PULSE_DESTS.filter(d => d.vibe === vacFilter);
+    pulseEl.innerHTML = filtered.map((d, idx) => `
+      <div class="pulse-card" style="border-left:3px solid ${d.col}" onclick="saveTrip(${PULSE_DESTS.indexOf(d)})">
+        <div class="pulse-flag">${d.flag}</div>
+        <div class="pulse-name">${d.dest}</div>
+        <div class="pulse-vibe">${d.vibe}</div>
+        <div class="pulse-why">${d.why}</div>
+        <div class="pulse-cost">${d.cost}</div>
+      </div>
+    `).join('');
+  }
+
+  // Filter chips active state
+  document.querySelectorAll('.ff-filter').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.filter === vacFilter);
+  });
+
+  // Leaflet map markers
+  if (typeof L !== 'undefined') {
+    const mapEl = document.getElementById('ff-map');
+    if (mapEl) {
+      if (!vacMap) {
+        vacMap = L.map('ff-map', { zoomControl: false }).setView([20, 15], 2);
+        L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png', {
+          attribution: '\u00a9 CARTO', maxZoom: 18
+        }).addTo(vacMap);
+      } else {
+        vacMap.eachLayer(l => { if (l instanceof L.CircleMarker) vacMap.removeLayer(l); });
+      }
+      PULSE_DESTS.forEach((d, idx) => {
+        L.circleMarker([d.lat, d.lng], {
+          radius: 8, color: d.col, fillColor: d.col, fillOpacity: 0.6, weight: 2
+        }).bindPopup(`<b>${d.flag} ${d.dest}</b><br>${d.cost}<br><em>${d.why}</em>`)
+          .on('click', () => saveTrip(idx))
+          .addTo(vacMap);
+      });
+      setTimeout(() => vacMap.invalidateSize(), 100);
+    }
+  }
+}
+
+function setVacFilter(vibe) {
+  vacFilter = vibe;
+  renderFunFund();
+}
+
+function saveTrip(idx) {
+  const dest = PULSE_DESTS[idx];
+  if (!dest) return;
+  if (!state.savedTrips) state.savedTrips = [];
+  state.savedTrips.push({ ...dest });
+  saveState();
+  renderFunFund();
+}
+
+function removeTrip(idx) {
+  (state.savedTrips || []).splice(idx, 1);
+  saveState();
+  renderFunFund();
+}
+
+// ───────────────────────────────────────────────────────────────────
+// RETIRE ANYWHERE
+// ───────────────────────────────────────────────────────────────────
+let retMap = null;
+let retExpModel = 'mid';
+
+function renderRetire() {
+  const ret = calcRetirement();
+  const egg = calcNestEgg();
+
+  // Scenario cards
+  setEl('ret-years-to', String(ret.yearsToRetirement));
+  setEl('ret-years-in', String(ret.retirementYears));
+  setEl('ret-nest-egg', fmtCur(ret.nestEggAtRetirement));
+  setEl('ret-monthly-income', fmtCur(ret.monthlyRetirementIncome));
+  setEl('ret-monthly-target', fmtCur(ret.monthlyTarget));
+  setEl('ret-fire', fmtCur(ret.fireNumber));
+  setEl('ret-gap', fmtCur(Math.abs(ret.gap)));
+  const gapEl = document.getElementById('ret-gap-status');
+  if (gapEl) {
+    gapEl.textContent = ret.onTrack ? 'ON TRACK' : 'GAP';
+    gapEl.className = 'gap-badge ' + (ret.onTrack ? 'ok' : 'bad');
+  }
+
+  // Swedish pension input fields
+  setVal('ret-pen-allman', state.penAllman || 0);
+  setVal('ret-pen-itp', state.penITP || 0);
+  setVal('ret-pen-other', state.penOther || 0);
+  setEl('ret-pen-total', fmtCur(ret.pension.monthlyTotal));
+
+  // Profile inputs
+  setVal('ret-current-age', state.currentAge);
+  setVal('ret-retire-age', state.retirementAge);
+  setVal('ret-life-exp', state.lifeExp);
+  setVal('ret-post-growth', state.postRetGrowth);
+  setVal('ret-tax-rate', state.withdrawTaxRate);
+
+  // Dream chip selector
+  const chipsEl = document.getElementById('ret-dream-chips');
+  if (chipsEl) {
+    const sel = state.selectedDreams || [];
+    chipsEl.innerHTML = DREAM_TYPES.map(d => `
+      <div class="dream-chip ${sel.includes(d.id) ? 'on' : ''}"
+        onclick="toggleDream('${d.id}')">
+        <span class="dream-icon">${d.icon}</span>
+        <span>${d.name}</span>
+      </div>
+    `).join('');
+  }
+
+  // Expense model rows
+  const model = RET_EXP_MODELS[retExpModel];
+  const modelEl = document.getElementById('ret-exp-model');
+  if (modelEl) {
+    const rows = Object.entries(model).map(([k, v]) => `
+      <div class="exp-row">
+        <div class="exp-k">${k.charAt(0).toUpperCase() + k.slice(1)}</div>
+        <div class="exp-v">${fmtCur(v)}</div>
+      </div>
+    `).join('');
+    const total = Object.values(model).reduce((s, v) => s + v, 0);
+    modelEl.innerHTML = rows + `
+      <div class="exp-row total">
+        <div class="exp-k">Total / month</div>
+        <div class="exp-v"><b>${fmtCur(total)}</b></div>
+      </div>
+    `;
+  }
+
+  // Expense model tier buttons
+  document.querySelectorAll('.ret-exp-tier').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.model === retExpModel);
+  });
+
+  // Destination cards
+  const destEl = document.getElementById('ret-dest-cards');
+  if (destEl) {
+    destEl.innerHTML = RET_DESTS.map((d, idx) => {
+      const selected = state.selectedRetDest === idx;
+      const tags = d.tl.map(t => `<span class="dt-tag">${t}</span>`).join('');
+      return `
+        <div class="ret-card ${selected ? 'selected' : ''}" onclick="selectRetDest(${idx})">
+          <div class="ret-card-hd">
+            <span class="ret-flag">${d.flag}</span>
+            <div>
+              <div class="ret-name">${d.name}</div>
+              <div class="ret-country">${d.country}</div>
+            </div>
+            <div class="ret-cost">${fmtCur(d.costK * 1000)}/mo</div>
+          </div>
+          <div class="ret-tags">${tags}</div>
+        </div>
+      `;
+    }).join('');
+  }
+
+  // Leaflet world map
+  if (typeof L !== 'undefined') {
+    const mapEl = document.getElementById('ret-map');
+    if (mapEl) {
+      if (!retMap) {
+        retMap = L.map('ret-map', { zoomControl: false }).setView([25, 10], 2);
+        L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png', {
+          attribution: '\u00a9 CARTO', maxZoom: 18
+        }).addTo(retMap);
+      } else {
+        retMap.eachLayer(l => { if (l instanceof L.CircleMarker) retMap.removeLayer(l); });
+      }
+      RET_DESTS.forEach((d, idx) => {
+        const sel = state.selectedRetDest === idx;
+        L.circleMarker([d.lat, d.lng], {
+          radius: sel ? 11 : 7,
+          color: sel ? '#00e8a0' : '#4d8fff',
+          fillColor: sel ? '#00e8a0' : '#4d8fff',
+          fillOpacity: 0.6, weight: 2
+        }).bindPopup(`<b>${d.flag} ${d.name}</b><br>${d.country}<br>${fmtCur(d.costK * 1000)}/mo`)
+          .on('click', () => selectRetDest(idx))
+          .addTo(retMap);
+      });
+      setTimeout(() => retMap.invalidateSize(), 100);
+    }
+  }
+
+  // APEX terminal output area — scenario summary
+  const apexEl = document.getElementById('ret-apex-output');
+  if (apexEl) {
+    const dest = state.selectedRetDest !== null && state.selectedRetDest !== undefined
+      ? RET_DESTS[state.selectedRetDest] : null;
+    const lines = [
+      '> APEX RETIREMENT SCENARIO ANALYSIS',
+      '> ---------------------------------',
+      `> CURRENT AGE ........... ${state.currentAge}`,
+      `> RETIRE AGE ............ ${state.retirementAge}`,
+      `> HORIZON ............... ${ret.yearsToRetirement}y accumulation / ${ret.retirementYears}y drawdown`,
+      `> NEST EGG @ RETIRE ..... ${fmtCur(ret.nestEggAtRetirement)}`,
+      `> PENSION / MONTH ....... ${fmtCur(ret.pension.monthlyTotal)}`,
+      `> DRAWDOWN / MONTH ...... ${fmtCur(ret.monthlyDrawdownAfterTax)} (after ${state.withdrawTaxRate}% tax)`,
+      `> TOTAL INCOME / MONTH .. ${fmtCur(ret.monthlyRetirementIncome)}`,
+      `> CURRENT EXPENSES ...... ${fmtCur(ret.monthlyTarget)}`,
+      `> GAP ................... ${ret.onTrack ? 'NONE \u2014 ON TRACK' : fmtCur(Math.abs(ret.gap)) + ' SHORTFALL'}`,
+      `> FIRE NUMBER ........... ${fmtCur(ret.fireNumber)}`,
+      '> ---------------------------------',
+      dest ? `> TARGET DESTINATION ... ${dest.flag} ${dest.name}, ${dest.country}` : '> TARGET DESTINATION ... (none selected)',
+      dest ? `> LOCAL COST ESTIMATE .. ${fmtCur(dest.costK * 1000)}/mo` : '',
+      '> END REPORT'
+    ].filter(Boolean);
+    apexEl.textContent = lines.join('\n');
+  }
+}
+
+function toggleDream(id) {
+  if (!state.selectedDreams) state.selectedDreams = [];
+  const i = state.selectedDreams.indexOf(id);
+  if (i >= 0) state.selectedDreams.splice(i, 1);
+  else state.selectedDreams.push(id);
+  saveState();
+  renderRetire();
+}
+
+function setExpModel(model) {
+  retExpModel = model;
+  renderRetire();
+}
+
+function selectRetDest(idx) {
+  state.selectedRetDest = idx;
+  saveState();
+  renderRetire();
+}
+
+function updateRetField(field, val) {
+  state[field] = val;
+  saveState();
+  renderRetire();
+}
+
+// ───────────────────────────────────────────────────────────────────
+// SETTINGS
+// ───────────────────────────────────────────────────────────────────
+function renderSettings() {
+  // Profile fields
+  setVal('set-current-age', state.currentAge);
+  setVal('set-retire-age', state.retirementAge);
+  setVal('set-life-exp', state.lifeExp);
+  setVal('set-growth-rate', state.growthRate);
+  setVal('set-inflation', state.inflationRate);
+  setVal('set-post-growth', state.postRetGrowth);
+  setVal('set-tax-rate', state.withdrawTaxRate);
+  setVal('set-ticker', state.tickerQuote || '');
+
+  // Display toggles — currency selector + dark mode
+  const curSel = document.getElementById('set-currency');
+  if (curSel) {
+    curSel.innerHTML = Object.keys(CSYM).map(c =>
+      `<option value="${c}" ${c === state.currency ? 'selected' : ''}>${c} (${CSYM[c]})</option>`
+    ).join('');
+  }
+
+  const darkEl = document.getElementById('set-dark-mode');
+  if (darkEl) darkEl.checked = !!state.darkMode;
+
+  const realEl = document.getElementById('set-nestegg-real');
+  if (realEl) realEl.checked = !!state.nestEggReal;
+
+  // Exchange rate inputs
+  const fxEl = document.getElementById('set-exchange-rates');
+  if (fxEl) {
+    fxEl.innerHTML = Object.entries(state.exchangeRates).map(([cur, rate]) => `
+      <div class="fx-row">
+        <label>${cur} (${CSYM[cur] || ''})</label>
+        <input type="number" step="0.0001" value="${rate}"
+          onchange="updateExchangeRate('${cur}', Number(this.value))"
+          ${cur === 'SEK' ? 'disabled' : ''}>
+      </div>
+    `).join('');
+  }
+
+  // Firebase status
+  const fbStatus = document.getElementById('fbStatus');
+  if (fbStatus && !fbStatus.innerHTML.trim()) {
+    fbStatus.innerHTML = fbReady
+      ? '<span style="color:var(--green)">\u2713 Connected</span>'
+      : '<span style="color:var(--text2)">Not connected</span>';
+  }
+  const fbUrlEl = document.getElementById('fbUrl');
+  const fbKeyEl = document.getElementById('fbKey');
+  const fbUserEl = document.getElementById('fbUser');
+  if (fbUrlEl && !fbUrlEl.value) fbUrlEl.value = localStorage.getItem('horizon-fb-url') || '';
+  if (fbKeyEl && !fbKeyEl.value) fbKeyEl.value = localStorage.getItem('horizon-fb-key') || '';
+  if (fbUserEl && !fbUserEl.value) fbUserEl.value = localStorage.getItem('horizon-fb-user') || 'default';
+
+  // Perplexity key field
+  const pkEl = document.getElementById('set-perplexity-key');
+  if (pkEl && !pkEl.value) {
+    pkEl.value = localStorage.getItem('propiq_pk') || '';
+  }
+
+  // Anthropic key field
+  const akEl = document.getElementById('set-anthropic-key');
+  if (akEl && !akEl.value) {
+    akEl.value = localStorage.getItem('propiq_ak') || '';
+  }
+
+  // Export / import buttons — wire up onclick if present
+  const expBtn = document.getElementById('set-export-btn');
+  if (expBtn && !expBtn.onclick) expBtn.onclick = exportState;
+  const impBtn = document.getElementById('set-import-btn');
+  if (impBtn && !impBtn.onclick) impBtn.onclick = () => document.getElementById('set-import-file').click();
+  const impFile = document.getElementById('set-import-file');
+  if (impFile && !impFile.onchange) impFile.onchange = (e) => importState(e.target);
+  const resetBtn = document.getElementById('set-reset-btn');
+  if (resetBtn && !resetBtn.onclick) {
+    resetBtn.onclick = () => {
+      if (confirm('Reset all data? This cannot be undone.')) {
+        localStorage.removeItem(STORAGE_KEY);
+        location.reload();
+      }
+    };
+  }
+}
+
+function updateSettingField(field, val) {
+  state[field] = val;
+  saveState();
+  renderAll();
+}
+
+function updateExchangeRate(cur, val) {
+  state.exchangeRates[cur] = val;
+  saveState();
+  renderAll();
+}
+
+function exportState() {
+  const a = document.createElement('a');
+  a.href = 'data:application/json,' + encodeURIComponent(JSON.stringify(state, null, 2));
+  a.download = 'horizon-backup-' + new Date().toISOString().slice(0, 10) + '.json';
+  a.click();
+}
+
+function importState(input) {
+  const f = input.files && input.files[0];
+  if (!f) return;
+  const r = new FileReader();
+  r.onload = e => {
+    try {
+      Object.assign(state, JSON.parse(e.target.result));
+      saveState();
+      renderAll();
+      alert('Import successful');
+    } catch (ex) {
+      alert('Invalid file: ' + ex.message);
+    }
+  };
+  r.readAsText(f);
+}
+
+// ───────────────────────────────────────────────────────────────────
+// MASTER RENDER DISPATCH
+// ───────────────────────────────────────────────────────────────────
+function renderAll() {
+  renderDashboard();
+  renderCashFlow();
+  renderNetWorth();
+  renderAssets();
+  renderFunFund();
+  renderRetire();
+  renderSettings();
+}
+
+function renderActivePanel() {
+  switch (currentPanel) {
+    case 'dashboard':   renderDashboard(); break;
+    case 'cashflow':    renderCashFlow();  break;
+    case 'networth':    renderNetWorth();  break;
+    case 'assets':      renderAssets();    break;
+    case 'vacation':    renderFunFund();   break;
+    case 'retirement':  renderRetire();    break;
+    case 'settings':    renderSettings();  break;
+  }
+}
+</script>
+
+<script>
+// ═══════════════════════════════════════════════════════════════════
+// PROPIQ — SEARCH ENGINE + RESULTS RENDERING (Part 4)
+// ═══════════════════════════════════════════════════════════════════
+
+// ───────────────────────────────────────────────────────────────────
+// MARKET CONFIG
+// ───────────────────────────────────────────────────────────────────
+const MARKETS = {
+  ke: {
+    code: 'ke',
+    name: 'Kenya',
+    flag: '\ud83c\uddf0\ud83c\uddea',
+    currency: 'KES',
+    currencySymbol: 'KSh',
+    locale: 'en-KE',
+    banner: '\ud83c\uddf0\ud83c\uddea &nbsp; Kenya market \u00b7 Prices in KES \u00b7 Nairobi focus',
+    searchLabel: 'Search any Nairobi location or property type',
+    placeholder: 'e.g. Westlands 2BR, Karen villa, Kilimani off-plan...',
+    quickTags: [
+      'Westlands', 'Kilimani', 'Karen', 'Kileleshwa',
+      'Lavington', 'Runda', 'Parklands', 'Nairobi CBD'
+    ],
+    mortgageRates: [
+      { label: 'KCB (13.5%)',       val: 13.5 },
+      { label: 'Equity Bank (14%)', val: 14 },
+      { label: 'Stanbic (13%)',     val: 13 },
+      { label: 'NCBA (14.5%)',      val: 14.5 }
+    ],
+    mortgageTerms: [
+      { label: '20 years', val: 240 },
+      { label: '25 years', val: 300 },
+      { label: '15 years', val: 180 }
+    ],
+    mortgageDeposit: 20,
+    propertyTerms: {
+      freehold: 'Freehold title',
+      leasehold: '99-year leasehold',
+      search: 'Ardhi House title search',
+      advocate: 'Kenya-registered advocate',
+      stampDuty: '4% (urban) / 2% (rural)',
+      landRates: 'Nairobi County land rates'
+    },
+    pensionTerms: {
+      mandatory: 'NSSF',
+      voluntary: 'Individual Pension Plan (IPP)',
+      retirementAge: 60
+    },
+    legalFlags: [
+      { key: 'title',    label: 'Title search',     required: true },
+      { key: 'advocate', label: 'Advocate engaged', required: true },
+      { key: 'rates',    label: 'Land rates clear', required: true },
+      { key: 'survey',   label: 'Survey plan',      required: true },
+      { key: 'consent',  label: 'Spousal consent',  required: false }
+    ],
+    legalNote: 'Always conduct an official title search at Ardhi House (Lands Registry, Upper Hill, Nairobi) before paying any deposit. Official search costs KES 500 and takes 3\u20135 working days. Instruct a Kenya-registered advocate to conduct the search on your behalf.',
+    perplexityContext: `You are a Kenya real estate analyst. Research: "{q}" in Nairobi, Kenya.
+Provide: prices in KES, price per sqm, rental yields (%), recent transactions, comparable properties, infrastructure nearby, and market risks/positives. Focus on 2024-2025 data.`,
+    analysisContext: `You are PropIQ Kenya - AI property investment analyst for Nairobi. Query: "{q}". Research signals: {signals}
+Return ONLY valid JSON:
+{"summary":"2-3 sentence overview","priceRange":"e.g. KES 8M-15M","pricePerSqm":"e.g. KES 95,000/m^2","rentalYield":"e.g. 5.8%","capitalAppreciation":"e.g. 8-12% annually","verdict":"BUY|HOLD|AVOID","verdictReason":"one sentence","investmentThesis":"3-4 sentences","signals":[{"sentiment":"positive|negative|neutral","text":"text","source":"source"}],"pipeline":[{"name":"name","developer":"dev","units":50,"status":"Planning|Approved|Under Construction|Complete","completion":"Q4 2025","priceFrom":"KES 9M"}],"titleRisks":[{"level":"ok|warn|danger","title":"title","detail":"detail"}],"kpis":{"avgPrice":"KES 12M","yield":"5.8%","appreciation":"9%","liquidity":"Medium"}}`
+  },
+
+  se: {
+    code: 'se',
+    name: 'Sweden',
+    flag: '\ud83c\uddf8\ud83c\uddea',
+    currency: 'SEK',
+    currencySymbol: 'kr',
+    locale: 'sv-SE',
+    banner: '\ud83c\uddf8\ud83c\uddea &nbsp; Swedish market \u00b7 Prices in SEK \u00b7 Stockholm & major cities',
+    searchLabel: 'Search any Swedish location or property type',
+    placeholder: 'e.g. \u00d6stermalm l\u00e4genhet, Liding\u00f6 villa, Nacka bostadsr\u00e4tt...',
+    quickTags: [
+      '\u00d6stermalm', 'Liding\u00f6', 'Nacka', 'Bromma',
+      'Djursholm', 'Solna', 'Gothenburg', 'Malm\u00f6'
+    ],
+    mortgageRates: [
+      { label: 'Riksbank rate + 1% (4.5%)', val: 4.5 },
+      { label: 'Swedbank (4.2%)',           val: 4.2 },
+      { label: 'SEB (4.4%)',                val: 4.4 },
+      { label: 'Handelsbanken (4.3%)',      val: 4.3 }
+    ],
+    mortgageTerms: [
+      { label: '30 years', val: 360 },
+      { label: '25 years', val: 300 },
+      { label: '15 years', val: 180 }
+    ],
+    mortgageDeposit: 15,
+    propertyTerms: {
+      freehold: 'Fastighet (villa)',
+      leasehold: 'Bostadsr\u00e4tt (co-op)',
+      search: 'Lantm\u00e4teriregistret search',
+      advocate: 'Fastighetsm\u00e4klare',
+      stampDuty: 'Lagfart 1.5% + pantbrev 2%',
+      landRates: 'Kommunal fastighetsavgift'
+    },
+    pensionTerms: {
+      mandatory: 'Allm\u00e4n pension',
+      voluntary: 'ITP / Tj\u00e4nstepension',
+      retirementAge: 65
+    },
+    legalFlags: [
+      { key: 'lagfart',  label: 'Lagfart clear',         required: true },
+      { key: 'pantbrev', label: 'Pantbrev status',       required: true },
+      { key: 'brf',      label: 'BRF \u00e5rsredovisning', required: true },
+      { key: 'energy',   label: 'Energideklaration',     required: true },
+      { key: 'survey',   label: 'Besiktning',            required: false }
+    ],
+    legalNote: 'Engage a licensed Swedish fastighetsm\u00e4klare and conduct a full Lantm\u00e4teriregistret search before signing. Confirm pantbrev status and inteckningar with the seller. For bostadsr\u00e4tt, review the bostadsr\u00e4ttsf\u00f6reningens \u00e5rsredovisning and check the association debt (skuld per andel). An energideklaration is required by law.',
+    perplexityContext: `You are a Swedish real estate analyst. Research: "{q}" in Sweden.
+Provide: prices in SEK (including SEK/m^2), HOX/Valueguard trends, rental yields, Riksbank rate impact, nyproduktion nearby, comparables with SEK prices, risks and positives. Focus on 2024-2025 Swedish housing data.`,
+    analysisContext: `You are PropIQ Sweden - AI property investment analyst for Swedish real estate. Query: "{q}". Research signals: {signals}
+Return ONLY valid JSON:
+{"summary":"2-3 sentence overview","priceRange":"e.g. SEK 4M-8M","pricePerSqm":"e.g. SEK 85,000/m^2","rentalYield":"e.g. 2.8%","capitalAppreciation":"e.g. 3-5% annually","verdict":"BUY|HOLD|AVOID","verdictReason":"one sentence","investmentThesis":"3-4 sentences including Riksbank context","signals":[{"sentiment":"positive|negative|neutral","text":"text","source":"Hemnet|Valueguard|Riksbank|etc"}],"pipeline":[{"name":"name","developer":"dev","units":60,"status":"Bygglov ans\u00f6kt|Bygglov beviljat|Byggnation p\u00e5g\u00e5r|Klart","completion":"2026","priceFrom":"SEK 5.5M"}],"titleRisks":[{"level":"ok|warn|danger","title":"title","detail":"Sweden-specific legal detail about lagfart, pantbrev, bostadsr\u00e4tt etc"}],"kpis":{"avgPrice":"SEK 6M","yield":"2.8%","appreciation":"4%","liquidity":"High"}}`
+  }
+};
+
+// Ensure state.propiq exists, migrating from legacy flat keys if needed
+function ensurePropiqState() {
+  if (!state.propiq || typeof state.propiq !== 'object') {
+    state.propiq = {
+      market:    state.ppiMarket    || 'ke',
+      history:   state.ppiHistory   || [],
+      lastQuery: state.ppiLastQuery || ''
+    };
+  }
+  if (!state.propiq.market) state.propiq.market = 'ke';
+  if (!state.propiq.history) state.propiq.history = [];
+  if (typeof state.propiq.lastQuery !== 'string') state.propiq.lastQuery = '';
+}
+
+// ───────────────────────────────────────────────────────────────────
+// setMarket — switches active market (KE/SE)
+// ───────────────────────────────────────────────────────────────────
+function setMarket(market) {
+  if (!MARKETS[market]) return;
+  ensurePropiqState();
+  state.propiq.market = market;
+  saveState();
+
+  const cfg = MARKETS[market];
+
+  // Market banner
+  const banner = document.getElementById('piq-market-banner');
+  if (banner) {
+    banner.className = 'market-banner ' + market;
+    banner.innerHTML = cfg.banner;
+  }
+
+  // Search label + placeholder
+  const label = document.getElementById('piq-search-label');
+  if (label) label.textContent = cfg.searchLabel;
+  const input = document.getElementById('piq-search-input');
+  if (input) input.placeholder = cfg.placeholder;
+
+  // Swap quick tags
+  const tagsEl = document.getElementById('piq-quick-tags');
+  if (tagsEl) {
+    tagsEl.innerHTML = cfg.quickTags.map(t =>
+      `<span class="qtag" onclick="piqQuickSearch('${t.replace(/'/g, "\\'")}')">${t}</span>`
+    ).join('');
+  }
+
+  // Sidebar toggle state — top-of-sidebar KE/SE switcher
+  document.querySelectorAll('.market-toggle-btn').forEach(btn => {
+    btn.classList.toggle('on', btn.dataset.market === market);
+  });
+  // Legacy toggle IDs (tog-ke / tog-se) — keep compatible
+  const togKe = document.getElementById('tog-ke');
+  const togSe = document.getElementById('tog-se');
+  if (togKe) togKe.classList.toggle('on', market === 'ke');
+  if (togSe) togSe.classList.toggle('on', market === 'se');
+}
+
+function piqQuickSearch(term) {
+  const input = document.getElementById('piq-search-input');
+  if (input) input.value = term;
+  piqSearch();
+}
+
+// ───────────────────────────────────────────────────────────────────
+// piqSearch — 4-step search pipeline
+// ───────────────────────────────────────────────────────────────────
+let piqBusy = false;
+
+function piqSetStep(step, status, msg) {
+  // status: 'pending' | 'active' | 'done' | 'skip' | 'error'
+  const el = document.getElementById('piq-step-' + step);
+  if (el) {
+    el.className = 'piq-step ' + status;
+    const m = el.querySelector('.piq-step-msg');
+    if (m && msg !== undefined) m.textContent = msg;
+  }
+  const bar = document.getElementById('piq-progress-bar');
+  if (bar) {
+    const doneCount = document.querySelectorAll('.piq-step.done, .piq-step.skip').length;
+    bar.style.width = Math.round((doneCount / 4) * 100) + '%';
+  }
+}
+
+function piqShowProgress(show) {
+  const wrap = document.getElementById('piq-progress');
+  if (wrap) wrap.style.display = show ? '' : 'none';
+  if (show) {
+    ['1', '2', '3', '4'].forEach(n => piqSetStep(n, 'pending', ''));
+    const bar = document.getElementById('piq-progress-bar');
+    if (bar) bar.style.width = '0%';
+  }
+}
+
+async function piqSearch() {
+  if (piqBusy) return;
+  ensurePropiqState();
+
+  const input = document.getElementById('piq-search-input');
+  const query = (input && input.value || '').trim();
+  if (!query) {
+    alert('Enter a location or property type to search.');
+    return;
+  }
+
+  const market = state.propiq.market || 'ke';
+  const cfg = MARKETS[market];
+  if (!cfg) { alert('Unknown market: ' + market); return; }
+
+  const anthropicKey = localStorage.getItem('propiq_ak') || '';
+  const perplexityKey = localStorage.getItem('propiq_pk') || '';
+  if (!anthropicKey) {
+    alert('Anthropic API key required. Add it in Settings.');
+    return;
+  }
+  if (!anthropicKey.startsWith('sk-ant-')) {
+    alert('Anthropic key should start with sk-ant-');
+    return;
+  }
+
+  piqBusy = true;
+  state.propiq.lastQuery = query;
+  piqShowProgress(true);
+
+  const result = {
+    id: 'r' + Date.now(),
+    query,
+    market,
+    marketName: cfg.name,
+    marketFlag: cfg.flag,
+    currency: cfg.currency,
+    timestamp: new Date().toISOString(),
+    signals: [],
+    analysis: null,
+    legal: null,
+    verdict: null
+  };
+
+  try {
+    // ── STEP 1: Perplexity signals fetch ────────────────────────
+    let signalsText = '';
+    if (perplexityKey) {
+      piqSetStep('1', 'active', 'Fetching live market signals\u2026');
+      try {
+        const prompt = cfg.perplexityContext.replace('{q}', query);
+        const res = await fetch('https://api.perplexity.ai/chat/completions', {
+          method: 'POST',
+          headers: {
+            'Authorization': 'Bearer ' + perplexityKey,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            model: 'llama-3.1-sonar-small-128k-online',
+            messages: [{ role: 'user', content: prompt }],
+            max_tokens: 1500
+          })
+        });
+        if (res.ok) {
+          const data = await res.json();
+          signalsText = data.choices && data.choices[0]
+            && data.choices[0].message && data.choices[0].message.content || '';
+          result.rawSignals = signalsText;
+          piqSetStep('1', 'done', 'Live signals retrieved');
+        } else {
+          piqSetStep('1', 'error', 'Perplexity error \u2014 continuing');
+        }
+      } catch (e) {
+        piqSetStep('1', 'error', 'Perplexity unavailable \u2014 continuing');
+      }
+    } else {
+      piqSetStep('1', 'skip', 'No Perplexity key \u2014 skipped');
+    }
+
+    // ── STEP 2: Anthropic analysis ──────────────────────────────
+    piqSetStep('2', 'active', 'Running AI investment analysis\u2026');
+    const analysisPrompt = cfg.analysisContext
+      .replace('{q}', query)
+      .replace('{signals}', signalsText || '(no external signals \u2014 use general market knowledge)');
+    const aRes = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'x-api-key': anthropicKey,
+        'anthropic-version': '2023-06-01',
+        'anthropic-dangerous-direct-browser-access': 'true',
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        model: 'claude-haiku-4-5-20251001',
+        max_tokens: 2000,
+        messages: [{ role: 'user', content: analysisPrompt }]
+      })
+    });
+    if (!aRes.ok) {
+      const err = await aRes.json().catch(() => ({}));
+      throw new Error((err.error && err.error.message) || 'Anthropic call failed');
+    }
+    const aData = await aRes.json();
+    const aText = aData.content && aData.content[0] && aData.content[0].text || '';
+    piqSetStep('2', 'done', 'Analysis complete');
+
+    // ── STEP 3: Parse thesis JSON + determine verdict ───────────
+    piqSetStep('3', 'active', 'Parsing thesis\u2026');
+    let parsed = null;
+    try {
+      const match = aText.match(/\{[\s\S]*\}/);
+      parsed = JSON.parse(match ? match[0] : aText);
+    } catch (e) {
+      throw new Error('Thesis parse failed: ' + e.message);
+    }
+    result.analysis = parsed;
+    result.signals = parsed.signals || [];
+
+    // Verdict determination — normalize to BUY / HOLD / AVOID
+    let verdict = (parsed.verdict || '').toString().toUpperCase();
+    if (!['BUY', 'HOLD', 'AVOID'].includes(verdict)) {
+      const yieldNum = parseFloat((parsed.rentalYield || '').toString()) || 0;
+      if (yieldNum >= 5) verdict = 'BUY';
+      else if (yieldNum >= 3) verdict = 'HOLD';
+      else verdict = 'AVOID';
+    }
+    result.verdict = verdict;
+    result.verdictReason = parsed.verdictReason || '';
+
+    // Simple score: 0-100 derived from verdict + yield
+    const yieldNum = parseFloat((parsed.rentalYield || '').toString()) || 0;
+    const base = verdict === 'BUY' ? 75 : verdict === 'HOLD' ? 55 : 30;
+    result.score = Math.min(100, Math.max(0, Math.round(base + yieldNum * 2)));
+    piqSetStep('3', 'done', 'Verdict: ' + verdict);
+
+    // ── STEP 4: Legal risk assessment ───────────────────────────
+    piqSetStep('4', 'active', 'Running legal risk check\u2026');
+    const legalPrompt = `You are a ${cfg.name} real estate legal analyst. For the query "${query}" in ${cfg.name}, return ONLY valid JSON assessing legal/title risks.
+Consider these flag areas: ${cfg.legalFlags.map(f => f.label).join(', ')}.
+Return:
+{"overall":"ok|warn|danger","flags":[{"key":"...","label":"...","level":"ok|warn|danger","detail":"one sentence"}],"summary":"2 sentences"}`;
+    try {
+      const lRes = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: {
+          'x-api-key': anthropicKey,
+          'anthropic-version': '2023-06-01',
+          'anthropic-dangerous-direct-browser-access': 'true',
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          model: 'claude-haiku-4-5-20251001',
+          max_tokens: 1000,
+          messages: [{ role: 'user', content: legalPrompt }]
+        })
+      });
+      if (lRes.ok) {
+        const lData = await lRes.json();
+        const lText = lData.content && lData.content[0] && lData.content[0].text || '';
+        const lMatch = lText.match(/\{[\s\S]*\}/);
+        result.legal = JSON.parse(lMatch ? lMatch[0] : lText);
+        piqSetStep('4', 'done', 'Legal check complete');
+      } else {
+        result.legal = { overall: 'warn', flags: [], summary: 'Legal check unavailable.' };
+        piqSetStep('4', 'error', 'Legal check failed \u2014 using defaults');
+      }
+    } catch (e) {
+      result.legal = { overall: 'warn', flags: [], summary: 'Legal check unavailable.' };
+      piqSetStep('4', 'error', 'Legal check unavailable');
+    }
+
+    // ── SAVE TO HISTORY ────────────────────────────────────────
+    if (!Array.isArray(state.propiq.history)) state.propiq.history = [];
+    state.propiq.history.unshift(result);
+    if (state.propiq.history.length > 50) {
+      state.propiq.history = state.propiq.history.slice(0, 50);
+    }
+    saveState();
+
+    // Render results
+    if (typeof piqRenderResults === 'function') {
+      piqRenderResults(result);
+    }
+    if (typeof piqRenderHistory === 'function') {
+      piqRenderHistory();
+    }
+
+    setTimeout(() => piqShowProgress(false), 800);
+  } catch (e) {
+    piqSetStep('4', 'error', e.message || 'Search failed');
+    alert('Search failed: ' + (e.message || e));
+  } finally {
+    piqBusy = false;
+  }
+}
+
+// ───────────────────────────────────────────────────────────────────
+// piqRenderResults — full results view (KPI row + tabs + active body)
+// ───────────────────────────────────────────────────────────────────
+let piqCurrentResult = null;
+let piqActiveTab = 'investment';
+
+const PIQ_TABS = [
+  { id: 'investment', label: 'Investment',  icon: '\ud83d\udcc8' },
+  { id: 'mortgage',   label: 'Mortgage',    icon: '\ud83c\udfe6' },
+  { id: 'pipeline',   label: 'Pipeline',    icon: '\ud83d\udee0' },
+  { id: 'signals',    label: 'Signals',     icon: '\ud83d\udce1' },
+  { id: 'legal',      label: 'Legal',       icon: '\u2696\ufe0f' },
+  { id: 'currency',   label: 'Currency',    icon: '\ud83d\udcb1' },
+  { id: 'share',      label: 'Share',       icon: '\ud83d\udd17' }
+];
+
+function piqRenderResults(result) {
+  if (!result) return;
+  piqCurrentResult = result;
+  piqActiveTab = 'investment';
+
+  const area = document.getElementById('piq-results-area');
+  if (!area) return;
+
+  const cfg = MARKETS[result.market] || {};
+  const a = result.analysis || {};
+  const k = a.kpis || {};
+
+  // Verdict color
+  const verdictCls = result.verdict === 'BUY' ? 'buy'
+    : result.verdict === 'HOLD' ? 'hold' : 'avoid';
+
+  // KPI row
+  const kpiRow = `
+    <div class="piq-kpi-row">
+      <div class="piq-kpi">
+        <div class="piq-kpi-lbl">Verdict</div>
+        <div class="piq-kpi-val verdict ${verdictCls}">${result.verdict || '\u2014'}</div>
+        <div class="piq-kpi-sub">Score ${result.score || 0}/100</div>
+      </div>
+      <div class="piq-kpi">
+        <div class="piq-kpi-lbl">Price Range</div>
+        <div class="piq-kpi-val">${a.priceRange || '\u2014'}</div>
+        <div class="piq-kpi-sub">${a.pricePerSqm || ''}</div>
+      </div>
+      <div class="piq-kpi">
+        <div class="piq-kpi-lbl">Rental Yield</div>
+        <div class="piq-kpi-val">${k.yield || a.rentalYield || '\u2014'}</div>
+        <div class="piq-kpi-sub">Gross annual</div>
+      </div>
+      <div class="piq-kpi">
+        <div class="piq-kpi-lbl">Appreciation</div>
+        <div class="piq-kpi-val">${k.appreciation || a.capitalAppreciation || '\u2014'}</div>
+        <div class="piq-kpi-sub">Annual capital growth</div>
+      </div>
+      <div class="piq-kpi">
+        <div class="piq-kpi-lbl">Liquidity</div>
+        <div class="piq-kpi-val">${k.liquidity || '\u2014'}</div>
+        <div class="piq-kpi-sub">${cfg.flag || ''} ${cfg.name || ''}</div>
+      </div>
+      <div class="piq-kpi">
+        <div class="piq-kpi-lbl">Avg Price</div>
+        <div class="piq-kpi-val">${k.avgPrice || '\u2014'}</div>
+        <div class="piq-kpi-sub">Market median</div>
+      </div>
+    </div>
+  `;
+
+  // Header — query + timestamp
+  const header = `
+    <div class="piq-result-header">
+      <div class="piq-result-title">
+        <span class="piq-result-flag">${cfg.flag || ''}</span>
+        <div>
+          <div class="piq-result-query">${result.query}</div>
+          <div class="piq-result-meta">${cfg.name || ''} \u00b7 ${new Date(result.timestamp).toLocaleString()}</div>
+        </div>
+      </div>
+    </div>
+  `;
+
+  // Tab strip
+  const tabs = `
+    <div class="piq-tabs" id="piq-tabs">
+      ${PIQ_TABS.map(t => `
+        <div class="piq-tab ${t.id === piqActiveTab ? 'active' : ''}"
+             data-tab="${t.id}"
+             onclick="piqSwitchTab('${t.id}')">
+          <span class="piq-tab-icon">${t.icon}</span>
+          <span class="piq-tab-lbl">${t.label}</span>
+        </div>
+      `).join('')}
+    </div>
+  `;
+
+  // Tab body mount point — filled by piqRenderTab
+  const body = `<div class="piq-tab-body" id="piq-tab-body"></div>`;
+
+  area.innerHTML = header + kpiRow + tabs + body;
+
+  // Render the default active tab
+  piqRenderTab(piqActiveTab);
+}
+
+function piqSwitchTab(tabId) {
+  if (!piqCurrentResult) return;
+  piqActiveTab = tabId;
+  document.querySelectorAll('#piq-tabs .piq-tab').forEach(el => {
+    el.classList.toggle('active', el.dataset.tab === tabId);
+  });
+  piqRenderTab(tabId);
+}
+
+function piqRenderTab(tabId) {
+  const body = document.getElementById('piq-tab-body');
+  if (!body || !piqCurrentResult) return;
+  const r = piqCurrentResult;
+
+  switch (tabId) {
+    case 'investment':
+      if (typeof piqRenderInvestment === 'function') body.innerHTML = piqRenderInvestment(r);
+      else body.innerHTML = '<div class="piq-placeholder">Investment view pending</div>';
+      break;
+    case 'mortgage':
+      if (typeof piqRenderMortgage === 'function') body.innerHTML = piqRenderMortgage(r);
+      else body.innerHTML = '<div class="piq-placeholder">Mortgage view pending</div>';
+      break;
+    case 'pipeline':
+      if (typeof piqRenderPipeline === 'function') body.innerHTML = piqRenderPipeline(r);
+      else body.innerHTML = '<div class="piq-placeholder">Pipeline view pending</div>';
+      break;
+    case 'signals':
+      if (typeof piqRenderSignals === 'function') body.innerHTML = piqRenderSignals(r);
+      else body.innerHTML = '<div class="piq-placeholder">Signals view pending</div>';
+      break;
+    case 'legal':
+      if (typeof piqRenderLegal === 'function') body.innerHTML = piqRenderLegal(r);
+      else body.innerHTML = '<div class="piq-placeholder">Legal view pending</div>';
+      break;
+    case 'currency':
+      if (typeof piqRenderCurrency === 'function') body.innerHTML = piqRenderCurrency(r);
+      else body.innerHTML = '<div class="piq-placeholder">Currency view pending</div>';
+      break;
+    case 'share':
+      if (typeof piqRenderShare === 'function') body.innerHTML = piqRenderShare(r);
+      else body.innerHTML = '<div class="piq-placeholder">Share view pending</div>';
+      break;
+  }
+}
+
+function piqEscape(s) {
+  return String(s == null ? '' : s)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+
+// ───────────────────────────────────────────────────────────────────
+// piqRenderInvestment — summary, thesis bullets, verdict card
+// ───────────────────────────────────────────────────────────────────
+function piqRenderInvestment(r) {
+  const a = r.analysis || {};
+  const cfg = MARKETS[r.market] || {};
+  const verdictCls = r.verdict === 'BUY' ? 'buy'
+    : r.verdict === 'HOLD' ? 'hold' : 'avoid';
+
+  const summary = a.summary
+    ? `<p class="piq-prose">${piqEscape(a.summary)}</p>`
+    : '<p class="piq-prose piq-muted">No summary available.</p>';
+
+  // Thesis bullets — split by sentence if it's prose, or by newline
+  let thesisBullets = '';
+  if (a.investmentThesis) {
+    const raw = String(a.investmentThesis);
+    const parts = raw.indexOf('\n') >= 0
+      ? raw.split(/\n+/)
+      : raw.split(/(?<=\.)\s+(?=[A-Z])/);
+    thesisBullets = parts.filter(Boolean).map(p =>
+      `<li>${piqEscape(p.trim())}</li>`
+    ).join('');
+  }
+
+  const verdictCard = `
+    <div class="piq-verdict-card ${verdictCls}">
+      <div class="piq-verdict-hd">
+        <div class="piq-verdict-lbl">AI Verdict</div>
+        <div class="piq-verdict-big">${r.verdict || '\u2014'}</div>
+      </div>
+      <div class="piq-verdict-score">
+        <div class="piq-score-bar">
+          <div class="piq-score-fill ${verdictCls}" style="width:${r.score || 0}%"></div>
+        </div>
+        <div class="piq-score-num">${r.score || 0}/100</div>
+      </div>
+      ${r.verdictReason ? `<div class="piq-verdict-reason">${piqEscape(r.verdictReason)}</div>` : ''}
+      <div class="piq-verdict-meta">
+        ${cfg.flag || ''} ${cfg.name || ''} \u00b7 ${a.priceRange || ''}
+      </div>
+    </div>
+  `;
+
+  return `
+    <div class="piq-investment">
+      <div class="piq-investment-main">
+        <div class="piq-section">
+          <div class="piq-section-hd">Summary</div>
+          ${summary}
+        </div>
+        <div class="piq-section">
+          <div class="piq-section-hd">Investment Thesis</div>
+          ${thesisBullets
+            ? `<ul class="piq-thesis">${thesisBullets}</ul>`
+            : '<p class="piq-muted">No thesis available.</p>'}
+        </div>
+      </div>
+      <aside class="piq-investment-side">
+        ${verdictCard}
+      </aside>
+    </div>
+  `;
+}
+
+// ───────────────────────────────────────────────────────────────────
+// piqRenderMortgage — market-specific calculator
+// ───────────────────────────────────────────────────────────────────
+function piqRenderMortgage(r) {
+  const cfg = MARKETS[r.market] || {};
+  const a = r.analysis || {};
+
+  // Parse a reasonable price default from the analysis
+  function parseNum(s) {
+    if (!s) return 0;
+    const match = String(s).replace(/,/g, '').match(/[\d.]+/);
+    const n = match ? parseFloat(match[0]) : 0;
+    // Handle "M" shorthand (8M, 12M, etc.)
+    return /m/i.test(String(s)) ? n * 1000000 : n;
+  }
+
+  const priceRange = a.priceRange || '';
+  const defaultPrice = parseNum(priceRange) || (r.market === 'se' ? 5000000 : 12000000);
+  const defaultRate = cfg.mortgageRates && cfg.mortgageRates[0] ? cfg.mortgageRates[0].val : 5;
+  const defaultTerm = cfg.mortgageTerms && cfg.mortgageTerms[0] ? cfg.mortgageTerms[0].val : 300;
+  const defaultDeposit = cfg.mortgageDeposit || 20;
+
+  const rateOpts = (cfg.mortgageRates || []).map((o, i) =>
+    `<option value="${o.val}" ${i === 0 ? 'selected' : ''}>${piqEscape(o.label)}</option>`
+  ).join('');
+  const termOpts = (cfg.mortgageTerms || []).map((o, i) =>
+    `<option value="${o.val}" ${i === 0 ? 'selected' : ''}>${piqEscape(o.label)}</option>`
+  ).join('');
+
+  return `
+    <div class="piq-mortgage">
+      <div class="piq-mortgage-form">
+        <div class="piq-section-hd">${cfg.flag || ''} ${cfg.name || ''} Mortgage Calculator</div>
+        <div class="mort-field">
+          <label>Property price (${cfg.currency || ''})</label>
+          <input type="number" id="mort-price" value="${defaultPrice}" oninput="piqCalcMortgage()">
+        </div>
+        <div class="mort-field">
+          <label>Deposit %</label>
+          <input type="number" id="mort-deposit" value="${defaultDeposit}" min="0" max="100" oninput="piqCalcMortgage()">
+          <div class="mort-ltv">LTV: <span id="mort-ltv">${100 - defaultDeposit}</span>%</div>
+        </div>
+        <div class="mort-field">
+          <label>Lender / rate</label>
+          <select id="mort-rate" onchange="piqCalcMortgage()">${rateOpts}</select>
+        </div>
+        <div class="mort-field">
+          <label>Term</label>
+          <select id="mort-term" onchange="piqCalcMortgage()">${termOpts}</select>
+        </div>
+      </div>
+      <div class="piq-mortgage-output" id="mort-output">
+        <div class="mort-out-lbl">Monthly payment</div>
+        <div class="mort-out-val" id="mort-monthly">\u2014</div>
+        <div class="mort-out-sub">
+          Loan: <span id="mort-loan">\u2014</span> \u00b7
+          Total: <span id="mort-total">\u2014</span> \u00b7
+          Interest: <span id="mort-interest">\u2014</span>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function piqCalcMortgage() {
+  const price    = Number((document.getElementById('mort-price')   || {}).value) || 0;
+  const depPct   = Number((document.getElementById('mort-deposit') || {}).value) || 0;
+  const rate     = Number((document.getElementById('mort-rate')    || {}).value) || 0;
+  const termMon  = Number((document.getElementById('mort-term')    || {}).value) || 0;
+  if (!piqCurrentResult) return;
+  const cfg = MARKETS[piqCurrentResult.market] || {};
+  const cur = cfg.currencySymbol || '';
+
+  const loan = price * (1 - depPct / 100);
+  const r = rate / 100 / 12;
+  let monthly = 0;
+  if (termMon > 0) {
+    if (r > 0) {
+      monthly = loan * r / (1 - Math.pow(1 + r, -termMon));
+    } else {
+      monthly = loan / termMon;
+    }
+  }
+  const total = monthly * termMon;
+  const interest = total - loan;
+
+  const fmt = n => cur + ' ' + Math.round(n).toLocaleString('en-US');
+  const setTxt = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
+  setTxt('mort-monthly', fmt(monthly));
+  setTxt('mort-loan',    fmt(loan));
+  setTxt('mort-total',   fmt(total));
+  setTxt('mort-interest', fmt(interest));
+  setTxt('mort-ltv',     String(Math.max(0, 100 - depPct)));
+}
+
+// ───────────────────────────────────────────────────────────────────
+// piqRenderPipeline — developments table with status badges
+// ───────────────────────────────────────────────────────────────────
+function piqRenderPipeline(r) {
+  const a = r.analysis || {};
+  const pipe = Array.isArray(a.pipeline) ? a.pipeline : [];
+
+  if (pipe.length === 0) {
+    return `
+      <div class="piq-section">
+        <div class="piq-section-hd">Development Pipeline</div>
+        <div class="piq-empty">No pipeline data found for this query.</div>
+      </div>
+    `;
+  }
+
+  function statusClass(s) {
+    const t = String(s || '').toLowerCase();
+    if (t.includes('complete') || t.includes('klart')) return 'done';
+    if (t.includes('construction') || t.includes('byggnation') || t.includes('pågår')) return 'building';
+    if (t.includes('approved') || t.includes('beviljat')) return 'approved';
+    if (t.includes('planning') || t.includes('ansökt')) return 'planning';
+    return 'neutral';
+  }
+
+  const rows = pipe.map(p => `
+    <tr>
+      <td><b>${piqEscape(p.name || '\u2014')}</b></td>
+      <td>${piqEscape(p.developer || '\u2014')}</td>
+      <td>${p.units != null ? piqEscape(p.units) : '\u2014'}</td>
+      <td><span class="status-badge ${statusClass(p.status)}">${piqEscape(p.status || '\u2014')}</span></td>
+      <td>${piqEscape(p.completion || '\u2014')}</td>
+      <td>${piqEscape(p.priceFrom || '\u2014')}</td>
+    </tr>
+  `).join('');
+
+  return `
+    <div class="piq-section">
+      <div class="piq-section-hd">Development Pipeline</div>
+      <div class="piq-table-wrap">
+        <table class="dt piq-pipeline-table">
+          <thead>
+            <tr>
+              <th>Project</th>
+              <th>Developer</th>
+              <th>Units</th>
+              <th>Status</th>
+              <th>Completion</th>
+              <th>Price from</th>
+            </tr>
+          </thead>
+          <tbody>${rows}</tbody>
+        </table>
+      </div>
+    </div>
+  `;
+}
+
+// ───────────────────────────────────────────────────────────────────
+// piqRenderSignals — bullet list with sentiment dots
+// ───────────────────────────────────────────────────────────────────
+function piqRenderSignals(r) {
+  const sigs = Array.isArray(r.signals) ? r.signals : [];
+
+  if (sigs.length === 0) {
+    return `
+      <div class="piq-section">
+        <div class="piq-section-hd">Market Signals</div>
+        <div class="piq-empty">No signals returned for this query.</div>
+      </div>
+    `;
+  }
+
+  // Count by sentiment
+  const counts = { positive: 0, neutral: 0, negative: 0 };
+  sigs.forEach(s => {
+    const k = (s.sentiment || 'neutral').toLowerCase();
+    if (counts[k] != null) counts[k]++;
+  });
+
+  const bullets = sigs.map(s => {
+    const sent = (s.sentiment || 'neutral').toLowerCase();
+    return `
+      <li class="signal-item ${sent}">
+        <span class="sig-dot ${sent}"></span>
+        <div class="sig-body">
+          <div class="sig-text">${piqEscape(s.text || '')}</div>
+          ${s.source ? `<div class="sig-source">\u2014 ${piqEscape(s.source)}</div>` : ''}
+        </div>
+      </li>
+    `;
+  }).join('');
+
+  return `
+    <div class="piq-section">
+      <div class="piq-section-hd">Market Signals</div>
+      <div class="piq-sentiment-summary">
+        <span class="sig-count positive"><span class="sig-dot positive"></span> ${counts.positive} positive</span>
+        <span class="sig-count neutral"><span class="sig-dot neutral"></span> ${counts.neutral} neutral</span>
+        <span class="sig-count negative"><span class="sig-dot negative"></span> ${counts.negative} negative</span>
+      </div>
+      <ul class="piq-signals">${bullets}</ul>
+    </div>
+  `;
+}
+
+// ───────────────────────────────────────────────────────────────────
+// piqRenderLegal — legal flag cards + long-form note
+// ───────────────────────────────────────────────────────────────────
+function piqRenderLegal(r) {
+  const cfg = MARKETS[r.market] || {};
+  const legal = r.legal || { overall: 'warn', flags: [], summary: '' };
+  const a = r.analysis || {};
+
+  // Merge analysis.titleRisks (from Step 2) and legal.flags (from Step 4)
+  const apiFlags = Array.isArray(legal.flags) ? legal.flags : [];
+  const titleRisks = Array.isArray(a.titleRisks) ? a.titleRisks : [];
+
+  // Build a map keyed by label so we don't double-render
+  const merged = {};
+  (cfg.legalFlags || []).forEach(f => {
+    merged[f.key] = {
+      key: f.key,
+      label: f.label,
+      required: f.required,
+      level: 'ok',
+      detail: f.required ? 'Required for this market.' : 'Optional but recommended.'
+    };
+  });
+  apiFlags.forEach(f => {
+    const key = f.key || f.label || '';
+    merged[key] = {
+      key,
+      label: f.label || f.key || '\u2014',
+      required: merged[key] ? merged[key].required : false,
+      level: (f.level || 'warn').toLowerCase(),
+      detail: f.detail || ''
+    };
+  });
+  titleRisks.forEach(t => {
+    const key = (t.title || '').toLowerCase().replace(/\s+/g, '-') || ('risk-' + Math.random());
+    merged[key] = {
+      key,
+      label: t.title || 'Risk',
+      required: false,
+      level: (t.level || 'warn').toLowerCase(),
+      detail: t.detail || ''
+    };
+  });
+
+  const flagCards = Object.values(merged).map(f => {
+    const level = ['ok', 'warn', 'danger'].includes(f.level) ? f.level : 'warn';
+    const icon = level === 'ok' ? '\u2713' : level === 'warn' ? '\u26a0' : '\u2715';
+    return `
+      <div class="legal-card ${level}">
+        <div class="legal-card-hd">
+          <span class="legal-icon">${icon}</span>
+          <div class="legal-label">${piqEscape(f.label)}</div>
+          ${f.required ? '<span class="legal-req">REQ</span>' : ''}
+        </div>
+        <div class="legal-detail">${piqEscape(f.detail)}</div>
+      </div>
+    `;
+  }).join('');
+
+  const overall = (legal.overall || 'warn').toLowerCase();
+  const overallLabel = overall === 'ok' ? 'CLEAR' : overall === 'danger' ? 'HIGH RISK' : 'REVIEW REQUIRED';
+
+  return `
+    <div class="piq-legal">
+      <div class="legal-overall ${overall}">
+        <div class="legal-overall-lbl">Overall Legal Status</div>
+        <div class="legal-overall-val">${overallLabel}</div>
+        ${legal.summary ? `<div class="legal-overall-sum">${piqEscape(legal.summary)}</div>` : ''}
+      </div>
+
+      <div class="piq-section">
+        <div class="piq-section-hd">${cfg.flag || ''} ${cfg.name || ''} Legal Flags</div>
+        <div class="legal-grid">${flagCards}</div>
+      </div>
+
+      <div class="piq-section">
+        <div class="piq-section-hd">Legal Note</div>
+        <div class="legal-note">${piqEscape(cfg.legalNote || 'No legal guidance available for this market.')}</div>
+      </div>
+
+      <div class="piq-section">
+        <div class="piq-section-hd">Property Terms</div>
+        <div class="legal-terms">
+          <div><b>Freehold:</b> ${piqEscape((cfg.propertyTerms && cfg.propertyTerms.freehold) || '\u2014')}</div>
+          <div><b>Leasehold:</b> ${piqEscape((cfg.propertyTerms && cfg.propertyTerms.leasehold) || '\u2014')}</div>
+          <div><b>Search:</b> ${piqEscape((cfg.propertyTerms && cfg.propertyTerms.search) || '\u2014')}</div>
+          <div><b>Advocate:</b> ${piqEscape((cfg.propertyTerms && cfg.propertyTerms.advocate) || '\u2014')}</div>
+          <div><b>Stamp duty:</b> ${piqEscape((cfg.propertyTerms && cfg.propertyTerms.stampDuty) || '\u2014')}</div>
+          <div><b>Land rates:</b> ${piqEscape((cfg.propertyTerms && cfg.propertyTerms.landRates) || '\u2014')}</div>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+// ───────────────────────────────────────────────────────────────────
+// piqRenderCurrency — FX converter with live rate
+// ───────────────────────────────────────────────────────────────────
+function piqRenderCurrency(r) {
+  const cfg = MARKETS[r.market] || {};
+  const base = cfg.currency || 'SEK';
+
+  // Market-relevant currency pairs
+  const pairs = r.market === 'ke'
+    ? ['USD', 'EUR', 'GBP', 'SEK', 'ZAR', 'UGX']
+    : ['EUR', 'USD', 'GBP', 'NOK', 'DKK', 'KES'];
+
+  // Rates against SEK base (from state.exchangeRates); derive base-to-X
+  const fxRates = state.exchangeRates || {};
+  const baseRate = fxRates[base] || 1; // how many SEK per 1 unit of base
+  const rowHtml = pairs.map(cur => {
+    const curRate = fxRates[cur] || 0;
+    // 1 base = baseRate SEK = baseRate/curRate in cur (if curRate != 0)
+    const rate = curRate ? (baseRate / curRate) : null;
+    return `
+      <tr>
+        <td><b>1 ${base}</b></td>
+        <td>=</td>
+        <td><b>${rate != null ? rate.toFixed(4) : '\u2014'}</b> ${cur}</td>
+        <td class="piq-muted">${CSYM[cur] || ''}</td>
+      </tr>
+    `;
+  }).join('');
+
+  return `
+    <div class="piq-currency">
+      <div class="piq-section">
+        <div class="piq-section-hd">${cfg.flag || ''} ${base} Converter</div>
+        <div class="fx-converter">
+          <div class="fx-field">
+            <label>Amount in ${base}</label>
+            <input type="number" id="fx-amount" value="1000000" oninput="piqFxConvert()">
+          </div>
+          <div class="fx-field">
+            <label>Convert to</label>
+            <select id="fx-target" onchange="piqFxConvert()">
+              ${pairs.map((c, i) =>
+                `<option value="${c}" ${i === 0 ? 'selected' : ''}>${c} (${CSYM[c] || ''})</option>`
+              ).join('')}
+            </select>
+          </div>
+          <div class="fx-output">
+            <div class="fx-out-lbl">Result</div>
+            <div class="fx-out-val" id="fx-result">\u2014</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="piq-section">
+        <div class="piq-section-hd">Market Rates (1 ${base} =)</div>
+        <div class="piq-table-wrap">
+          <table class="dt fx-table">
+            <tbody>${rowHtml}</tbody>
+          </table>
+        </div>
+        <div class="piq-muted fx-note">
+          Rates sourced from your Settings panel. Update them under Money OS \u2192 Settings.
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function piqFxConvert() {
+  if (!piqCurrentResult) return;
+  const cfg = MARKETS[piqCurrentResult.market] || {};
+  const base = cfg.currency || 'SEK';
+  const amountEl = document.getElementById('fx-amount');
+  const targetEl = document.getElementById('fx-target');
+  const outEl    = document.getElementById('fx-result');
+  if (!amountEl || !targetEl || !outEl) return;
+  const amt = Number(amountEl.value) || 0;
+  const target = targetEl.value;
+  const fxRates = state.exchangeRates || {};
+  const baseRate = fxRates[base] || 1;
+  const curRate = fxRates[target] || 0;
+  if (!curRate) { outEl.textContent = '\u2014'; return; }
+  const result = amt * (baseRate / curRate);
+  outEl.textContent = (CSYM[target] || '') + ' ' +
+    Math.round(result).toLocaleString('en-US') + ' ' + target;
+}
+
+// ───────────────────────────────────────────────────────────────────
+// piqRenderShare — copy / WhatsApp / print / feedback / export
+// ───────────────────────────────────────────────────────────────────
+function piqRenderShare(r) {
+  const cfg = MARKETS[r.market] || {};
+  const a = r.analysis || {};
+  return `
+    <div class="piq-share">
+      <div class="piq-section">
+        <div class="piq-section-hd">Share this analysis</div>
+        <div class="share-buttons">
+          <button class="share-btn" onclick="piqShareCopy()">
+            <span class="share-icon">\ud83d\udccb</span> Copy link
+          </button>
+          <button class="share-btn" onclick="piqShareWhatsapp()">
+            <span class="share-icon">\ud83d\udcac</span> WhatsApp
+          </button>
+          <button class="share-btn" onclick="window.print()">
+            <span class="share-icon">\ud83d\udda8</span> Print
+          </button>
+          <button class="share-btn" onclick="piqShareExport()">
+            <span class="share-icon">\u2b07</span> Export JSON
+          </button>
+        </div>
+      </div>
+
+      <div class="piq-section">
+        <div class="piq-section-hd">Was this analysis useful?</div>
+        <div class="share-feedback">
+          <button class="fb-btn" data-fb="up" onclick="piqFeedback('up')">
+            <span class="fb-icon">\ud83d\udc4d</span> Helpful
+          </button>
+          <button class="fb-btn" data-fb="down" onclick="piqFeedback('down')">
+            <span class="fb-icon">\ud83d\udc4e</span> Not useful
+          </button>
+          <span class="fb-status" id="fb-status"></span>
+        </div>
+      </div>
+
+      <div class="piq-section">
+        <div class="piq-section-hd">Result Summary</div>
+        <div class="share-preview" id="share-preview">
+          <div><b>${cfg.flag || ''} ${piqEscape(r.query)}</b> \u00b7 ${piqEscape(cfg.name || '')}</div>
+          <div>Verdict: <b>${r.verdict || '\u2014'}</b> (${r.score || 0}/100)</div>
+          <div>${piqEscape(a.priceRange || '')} \u00b7 ${piqEscape(a.rentalYield || '')} yield</div>
+          ${a.summary ? `<div class="share-summary">${piqEscape(a.summary)}</div>` : ''}
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function piqShareText(r) {
+  r = r || piqCurrentResult;
+  if (!r) return '';
+  const cfg = MARKETS[r.market] || {};
+  const a = r.analysis || {};
+  return [
+    `${cfg.flag || ''} PropIQ — ${r.query} (${cfg.name || ''})`,
+    `Verdict: ${r.verdict || '\u2014'} (${r.score || 0}/100)`,
+    a.priceRange ? `Price: ${a.priceRange}` : '',
+    a.rentalYield ? `Yield: ${a.rentalYield}` : '',
+    a.summary ? '\n' + a.summary : '',
+    r.verdictReason ? '\n' + r.verdictReason : ''
+  ].filter(Boolean).join('\n');
+}
+
+function piqShareCopy() {
+  const text = piqShareText();
+  if (!text) return;
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(text).then(() => {
+      const el = document.getElementById('fb-status');
+      if (el) { el.textContent = 'Copied'; setTimeout(() => el.textContent = '', 1500); }
+    });
+  } else {
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    document.body.appendChild(ta);
+    ta.select();
+    try { document.execCommand('copy'); } catch (e) {}
+    document.body.removeChild(ta);
+  }
+}
+
+function piqShareWhatsapp() {
+  const text = piqShareText();
+  if (!text) return;
+  const url = 'https://wa.me/?text=' + encodeURIComponent(text);
+  window.open(url, '_blank');
+}
+
+function piqShareExport() {
+  if (!piqCurrentResult) return;
+  const blob = new Blob([JSON.stringify(piqCurrentResult, null, 2)], { type: 'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  const safeQ = (piqCurrentResult.query || 'result').replace(/[^a-z0-9]+/gi, '-').toLowerCase();
+  a.download = 'propiq-' + safeQ + '-' + new Date().toISOString().slice(0, 10) + '.json';
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+
+function piqFeedback(val) {
+  if (!piqCurrentResult) return;
+  piqCurrentResult.feedback = val;
+  // Persist into history entry
+  if (state.propiq && Array.isArray(state.propiq.history)) {
+    const idx = state.propiq.history.findIndex(h => h.id === piqCurrentResult.id);
+    if (idx >= 0) state.propiq.history[idx].feedback = val;
+  }
+  saveState();
+  document.querySelectorAll('.fb-btn').forEach(b => {
+    b.classList.toggle('on', b.dataset.fb === val);
+  });
+  const el = document.getElementById('fb-status');
+  if (el) {
+    el.textContent = val === 'up' ? 'Thanks \u2014 feedback saved' : 'Noted \u2014 we\u2019ll improve';
+    setTimeout(() => el.textContent = '', 2500);
+  }
+}
+
+// ───────────────────────────────────────────────────────────────────
+// piqRenderHistory — sidebar history list
+// ───────────────────────────────────────────────────────────────────
+function piqRenderHistory() {
+  ensurePropiqState();
+  const list = state.propiq.history || [];
+  const listEl = document.getElementById('piq-history-list');
+  const clearBtn = document.getElementById('piq-clear-history');
+
+  if (!listEl) return;
+
+  if (list.length === 0) {
+    listEl.innerHTML = `
+      <div class="sidebar-empty">
+        No searches yet.<br>Results saved automatically.
+      </div>
+    `;
+    if (clearBtn) clearBtn.style.display = 'none';
+    return;
+  }
+
+  if (clearBtn) clearBtn.style.display = '';
+
+  listEl.innerHTML = list.map(h => {
+    const cfg = MARKETS[h.market] || {};
+    const verdict = (h.verdict || '').toUpperCase();
+    const verdictCls = verdict === 'BUY' ? 'buy'
+      : verdict === 'HOLD' ? 'hold'
+      : verdict === 'AVOID' ? 'avoid' : 'neutral';
+    const active = piqCurrentResult && piqCurrentResult.id === h.id ? 'active' : '';
+    const date = new Date(h.timestamp);
+    const dateStr = date.toLocaleDateString() + ' ' +
+      date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+    return `
+      <div class="history-item ${active}" onclick="piqLoadFromHistory('${h.id}')">
+        <div class="hist-row">
+          <span class="hist-flag">${cfg.flag || ''}</span>
+          <span class="hist-query">${piqEscape(h.query)}</span>
+          <span class="hist-verdict-badge ${verdictCls}">${verdict || '\u2014'}</span>
+        </div>
+        <div class="hist-meta">
+          <span class="hist-market">${piqEscape(cfg.name || h.market)}</span>
+          <span class="hist-date">${dateStr}</span>
+          ${h.score != null ? `<span class="hist-score">${h.score}/100</span>` : ''}
+        </div>
+        <button class="hist-del" onclick="event.stopPropagation();piqDeleteFromHistory('${h.id}')" title="Delete">\u2715</button>
+      </div>
+    `;
+  }).join('');
+}
+
+function piqLoadFromHistory(id) {
+  ensurePropiqState();
+  const entry = (state.propiq.history || []).find(h => h.id === id);
+  if (!entry) return;
+  piqRenderResults(entry);
+  piqRenderHistory(); // refresh active state
+}
+
+function piqDeleteFromHistory(id) {
+  ensurePropiqState();
+  state.propiq.history = (state.propiq.history || []).filter(h => h.id !== id);
+  // If we deleted the currently-shown result, clear the view
+  if (piqCurrentResult && piqCurrentResult.id === id) {
+    piqCurrentResult = null;
+    const area = document.getElementById('piq-results-area');
+    if (area) {
+      area.innerHTML = `
+        <div class="empty">
+          <div class="empty-title">Search a location to begin</div>
+          <div class="empty-sub">Live signals \u00b7 Investment analysis \u00b7 Mortgage calculator \u00b7 Legal risk</div>
+        </div>
+      `;
+    }
+  }
+  saveState();
+  piqRenderHistory();
+}
+
+function piqClearHistory() {
+  if (!confirm('Clear all search history? This cannot be undone.')) return;
+  ensurePropiqState();
+  state.propiq.history = [];
+  piqCurrentResult = null;
+  saveState();
+  piqRenderHistory();
+  const area = document.getElementById('piq-results-area');
+  if (area) {
+    area.innerHTML = `
+      <div class="empty">
+        <div class="empty-title">Search a location to begin</div>
+        <div class="empty-sub">Live signals \u00b7 Investment analysis \u00b7 Mortgage calculator \u00b7 Legal risk</div>
+      </div>
+    `;
+  }
+}
+
+// ───────────────────────────────────────────────────────────────────
+// piqCompare — side-by-side grid of recent searches
+// ───────────────────────────────────────────────────────────────────
+function piqCompare(n) {
+  ensurePropiqState();
+  const count = Math.min(n || 4, 6);
+  const list = (state.propiq.history || []).slice(0, count);
+  const area = document.getElementById('piq-results-area');
+  if (!area) return;
+
+  if (list.length < 2) {
+    area.innerHTML = `
+      <div class="empty">
+        <div class="empty-title">Not enough searches to compare</div>
+        <div class="empty-sub">Run at least 2 searches to see a side-by-side view.</div>
+      </div>
+    `;
+    return;
+  }
+
+  const cfgFirst = MARKETS[list[0].market] || {};
+
+  // Build columns
+  const cols = list.map(r => {
+    const cfg = MARKETS[r.market] || {};
+    const a = r.analysis || {};
+    const k = a.kpis || {};
+    const verdict = (r.verdict || '').toUpperCase();
+    const verdictCls = verdict === 'BUY' ? 'buy'
+      : verdict === 'HOLD' ? 'hold'
+      : verdict === 'AVOID' ? 'avoid' : 'neutral';
+    return {
+      r, cfg, a, k, verdict, verdictCls
+    };
+  });
+
+  // Rows of compared attributes
+  const rows = [
+    { label: 'Market',        pick: c => `${c.cfg.flag || ''} ${c.cfg.name || ''}` },
+    { label: 'Verdict',       pick: c => `<span class="cmp-verdict ${c.verdictCls}">${c.verdict || '\u2014'}</span>` },
+    { label: 'Score',         pick: c => `${c.r.score || 0}/100` },
+    { label: 'Price Range',   pick: c => piqEscape(c.a.priceRange || '\u2014') },
+    { label: 'Price per m\u00b2',pick: c => piqEscape(c.a.pricePerSqm || '\u2014') },
+    { label: 'Rental Yield',  pick: c => piqEscape(c.k.yield || c.a.rentalYield || '\u2014') },
+    { label: 'Appreciation',  pick: c => piqEscape(c.k.appreciation || c.a.capitalAppreciation || '\u2014') },
+    { label: 'Avg Price',     pick: c => piqEscape(c.k.avgPrice || '\u2014') },
+    { label: 'Liquidity',     pick: c => piqEscape(c.k.liquidity || '\u2014') },
+    { label: 'Summary',       pick: c => piqEscape((c.a.summary || '').slice(0, 160) + ((c.a.summary || '').length > 160 ? '\u2026' : '')) }
+  ];
+
+  const headerCells = cols.map(c => `
+    <th class="cmp-col-head">
+      <div class="cmp-col-flag">${c.cfg.flag || ''}</div>
+      <div class="cmp-col-query">${piqEscape(c.r.query)}</div>
+      <div class="cmp-col-date">${new Date(c.r.timestamp).toLocaleDateString()}</div>
+      <button class="cmp-open" onclick="piqLoadFromHistory('${c.r.id}')">Open \u2192</button>
+    </th>
+  `).join('');
+
+  const bodyRows = rows.map(row => `
+    <tr>
+      <th class="cmp-row-label">${row.label}</th>
+      ${cols.map(c => `<td>${row.pick(c)}</td>`).join('')}
+    </tr>
+  `).join('');
+
+  area.innerHTML = `
+    <div class="piq-compare">
+      <div class="piq-compare-hd">
+        <div>
+          <div class="piq-section-hd">Property Comparison</div>
+          <div class="piq-muted">Your last ${list.length} searches \u00b7 ${cfgFirst.flag || ''} ${cfgFirst.name || ''} focus</div>
+        </div>
+        <button class="btn-secondary" onclick="piqBackToResults()">\u2190 Back</button>
+      </div>
+      <div class="piq-compare-wrap">
+        <table class="dt cmp-table">
+          <thead>
+            <tr>
+              <th class="cmp-row-label"></th>
+              ${headerCells}
+            </tr>
+          </thead>
+          <tbody>${bodyRows}</tbody>
+        </table>
+      </div>
+    </div>
+  `;
+}
+
+function piqBackToResults() {
+  if (piqCurrentResult) {
+    piqRenderResults(piqCurrentResult);
+  } else {
+    ensurePropiqState();
+    const last = (state.propiq.history || [])[0];
+    if (last) {
+      piqRenderResults(last);
+    } else {
+      const area = document.getElementById('piq-results-area');
+      if (area) {
+        area.innerHTML = `
+          <div class="empty">
+            <div class="empty-title">Search a location to begin</div>
+            <div class="empty-sub">Live signals \u00b7 Investment analysis \u00b7 Mortgage calculator \u00b7 Legal risk</div>
+          </div>
+        `;
+      }
+    }
+  }
+}
+</script>
+
+<script>
+// ═══════════════════════════════════════════════════════════════════
+// TICKER BAR (Part 5E-1)
+// ═══════════════════════════════════════════════════════════════════
+
+function updateTicker() {
+  const contentEl = document.getElementById('ticker-content');
+  if (!contentEl) return;
+
+  // Pull live values from the calc engine
+  const sav = calcSavings();
+  const ff  = calcFunFund();
+  const nw  = calcNetWorth();
+  const egg = calcNestEgg();
+
+  const surplus    = sav.surplus;
+  const funFund    = ff.balance;
+  const nestEgg    = egg.finalNominal;
+  const netWorth   = nw.netWorth;
+  const savingsPct = sav.savingsRate;
+
+  // Each field has icon, label, value, and directional tone (pos/neg/neu)
+  const items = [
+    {
+      icon: '\ud83d\udcb0',
+      label: 'MONTHLY SURPLUS',
+      val: fmtCur(surplus),
+      tone: surplus > 0 ? 'pos' : surplus < 0 ? 'neg' : 'neu'
+    },
+    {
+      icon: '\ud83c\udf89',
+      label: 'FUN FUND',
+      val: fmtCur(funFund),
+      tone: funFund > 0 ? 'pos' : 'neu'
+    },
+    {
+      icon: '\ud83e\udd5a',
+      label: 'NEST EGG',
+      val: fmtCur(nestEgg),
+      tone: 'pos'
+    },
+    {
+      icon: '\ud83c\udfe6',
+      label: 'NET WORTH',
+      val: fmtCur(netWorth),
+      tone: netWorth >= 0 ? 'pos' : 'neg'
+    },
+    {
+      icon: '\ud83d\udcca',
+      label: 'SAVINGS RATE',
+      val: (savingsPct || 0).toFixed(1) + '%',
+      tone: savingsPct >= 20 ? 'pos' : savingsPct >= 10 ? 'neu' : 'neg'
+    }
+  ];
+
+  // Build marquee HTML — duplicate the set so the CSS scroll loop is seamless
+  const segment = items.map(it => `
+    <span class="ticker-item ${it.tone}">
+      <span class="ticker-icon">${it.icon}</span>
+      <span class="ticker-label">${it.label}</span>
+      <span class="ticker-value">${it.val}</span>
+    </span>
+    <span class="ticker-sep">\u2022</span>
+  `).join('');
+
+  contentEl.innerHTML = segment + segment;
+
+  // Optional quote element
+  const quoteEl = document.getElementById('ticker-quote');
+  if (quoteEl && state.tickerQuote) {
+    quoteEl.textContent = state.tickerQuote;
+  }
+}
+</script>
+
+<script>
+// ═══════════════════════════════════════════════════════════════════
+// THEME TOGGLE (Part 5E-2)
+// ═══════════════════════════════════════════════════════════════════
+
+function ensureDisplayState() {
+  if (!state.display || typeof state.display !== 'object') {
+    state.display = {
+      theme: state.darkMode === false ? 'light' : 'dark'
+    };
+  }
+  if (state.display.theme !== 'light' && state.display.theme !== 'dark') {
+    state.display.theme = 'dark';
+  }
+}
+
+function setTheme(theme) {
+  // Normalize
+  if (theme !== 'light' && theme !== 'dark') theme = 'dark';
+
+  ensureDisplayState();
+  state.display.theme = theme;
+  // Keep legacy darkMode flag in sync so existing panels/settings read right
+  state.darkMode = theme === 'dark';
+
+  // Apply to <html>
+  document.documentElement.setAttribute('data-theme', theme);
+
+  // Update toggle button icon(s)
+  // Convention: any element with .theme-toggle gets its innerHTML updated,
+  // and elements with id="theme-toggle-icon" get refreshed too.
+  const icon = theme === 'dark' ? '\u263e' : '\u2600\ufe0f';   // ☾ moon / ☀ sun
+  const nextLbl = theme === 'dark' ? 'Light mode' : 'Dark mode';
+
+  document.querySelectorAll('.theme-toggle').forEach(btn => {
+    btn.setAttribute('aria-label', nextLbl);
+    btn.setAttribute('title', nextLbl);
+    const iconEl = btn.querySelector('.theme-toggle-icon');
+    if (iconEl) {
+      iconEl.textContent = icon;
+    } else {
+      btn.textContent = icon;
+    }
+  });
+
+  const topIcon = document.getElementById('theme-toggle-icon');
+  if (topIcon) topIcon.textContent = icon;
+
+  saveState();
+}
+
+function toggleTheme() {
+  ensureDisplayState();
+  setTheme(state.display.theme === 'dark' ? 'light' : 'dark');
+}
+
+// Apply saved theme on load
+(function applySavedTheme() {
+  function apply() {
+    ensureDisplayState();
+    setTheme(state.display.theme);
+  }
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', apply);
+  } else {
+    apply();
+  }
+})();
+</script>
+
+<script>
+// ═══════════════════════════════════════════════════════════════════
+// API KEY MODAL (Part 5E-3)
+// ═══════════════════════════════════════════════════════════════════
+
+function openKeyModal() {
+  const modal = document.getElementById('key-modal');
+  if (!modal) return;
+
+  // Prefill inputs from localStorage (under both the spec keys and
+  // the legacy propiq_* keys used by the search engine)
+  const ak = localStorage.getItem('anthropic-key')  || localStorage.getItem('propiq_ak') || '';
+  const pk = localStorage.getItem('perplexity-key') || localStorage.getItem('propiq_pk') || '';
+
+  const akInput = document.getElementById('key-anthropic');
+  const pkInput = document.getElementById('key-perplexity');
+  if (akInput) akInput.value = ak;
+  if (pkInput) pkInput.value = pk;
+
+  // Clear any previous error state
+  const err = document.getElementById('key-modal-error');
+  if (err) err.textContent = '';
+
+  modal.classList.add('open');
+  modal.style.display = 'flex';
+
+  // Focus first empty field
+  setTimeout(() => {
+    if (akInput && !akInput.value) akInput.focus();
+    else if (pkInput && !pkInput.value) pkInput.focus();
+    else if (akInput) akInput.focus();
+  }, 50);
+}
+
+function closeKeyModal() {
+  const modal = document.getElementById('key-modal');
+  if (!modal) return;
+  modal.classList.remove('open');
+  modal.style.display = 'none';
+}
+
+function saveKeys() {
+  const akInput = document.getElementById('key-anthropic');
+  const pkInput = document.getElementById('key-perplexity');
+  const err = document.getElementById('key-modal-error');
+
+  const ak = (akInput && akInput.value || '').trim();
+  const pk = (pkInput && pkInput.value || '').trim();
+
+  // Validate: Anthropic key is required (non-empty)
+  if (!ak) {
+    if (err) err.textContent = 'Anthropic API key is required.';
+    if (akInput) akInput.focus();
+    updateKeyBadge();
+    return;
+  }
+
+  // Persist under the spec key names …
+  localStorage.setItem('anthropic-key', ak);
+  if (pk) localStorage.setItem('perplexity-key', pk);
+  else localStorage.removeItem('perplexity-key');
+
+  // … and mirror to the legacy keys used by piqSearch() so the
+  // PropIQ engine picks them up without a reload.
+  localStorage.setItem('propiq_ak', ak);
+  if (pk) localStorage.setItem('propiq_pk', pk);
+  else localStorage.removeItem('propiq_pk');
+
+  if (err) err.textContent = '';
+  updateKeyBadge();
+  closeKeyModal();
+}
+
+function updateKeyBadge() {
+  const ak = localStorage.getItem('anthropic-key') || localStorage.getItem('propiq_ak') || '';
+  const pk = localStorage.getItem('perplexity-key') || localStorage.getItem('propiq_pk') || '';
+  const hasAnthropic = !!ak;
+  const hasPerplexity = !!pk;
+
+  // Overall badge — green only when the required key is set
+  const badge = document.getElementById('key-badge');
+  if (badge) {
+    badge.classList.remove('set', 'missing', 'partial');
+    if (hasAnthropic && hasPerplexity) {
+      badge.classList.add('set');
+      badge.style.color = 'var(--green)';
+      badge.style.borderColor = 'var(--green)';
+      badge.textContent = '\u25cf KEYS SET';
+    } else if (hasAnthropic) {
+      badge.classList.add('partial');
+      badge.style.color = 'var(--green)';
+      badge.style.borderColor = 'var(--green)';
+      badge.textContent = '\u25cf ANTHROPIC SET';
+    } else {
+      badge.classList.add('missing');
+      badge.style.color = 'var(--amber)';
+      badge.style.borderColor = 'var(--amber)';
+      badge.textContent = '\u25cf KEY MISSING';
+    }
+  }
+
+  // Per-key pill indicators (optional elements)
+  const akPill = document.getElementById('key-badge-anthropic');
+  if (akPill) {
+    akPill.classList.toggle('set', hasAnthropic);
+    akPill.classList.toggle('missing', !hasAnthropic);
+    akPill.style.color = hasAnthropic ? 'var(--green)' : 'var(--amber)';
+  }
+  const pkPill = document.getElementById('key-badge-perplexity');
+  if (pkPill) {
+    pkPill.classList.toggle('set', hasPerplexity);
+    pkPill.classList.toggle('missing', !hasPerplexity);
+    pkPill.style.color = hasPerplexity ? 'var(--green)' : 'var(--amber)';
+  }
+}
+
+// Initial badge sync on load
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', updateKeyBadge);
+} else {
+  updateKeyBadge();
+}
+</script>
+
+<script>
+// ═══════════════════════════════════════════════════════════════════
+// CLAUDE API CLIENT (Part 5E-4)
+// ═══════════════════════════════════════════════════════════════════
+
+async function claudeFetch(systemPrompt, userMessage) {
+  // Pull the stored Anthropic key — try the spec key name first,
+  // then fall back to the legacy name used by the PropIQ engine.
+  const key = localStorage.getItem('anthropic-key')
+    || localStorage.getItem('propiq_ak')
+    || '';
+
+  if (!key) {
+    return 'Anthropic API key missing. Open the key modal and paste a key starting with sk-ant- to continue.';
+  }
+  if (!key.startsWith('sk-ant-')) {
+    return 'Anthropic API key looks invalid (should start with sk-ant-). Please re-enter it via the key modal.';
+  }
+
+  const body = {
+    model: 'claude-sonnet-4-5',
+    max_tokens: 2000,
+    messages: [
+      { role: 'user', content: String(userMessage == null ? '' : userMessage) }
+    ]
+  };
+  if (systemPrompt) {
+    body.system = String(systemPrompt);
+  }
+
+  try {
+    const res = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'x-api-key': key,
+        'anthropic-version': '2023-06-01',
+        'anthropic-dangerous-direct-browser-access': 'true',
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(body)
+    });
+
+    if (!res.ok) {
+      let detail = '';
+      try {
+        const err = await res.json();
+        detail = (err && err.error && err.error.message) || '';
+      } catch (e) {
+        try { detail = await res.text(); } catch (_) {}
+      }
+      return 'Claude request failed (' + res.status + ')'
+        + (detail ? ': ' + detail : '') + '.';
+    }
+
+    const data = await res.json();
+    // Expected shape: { content: [{ type: 'text', text: '...' }, ...], ... }
+    if (data && Array.isArray(data.content)) {
+      const text = data.content
+        .filter(b => b && b.type === 'text' && typeof b.text === 'string')
+        .map(b => b.text)
+        .join('\n')
+        .trim();
+      if (text) return text;
+    }
+    return 'Claude returned an empty response. Please try again.';
+  } catch (e) {
+    const msg = (e && e.message) ? e.message : String(e);
+    if (/NetworkError|Failed to fetch|CORS/i.test(msg)) {
+      return 'Network or CORS error reaching api.anthropic.com. If you are running from a local file, host the page on Netlify or a local server so the browser can call the API.';
+    }
+    return 'Claude request error: ' + msg;
+  }
+}
+</script>
+
+<script>
+// ═══════════════════════════════════════════════════════════════════
+// AI FAB CHAT PANEL (Part 5E-5)
+// ═══════════════════════════════════════════════════════════════════
+
+let chatHistory = [];       // [{ role: 'user'|'assistant', text: '...' }]
+let chatBusy = false;
+
+function openChat() {
+  const panel = document.getElementById('chat-panel');
+  if (!panel) return;
+  panel.classList.add('open');
+  panel.style.display = 'flex';
+  // Focus input
+  setTimeout(() => {
+    const input = document.getElementById('chat-input');
+    if (input) input.focus();
+  }, 60);
+  // Seed welcome bubble on first open
+  const msgs = document.getElementById('chat-messages');
+  if (msgs && !msgs.childElementCount) {
+    const ctx = (typeof currentApp !== 'undefined' && currentApp === 'property')
+      ? 'Hi! I\u2019m your PropIQ property analyst. Ask me about any location, comparable deals, legal risks, or mortgage options.'
+      : 'Hi! I\u2019m your Money OS financial assistant. Ask me anything about your cashflow, nest egg, retirement plan, or fun fund.';
+    appendChatBubble('assistant', ctx);
+  }
+}
+
+function closeChat() {
+  const panel = document.getElementById('chat-panel');
+  if (!panel) return;
+  panel.classList.remove('open');
+  panel.style.display = 'none';
+}
+
+function toggleChat() {
+  const panel = document.getElementById('chat-panel');
+  if (!panel) return;
+  if (panel.classList.contains('open')) closeChat();
+  else openChat();
+}
+
+function appendChatBubble(role, text) {
+  const msgs = document.getElementById('chat-messages');
+  if (!msgs) return null;
+  const div = document.createElement('div');
+  div.className = 'chat-bubble ' + (role === 'user' ? 'user' : 'assistant');
+  // Render markdown for assistant, plaintext (escaped) for user
+  if (role === 'assistant' && typeof renderMarkdown === 'function') {
+    div.innerHTML = renderMarkdown(text);
+  } else {
+    // Fallback escape — mirrors piqEscape to avoid injection from user input
+    const esc = String(text == null ? '' : text)
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;').replace(/'/g, '&#39;')
+      .replace(/\n/g, '<br>');
+    div.innerHTML = esc;
+  }
+  msgs.appendChild(div);
+  chatScrollBottom();
+  return div;
+}
+
+function chatScrollBottom() {
+  const msgs = document.getElementById('chat-messages');
+  if (msgs) msgs.scrollTop = msgs.scrollHeight;
+}
+
+// ── Context-aware system prompt ────────────────────────────────────
+function buildChatSystemPrompt() {
+  const app = (typeof currentApp !== 'undefined') ? currentApp : 'money';
+
+  if (app === 'property') {
+    ensurePropiqState();
+    const market = state.propiq && state.propiq.market ? state.propiq.market : 'ke';
+    const cfg = MARKETS[market] || {};
+    const last = piqCurrentResult;
+    const ctxParts = [
+      'You are PropIQ, an AI property investment analyst embedded in the Horizon app.',
+      `Active market: ${cfg.flag || ''} ${cfg.name || market} (currency ${cfg.currency || ''}).`,
+      'Be concise, cite ranges in the local currency, and focus on rental yield, capital appreciation, legal risk, and mortgage math when relevant.'
+    ];
+    if (last) {
+      const a = last.analysis || {};
+      ctxParts.push(
+        `The user is currently viewing the analysis for "${last.query}" with verdict ${last.verdict || '—'} (score ${last.score || 0}/100). `
+        + `Price range: ${a.priceRange || '—'}. Yield: ${a.rentalYield || '—'}. Summary: ${a.summary || '—'}`
+      );
+    }
+    ctxParts.push('Format answers in short Markdown (headings, bullets, bold). Never invent API data — only reason from what is stated.');
+    return ctxParts.join('\n\n');
+  }
+
+  // Money OS context — pull live calc values
+  try {
+    const inc = calcIncome();
+    const exp = calcExpenses();
+    const sav = calcSavings();
+    const nw  = calcNetWorth();
+    const egg = calcNestEgg();
+    const ret = calcRetirement();
+    const ff  = calcFunFund();
+    const cur = state.currency || 'SEK';
+
+    return [
+      'You are the Money OS financial assistant inside the Horizon app — a personal CFO for the user.',
+      'Answer questions about cashflow, net worth, nest egg, retirement plan, and the fun fund.',
+      `Base currency: ${cur}. The user is ${state.currentAge} years old, targeting retirement at ${state.retirementAge} (life expectancy ${state.lifeExp}).`,
+      'Live snapshot (all figures in base currency):',
+      `- Monthly income: ${Math.round(inc.total)}`,
+      `- Monthly expenses: ${Math.round(exp.total)} (${exp.paid.length}/${exp.items.length} paid)`,
+      `- Monthly surplus: ${Math.round(sav.surplus)}`,
+      `- Base savings: ${Math.round(sav.baseSavings)} (${sav.savingsRate.toFixed(1)}% of income)`,
+      `- Fun fund balance: ${Math.round(ff.balance)}`,
+      `- Net worth: ${Math.round(nw.netWorth)} (assets ${Math.round(nw.assets.total)}, liabilities ${Math.round(nw.liabilities.total)})`,
+      `- Nest egg projection at retirement: ${Math.round(ret.nestEggAtRetirement)} (nominal)`,
+      `- Pension monthly: ${Math.round(ret.pension.monthlyTotal)}; drawdown after tax: ${Math.round(ret.monthlyDrawdownAfterTax)}; total retirement income: ${Math.round(ret.monthlyRetirementIncome)}`,
+      `- Retirement gap vs current expenses: ${Math.round(ret.gap)} (${ret.onTrack ? 'ON TRACK' : 'SHORTFALL'})`,
+      `- FIRE number: ${Math.round(ret.fireNumber)}`,
+      'Use short Markdown (bold, bullets, inline code for numbers when helpful). Never fabricate numbers beyond the snapshot — if the user asks something you cannot compute from it, say so and suggest what to enter in the app.'
+    ].join('\n');
+  } catch (e) {
+    return 'You are the Money OS financial assistant inside the Horizon app. Help the user think about cashflow, savings, net worth, retirement, and the fun fund. Keep answers concise, use Markdown.';
+  }
+}
+
+// ── Send handler ──────────────────────────────────────────────────
+async function sendChat() {
+  if (chatBusy) return;
+  const input = document.getElementById('chat-input');
+  if (!input) return;
+  const text = (input.value || '').trim();
+  if (!text) return;
+
+  // Append user bubble + clear input
+  appendChatBubble('user', text);
+  chatHistory.push({ role: 'user', text });
+  input.value = '';
+  input.focus();
+
+  // Show a pending assistant bubble
+  const pending = appendChatBubble('assistant', '\u2026');
+  if (pending) pending.classList.add('pending');
+
+  chatBusy = true;
+  try {
+    // Build context-aware prompt
+    const system = buildChatSystemPrompt();
+
+    // Include recent prior exchanges (last 6 turns) as rolling context
+    const recent = chatHistory.slice(-7, -1) // exclude the just-pushed user turn
+      .map(t => (t.role === 'user' ? 'User' : 'Assistant') + ': ' + t.text)
+      .join('\n\n');
+    const userMsg = recent
+      ? `Previous exchange:\n${recent}\n\nNew user message: ${text}`
+      : text;
+
+    const reply = await claudeFetch(system, userMsg);
+
+    // Replace pending bubble content
+    if (pending) {
+      pending.classList.remove('pending');
+      if (typeof renderMarkdown === 'function') {
+        pending.innerHTML = renderMarkdown(reply);
+      } else {
+        pending.textContent = reply;
+      }
+    } else {
+      appendChatBubble('assistant', reply);
+    }
+    chatHistory.push({ role: 'assistant', text: reply });
+  } catch (e) {
+    const errMsg = 'Sorry — chat error: ' + ((e && e.message) || e);
+    if (pending) {
+      pending.classList.remove('pending');
+      pending.textContent = errMsg;
+    } else {
+      appendChatBubble('assistant', errMsg);
+    }
+  } finally {
+    chatBusy = false;
+    chatScrollBottom();
+  }
+}
+
+// Enter-to-send wiring (attached on first open via openChat focus)
+document.addEventListener('keydown', (e) => {
+  if (e.key !== 'Enter' || e.shiftKey) return;
+  const active = document.activeElement;
+  if (active && active.id === 'chat-input') {
+    e.preventDefault();
+    sendChat();
+  }
+});
+</script>
+
+<script>
+// ═══════════════════════════════════════════════════════════════════
+// MARKDOWN RENDERER (Part 5E-6)
+// ═══════════════════════════════════════════════════════════════════
+
+function renderMarkdown(text) {
+  if (text == null) return '';
+  let src = String(text);
+
+  // 1) HTML-escape first so Markdown source can't inject tags.
+  src = src
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+
+  // 2) Protect inline code spans with placeholders so their content
+  //    isn't processed by bold/italic passes. `code`
+  const codeStore = [];
+  src = src.replace(/`([^`\n]+)`/g, (_, c) => {
+    codeStore.push(c);
+    return '\u0000CODE' + (codeStore.length - 1) + '\u0000';
+  });
+
+  // 3) Bold: **text** → <strong>text</strong>
+  //    Non-greedy, cannot cross newlines.
+  src = src.replace(/\*\*([^\n*][^\n*]*?)\*\*/g, '<strong>$1</strong>');
+
+  // 4) Italic: *text* → <em>text</em>
+  //    Avoid matching across whitespace boundaries that look like bullets.
+  src = src.replace(/(^|[^*])\*(?!\s)([^\n*]+?)\*(?!\*)/g, '$1<em>$2</em>');
+
+  // 5) Split into lines and walk them, grouping bullet and numbered list
+  //    runs into <ul> / <ol> blocks. Non-list lines become paragraphs
+  //    (or are joined with <br> inside a paragraph run).
+  const lines = src.split(/\n/);
+  const out = [];
+  let i = 0;
+
+  function isBullet(line) {
+    return /^\s*[-*+]\s+/.test(line);
+  }
+  function isNumbered(line) {
+    return /^\s*\d+\.\s+/.test(line);
+  }
+  function stripBullet(line) {
+    return line.replace(/^\s*[-*+]\s+/, '');
+  }
+  function stripNumbered(line) {
+    return line.replace(/^\s*\d+\.\s+/, '');
+  }
+
+  while (i < lines.length) {
+    const line = lines[i];
+
+    if (isBullet(line)) {
+      const items = [];
+      while (i < lines.length && isBullet(lines[i])) {
+        items.push('<li>' + stripBullet(lines[i]).trim() + '</li>');
+        i++;
+      }
+      out.push('<ul>' + items.join('') + '</ul>');
+      continue;
+    }
+
+    if (isNumbered(line)) {
+      const items = [];
+      while (i < lines.length && isNumbered(lines[i])) {
+        items.push('<li>' + stripNumbered(lines[i]).trim() + '</li>');
+        i++;
+      }
+      out.push('<ol>' + items.join('') + '</ol>');
+      continue;
+    }
+
+    // Paragraph run — consume consecutive non-empty, non-list lines,
+    // joined with <br>. Blank lines end the paragraph.
+    if (line.trim() === '') {
+      i++;
+      continue;
+    }
+    const paraLines = [];
+    while (
+      i < lines.length &&
+      lines[i].trim() !== '' &&
+      !isBullet(lines[i]) &&
+      !isNumbered(lines[i])
+    ) {
+      paraLines.push(lines[i]);
+      i++;
+    }
+    out.push('<p>' + paraLines.join('<br>') + '</p>');
+  }
+
+  let html = out.join('');
+
+  // 6) Restore inline code placeholders.
+  html = html.replace(/\u0000CODE(\d+)\u0000/g, (_, idx) => {
+    return '<code>' + codeStore[Number(idx)] + '</code>';
+  });
+
+  return html;
+}
+</script>
+
+<script>
+// ═══════════════════════════════════════════════════════════════════
+// MOBILE NAV (Part 5E-7)
+// ═══════════════════════════════════════════════════════════════════
+
+function initMobileNav() {
+  // ── App-switch strip (Money OS vs PropIQ) ───────────────────────
+  // Buttons in the bottom app-switch strip carry data-app="money"
+  // or data-app="property".
+  const appBtns = document.querySelectorAll('.mob-app-switch [data-app], #mob-app-switch [data-app]');
+  appBtns.forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.preventDefault();
+      const app = btn.dataset.app;
+      if (!app) return;
+      if (typeof showApp === 'function') showApp(app);
+      setMobileActiveApp(app);
+    });
+  });
+
+  // ── Section nav buttons ─────────────────────────────────────────
+  // Money OS section nav items use data-panel="dashboard" etc.
+  const panelBtns = document.querySelectorAll('.mob-nav-item[data-panel], #mob-nav [data-panel]');
+  panelBtns.forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.preventDefault();
+      const panel = btn.dataset.panel;
+      if (!panel) return;
+      if (typeof showPanel === 'function') showPanel(panel);
+      setMobileActivePanel(panel);
+    });
+  });
+
+  // PropIQ section nav items use data-piq="search" / "compare" etc.
+  const piqBtns = document.querySelectorAll('.mob-nav-item[data-piq], #mob-nav [data-piq]');
+  piqBtns.forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.preventDefault();
+      const view = btn.dataset.piq;
+      if (!view) return;
+      if (typeof showPiqPanel === 'function') showPiqPanel(view);
+      setMobileActivePiq(view);
+    });
+  });
+
+  // ── Legacy ID pattern (mn-dashboard / mn-cashflow / etc.) ───────
+  // The horizon-os-v2 reference used #mn-<panel>, so we wire those
+  // too in case the HTML uses the older naming.
+  ['dashboard', 'cashflow', 'networth', 'assets', 'vacation', 'retirement', 'settings']
+    .forEach(p => {
+      const el = document.getElementById('mn-' + p);
+      if (el && !el.__wired) {
+        el.__wired = true;
+        el.addEventListener('click', (e) => {
+          e.preventDefault();
+          if (typeof showPanel === 'function') showPanel(p);
+          setMobileActivePanel(p);
+        });
+      }
+    });
+
+  // Set initial active state based on router state
+  if (typeof currentApp !== 'undefined') setMobileActiveApp(currentApp);
+  if (typeof currentPanel !== 'undefined') setMobileActivePanel(currentPanel);
+  if (typeof currentPiqView !== 'undefined') setMobileActivePiq(currentPiqView);
+}
+
+function setMobileActiveApp(app) {
+  document.querySelectorAll('.mob-app-switch [data-app], #mob-app-switch [data-app]')
+    .forEach(btn => btn.classList.toggle('active', btn.dataset.app === app));
+  // Show/hide the matching section-nav strip
+  const moneyStrip = document.getElementById('mob-nav-money');
+  const propStrip  = document.getElementById('mob-nav-property');
+  if (moneyStrip) moneyStrip.style.display = app === 'money' ? '' : 'none';
+  if (propStrip)  propStrip.style.display  = app === 'property' ? '' : 'none';
+}
+
+function setMobileActivePanel(panel) {
+  document.querySelectorAll('.mob-nav-item[data-panel], #mob-nav [data-panel]')
+    .forEach(btn => btn.classList.toggle('active', btn.dataset.panel === panel));
+  // Also update legacy #mn-<panel> IDs
+  ['dashboard', 'cashflow', 'networth', 'assets', 'vacation', 'retirement', 'settings']
+    .forEach(p => {
+      const el = document.getElementById('mn-' + p);
+      if (el) el.classList.toggle('active', p === panel);
+    });
+}
+
+function setMobileActivePiq(view) {
+  document.querySelectorAll('.mob-nav-item[data-piq], #mob-nav [data-piq]')
+    .forEach(btn => btn.classList.toggle('active', btn.dataset.piq === view));
+}
+
+// Auto-initialize on load so the nav works without manual wiring
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', initMobileNav);
+} else {
+  initMobileNav();
+}
+</script>
+
+<script>
+// ═══════════════════════════════════════════════════════════════════
+// GLOBAL EVENT LISTENERS (Part 5E-8)
+// ═══════════════════════════════════════════════════════════════════
+
+function initGlobalListeners() {
+  // Helper — bind once, guarded by a flag so re-calling initGlobalListeners
+  // from a hot reload or second DOMContentLoaded won't double-wire.
+  function on(el, evt, fn) {
+    if (!el) return;
+    const key = '__h_' + evt;
+    if (el[key]) return;
+    el[key] = true;
+    el.addEventListener(evt, fn);
+  }
+
+  // ── App switcher tabs ──────────────────────────────────────────
+  // Any element with .app-tab[data-app] or #app-tabs [data-app]
+  document.querySelectorAll('.app-tab[data-app], #app-tabs [data-app]').forEach(tab => {
+    on(tab, 'click', (e) => {
+      e.preventDefault();
+      const app = tab.dataset.app;
+      if (app && typeof showApp === 'function') showApp(app);
+    });
+  });
+
+  // ── Sidebar nav items (Money OS) ───────────────────────────────
+  // .nav-item[data-panel] — desktop sidebar
+  document.querySelectorAll('.nav-item[data-panel]').forEach(item => {
+    on(item, 'click', (e) => {
+      e.preventDefault();
+      const panel = item.dataset.panel;
+      if (panel && typeof showPanel === 'function') showPanel(panel);
+    });
+  });
+  // Legacy #nav-<panel> IDs from horizon-os-v2 reference
+  ['dashboard', 'cashflow', 'networth', 'assets', 'vacation', 'retirement', 'settings']
+    .forEach(p => {
+      const el = document.getElementById('nav-' + p);
+      on(el, 'click', (e) => {
+        e.preventDefault();
+        if (typeof showPanel === 'function') showPanel(p);
+      });
+    });
+
+  // ── Theme toggle ───────────────────────────────────────────────
+  document.querySelectorAll('.theme-toggle, #theme-toggle, #theme-toggle-btn').forEach(btn => {
+    on(btn, 'click', (e) => {
+      e.preventDefault();
+      if (typeof toggleTheme === 'function') toggleTheme();
+    });
+  });
+
+  // ── Key badge (opens the key modal) ────────────────────────────
+  document.querySelectorAll('#key-badge, .key-badge-btn, #key-badge-btn').forEach(el => {
+    on(el, 'click', (e) => {
+      e.preventDefault();
+      if (typeof openKeyModal === 'function') openKeyModal();
+    });
+  });
+
+  // ── Export / import buttons ────────────────────────────────────
+  const expBtn = document.getElementById('export-btn') || document.getElementById('set-export-btn');
+  on(expBtn, 'click', (e) => {
+    e.preventDefault();
+    if (typeof exportState === 'function') exportState();
+  });
+
+  const impBtn = document.getElementById('import-btn') || document.getElementById('set-import-btn');
+  on(impBtn, 'click', (e) => {
+    e.preventDefault();
+    const file = document.getElementById('import-file') || document.getElementById('set-import-file');
+    if (file) file.click();
+  });
+  const impFile = document.getElementById('import-file') || document.getElementById('set-import-file');
+  on(impFile, 'change', (e) => {
+    if (typeof importState === 'function') importState(e.target);
+  });
+
+  // ── Modal close buttons ────────────────────────────────────────
+  // Any element with .modal-close or data-modal-close inside a modal
+  // closes the modal it belongs to. Special-case the key modal.
+  document.querySelectorAll('#key-modal .modal-close, #key-modal [data-modal-close], #key-modal-close').forEach(btn => {
+    on(btn, 'click', (e) => {
+      e.preventDefault();
+      if (typeof closeKeyModal === 'function') closeKeyModal();
+    });
+  });
+  // Click-outside-to-close for the key modal backdrop
+  const keyModal = document.getElementById('key-modal');
+  on(keyModal, 'click', (e) => {
+    if (e.target === keyModal && typeof closeKeyModal === 'function') closeKeyModal();
+  });
+  // Save button inside the key modal
+  const keySaveBtn = document.getElementById('key-save-btn') || document.getElementById('save-keys-btn');
+  on(keySaveBtn, 'click', (e) => {
+    e.preventDefault();
+    if (typeof saveKeys === 'function') saveKeys();
+  });
+
+  // ── AI FAB button ──────────────────────────────────────────────
+  document.querySelectorAll('#chat-fab, .chat-fab, #ai-fab').forEach(fab => {
+    on(fab, 'click', (e) => {
+      e.preventDefault();
+      if (typeof toggleChat === 'function') toggleChat();
+      else if (typeof openChat === 'function') openChat();
+    });
+  });
+  // Chat panel close button
+  document.querySelectorAll('#chat-close, .chat-close, #chat-panel .modal-close').forEach(btn => {
+    on(btn, 'click', (e) => {
+      e.preventDefault();
+      if (typeof closeChat === 'function') closeChat();
+    });
+  });
+
+  // ── Chat send (click + Enter) ──────────────────────────────────
+  const chatSendBtn = document.getElementById('chat-send') || document.getElementById('chat-send-btn');
+  on(chatSendBtn, 'click', (e) => {
+    e.preventDefault();
+    if (typeof sendChat === 'function') sendChat();
+  });
+  // Enter-to-send is already wired by Part 5 via a global keydown
+  // listener on #chat-input; no duplicate binding here.
+
+  // ── Market toggle buttons (PropIQ) ─────────────────────────────
+  document.querySelectorAll('[data-market], .market-toggle-btn, #tog-ke, #tog-se').forEach(btn => {
+    on(btn, 'click', (e) => {
+      e.preventDefault();
+      let m = btn.dataset.market;
+      if (!m) {
+        if (btn.id === 'tog-ke') m = 'ke';
+        else if (btn.id === 'tog-se') m = 'se';
+      }
+      if (m && typeof setMarket === 'function') setMarket(m);
+    });
+  });
+
+  // ── Quick tag chips ────────────────────────────────────────────
+  // Static chips outside the dynamic #piq-quick-tags strip — support
+  // data-tag="Westlands" attribute. (Dynamic tags already have inline
+  // onclick wired by setMarket().)
+  document.querySelectorAll('.qtag[data-tag]').forEach(chip => {
+    on(chip, 'click', (e) => {
+      e.preventDefault();
+      const term = chip.dataset.tag;
+      if (term && typeof piqQuickSearch === 'function') piqQuickSearch(term);
+    });
+  });
+
+  // ── Search input (Enter key) + search button ──────────────────
+  const searchInput = document.getElementById('piq-search-input') || document.getElementById('search-input');
+  on(searchInput, 'keydown', (e) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      if (typeof piqSearch === 'function') piqSearch();
+    }
+  });
+  const searchBtn = document.getElementById('piq-search-btn') || document.getElementById('search-btn');
+  on(searchBtn, 'click', (e) => {
+    e.preventDefault();
+    if (typeof piqSearch === 'function') piqSearch();
+  });
+
+  // ── Compare button ─────────────────────────────────────────────
+  const cmpBtn = document.getElementById('piq-compare-btn') || document.getElementById('compare-btn');
+  on(cmpBtn, 'click', (e) => {
+    e.preventDefault();
+    if (typeof piqCompare === 'function') piqCompare(4);
+  });
+
+  // ── Clear history button ───────────────────────────────────────
+  const clrBtn = document.getElementById('piq-clear-history') || document.getElementById('clear-history-btn');
+  on(clrBtn, 'click', (e) => {
+    e.preventDefault();
+    if (typeof piqClearHistory === 'function') piqClearHistory();
+  });
+
+  // ── Escape key closes modals / panels ──────────────────────────
+  if (!document.__h_escListener) {
+    document.__h_escListener = true;
+    document.addEventListener('keydown', (e) => {
+      if (e.key !== 'Escape') return;
+      const km = document.getElementById('key-modal');
+      if (km && km.classList.contains('open')) {
+        if (typeof closeKeyModal === 'function') closeKeyModal();
+        return;
+      }
+      const cp = document.getElementById('chat-panel');
+      if (cp && cp.classList.contains('open')) {
+        if (typeof closeChat === 'function') closeChat();
+      }
+    });
+  }
+}
+
+// Auto-initialize on load
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', initGlobalListeners);
+} else {
+  initGlobalListeners();
+}
+</script>
+
+<script>
+// ═══════════════════════════════════════════════════════════════════
+// BOOT (Part 5E-9) — init() master boot function
+// ═══════════════════════════════════════════════════════════════════
+
+function init() {
+  // 1) Load state from localStorage (horizon-unified-v1)
+  if (typeof loadState === 'function') loadState();
+
+  // 2) Apply saved theme
+  if (typeof ensureDisplayState === 'function') ensureDisplayState();
+  if (typeof setTheme === 'function' && state.display && state.display.theme) {
+    setTheme(state.display.theme);
+  }
+
+  // 3) Update the API key badge (green/amber based on stored keys)
+  if (typeof updateKeyBadge === 'function') updateKeyBadge();
+
+  // 4) Auto-connect Firebase if a saved config is present
+  const fbUrl  = localStorage.getItem('horizon-fb-url');
+  const fbKey  = localStorage.getItem('horizon-fb-key');
+  const fbUser = localStorage.getItem('horizon-fb-user');
+  if (fbUrl && fbKey && typeof initFirebase === 'function'
+      && typeof firebase !== 'undefined') {
+    // Populate the form fields so initFirebase() can read them
+    const urlEl  = document.getElementById('fbUrl');
+    const keyEl  = document.getElementById('fbKey');
+    const userEl = document.getElementById('fbUser');
+    if (urlEl)  urlEl.value  = fbUrl;
+    if (keyEl)  keyEl.value  = fbKey;
+    if (userEl) userEl.value = fbUser || 'default';
+    try { initFirebase(); } catch (e) { /* non-fatal */ }
+  }
+
+  // 5) Live ticker bar
+  if (typeof updateTicker === 'function') updateTicker();
+
+  // 6) Mobile bottom nav wiring
+  if (typeof initMobileNav === 'function') initMobileNav();
+
+  // 7) Hash-based routing — read the URL fragment and dispatch
+  const hash = (location.hash || '').trim();
+  if (hash && hash.startsWith('#/')) {
+    if (typeof handleRoute === 'function') {
+      handleRoute();
+    } else {
+      // Fallback parse if handleRoute isn't available
+      const parts = hash.replace('#/', '').split('/');
+      const app = parts[0] || 'money';
+      const sub = parts[1] || (app === 'money' ? 'dashboard' : 'search');
+      if (typeof showApp === 'function') showApp(app);
+      if (app === 'money' && typeof showPanel === 'function') showPanel(sub);
+      if (app === 'property' && typeof showPiqPanel === 'function') showPiqPanel(sub);
+    }
+  } else {
+    // 8) Default route when no hash is present
+    if (typeof showApp === 'function') showApp('money');
+    if (typeof showPanel === 'function') showPanel('dashboard');
+  }
+
+  // 9) Render whichever panel is now active
+  if (typeof renderActivePanel === 'function') renderActivePanel();
+
+  // Also render PropIQ history sidebar so it's populated on boot
+  if (typeof piqRenderHistory === 'function') piqRenderHistory();
+
+  // Apply saved PropIQ market (updates banner, tags, toggle state)
+  if (typeof ensurePropiqState === 'function') ensurePropiqState();
+  if (typeof setMarket === 'function'
+      && state && state.propiq && state.propiq.market) {
+    setMarket(state.propiq.market);
+  }
+
+  // 10) Wire all global event listeners
+  if (typeof initGlobalListeners === 'function') initGlobalListeners();
+}
+
+// Kick off on DOMContentLoaded (or immediately if already parsed)
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', init);
+} else {
+  init();
+}
+</script>
+
+</body>
+</html>
