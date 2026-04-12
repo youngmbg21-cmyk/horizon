@@ -3081,9 +3081,11 @@ window.syncYearCascade=function(){
 // Helper: build runway Chart.js data from simulation
 function buildRunwayChartData(nums) {
   // We need per-year: portfolio balance (line), portfolio withdrawal (bar), pension income (bar)
-  // Re-run simulation year by year to get annual income breakdown
+  // Re-run simulation year by year to get annual income breakdown.
+  // The x-axis ends at the user's life expectancy — no bars or data
+  // points are emitted beyond it.
   const lifeExp = state.lifeExp||90;
-  const maxAge = Math.max(lifeExp + 10, (nums.runoutAge||0) + 5, state.retirementAge + 35);
+  const maxAge = lifeExp;
   const pensions = getPensionAssets();
   const taxRate = nums.taxRate;
   const realRate = Math.max(0.001,(state.retirementPostGrowth||4)-state.inflationRate)/100/12;
@@ -3432,9 +3434,11 @@ function renderRunwayChart(){
   const verticalLinesPlugin = {
     id:'vertLines',
     beforeDatasetsDraw(chart){
-      // Shade the "surplus zone" — the portion of the chart area AFTER
-      // life expectancy where the portfolio is still positive. Visual cue
-      // that the plan is funded beyond the planning horizon.
+      // The x-axis now ends at life expectancy, so we surface the
+      // "surplus" annotation as a top-right badge inside the plot area
+      // whenever the portfolio is still positive at life-exp. The old
+      // behavior shaded the strip from life-exp → right edge, which is
+      // zero width once the chart is trimmed.
       const xAxis=chart.scales.x;
       const yAxis=chart.scales.y1;
       if(!xAxis||!yAxis) return;
@@ -3444,19 +3448,35 @@ function renderRunwayChart(){
       if(balAtLifeExp <= 0) return;
       const ctx2 = chart.ctx;
       ctx2.save();
-      const x0 = xAxis.getPixelForValue(leIdx);
-      const x1 = xAxis.right;
-      const grd = ctx2.createLinearGradient(x0, 0, x1, 0);
-      grd.addColorStop(0, 'rgba(0,232,160,0.14)');
-      grd.addColorStop(1, 'rgba(0,232,160,0.03)');
-      ctx2.fillStyle = grd;
-      ctx2.fillRect(x0, yAxis.top, x1 - x0, yAxis.bottom - yAxis.top);
-      // Zone label
-      ctx2.fillStyle='rgba(0,232,160,0.85)';
-      ctx2.font='bold 10px JetBrains Mono';
-      ctx2.textAlign='right';
-      ctx2.fillText('SURPLUS ZONE', x1-8, yAxis.top+14);
-      ctx2.textAlign='left';
+      // Soft full-area tint to communicate "plan is funded".
+      ctx2.fillStyle = 'rgba(0,232,160,0.04)';
+      ctx2.fillRect(xAxis.left, yAxis.top, xAxis.right - xAxis.left, yAxis.bottom - yAxis.top);
+      // Top-right pill badge
+      const label = 'SURPLUS AT LIFE EXP';
+      ctx2.font = 'bold 10px JetBrains Mono';
+      const tw = ctx2.measureText(label).width;
+      const padX = 8, padY = 5;
+      const bx = xAxis.right - tw - padX*2 - 4;
+      const by = yAxis.top + 6;
+      ctx2.fillStyle = 'rgba(0,232,160,0.18)';
+      ctx2.strokeStyle = 'rgba(0,232,160,0.55)';
+      ctx2.lineWidth = 1;
+      ctx2.beginPath();
+      const r = 4;
+      ctx2.moveTo(bx+r, by);
+      ctx2.lineTo(bx+tw+padX*2-r, by);
+      ctx2.quadraticCurveTo(bx+tw+padX*2, by, bx+tw+padX*2, by+r);
+      ctx2.lineTo(bx+tw+padX*2, by+padY*2+10-r);
+      ctx2.quadraticCurveTo(bx+tw+padX*2, by+padY*2+10, bx+tw+padX*2-r, by+padY*2+10);
+      ctx2.lineTo(bx+r, by+padY*2+10);
+      ctx2.quadraticCurveTo(bx, by+padY*2+10, bx, by+padY*2+10-r);
+      ctx2.lineTo(bx, by+r);
+      ctx2.quadraticCurveTo(bx, by, bx+r, by);
+      ctx2.closePath();
+      ctx2.fill();
+      ctx2.stroke();
+      ctx2.fillStyle = 'rgba(0,232,160,0.95)';
+      ctx2.fillText(label, bx+padX, by+padY+9);
       ctx2.restore();
     },
     afterDraw(chart){
@@ -3465,6 +3485,12 @@ function renderRunwayChart(){
       const yAxis=chart.scales.y1;
       if(!xAxis||!yAxis) return;
       ctx2.save();
+      // Helper: choose left or right side for a marker label so it never
+      // clips off the chart edge. Returns the {bx, tx} for label box.
+      const labelSide = (x, w) => {
+        if(x + 4 + w + 4 <= xAxis.right) return { bx: x + 4, tx: x + 9 };
+        return { bx: x - 4 - w, tx: x - 4 - w + 5 };
+      };
       // Life expectancy line (amber dashed, consistent with reference design)
       const leIdx=cdata.labels.indexOf(lifeExp);
       if(leIdx>=0){
@@ -3478,13 +3504,15 @@ function renderRunwayChart(){
         ctx2.font='bold 10px JetBrains Mono';
         const label = 'Life exp. '+lifeExp;
         const w = ctx2.measureText(label).width + 10;
+        const { bx, tx } = labelSide(x, w);
         ctx2.fillStyle='rgba(245,166,35,0.18)';
-        ctx2.fillRect(x+4, yAxis.top+4, w, 16);
+        ctx2.fillRect(bx, yAxis.top+4, w, 16);
         ctx2.fillStyle='rgba(245,166,35,0.95)';
-        ctx2.fillText(label, x+9, yAxis.top+16);
+        ctx2.fillText(label, tx, yAxis.top+16);
       }
-      // Runout line (red solid)
-      if(nums.runoutAge&&cdata.runoutIdx>=0){
+      // Runout line (red solid) — only drawn if depletion happens at or
+      // before life expectancy (the chart no longer extends past it).
+      if(nums.runoutAge && nums.runoutAge <= lifeExp && cdata.runoutIdx>=0){
         const x=xAxis.getPixelForValue(cdata.runoutIdx);
         ctx2.beginPath(); ctx2.setLineDash([]);
         ctx2.strokeStyle='rgba(255,77,109,0.85)'; ctx2.lineWidth=2;
@@ -3493,10 +3521,11 @@ function renderRunwayChart(){
         ctx2.font='bold 10px JetBrains Mono';
         const lbl='Depletes ~'+Math.round(nums.runoutAge);
         const w = ctx2.measureText(lbl).width + 10;
+        const side = labelSide(x, w);
         ctx2.fillStyle='rgba(255,77,109,0.2)';
-        ctx2.fillRect(x+4, yAxis.top+24, w, 16);
+        ctx2.fillRect(side.bx, yAxis.top+24, w, 16);
         ctx2.fillStyle='rgba(255,77,109,0.95)';
-        ctx2.fillText(lbl, x+9, yAxis.top+36);
+        ctx2.fillText(lbl, side.tx, yAxis.top+36);
       }
       // Retire start dot
       const x0=xAxis.getPixelForValue(0);
