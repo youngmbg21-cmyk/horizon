@@ -1211,5 +1211,317 @@ function renderActivePanel() {
 }
 </script>
 
+<script>
+// ═══════════════════════════════════════════════════════════════════
+// MONEY OS — PANEL RENDERERS (Part 3)
+// ═══════════════════════════════════════════════════════════════════
+
+let charts = {};
+let dashCfView = 'month'; // 'month' | '12mo'
+
+function fmtCur(n, cur) {
+  const c = cur || state.currency || 'SEK';
+  const sym = CSYM[c] || '';
+  const rate = state.exchangeRates[c] || 1;
+  const v = Math.round(n * rate);
+  return sym + ' ' + v.toLocaleString('en-US');
+}
+
+function setEl(id, html) {
+  const el = document.getElementById(id);
+  if (el) el.innerHTML = html;
+}
+
+function setVal(id, val) {
+  const el = document.getElementById(id);
+  if (el) el.value = val;
+}
+
+// ───────────────────────────────────────────────────────────────────
+// DASHBOARD
+// ───────────────────────────────────────────────────────────────────
+function renderDashboard() {
+  const inc = calcIncome();
+  const exp = calcExpenses();
+  const sav = calcSavings();
+  const nw = calcNetWorth();
+  const egg = calcNestEgg();
+  const cf = calcCashFlow();
+
+  // KPI grid
+  setEl('kpi-income', fmtCur(inc.total));
+  setEl('kpi-expenses', fmtCur(exp.total));
+  setEl('kpi-surplus', fmtCur(sav.surplus));
+  setEl('kpi-savings-rate', sav.savingsRate.toFixed(1) + '%');
+  setEl('kpi-networth', fmtCur(nw.netWorth));
+  setEl('kpi-nestegg', fmtCur(egg.finalNominal));
+  setEl('kpi-funfund', fmtCur(sav.funFund));
+  setEl('kpi-paid', exp.paid.length + '/' + exp.items.length);
+
+  // Ticker quote
+  setEl('dash-ticker', state.tickerQuote || '');
+
+  // Cash flow summary toggle (month vs 12-mo)
+  const cfSummary = document.getElementById('dash-cf-summary');
+  if (cfSummary) {
+    if (dashCfView === 'month') {
+      cfSummary.innerHTML = `
+        <div class="cf-row"><span>Income</span><b>${fmtCur(inc.total)}</b></div>
+        <div class="cf-row"><span>Expenses</span><b>${fmtCur(exp.total)}</b></div>
+        <div class="cf-row"><span>Surplus</span><b>${fmtCur(sav.surplus)}</b></div>
+        <div class="cf-row"><span>Fun Fund</span><b>${fmtCur(sav.funFund)}</b></div>
+      `;
+    } else {
+      cfSummary.innerHTML = `
+        <div class="cf-row"><span>Avg Income</span><b>${fmtCur(cf.avgIncome)}</b></div>
+        <div class="cf-row"><span>Avg Expenses</span><b>${fmtCur(cf.avgExpenses)}</b></div>
+        <div class="cf-row"><span>Avg Surplus</span><b>${fmtCur(cf.avgSurplus)}</b></div>
+        <div class="cf-row"><span>12-mo Saved</span><b>${fmtCur(cf.cumSavings)}</b></div>
+      `;
+    }
+  }
+
+  // Toggle buttons active state
+  document.querySelectorAll('.dash-cf-toggle').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.view === dashCfView);
+  });
+
+  // Savings chart (Chart.js)
+  const chartEl = document.getElementById('dash-savings-chart');
+  if (chartEl && typeof Chart !== 'undefined') {
+    if (charts.dashSavings) charts.dashSavings.destroy();
+    charts.dashSavings = new Chart(chartEl, {
+      type: 'line',
+      data: {
+        labels: cf.months.map(m => m.label),
+        datasets: [{
+          label: 'Cumulative Savings',
+          data: cf.months.map(m => m.cumSavings),
+          borderColor: '#00e8a0',
+          backgroundColor: 'rgba(0,232,160,0.1)',
+          tension: 0.3,
+          fill: true
+        }, {
+          label: 'Monthly Surplus',
+          data: cf.months.map(m => m.surplus),
+          borderColor: '#4d8fff',
+          backgroundColor: 'transparent',
+          tension: 0.3,
+          borderDash: [4, 4]
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { legend: { labels: { color: '#888', font: { size: 10 } } } },
+        scales: {
+          x: { ticks: { color: '#666', font: { size: 9 } }, grid: { color: '#ffffff08' } },
+          y: { ticks: { color: '#666', font: { size: 9 } }, grid: { color: '#ffffff08' } }
+        }
+      }
+    });
+  }
+
+  // Nest egg milestone progress bars
+  const milestones = [1000000, 2500000, 5000000, 10000000, 25000000];
+  const currentEgg = egg.finalNominal;
+  const milestonesEl = document.getElementById('dash-milestones');
+  if (milestonesEl) {
+    milestonesEl.innerHTML = milestones.map(m => {
+      const pct = Math.min(100, (currentEgg / m) * 100);
+      const reached = currentEgg >= m;
+      return `
+        <div class="milestone ${reached ? 'reached' : ''}">
+          <div class="milestone-label">
+            <span>${fmtCur(m)}</span>
+            <span>${pct.toFixed(0)}%</span>
+          </div>
+          <div class="milestone-bar">
+            <div class="milestone-fill" style="width:${pct}%"></div>
+          </div>
+        </div>
+      `;
+    }).join('');
+  }
+}
+
+function setDashCfView(view) {
+  dashCfView = view;
+  renderDashboard();
+}
+
+// ───────────────────────────────────────────────────────────────────
+// CASH FLOW
+// ───────────────────────────────────────────────────────────────────
+function renderCashFlow() {
+  const inc = calcIncome();
+  const exp = calcExpenses();
+  const sav = calcSavings();
+  const cf = calcCashFlow();
+
+  // Month strip — 12 months centered on current selection
+  const stripEl = document.getElementById('cf-month-strip');
+  if (stripEl) {
+    const [selY, selM] = state.selectedMonth.split('-').map(Number);
+    const strip = [];
+    for (let i = -6; i <= 5; i++) {
+      const d = new Date(selY, selM - 1 + i, 1);
+      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+      const active = key === state.selectedMonth;
+      strip.push(`
+        <div class="cf-month ${active ? 'active' : ''}" onclick="selectMonth('${key}')">
+          <div class="cf-month-mn">${MN[d.getMonth()]}</div>
+          <div class="cf-month-yr">${d.getFullYear()}</div>
+        </div>
+      `);
+    }
+    stripEl.innerHTML = strip.join('');
+  }
+
+  // Income line items with paid checkboxes + remove buttons
+  const incEl = document.getElementById('cf-income-list');
+  if (incEl) {
+    incEl.innerHTML = inc.items.map(i => `
+      <div class="line-item">
+        <input type="checkbox" ${i.paid ? 'checked' : ''} onchange="togglePaid('income','${i.id}')">
+        <input type="text" value="${i.name}" onchange="updateLineItem('income','${i.id}','name',this.value)">
+        <input type="number" value="${i.amount}" onchange="updateLineItem('income','${i.id}','amount',Number(this.value))">
+        <button class="btn-remove" onclick="removeLineItem('income','${i.id}')">\u2715</button>
+      </div>
+    `).join('') + `
+      <button class="btn-add" onclick="addLineItem('income')">+ Add income</button>
+    `;
+  }
+
+  // Expense line items
+  const expEl = document.getElementById('cf-expense-list');
+  if (expEl) {
+    expEl.innerHTML = exp.items.map(i => `
+      <div class="line-item ${i.paid ? 'is-paid' : ''}">
+        <input type="checkbox" ${i.paid ? 'checked' : ''} onchange="togglePaid('expenses','${i.id}')">
+        <input type="text" value="${i.name}" onchange="updateLineItem('expenses','${i.id}','name',this.value)">
+        <input type="number" value="${i.amount}" onchange="updateLineItem('expenses','${i.id}','amount',Number(this.value))">
+        <button class="btn-remove" onclick="removeLineItem('expenses','${i.id}')">\u2715</button>
+      </div>
+    `).join('') + `
+      <button class="btn-add" onclick="addLineItem('expenses')">+ Add expense</button>
+    `;
+  }
+
+  // Totals
+  setEl('cf-income-total', fmtCur(inc.total));
+  setEl('cf-expense-total', fmtCur(exp.total));
+  setEl('cf-surplus-total', fmtCur(sav.surplus));
+  setEl('cf-paid-total', fmtCur(exp.paidTotal));
+  setEl('cf-unpaid-total', fmtCur(exp.unpaidTotal));
+
+  // Savings allocation sliders
+  const allocEl = document.getElementById('cf-allocation');
+  if (allocEl) {
+    const total = sav.baseSavings;
+    const emPct = total > 0 ? (sav.allocation.emergency / total * 100) : 50;
+    const nePct = total > 0 ? (sav.allocation.nestEgg / total * 100) : 30;
+    const ffPct = total > 0 ? (sav.allocation.funFund / total * 100) : 20;
+    allocEl.innerHTML = `
+      <div class="alloc-row">
+        <label>Base savings</label>
+        <input type="number" value="${sav.baseSavings}" onchange="updateBaseSavings(Number(this.value))">
+        <span>${fmtCur(sav.baseSavings)}</span>
+      </div>
+      <div class="alloc-slider">
+        <label>Emergency (${emPct.toFixed(0)}%)</label>
+        <div class="slider-track"><div class="slider-fill" style="width:${emPct}%;background:#f5a623"></div></div>
+        <span>${fmtCur(sav.allocation.emergency)}</span>
+      </div>
+      <div class="alloc-slider">
+        <label>Nest Egg (${nePct.toFixed(0)}%)</label>
+        <div class="slider-track"><div class="slider-fill" style="width:${nePct}%;background:#00e8a0"></div></div>
+        <span>${fmtCur(sav.allocation.nestEgg)}</span>
+      </div>
+      <div class="alloc-slider">
+        <label>Fun Fund (${ffPct.toFixed(0)}%)</label>
+        <div class="slider-track"><div class="slider-fill" style="width:${ffPct}%;background:#4d8fff"></div></div>
+        <span>${fmtCur(sav.allocation.funFund)}</span>
+      </div>
+    `;
+  }
+
+  // 12-month breakdown table
+  const tblEl = document.getElementById('cf-12mo-table');
+  if (tblEl) {
+    tblEl.innerHTML = `
+      <table class="dt">
+        <thead>
+          <tr>
+            <th>Month</th>
+            <th>Income</th>
+            <th>Expenses</th>
+            <th>Surplus</th>
+            <th>Cumulative</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${cf.months.map(m => `
+            <tr>
+              <td>${m.label}</td>
+              <td>${fmtCur(m.income)}</td>
+              <td>${fmtCur(m.expenses)}</td>
+              <td class="${m.surplus >= 0 ? 'pos' : 'neg'}">${fmtCur(m.surplus)}</td>
+              <td>${fmtCur(m.cumSavings)}</td>
+            </tr>
+          `).join('')}
+          <tr class="tr-total">
+            <td><b>Avg</b></td>
+            <td><b>${fmtCur(cf.avgIncome)}</b></td>
+            <td><b>${fmtCur(cf.avgExpenses)}</b></td>
+            <td><b>${fmtCur(cf.avgSurplus)}</b></td>
+            <td><b>${fmtCur(cf.cumSavings)}</b></td>
+          </tr>
+        </tbody>
+      </table>
+    `;
+  }
+}
+
+function selectMonth(key) {
+  state.selectedMonth = key;
+  saveState();
+  renderCashFlow();
+}
+
+function togglePaid(kind, id) {
+  const list = state[kind];
+  const item = list.find(x => x.id === id);
+  if (item) { item.paid = !item.paid; saveState(); renderCashFlow(); }
+}
+
+function updateLineItem(kind, id, field, value) {
+  const list = state[kind];
+  const item = list.find(x => x.id === id);
+  if (item) { item[field] = value; saveState(); renderCashFlow(); }
+}
+
+function addLineItem(kind) {
+  const list = state[kind];
+  const prefix = kind === 'income' ? 'i' : 'e';
+  const id = prefix + (Date.now());
+  list.push({ id, name: 'New ' + kind, amount: 0, paid: false });
+  saveState();
+  renderCashFlow();
+}
+
+function removeLineItem(kind, id) {
+  state[kind] = state[kind].filter(x => x.id !== id);
+  saveState();
+  renderCashFlow();
+}
+
+function updateBaseSavings(val) {
+  state.baseSavings = val;
+  saveState();
+  renderCashFlow();
+}
+</script>
+
 </body>
 </html>
