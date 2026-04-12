@@ -519,6 +519,154 @@
       </div>
     </div>
 
+    <!-- ════════════════ SETTINGS ════════════════ -->
+    <div class="panel" id="panel-settings">
+      <div class="ph">
+        <div class="ph-tag">CONFIGURATION</div>
+        <div class="ph-title">Settings</div>
+        <div class="ph-sub">Profile, display, exchange rates, sync, and data management.</div>
+      </div>
+
+      <div class="two-col">
+        <!-- PROFILE -->
+        <div class="card">
+          <div class="card-title">👤 Profile</div>
+          <div class="field">
+            <label>Name</label>
+            <input type="text" id="set-name" placeholder="Your name" oninput="updateSettingField('name', this.value)">
+          </div>
+          <div class="field">
+            <label>Your Age</label>
+            <input type="number" class="mono" id="set-age" placeholder="35" oninput="updateSettingField('age', +this.value)">
+          </div>
+          <div class="field">
+            <label>Partner Age</label>
+            <input type="number" class="mono" id="set-partner-age" placeholder="35" oninput="updateSettingField('partnerAge', +this.value)">
+          </div>
+          <div class="field">
+            <label>Currency</label>
+            <select id="set-currency" onchange="updateSettingField('currency', this.value)">
+              <option value="SEK">SEK kr</option>
+              <option value="USD">USD $</option>
+              <option value="EUR">EUR €</option>
+              <option value="GBP">GBP £</option>
+              <option value="KES">KES KSh</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- DISPLAY -->
+        <div class="card">
+          <div class="card-title">🖥 Display</div>
+          <div class="setting-row">
+            <div class="s-lbl">Dark Mode</div>
+            <div class="s-ctrl">
+              <label class="toggle">
+                <input type="checkbox" id="set-dark-mode" onchange="setTheme(this.checked ? 'dark' : 'light')">
+                <div class="toggle-track"></div>
+              </label>
+            </div>
+          </div>
+          <div class="setting-row">
+            <div class="s-lbl">Real Nest Egg (inflation-adjusted)</div>
+            <div class="s-ctrl">
+              <label class="toggle">
+                <input type="checkbox" id="set-nestegg-real" onchange="updateSettingField('nestEggReal', this.checked)">
+                <div class="toggle-track"></div>
+              </label>
+            </div>
+          </div>
+          <div class="field">
+            <label>Language</label>
+            <select id="set-language" onchange="updateSettingField('language', this.value)">
+              <option value="en">English</option>
+              <option value="sv">Svenska</option>
+              <option value="de">Deutsch</option>
+              <option value="fr">Français</option>
+              <option value="es">Español</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <!-- EXCHANGE RATES -->
+      <div class="card">
+        <div class="card-title">💱 Exchange Rates (base SEK 1)</div>
+        <div id="set-exchange-rates">
+          <div class="three-col">
+            <div class="field">
+              <label>SEK</label>
+              <input type="number" step=".001" class="mono" id="rate-SEK" value="1" readonly oninput="updateExchangeRate('SEK', +this.value)">
+            </div>
+            <div class="field">
+              <label>USD</label>
+              <input type="number" step=".001" class="mono" id="rate-USD" placeholder="0.095" oninput="updateExchangeRate('USD', +this.value)">
+            </div>
+            <div class="field">
+              <label>EUR</label>
+              <input type="number" step=".001" class="mono" id="rate-EUR" placeholder="0.087" oninput="updateExchangeRate('EUR', +this.value)">
+            </div>
+            <div class="field">
+              <label>GBP</label>
+              <input type="number" step=".001" class="mono" id="rate-GBP" placeholder="0.075" oninput="updateExchangeRate('GBP', +this.value)">
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- FIREBASE SYNC -->
+      <div class="card">
+        <div class="card-title">☁ Firebase Cloud Sync</div>
+        <div class="three-col">
+          <div class="field">
+            <label>Firebase DB URL</label>
+            <input id="fbUrl" placeholder="https://xxx-default-rtdb.firebaseio.com">
+          </div>
+          <div class="field">
+            <label>Firebase API Key</label>
+            <input type="password" id="fbKey" placeholder="AIza...">
+          </div>
+          <div class="field">
+            <label>User Email / ID</label>
+            <input id="fbUser" placeholder="your@email.com">
+          </div>
+        </div>
+        <div style="display:flex;gap:8px;align-items:center;margin-top:6px">
+          <button class="btn btn-g btn-sm fb-btn" onclick="initFirebase()">Connect Firebase</button>
+          <div id="fbStatus" style="font-size:12px;color:var(--text3);font-family:var(--fm)"></div>
+          <div id="fb-status" style="font-size:12px;color:var(--text3);font-family:var(--fm)"></div>
+        </div>
+      </div>
+
+      <!-- API KEYS -->
+      <div class="card">
+        <div class="card-title">🔑 API Keys</div>
+        <div class="field">
+          <label>Anthropic API Key</label>
+          <input type="password" id="set-anthropic-key" placeholder="sk-ant-..." oninput="updateSettingField('anthropicKey', this.value)">
+        </div>
+        <div class="field">
+          <label>Perplexity API Key (optional)</label>
+          <input type="password" id="set-perplexity-key" placeholder="pplx-..." oninput="updateSettingField('perplexityKey', this.value)">
+          <div style="display:flex;gap:8px;align-items:center;margin-top:6px">
+            <button class="btn btn-o btn-sm" id="set-perplexity-test" onclick="updateSettingField('testPerplexity', true)">Test Key</button>
+            <div id="set-perplexity-status" style="font-size:11px;color:var(--text3);font-family:var(--fm)"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- DATA MANAGEMENT -->
+      <div class="card">
+        <div class="card-title">💾 Data Management</div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <button class="btn btn-o btn-sm" id="set-export-btn">⬇ Export JSON Backup</button>
+          <button class="btn btn-o btn-sm" id="set-import-btn">⬆ Import Backup</button>
+          <input type="file" id="set-import-file" accept=".json" style="display:none">
+          <button class="btn-danger" id="set-reset-btn">⚠ Reset All Data</button>
+        </div>
+      </div>
+    </div>
+
 <script>
 // ═══════════════════════════════════════════════════════════════════
 // CONSTANTS & DEFAULTS
