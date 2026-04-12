@@ -4236,5 +4236,106 @@ function renderMarkdown(text) {
 }
 </script>
 
+<script>
+// ═══════════════════════════════════════════════════════════════════
+// MOBILE NAV (Part 5E-7)
+// ═══════════════════════════════════════════════════════════════════
+
+function initMobileNav() {
+  // ── App-switch strip (Money OS vs PropIQ) ───────────────────────
+  // Buttons in the bottom app-switch strip carry data-app="money"
+  // or data-app="property".
+  const appBtns = document.querySelectorAll('.mob-app-switch [data-app], #mob-app-switch [data-app]');
+  appBtns.forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.preventDefault();
+      const app = btn.dataset.app;
+      if (!app) return;
+      if (typeof showApp === 'function') showApp(app);
+      setMobileActiveApp(app);
+    });
+  });
+
+  // ── Section nav buttons ─────────────────────────────────────────
+  // Money OS section nav items use data-panel="dashboard" etc.
+  const panelBtns = document.querySelectorAll('.mob-nav-item[data-panel], #mob-nav [data-panel]');
+  panelBtns.forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.preventDefault();
+      const panel = btn.dataset.panel;
+      if (!panel) return;
+      if (typeof showPanel === 'function') showPanel(panel);
+      setMobileActivePanel(panel);
+    });
+  });
+
+  // PropIQ section nav items use data-piq="search" / "compare" etc.
+  const piqBtns = document.querySelectorAll('.mob-nav-item[data-piq], #mob-nav [data-piq]');
+  piqBtns.forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.preventDefault();
+      const view = btn.dataset.piq;
+      if (!view) return;
+      if (typeof showPiqPanel === 'function') showPiqPanel(view);
+      setMobileActivePiq(view);
+    });
+  });
+
+  // ── Legacy ID pattern (mn-dashboard / mn-cashflow / etc.) ───────
+  // The horizon-os-v2 reference used #mn-<panel>, so we wire those
+  // too in case the HTML uses the older naming.
+  ['dashboard', 'cashflow', 'networth', 'assets', 'vacation', 'retirement', 'settings']
+    .forEach(p => {
+      const el = document.getElementById('mn-' + p);
+      if (el && !el.__wired) {
+        el.__wired = true;
+        el.addEventListener('click', (e) => {
+          e.preventDefault();
+          if (typeof showPanel === 'function') showPanel(p);
+          setMobileActivePanel(p);
+        });
+      }
+    });
+
+  // Set initial active state based on router state
+  if (typeof currentApp !== 'undefined') setMobileActiveApp(currentApp);
+  if (typeof currentPanel !== 'undefined') setMobileActivePanel(currentPanel);
+  if (typeof currentPiqView !== 'undefined') setMobileActivePiq(currentPiqView);
+}
+
+function setMobileActiveApp(app) {
+  document.querySelectorAll('.mob-app-switch [data-app], #mob-app-switch [data-app]')
+    .forEach(btn => btn.classList.toggle('active', btn.dataset.app === app));
+  // Show/hide the matching section-nav strip
+  const moneyStrip = document.getElementById('mob-nav-money');
+  const propStrip  = document.getElementById('mob-nav-property');
+  if (moneyStrip) moneyStrip.style.display = app === 'money' ? '' : 'none';
+  if (propStrip)  propStrip.style.display  = app === 'property' ? '' : 'none';
+}
+
+function setMobileActivePanel(panel) {
+  document.querySelectorAll('.mob-nav-item[data-panel], #mob-nav [data-panel]')
+    .forEach(btn => btn.classList.toggle('active', btn.dataset.panel === panel));
+  // Also update legacy #mn-<panel> IDs
+  ['dashboard', 'cashflow', 'networth', 'assets', 'vacation', 'retirement', 'settings']
+    .forEach(p => {
+      const el = document.getElementById('mn-' + p);
+      if (el) el.classList.toggle('active', p === panel);
+    });
+}
+
+function setMobileActivePiq(view) {
+  document.querySelectorAll('.mob-nav-item[data-piq], #mob-nav [data-piq]')
+    .forEach(btn => btn.classList.toggle('active', btn.dataset.piq === view));
+}
+
+// Auto-initialize on load so the nav works without manual wiring
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', initMobileNav);
+} else {
+  initMobileNav();
+}
+</script>
+
 </body>
 </html>
