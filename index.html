@@ -4541,5 +4541,90 @@ if (document.readyState === 'loading') {
 }
 </script>
 
+<script>
+// ═══════════════════════════════════════════════════════════════════
+// BOOT (Part 5E-9) — init() master boot function
+// ═══════════════════════════════════════════════════════════════════
+
+function init() {
+  // 1) Load state from localStorage (horizon-unified-v1)
+  if (typeof loadState === 'function') loadState();
+
+  // 2) Apply saved theme
+  if (typeof ensureDisplayState === 'function') ensureDisplayState();
+  if (typeof setTheme === 'function' && state.display && state.display.theme) {
+    setTheme(state.display.theme);
+  }
+
+  // 3) Update the API key badge (green/amber based on stored keys)
+  if (typeof updateKeyBadge === 'function') updateKeyBadge();
+
+  // 4) Auto-connect Firebase if a saved config is present
+  const fbUrl  = localStorage.getItem('horizon-fb-url');
+  const fbKey  = localStorage.getItem('horizon-fb-key');
+  const fbUser = localStorage.getItem('horizon-fb-user');
+  if (fbUrl && fbKey && typeof initFirebase === 'function'
+      && typeof firebase !== 'undefined') {
+    // Populate the form fields so initFirebase() can read them
+    const urlEl  = document.getElementById('fbUrl');
+    const keyEl  = document.getElementById('fbKey');
+    const userEl = document.getElementById('fbUser');
+    if (urlEl)  urlEl.value  = fbUrl;
+    if (keyEl)  keyEl.value  = fbKey;
+    if (userEl) userEl.value = fbUser || 'default';
+    try { initFirebase(); } catch (e) { /* non-fatal */ }
+  }
+
+  // 5) Live ticker bar
+  if (typeof updateTicker === 'function') updateTicker();
+
+  // 6) Mobile bottom nav wiring
+  if (typeof initMobileNav === 'function') initMobileNav();
+
+  // 7) Hash-based routing — read the URL fragment and dispatch
+  const hash = (location.hash || '').trim();
+  if (hash && hash.startsWith('#/')) {
+    if (typeof handleRoute === 'function') {
+      handleRoute();
+    } else {
+      // Fallback parse if handleRoute isn't available
+      const parts = hash.replace('#/', '').split('/');
+      const app = parts[0] || 'money';
+      const sub = parts[1] || (app === 'money' ? 'dashboard' : 'search');
+      if (typeof showApp === 'function') showApp(app);
+      if (app === 'money' && typeof showPanel === 'function') showPanel(sub);
+      if (app === 'property' && typeof showPiqPanel === 'function') showPiqPanel(sub);
+    }
+  } else {
+    // 8) Default route when no hash is present
+    if (typeof showApp === 'function') showApp('money');
+    if (typeof showPanel === 'function') showPanel('dashboard');
+  }
+
+  // 9) Render whichever panel is now active
+  if (typeof renderActivePanel === 'function') renderActivePanel();
+
+  // Also render PropIQ history sidebar so it's populated on boot
+  if (typeof piqRenderHistory === 'function') piqRenderHistory();
+
+  // Apply saved PropIQ market (updates banner, tags, toggle state)
+  if (typeof ensurePropiqState === 'function') ensurePropiqState();
+  if (typeof setMarket === 'function'
+      && state && state.propiq && state.propiq.market) {
+    setMarket(state.propiq.market);
+  }
+
+  // 10) Wire all global event listeners
+  if (typeof initGlobalListeners === 'function') initGlobalListeners();
+}
+
+// Kick off on DOMContentLoaded (or immediately if already parsed)
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', init);
+} else {
+  init();
+}
+</script>
+
 </body>
 </html>
