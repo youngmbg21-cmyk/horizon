@@ -3074,6 +3074,310 @@ function piqRenderSignals(r) {
     </div>
   `;
 }
+
+// ───────────────────────────────────────────────────────────────────
+// piqRenderLegal — legal flag cards + long-form note
+// ───────────────────────────────────────────────────────────────────
+function piqRenderLegal(r) {
+  const cfg = MARKETS[r.market] || {};
+  const legal = r.legal || { overall: 'warn', flags: [], summary: '' };
+  const a = r.analysis || {};
+
+  // Merge analysis.titleRisks (from Step 2) and legal.flags (from Step 4)
+  const apiFlags = Array.isArray(legal.flags) ? legal.flags : [];
+  const titleRisks = Array.isArray(a.titleRisks) ? a.titleRisks : [];
+
+  // Build a map keyed by label so we don't double-render
+  const merged = {};
+  (cfg.legalFlags || []).forEach(f => {
+    merged[f.key] = {
+      key: f.key,
+      label: f.label,
+      required: f.required,
+      level: 'ok',
+      detail: f.required ? 'Required for this market.' : 'Optional but recommended.'
+    };
+  });
+  apiFlags.forEach(f => {
+    const key = f.key || f.label || '';
+    merged[key] = {
+      key,
+      label: f.label || f.key || '\u2014',
+      required: merged[key] ? merged[key].required : false,
+      level: (f.level || 'warn').toLowerCase(),
+      detail: f.detail || ''
+    };
+  });
+  titleRisks.forEach(t => {
+    const key = (t.title || '').toLowerCase().replace(/\s+/g, '-') || ('risk-' + Math.random());
+    merged[key] = {
+      key,
+      label: t.title || 'Risk',
+      required: false,
+      level: (t.level || 'warn').toLowerCase(),
+      detail: t.detail || ''
+    };
+  });
+
+  const flagCards = Object.values(merged).map(f => {
+    const level = ['ok', 'warn', 'danger'].includes(f.level) ? f.level : 'warn';
+    const icon = level === 'ok' ? '\u2713' : level === 'warn' ? '\u26a0' : '\u2715';
+    return `
+      <div class="legal-card ${level}">
+        <div class="legal-card-hd">
+          <span class="legal-icon">${icon}</span>
+          <div class="legal-label">${piqEscape(f.label)}</div>
+          ${f.required ? '<span class="legal-req">REQ</span>' : ''}
+        </div>
+        <div class="legal-detail">${piqEscape(f.detail)}</div>
+      </div>
+    `;
+  }).join('');
+
+  const overall = (legal.overall || 'warn').toLowerCase();
+  const overallLabel = overall === 'ok' ? 'CLEAR' : overall === 'danger' ? 'HIGH RISK' : 'REVIEW REQUIRED';
+
+  return `
+    <div class="piq-legal">
+      <div class="legal-overall ${overall}">
+        <div class="legal-overall-lbl">Overall Legal Status</div>
+        <div class="legal-overall-val">${overallLabel}</div>
+        ${legal.summary ? `<div class="legal-overall-sum">${piqEscape(legal.summary)}</div>` : ''}
+      </div>
+
+      <div class="piq-section">
+        <div class="piq-section-hd">${cfg.flag || ''} ${cfg.name || ''} Legal Flags</div>
+        <div class="legal-grid">${flagCards}</div>
+      </div>
+
+      <div class="piq-section">
+        <div class="piq-section-hd">Legal Note</div>
+        <div class="legal-note">${piqEscape(cfg.legalNote || 'No legal guidance available for this market.')}</div>
+      </div>
+
+      <div class="piq-section">
+        <div class="piq-section-hd">Property Terms</div>
+        <div class="legal-terms">
+          <div><b>Freehold:</b> ${piqEscape((cfg.propertyTerms && cfg.propertyTerms.freehold) || '\u2014')}</div>
+          <div><b>Leasehold:</b> ${piqEscape((cfg.propertyTerms && cfg.propertyTerms.leasehold) || '\u2014')}</div>
+          <div><b>Search:</b> ${piqEscape((cfg.propertyTerms && cfg.propertyTerms.search) || '\u2014')}</div>
+          <div><b>Advocate:</b> ${piqEscape((cfg.propertyTerms && cfg.propertyTerms.advocate) || '\u2014')}</div>
+          <div><b>Stamp duty:</b> ${piqEscape((cfg.propertyTerms && cfg.propertyTerms.stampDuty) || '\u2014')}</div>
+          <div><b>Land rates:</b> ${piqEscape((cfg.propertyTerms && cfg.propertyTerms.landRates) || '\u2014')}</div>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+// ───────────────────────────────────────────────────────────────────
+// piqRenderCurrency — FX converter with live rate
+// ───────────────────────────────────────────────────────────────────
+function piqRenderCurrency(r) {
+  const cfg = MARKETS[r.market] || {};
+  const base = cfg.currency || 'SEK';
+
+  // Market-relevant currency pairs
+  const pairs = r.market === 'ke'
+    ? ['USD', 'EUR', 'GBP', 'SEK', 'ZAR', 'UGX']
+    : ['EUR', 'USD', 'GBP', 'NOK', 'DKK', 'KES'];
+
+  // Rates against SEK base (from state.exchangeRates); derive base-to-X
+  const fxRates = state.exchangeRates || {};
+  const baseRate = fxRates[base] || 1; // how many SEK per 1 unit of base
+  const rowHtml = pairs.map(cur => {
+    const curRate = fxRates[cur] || 0;
+    // 1 base = baseRate SEK = baseRate/curRate in cur (if curRate != 0)
+    const rate = curRate ? (baseRate / curRate) : null;
+    return `
+      <tr>
+        <td><b>1 ${base}</b></td>
+        <td>=</td>
+        <td><b>${rate != null ? rate.toFixed(4) : '\u2014'}</b> ${cur}</td>
+        <td class="piq-muted">${CSYM[cur] || ''}</td>
+      </tr>
+    `;
+  }).join('');
+
+  return `
+    <div class="piq-currency">
+      <div class="piq-section">
+        <div class="piq-section-hd">${cfg.flag || ''} ${base} Converter</div>
+        <div class="fx-converter">
+          <div class="fx-field">
+            <label>Amount in ${base}</label>
+            <input type="number" id="fx-amount" value="1000000" oninput="piqFxConvert()">
+          </div>
+          <div class="fx-field">
+            <label>Convert to</label>
+            <select id="fx-target" onchange="piqFxConvert()">
+              ${pairs.map((c, i) =>
+                `<option value="${c}" ${i === 0 ? 'selected' : ''}>${c} (${CSYM[c] || ''})</option>`
+              ).join('')}
+            </select>
+          </div>
+          <div class="fx-output">
+            <div class="fx-out-lbl">Result</div>
+            <div class="fx-out-val" id="fx-result">\u2014</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="piq-section">
+        <div class="piq-section-hd">Market Rates (1 ${base} =)</div>
+        <div class="piq-table-wrap">
+          <table class="dt fx-table">
+            <tbody>${rowHtml}</tbody>
+          </table>
+        </div>
+        <div class="piq-muted fx-note">
+          Rates sourced from your Settings panel. Update them under Money OS \u2192 Settings.
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function piqFxConvert() {
+  if (!piqCurrentResult) return;
+  const cfg = MARKETS[piqCurrentResult.market] || {};
+  const base = cfg.currency || 'SEK';
+  const amountEl = document.getElementById('fx-amount');
+  const targetEl = document.getElementById('fx-target');
+  const outEl    = document.getElementById('fx-result');
+  if (!amountEl || !targetEl || !outEl) return;
+  const amt = Number(amountEl.value) || 0;
+  const target = targetEl.value;
+  const fxRates = state.exchangeRates || {};
+  const baseRate = fxRates[base] || 1;
+  const curRate = fxRates[target] || 0;
+  if (!curRate) { outEl.textContent = '\u2014'; return; }
+  const result = amt * (baseRate / curRate);
+  outEl.textContent = (CSYM[target] || '') + ' ' +
+    Math.round(result).toLocaleString('en-US') + ' ' + target;
+}
+
+// ───────────────────────────────────────────────────────────────────
+// piqRenderShare — copy / WhatsApp / print / feedback / export
+// ───────────────────────────────────────────────────────────────────
+function piqRenderShare(r) {
+  const cfg = MARKETS[r.market] || {};
+  const a = r.analysis || {};
+  return `
+    <div class="piq-share">
+      <div class="piq-section">
+        <div class="piq-section-hd">Share this analysis</div>
+        <div class="share-buttons">
+          <button class="share-btn" onclick="piqShareCopy()">
+            <span class="share-icon">\ud83d\udccb</span> Copy link
+          </button>
+          <button class="share-btn" onclick="piqShareWhatsapp()">
+            <span class="share-icon">\ud83d\udcac</span> WhatsApp
+          </button>
+          <button class="share-btn" onclick="window.print()">
+            <span class="share-icon">\ud83d\udda8</span> Print
+          </button>
+          <button class="share-btn" onclick="piqShareExport()">
+            <span class="share-icon">\u2b07</span> Export JSON
+          </button>
+        </div>
+      </div>
+
+      <div class="piq-section">
+        <div class="piq-section-hd">Was this analysis useful?</div>
+        <div class="share-feedback">
+          <button class="fb-btn" data-fb="up" onclick="piqFeedback('up')">
+            <span class="fb-icon">\ud83d\udc4d</span> Helpful
+          </button>
+          <button class="fb-btn" data-fb="down" onclick="piqFeedback('down')">
+            <span class="fb-icon">\ud83d\udc4e</span> Not useful
+          </button>
+          <span class="fb-status" id="fb-status"></span>
+        </div>
+      </div>
+
+      <div class="piq-section">
+        <div class="piq-section-hd">Result Summary</div>
+        <div class="share-preview" id="share-preview">
+          <div><b>${cfg.flag || ''} ${piqEscape(r.query)}</b> \u00b7 ${piqEscape(cfg.name || '')}</div>
+          <div>Verdict: <b>${r.verdict || '\u2014'}</b> (${r.score || 0}/100)</div>
+          <div>${piqEscape(a.priceRange || '')} \u00b7 ${piqEscape(a.rentalYield || '')} yield</div>
+          ${a.summary ? `<div class="share-summary">${piqEscape(a.summary)}</div>` : ''}
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function piqShareText(r) {
+  r = r || piqCurrentResult;
+  if (!r) return '';
+  const cfg = MARKETS[r.market] || {};
+  const a = r.analysis || {};
+  return [
+    `${cfg.flag || ''} PropIQ — ${r.query} (${cfg.name || ''})`,
+    `Verdict: ${r.verdict || '\u2014'} (${r.score || 0}/100)`,
+    a.priceRange ? `Price: ${a.priceRange}` : '',
+    a.rentalYield ? `Yield: ${a.rentalYield}` : '',
+    a.summary ? '\n' + a.summary : '',
+    r.verdictReason ? '\n' + r.verdictReason : ''
+  ].filter(Boolean).join('\n');
+}
+
+function piqShareCopy() {
+  const text = piqShareText();
+  if (!text) return;
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(text).then(() => {
+      const el = document.getElementById('fb-status');
+      if (el) { el.textContent = 'Copied'; setTimeout(() => el.textContent = '', 1500); }
+    });
+  } else {
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    document.body.appendChild(ta);
+    ta.select();
+    try { document.execCommand('copy'); } catch (e) {}
+    document.body.removeChild(ta);
+  }
+}
+
+function piqShareWhatsapp() {
+  const text = piqShareText();
+  if (!text) return;
+  const url = 'https://wa.me/?text=' + encodeURIComponent(text);
+  window.open(url, '_blank');
+}
+
+function piqShareExport() {
+  if (!piqCurrentResult) return;
+  const blob = new Blob([JSON.stringify(piqCurrentResult, null, 2)], { type: 'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  const safeQ = (piqCurrentResult.query || 'result').replace(/[^a-z0-9]+/gi, '-').toLowerCase();
+  a.download = 'propiq-' + safeQ + '-' + new Date().toISOString().slice(0, 10) + '.json';
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+
+function piqFeedback(val) {
+  if (!piqCurrentResult) return;
+  piqCurrentResult.feedback = val;
+  // Persist into history entry
+  if (state.propiq && Array.isArray(state.propiq.history)) {
+    const idx = state.propiq.history.findIndex(h => h.id === piqCurrentResult.id);
+    if (idx >= 0) state.propiq.history[idx].feedback = val;
+  }
+  saveState();
+  document.querySelectorAll('.fb-btn').forEach(b => {
+    b.classList.toggle('on', b.dataset.fb === val);
+  });
+  const el = document.getElementById('fb-status');
+  if (el) {
+    el.textContent = val === 'up' ? 'Thanks \u2014 feedback saved' : 'Noted \u2014 we\u2019ll improve';
+    setTimeout(() => el.textContent = '', 2500);
+  }
+}
 </script>
 
 </body>
