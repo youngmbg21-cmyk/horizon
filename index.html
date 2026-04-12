@@ -1521,6 +1521,252 @@ function updateBaseSavings(val) {
   saveState();
   renderCashFlow();
 }
+
+// ───────────────────────────────────────────────────────────────────
+// NET WORTH
+// ───────────────────────────────────────────────────────────────────
+function renderNetWorth() {
+  const nw = calcNetWorth();
+  const egg = calcNestEgg();
+
+  // KPI row
+  setEl('nw-total-assets', fmtCur(nw.assets.total));
+  setEl('nw-total-liabilities', fmtCur(nw.liabilities.total));
+  setEl('nw-net-worth', fmtCur(nw.netWorth));
+
+  // Assets card list (investments + property)
+  const assetsEl = document.getElementById('nw-assets-list');
+  if (assetsEl) {
+    const invCards = nw.assets.investments.items.map(a => `
+      <div class="nw-card asset">
+        <div class="nw-card-icon">\ud83d\udcc8</div>
+        <div class="nw-card-body">
+          <div class="nw-card-name">${a.name}</div>
+          <div class="nw-card-sub">Investment</div>
+        </div>
+        <div class="nw-card-val">${fmtCur(a.value)}</div>
+      </div>
+    `).join('');
+    const propCard = `
+      <div class="nw-card asset">
+        <div class="nw-card-icon">\ud83c\udfe0</div>
+        <div class="nw-card-body">
+          <div class="nw-card-name">Property</div>
+          <div class="nw-card-sub">
+            <input type="number" value="${state.netWorth.property || 0}"
+              onchange="updateNwField('property', Number(this.value))"
+              style="width:120px">
+          </div>
+        </div>
+        <div class="nw-card-val">${fmtCur(nw.assets.property)}</div>
+      </div>
+    `;
+    assetsEl.innerHTML = invCards + propCard;
+  }
+
+  // Liabilities card list
+  const liabEl = document.getElementById('nw-liabilities-list');
+  if (liabEl) {
+    liabEl.innerHTML = `
+      <div class="nw-card liability">
+        <div class="nw-card-icon">\ud83c\udfe6</div>
+        <div class="nw-card-body">
+          <div class="nw-card-name">Mortgage</div>
+          <div class="nw-card-sub">
+            <input type="number" value="${state.netWorth.mortgage || 0}"
+              onchange="updateNwField('mortgage', Number(this.value))"
+              style="width:120px">
+          </div>
+        </div>
+        <div class="nw-card-val">${fmtCur(nw.liabilities.mortgage)}</div>
+      </div>
+      <div class="nw-card liability">
+        <div class="nw-card-icon">\ud83d\udcb3</div>
+        <div class="nw-card-body">
+          <div class="nw-card-name">Other Debt</div>
+          <div class="nw-card-sub">
+            <input type="number" value="${state.netWorth.otherDebt || 0}"
+              onchange="updateNwField('otherDebt', Number(this.value))"
+              style="width:120px">
+          </div>
+        </div>
+        <div class="nw-card-val">${fmtCur(nw.liabilities.otherDebt)}</div>
+      </div>
+    `;
+  }
+
+  // Chart.js projection chart — net worth trajectory over years
+  const chartEl = document.getElementById('nw-projection-chart');
+  if (chartEl && typeof Chart !== 'undefined') {
+    if (charts.nwProjection) charts.nwProjection.destroy();
+    const labels = egg.grandTotal.map(p => 'Y' + p.year);
+    const netWorthSeries = egg.grandTotal.map(p => p.nominal + nw.assets.property - nw.liabilities.total);
+    charts.nwProjection = new Chart(chartEl, {
+      type: 'line',
+      data: {
+        labels,
+        datasets: [{
+          label: 'Projected Net Worth',
+          data: netWorthSeries,
+          borderColor: '#00e8a0',
+          backgroundColor: 'rgba(0,232,160,0.12)',
+          tension: 0.3,
+          fill: true
+        }, {
+          label: 'Investments only',
+          data: egg.grandTotal.map(p => p.nominal),
+          borderColor: '#4d8fff',
+          backgroundColor: 'transparent',
+          borderDash: [4, 4],
+          tension: 0.3
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { legend: { labels: { color: '#888', font: { size: 10 } } } },
+        scales: {
+          x: { ticks: { color: '#666', font: { size: 9 } }, grid: { color: '#ffffff08' } },
+          y: { ticks: { color: '#666', font: { size: 9 } }, grid: { color: '#ffffff08' } }
+        }
+      }
+    });
+  }
+}
+
+function updateNwField(field, val) {
+  state.netWorth[field] = val;
+  saveState();
+  renderNetWorth();
+}
+
+// ───────────────────────────────────────────────────────────────────
+// ASSETS & NEST EGG
+// ───────────────────────────────────────────────────────────────────
+let assetsRealView = false;
+
+function renderAssets() {
+  const egg = calcNestEgg();
+
+  // KPI summary
+  setEl('assets-total', fmtCur(egg.finalNominal));
+  setEl('assets-total-real', fmtCur(egg.finalReal));
+  setEl('assets-years', String(egg.years));
+
+  // Portfolio vehicle rows
+  const listEl = document.getElementById('assets-list');
+  if (listEl) {
+    listEl.innerHTML = (state.externalAssets || []).map(a => `
+      <div class="asset-row">
+        <input type="text" value="${a.name}"
+          onchange="updateAsset('${a.id}','name',this.value)"
+          class="asset-name">
+        <div class="asset-field">
+          <label>Balance</label>
+          <input type="number" value="${a.balance}"
+            onchange="updateAsset('${a.id}','balance',Number(this.value))">
+        </div>
+        <div class="asset-field">
+          <label>Growth %</label>
+          <input type="number" step="0.1" value="${a.growthRate}"
+            onchange="updateAsset('${a.id}','growthRate',Number(this.value))">
+        </div>
+        <div class="asset-field">
+          <label>Monthly</label>
+          <input type="number" value="${a.monthlyContribution}"
+            onchange="updateAsset('${a.id}','monthlyContribution',Number(this.value))">
+        </div>
+        <button class="btn-remove" onclick="removeAsset('${a.id}')">\u2715</button>
+      </div>
+    `).join('') + `
+      <button class="btn-add" onclick="addAsset()">+ Add vehicle</button>
+    `;
+  }
+
+  // Real/nominal toggle state
+  document.querySelectorAll('.assets-toggle').forEach(btn => {
+    btn.classList.toggle('active',
+      (btn.dataset.view === 'real') === assetsRealView);
+  });
+
+  // Chart.js nest egg growth chart — stacked per-asset
+  const chartEl = document.getElementById('assets-growth-chart');
+  if (chartEl && typeof Chart !== 'undefined') {
+    if (charts.assetsGrowth) charts.assetsGrowth.destroy();
+    const labels = [];
+    for (let y = 0; y <= egg.years; y++) labels.push('Y' + y);
+
+    const palette = ['#00e8a0', '#4d8fff', '#f5a623', '#8b5cf6', '#ec4899', '#00d4ff'];
+    const datasets = egg.assetProjections.map((ap, i) => ({
+      label: ap.name,
+      data: ap.timeline.map(t => assetsRealView ? t.real : t.nominal),
+      borderColor: palette[i % palette.length],
+      backgroundColor: palette[i % palette.length] + '33',
+      tension: 0.3,
+      fill: true
+    }));
+    // Add savings contribution line
+    datasets.push({
+      label: 'Monthly Savings',
+      data: egg.savingsTimeline.map(t => assetsRealView ? t.real : t.nominal),
+      borderColor: '#ffffff',
+      backgroundColor: 'rgba(255,255,255,0.08)',
+      tension: 0.3,
+      fill: true
+    });
+
+    charts.assetsGrowth = new Chart(chartEl, {
+      type: 'line',
+      data: { labels, datasets },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { labels: { color: '#888', font: { size: 10 } } },
+          title: {
+            display: true,
+            text: assetsRealView ? 'Real value (today\u2019s SEK)' : 'Nominal value',
+            color: '#888',
+            font: { size: 10 }
+          }
+        },
+        scales: {
+          x: { stacked: true, ticks: { color: '#666', font: { size: 9 } }, grid: { color: '#ffffff08' } },
+          y: { stacked: true, ticks: { color: '#666', font: { size: 9 } }, grid: { color: '#ffffff08' } }
+        }
+      }
+    });
+  }
+}
+
+function setAssetsView(real) {
+  assetsRealView = !!real;
+  renderAssets();
+}
+
+function updateAsset(id, field, val) {
+  const a = (state.externalAssets || []).find(x => x.id === id);
+  if (a) { a[field] = val; saveState(); renderAssets(); }
+}
+
+function addAsset() {
+  if (!state.externalAssets) state.externalAssets = [];
+  state.externalAssets.push({
+    id: 'a' + Date.now(),
+    name: 'New vehicle',
+    balance: 0,
+    growthRate: state.growthRate || 7,
+    monthlyContribution: 0
+  });
+  saveState();
+  renderAssets();
+}
+
+function removeAsset(id) {
+  state.externalAssets = (state.externalAssets || []).filter(x => x.id !== id);
+  saveState();
+  renderAssets();
+}
 </script>
 
 </body>
