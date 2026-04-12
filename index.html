@@ -114,6 +114,130 @@
   <!-- ── CONTENT AREA ── -->
   <div class="content" id="content">
 
+    <!-- ════════════════ DASHBOARD ════════════════ -->
+    <div class="panel active" id="panel-dashboard">
+      <div class="ph">
+        <div class="ph-tag">FINANCIAL OVERVIEW</div>
+        <div class="ph-title">Your Money at a Glance</div>
+        <div class="ph-sub" id="dash-ticker">Live position</div>
+      </div>
+
+      <!-- KPI GRID -->
+      <div class="kpi-row">
+        <div class="kpi">
+          <div class="kpi-lbl">INCOME</div>
+          <div class="kpi-val" id="kpi-income">—</div>
+        </div>
+        <div class="kpi">
+          <div class="kpi-lbl">EXPENSES</div>
+          <div class="kpi-val" id="kpi-expenses">—</div>
+        </div>
+        <div class="kpi">
+          <div class="kpi-lbl">SAVINGS</div>
+          <div class="kpi-val" id="kpi-savings">—</div>
+        </div>
+        <div class="kpi">
+          <div class="kpi-lbl">FUN FUND</div>
+          <div class="kpi-val" id="kpi-funfund">—</div>
+        </div>
+        <div class="kpi">
+          <div class="kpi-lbl">NEST EGG</div>
+          <div class="kpi-val" id="kpi-nestegg">—</div>
+        </div>
+        <div class="kpi">
+          <div class="kpi-lbl">RETIREMENT</div>
+          <div class="kpi-val" id="kpi-retirement">—</div>
+        </div>
+      </div>
+
+      <div class="two-col">
+        <!-- CASH FLOW SUMMARY -->
+        <div class="card">
+          <div class="card-title">⇄ Cash Flow
+            <div class="card-actions">
+              <div class="itabs" style="margin:0">
+                <button class="itab dash-cf-toggle active" data-view="month" onclick="setDashCfView('month')">Month</button>
+                <button class="itab dash-cf-toggle" data-view="12mo" onclick="setDashCfView('12mo')">12-Month</button>
+              </div>
+            </div>
+          </div>
+          <div id="dash-cf-summary"></div>
+        </div>
+
+        <!-- SAVINGS CHART -->
+        <div class="card">
+          <div class="card-title">📊 Savings Trend</div>
+          <canvas id="dash-savings-chart" height="185"></canvas>
+        </div>
+      </div>
+
+      <!-- NEST EGG MILESTONES -->
+      <div class="card">
+        <div class="card-title">◈ Nest Egg Milestones</div>
+        <div id="dash-milestones"></div>
+      </div>
+    </div>
+
+    <!-- ════════════════ CASH FLOW ════════════════ -->
+    <div class="panel" id="panel-cashflow">
+      <div class="ph">
+        <div class="ph-tag">MONTHLY BUDGET</div>
+        <div class="ph-title">Income &amp; Expenses</div>
+        <div class="ph-sub">Edit baseline or override any specific month.</div>
+      </div>
+
+      <!-- MONTH STRIP -->
+      <div class="month-strip" id="cf-month-strip"></div>
+
+      <div class="two-col">
+        <!-- INCOME LINES -->
+        <div class="card">
+          <div class="card-title">💰 Income
+            <div class="card-actions">
+              <span class="mono" id="cf-income-total">—</span>
+              <button class="btn btn-o btn-xs" onclick="addLineItem('income')">+ Add</button>
+            </div>
+          </div>
+          <div id="cf-income-list"></div>
+        </div>
+
+        <!-- EXPENSE LINES -->
+        <div class="card">
+          <div class="card-title">📤 Expenses
+            <div class="card-actions">
+              <span class="mono" id="cf-expense-total">—</span>
+              <button class="btn btn-o btn-xs" onclick="addLineItem('expenses')">+ Add</button>
+            </div>
+          </div>
+          <div id="cf-expense-list"></div>
+          <div class="cf-row" style="margin-top:8px">
+            <span>Paid</span><b class="mono pos" id="cf-paid-total">—</b>
+          </div>
+          <div class="cf-row">
+            <span>Unpaid</span><b class="mono neu" id="cf-unpaid-total">—</b>
+          </div>
+        </div>
+      </div>
+
+      <!-- SAVINGS ALLOCATION -->
+      <div class="card">
+        <div class="card-title">🏦 Savings Allocation
+          <div class="card-actions">
+            <span class="mono" id="cf-surplus-total">—</span>
+          </div>
+        </div>
+        <div id="cf-allocation"></div>
+      </div>
+
+      <!-- 12-MONTH BREAKDOWN -->
+      <div class="card">
+        <div class="card-title">📋 12-Month Expense Breakdown</div>
+        <div style="overflow-x:auto">
+          <table id="cf-12mo-table" style="width:100%;border-collapse:collapse;font-size:11px;font-family:var(--fm)"></table>
+        </div>
+      </div>
+    </div>
+
 <script>
 // ═══════════════════════════════════════════════════════════════════
 // CONSTANTS & DEFAULTS
