@@ -23,6 +23,23 @@
   --red:#ff4d6d; --red-dim:#ff4d6d12;
   --violet:#8b5cf6; --violet-dim:#8b5cf612;
   --pink:#ec4899;
+  /* Semantic tokens — use these in new components so intent is portable
+     across themes and accents without touching every call site. */
+  --accent-positive:var(--green);
+  --accent-positive-dim:var(--green-dim);
+  --accent-warning:var(--amber);
+  --accent-warning-dim:var(--amber-dim);
+  --accent-critical:var(--red);
+  --accent-critical-dim:var(--red-dim);
+  --accent-info:var(--blue);
+  --accent-info-dim:var(--blue-dim);
+  --accent-premium:var(--violet);
+  --accent-premium-dim:var(--violet-dim);
+  --accent-highlight:var(--cyan);
+  --accent-highlight-dim:var(--cyan-dim);
+  --focus-ring:0 0 0 2px rgba(0,232,160,0.35);
+  --card-shadow:0 1px 0 rgba(255,255,255,0.02) inset;
+  --card-shadow-hover:0 8px 24px -12px rgba(0,0,0,0.55);
   --ff:'Syne',sans-serif; --fb:'DM Sans',sans-serif; --fm:'JetBrains Mono',monospace;
   --r:10px; --rl:14px;
   --sidebar-w:220px;
@@ -38,6 +55,9 @@ body.light {
   --red:#c0392b; --red-dim:rgba(192,57,43,0.10);
   --violet:#6d3fad; --violet-dim:rgba(109,63,173,0.10);
   --green-glow:0 2px 14px rgba(0,168,112,0.15);
+  --focus-ring:0 0 0 2px rgba(0,168,112,0.35);
+  --card-shadow:0 1px 0 rgba(255,255,255,0.4) inset;
+  --card-shadow-hover:0 6px 20px -10px rgba(60,40,10,0.18);
 }
 * { margin:0; padding:0; box-sizing:border-box; }
 html,body { height:100%; overflow:hidden; }
@@ -83,9 +103,11 @@ input[type="number"] { -moz-appearance:textfield; }
 /* ── SIDEBAR ─────────────────────────────────────────── */
 .sidebar { width:var(--sidebar-w); flex-shrink:0; background:var(--bg1); border-right:1px solid var(--border); display:flex; flex-direction:column; overflow-y:auto; }
 .sb-section { padding:12px 12px 3px; font-size:9px; letter-spacing:.14em; color:var(--text3); font-weight:700; font-family:var(--fm); }
-.nav-item { display:flex; align-items:center; gap:9px; padding:8px 13px; margin:1px 7px; border-radius:8px; cursor:pointer; color:var(--text2); font-size:13px; font-weight:500; transition:all .16s; border:1px solid transparent; }
+.nav-item { position:relative; display:flex; align-items:center; gap:9px; padding:8px 13px; margin:1px 7px; border-radius:8px; cursor:pointer; color:var(--text2); font-size:13px; font-weight:500; transition:all .16s; border:1px solid transparent; }
 .nav-item:hover { background:var(--bg3); color:var(--text); }
 .nav-item.active { background:var(--bg4); color:var(--green); border-color:var(--border2); }
+.nav-item.dirty::after { content:''; position:absolute; top:10px; right:10px; width:6px; height:6px; border-radius:50%; background:var(--accent-warning); box-shadow:0 0 8px var(--accent-warning); animation:dirtyPulse 2s ease-in-out infinite; }
+@keyframes dirtyPulse { 0%,100%{opacity:.6} 50%{opacity:1} }
 .nav-icon { font-size:14px; width:20px; text-align:center; flex-shrink:0; }
 .sb-sep { height:1px; background:var(--border); margin:6px 10px; }
 .sb-bot { margin-top:auto; padding:10px; }
@@ -95,35 +117,127 @@ input[type="number"] { -moz-appearance:textfield; }
 .sb-mini-sub { font-size:10px; color:var(--text2); margin-top:2px; }
 
 /* ── CONTENT ─────────────────────────────────────────── */
-.content { flex:1; overflow-y:auto; }
-.panel { display:none; padding:16px 20px; max-width:1280px; margin:0 auto; animation:fadeIn .2s ease; }
+.content { flex:1; overflow-y:auto; scrollbar-gutter:stable; }
+.panel { display:none; padding:20px 24px 36px; max-width:1320px; margin:0 auto; }
 .panel.active { display:block; }
-@keyframes fadeIn { from{opacity:0;transform:translateY(4px)} to{opacity:1;transform:translateY(0)} }
+@media (max-width:720px){ .panel { padding:16px 14px 28px; } }
+
+/* ── BREADCRUMB ──────────────────────────────────────── */
+.breadcrumb { display:flex; align-items:center; gap:6px; font-family:var(--fm); font-size:10px; color:var(--text3); letter-spacing:.06em; margin-bottom:8px; text-transform:uppercase; flex-wrap:wrap; }
+.breadcrumb a,.breadcrumb button { color:var(--text3); background:none; border:none; padding:0; cursor:pointer; font:inherit; letter-spacing:inherit; text-transform:inherit; transition:color .15s; }
+.breadcrumb a:hover,.breadcrumb button:hover { color:var(--accent-positive); }
+.breadcrumb .bc-sep { color:var(--text3); opacity:.5; }
+.breadcrumb .bc-current { color:var(--text2); }
+
+/* ── RELATED ROW (cross-panel drill-through) ─────────── */
+.related-row { margin-top:22px; padding-top:14px; border-top:1px dashed var(--border); display:flex; gap:10px; flex-wrap:wrap; align-items:center; }
+.related-row-lbl { font-family:var(--fm); font-size:10px; letter-spacing:.1em; text-transform:uppercase; color:var(--text3); padding-right:4px; }
+.related-link { display:inline-flex; align-items:center; gap:8px; background:var(--bg2); border:1px solid var(--border); border-radius:8px; padding:8px 12px; color:var(--text2); font-size:12px; cursor:pointer; transition:all .18s; font-family:inherit; }
+.related-link:hover { border-color:var(--accent-positive); color:var(--text); transform:translateY(-1px); box-shadow:var(--card-shadow-hover); }
+.related-link .rl-icon { font-size:14px; line-height:1; }
+.related-link .rl-arrow { color:var(--text3); font-size:11px; margin-left:auto; transition:transform .18s, color .18s; }
+.related-link:hover .rl-arrow { color:var(--accent-positive); transform:translateX(2px); }
+
+/* ── SCOPE CHIP (topbar persistent time) ─────────────── */
+.scope-chip { display:inline-flex; align-items:center; gap:4px; background:var(--bg0); border:1px solid var(--border); border-radius:7px; padding:4px 6px; font-family:var(--fm); font-size:10px; color:var(--text2); letter-spacing:.04em; cursor:pointer; transition:all .18s; user-select:none; }
+.scope-chip:hover { border-color:var(--accent-positive); color:var(--text); }
+.scope-chip .sc-arrow { background:transparent; border:none; color:var(--text3); font-size:10px; cursor:pointer; padding:2px 4px; border-radius:3px; transition:color .15s, background .15s; }
+.scope-chip .sc-arrow:hover { color:var(--accent-positive); background:var(--bg3); }
+.scope-chip .sc-label { padding:0 4px; font-weight:600; min-width:86px; text-align:center; }
+.scope-chip.is-year .sc-label { min-width:54px; }
+
+/* ── COMMAND PALETTE HINT BUTTON (topbar) ────────────── */
+.cmdp-hint { display:inline-flex; align-items:center; gap:4px; background:var(--bg0); border:1px solid var(--border); border-radius:7px; padding:5px 8px; color:var(--text3); cursor:pointer; font-family:var(--fm); font-size:10px; letter-spacing:.04em; transition:all .18s; }
+.cmdp-hint:hover { border-color:var(--accent-positive); color:var(--accent-positive); }
+.cmdp-hint-icon { font-size:12px; font-weight:700; }
+.cmdp-hint-lbl { font-weight:700; }
+
+/* ── COMMAND PALETTE (⌘K) ────────────────────────────── */
+.cmdp-backdrop { position:fixed; inset:0; background:rgba(5,8,15,0.72); backdrop-filter:blur(4px); z-index:9998; opacity:0; pointer-events:none; transition:opacity .18s ease; }
+.cmdp-backdrop.open { opacity:1; pointer-events:auto; }
+.cmdp { position:fixed; top:12vh; left:50%; transform:translateX(-50%) translateY(-12px); width:min(640px, calc(100vw - 32px)); max-height:70vh; background:var(--bg2); border:1px solid var(--border2); border-radius:14px; box-shadow:0 24px 60px -20px rgba(0,0,0,0.7), 0 0 0 1px rgba(255,255,255,0.02) inset; z-index:9999; display:flex; flex-direction:column; overflow:hidden; opacity:0; pointer-events:none; transition:opacity .2s ease, transform .22s cubic-bezier(.2,.7,.2,1); }
+.cmdp.open { opacity:1; transform:translateX(-50%) translateY(0); pointer-events:auto; }
+.cmdp-head { display:flex; align-items:center; gap:10px; padding:14px 16px; border-bottom:1px solid var(--border); }
+.cmdp-icon { font-family:var(--fm); color:var(--accent-positive); font-size:16px; font-weight:700; }
+.cmdp-input { flex:1; background:transparent; border:none; outline:none; color:var(--text); font-size:15px; font-family:var(--fb); padding:2px 0; }
+.cmdp-input::placeholder { color:var(--text3); }
+.cmdp-kbd { font-family:var(--fm); font-size:10px; color:var(--text3); background:var(--bg3); border:1px solid var(--border); border-radius:4px; padding:2px 6px; letter-spacing:.04em; }
+.cmdp-results { flex:1; overflow-y:auto; padding:6px 0; }
+.cmdp-group { padding:8px 16px 4px; font-family:var(--fm); font-size:9px; letter-spacing:.12em; text-transform:uppercase; color:var(--text3); }
+.cmdp-item { display:flex; align-items:center; gap:12px; padding:9px 16px; cursor:pointer; color:var(--text2); font-size:13px; transition:background .1s, color .1s; border-left:2px solid transparent; }
+.cmdp-item:hover { color:var(--text); background:var(--bg3); }
+.cmdp-item.active { color:var(--text); background:var(--bg3); border-left-color:var(--accent-positive); }
+.cmdp-item-icon { font-size:15px; width:20px; text-align:center; flex-shrink:0; }
+.cmdp-item-label { flex:1; }
+.cmdp-item-hint { font-family:var(--fm); font-size:10px; color:var(--text3); letter-spacing:.03em; }
+.cmdp-empty { padding:30px 20px; text-align:center; color:var(--text3); font-size:13px; }
+.cmdp-foot { display:flex; gap:16px; padding:8px 16px; border-top:1px solid var(--border); font-family:var(--fm); font-size:10px; color:var(--text3); letter-spacing:.04em; }
+.cmdp-foot .cmdp-kbd { margin-right:4px; }
+
+/* ── SECTION PULSE (deep-link highlight) ─────────────── */
+.section-pulse { animation:sectionPulse 1.4s ease-out; }
+@keyframes sectionPulse {
+  0% { box-shadow:0 0 0 0 rgba(0,232,160,0.0), 0 0 0 0 rgba(0,232,160,0.0); }
+  15% { box-shadow:0 0 0 3px rgba(0,232,160,0.45), 0 0 24px 2px rgba(0,232,160,0.25); }
+  100% { box-shadow:0 0 0 0 rgba(0,232,160,0.0), 0 0 0 0 rgba(0,232,160,0.0); }
+}
+/* FLIP-ish transition: incoming panel slides up from 8px with a short
+   translate + fade; topbar/ticker/sidebar stay still to reinforce
+   "same app, new lens." The page title does a letter-spacing tighten
+   so nav reads as intentional rather than a straight swap. */
+@keyframes fadeIn {
+  from { opacity:0; transform:translateY(8px); }
+  to   { opacity:1; transform:translateY(0); }
+}
+.panel.active { animation:fadeIn .28s cubic-bezier(.2,.7,.2,1); }
+.panel.active .ph-title { animation:phTitleIn .42s cubic-bezier(.2,.7,.2,1); }
+@keyframes phTitleIn {
+  0%   { opacity:0; letter-spacing:.04em; transform:translateY(4px); }
+  60%  { opacity:1; }
+  100% { opacity:1; letter-spacing:-.01em; transform:translateY(0); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .panel.active, .panel.active .ph-title { animation:none !important; }
+}
 
 /* ── PAGE HEADER ─────────────────────────────────────── */
-.ph { margin-bottom:14px; }
-.ph-tag { font-size:9px; font-weight:700; letter-spacing:.18em; color:var(--green); margin-bottom:3px; font-family:var(--fm); }
-.ph-title { font-family:var(--ff); font-size:22px; font-weight:800; margin-bottom:3px; }
-.ph-sub { color:var(--text2); font-size:12px; }
+.ph { margin-bottom:16px; }
+.ph-tag { font-size:9px; font-weight:700; letter-spacing:.2em; color:var(--green); margin-bottom:4px; font-family:var(--fm); }
+.ph-title { font-family:var(--ff); font-size:24px; font-weight:800; margin-bottom:4px; letter-spacing:-.01em; line-height:1.15; }
+.ph-sub { color:var(--text2); font-size:12px; max-width:780px; line-height:1.5; }
 
 /* ── CARDS ───────────────────────────────────────────── */
-.card { background:var(--bg2); border:1px solid var(--border); border-radius:10px; padding:14px; margin-bottom:10px; }
+.card { background:var(--bg2); border:1px solid var(--border); border-radius:10px; padding:14px 16px; margin-bottom:10px; transition:border-color .2s, box-shadow .2s; }
 .card:hover { border-color:var(--border2); }
-.card-title { font-size:11px; letter-spacing:.04em; font-weight:600; text-transform:uppercase; color:var(--text2); margin-bottom:10px; display:flex; align-items:center; justify-content:space-between; }
+.card-title { font-size:11px; letter-spacing:.05em; font-weight:600; text-transform:uppercase; color:var(--text2); margin-bottom:12px; display:flex; align-items:center; justify-content:space-between; gap:10px; }
 .card-title .ct-actions { display:flex; gap:6px; }
+.two-col > .card,
+.three-col > .card { margin-bottom:0; }
 
 /* ── KPI GRID ────────────────────────────────────────── */
-.kpi-row { display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:8px; margin-bottom:12px; }
-.kpi { background:var(--bg2); border:1px solid var(--border); border-radius:10px; padding:12px 14px; transition:border-color .2s; cursor:default; }
+.kpi-row { display:grid; grid-template-columns:repeat(auto-fit,minmax(190px,1fr)); gap:10px; margin-bottom:14px; }
+.kpi { background:var(--bg2); border:1px solid var(--border); border-radius:10px; padding:14px 16px; transition:border-color .2s, transform .2s, box-shadow .2s; cursor:default; min-height:86px; display:flex; flex-direction:column; justify-content:center; position:relative; }
 .kpi:hover { border-color:var(--border2); }
-.kpi-icon { font-size:18px; margin-bottom:4px; }
-.kpi-lbl { font-size:9px; letter-spacing:.06em; color:var(--text3); text-transform:uppercase; margin-bottom:3px; font-weight:500; }
-.kpi-val { font-family:var(--fm); font-size:18px; font-weight:700; color:var(--text); }
-.kpi-sub { font-size:10px; color:var(--text2); margin-top:2px; }
+/* Flash when the displayed value changed since last render */
+.kpi.kpi-pulse { animation:kpiPulse 1.6s cubic-bezier(.2,.7,.2,1); }
+@keyframes kpiPulse {
+  0%   { box-shadow:0 0 0 0 rgba(0,232,160,0.0); border-color:var(--border); }
+  15%  { box-shadow:0 0 0 3px rgba(0,232,160,0.35), 0 0 18px 1px rgba(0,232,160,0.25); border-color:var(--accent-positive); }
+  100% { box-shadow:0 0 0 0 rgba(0,232,160,0.0); border-color:var(--border); }
+}
+@media (prefers-reduced-motion: reduce) { .kpi.kpi-pulse { animation:none; } }
+.kpi-icon { font-size:18px; margin-bottom:4px; line-height:1; }
+.kpi-lbl { font-size:9px; letter-spacing:.08em; color:var(--text3); text-transform:uppercase; margin-bottom:4px; font-weight:600; }
+.kpi-val { font-family:var(--fm); font-size:20px; font-weight:700; color:var(--text); line-height:1.15; word-break:break-word; }
+.kpi-sub { font-size:10px; color:var(--text2); margin-top:3px; line-height:1.3; }
 
 /* ── GRIDS ───────────────────────────────────────────── */
-.two-col { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
-.three-col { display:grid; grid-template-columns:1fr 1fr 1fr; gap:9px; }
+.two-col { display:grid; grid-template-columns:1fr 1fr; gap:12px; align-items:stretch; margin-bottom:10px; }
+.three-col { display:grid; grid-template-columns:1fr 1fr 1fr; gap:12px; align-items:stretch; margin-bottom:10px; }
+@media (max-width:980px){
+  .two-col { grid-template-columns:1fr; }
+  .three-col { grid-template-columns:1fr; }
+}
 
 /* ── BUTTONS ─────────────────────────────────────────── */
 .btn { display:inline-flex; align-items:center; gap:6px; border-radius:8px; font-size:12px; font-weight:600; cursor:pointer; transition:all .2s; border:none; padding:7px 16px; }
@@ -156,6 +270,10 @@ input[type="number"] { -moz-appearance:textfield; }
 .line-type { background:var(--bg3); border:1px solid var(--border); border-radius:4px; padding:6px 7px; color:var(--text2); font-size:10px; outline:none; }
 .line-rm { background:transparent; border:none; color:var(--red); font-size:15px; cursor:pointer; opacity:.5; transition:opacity .2s; padding:2px 5px; }
 .line-rm:hover { opacity:1; }
+/* Actual-vs-budget variance pill (Transactions → Budget mapping) */
+.line-variance { font-family:var(--fm); font-size:10px; font-weight:600; padding:3px 8px; border-radius:4px; white-space:nowrap; cursor:help; letter-spacing:.01em; }
+.line-variance.pos { background:var(--accent-positive-dim); color:var(--accent-positive); border:1px solid var(--accent-positive-dim); }
+.line-variance.neg { background:var(--accent-critical-dim); color:var(--accent-critical); border:1px solid var(--accent-critical-dim); }
 
 /* ── MONTH SELECTOR ──────────────────────────────────── */
 .month-pills { display:flex; gap:4px; overflow-x:auto; padding-bottom:6px; margin-bottom:12px; }
@@ -165,8 +283,19 @@ input[type="number"] { -moz-appearance:textfield; }
 .month-pill.current { border-color:var(--amber); color:var(--amber); }
 
 /* ── CHART WRAPPER ───────────────────────────────────── */
-.chart-wrap { position:relative; }
-.chart-wrap canvas { width:100% !important; }
+/* Fixed heights let Chart.js with maintainAspectRatio:false fill the box
+   cleanly across viewport widths, keeping charts visually balanced. */
+.chart-wrap { position:relative; width:100%; height:200px; }
+.chart-wrap.sm { height:160px; }
+.chart-wrap.md { height:200px; }
+.chart-wrap.lg { height:240px; }
+.chart-wrap.xl { height:280px; }
+.chart-wrap > canvas { width:100% !important; height:100% !important; display:block; }
+@media (max-width:900px){
+  .chart-wrap,.chart-wrap.md { height:180px; }
+  .chart-wrap.lg { height:210px; }
+  .chart-wrap.xl { height:240px; }
+}
 
 /* ── CASHFLOW BAR ────────────────────────────────────── */
 .cf-bar-wrap { margin-top:10px; }
@@ -199,6 +328,36 @@ input[type="number"] { -moz-appearance:textfield; }
 .pos { color:var(--green); }
 .neg { color:var(--red); }
 .amb { color:var(--amber); }
+
+/* ── Shared stat row (from ui.stat helper) ──────────────────────────── */
+.ui-stat { display:flex; align-items:baseline; justify-content:space-between; gap:12px; padding:6px 0; font-size:12px; border-bottom:1px solid var(--bg3); }
+.ui-stat:last-child { border-bottom:none; }
+.ui-stat-lbl { color:var(--text2); }
+.ui-stat-val { font-family:var(--fm); font-weight:600; color:var(--text); }
+
+/* ── Data management grid (Settings → split export/import) ────────── */
+.data-mgmt-grid { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+@media (max-width:760px) { .data-mgmt-grid { grid-template-columns:1fr; } }
+.data-mgmt-row { display:flex; align-items:center; justify-content:space-between; gap:10px; padding:10px 12px; background:var(--bg3); border:1px solid var(--border); border-radius:8px; transition:border-color .18s; }
+.data-mgmt-row:hover { border-color:var(--border2); }
+.data-mgmt-meta { display:flex; align-items:center; gap:10px; min-width:0; }
+.data-mgmt-icon { font-size:18px; flex-shrink:0; width:24px; text-align:center; }
+.data-mgmt-title { font-size:12px; font-weight:700; color:var(--text); }
+.data-mgmt-sub { font-size:10px; color:var(--text3); margin-top:1px; line-height:1.4; }
+.data-mgmt-btns { display:flex; gap:4px; flex-shrink:0; }
+
+/* ── Shared state surfaces (ui.empty / ui.loading / ui.error) ──────── */
+.state { background:var(--bg3); border:2px dashed var(--border2); border-radius:var(--rl); padding:28px 24px; text-align:center; display:flex; flex-direction:column; align-items:center; gap:6px; }
+.state-empty .state-icon { font-size:32px; opacity:.5; margin-bottom:2px; }
+.state-loading { border-style:solid; }
+.state-error { border-color:var(--accent-critical); background:var(--accent-critical-dim); }
+.state-error .state-icon { font-size:24px; color:var(--accent-critical); }
+.state-title { font-size:15px; font-weight:700; color:var(--text); }
+.state-sub { font-size:12px; color:var(--text2); line-height:1.6; max-width:540px; }
+.state-cta { margin-top:10px; display:flex; gap:8px; flex-wrap:wrap; justify-content:center; }
+.state-spinner { width:26px; height:26px; border-radius:50%; border:2px solid var(--border); border-top-color:var(--accent-positive); animation:stateSpin .9s linear infinite; }
+@keyframes stateSpin { to { transform:rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .state-spinner { animation:none; } }
 .muted { color:var(--text2); }
 
 /* ── SUSTAINABILITY CARD ─────────────────────────────── */
@@ -218,10 +377,12 @@ input[type="number"] { -moz-appearance:textfield; }
 
 /* ── RETIREMENT RUNWAY ───────────────────────────────── */
 .runway-card { background:var(--bg2); border:1px solid var(--border); border-radius:10px; padding:14px; margin-bottom:10px; }
-.runway-milestones { display:flex; flex-wrap:wrap; gap:6px; margin-top:10px; }
-.runway-ms { background:var(--bg3); border-radius:6px; padding:7px 10px; text-align:center; min-width:75px; font-size:10px; }
-.runway-ms-age { font-family:var(--fm); font-weight:700; font-size:14px; margin-bottom:1px; }
-.runway-ms-val { color:var(--text2); font-size:9px; }
+.runway-milestones { display:flex; flex-wrap:wrap; gap:6px; margin-top:14px; padding-top:12px; border-top:1px dashed var(--border); }
+.runway-ms { background:var(--bg3); border:1px solid var(--border); border-radius:6px; padding:7px 11px; text-align:center; min-width:78px; font-size:10px; transition:border-color .2s; }
+.runway-ms:hover { border-color:var(--border2); }
+.runway-ms-age { font-family:var(--fm); font-weight:700; font-size:14px; margin-bottom:2px; letter-spacing:.02em; }
+.runway-ms-val { color:var(--text2); font-size:9px; font-family:var(--fm); }
+#runway-legend { gap:14px !important; margin-top:10px !important; padding-top:8px; border-top:1px solid var(--border); font-family:var(--fm); letter-spacing:.02em; }
 
 /* ── BANK CONNECT ────────────────────────────────────── */
 .bank-empty { background:var(--bg3); border:2px dashed var(--border2); border-radius:10px; padding:24px; text-align:center; }
@@ -250,7 +411,8 @@ input[type="number"] { -moz-appearance:textfield; }
 .loc-stat-val { font-family:var(--fm); font-weight:600; }
 .loc-affordability-bar { height:5px; background:var(--bg3); border-radius:3px; overflow:hidden; margin:8px 0 3px; }
 .loc-affordability-fill { height:100%; border-radius:3px; transition:width .5s; }
-#retire-map { height:300px; border-radius:var(--r); overflow:hidden; margin-bottom:10px; border:1px solid var(--border); }
+#retire-map { height:360px; border-radius:var(--rl); overflow:hidden; margin-bottom:12px; border:1px solid var(--border); }
+@media (max-width:900px){ #retire-map { height:260px; } }
 
 /* ── FUN FUND ────────────────────────────────────────── */
 .trip-card { background:var(--bg2); border:1px solid var(--border); border-radius:10px; padding:12px; margin-bottom:8px; transition:all .2s; }
@@ -363,6 +525,10 @@ input[type="number"] { -moz-appearance:textfield; }
   font-family:var(--fm); transition:all .15s; text-align:left;
 }
 .aip-chip:hover { color:var(--amber); border-color:var(--amber); background:rgba(255,184,0,.1); }
+.aip-chip-divider { flex-basis:100%; height:1px; background:var(--border); margin:6px 0 0; }
+.aip-chip-group-lbl { flex-basis:100%; font-family:var(--fm); font-size:9px; letter-spacing:.12em; text-transform:uppercase; color:var(--text3); margin-top:2px; }
+.aip-chip.aip-chip-recent { background:var(--bg3); color:var(--text3); border-style:dashed; max-width:100%; overflow:hidden; text-overflow:ellipsis; }
+.aip-chip.aip-chip-recent:hover { color:var(--accent-positive); border-color:var(--accent-positive); background:var(--accent-positive-dim); }
 .aip-input-row { display:flex; gap:8px; align-items:flex-end; }
 .aip-textarea {
   flex:1; background:var(--bg4); border:1px solid var(--border); border-radius:8px;
@@ -659,6 +825,24 @@ input[type="number"] { -moz-appearance:textfield; }
 <body>
 
 <!-- ══════════════════════════════════════
+     COMMAND PALETTE (⌘K / Ctrl+K)
+══════════════════════════════════════ -->
+<div class="cmdp-backdrop" id="cmdp-backdrop" onclick="cmdpClose()"></div>
+<div class="cmdp" id="cmdp" role="dialog" aria-modal="true" aria-label="Command palette">
+  <div class="cmdp-head">
+    <span class="cmdp-icon">⌘</span>
+    <input type="text" id="cmdp-input" class="cmdp-input" placeholder="Type a command, panel, or setting…" autocomplete="off" spellcheck="false">
+    <span class="cmdp-kbd">Esc</span>
+  </div>
+  <div class="cmdp-results" id="cmdp-results"></div>
+  <div class="cmdp-foot">
+    <span><span class="cmdp-kbd">↑</span><span class="cmdp-kbd">↓</span> navigate</span>
+    <span><span class="cmdp-kbd">↵</span> select</span>
+    <span><span class="cmdp-kbd">Esc</span> close</span>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════
      MAIN APP SHELL
 ══════════════════════════════════════ -->
 <div class="app" id="app">
@@ -673,6 +857,14 @@ input[type="number"] { -moz-appearance:textfield; }
       <div class="logo-text">HORIZON <span>FINANCE OS</span></div>
     </div>
     <div class="topbar-right">
+      <button class="cmdp-hint" id="cmdp-hint" onclick="cmdpOpen()" title="Command palette">
+        <span class="cmdp-hint-icon">⌘</span><span class="cmdp-hint-lbl">K</span>
+      </button>
+      <div class="scope-chip" id="scope-chip" title="Current time scope — click to jump to relevant panel" onclick="scopeChipClick()">
+        <button class="sc-arrow" onclick="event.stopPropagation();scopeShift(-1)" title="Previous">◀</button>
+        <span class="sc-label" id="sc-label">—</span>
+        <button class="sc-arrow" onclick="event.stopPropagation();scopeShift(1)" title="Next">▶</button>
+      </div>
       <div class="cur-toggle" id="cur-toggle"></div>
       <span class="save-badge" id="save-badge" style="display:none"></span>
       <button class="iBtn" id="theme-btn" onclick="toggleTheme()" title="Toggle theme">☀</button>
@@ -897,17 +1089,23 @@ function defaultState() {
     transactions:[],
 
     // Retire Anywhere
-    retireLocations:[
-      {id:genId(),name:'Nairobi',country:'Kenya',flag:'🇰🇪',costOfLiving:35000,taxRate:10,climate:'Warm',healthcare:'Good',infrastructure:'Moderate',notes:'Long-term relocation goal, child ISK',lat:-1.286,lng:36.817},
-      {id:genId(),name:'Lisbon',country:'Portugal',flag:'🇵🇹',costOfLiving:45000,taxRate:10,climate:'Mediterranean',healthcare:'Excellent',infrastructure:'Good',notes:'NHR tax regime, great weather',lat:38.717,lng:-9.139},
-      {id:genId(),name:'Chiang Mai',country:'Thailand',flag:'🇹🇭',costOfLiving:22000,taxRate:5,climate:'Tropical',healthcare:'Good',infrastructure:'Good',notes:'Digital nomad hub, low cost',lat:18.789,lng:98.984},
-      {id:genId(),name:'Málaga',country:'Spain',flag:'🇪🇸',costOfLiving:40000,taxRate:20,climate:'Mediterranean',healthcare:'Excellent',infrastructure:'Excellent',notes:'Beckham Law for new residents',lat:36.721,lng:-4.421},
+    retireLocations:[ /* deprecated — merged into `places` on migrate v3→v4; keep key here for older snapshots */ ],
+    // Unified "places" collection. Each entry has a `kind` discriminator
+    // ('retirement' today, 'market' reserved for Property IQ). Retire
+    // Anywhere, Property IQ, and the global world map all read from here.
+    places:[
+      {id:genId(),kind:'retirement',name:'Nairobi',country:'Kenya',flag:'🇰🇪',costOfLiving:35000,taxRate:10,climate:'Warm',healthcare:'Good',infrastructure:'Moderate',notes:'Long-term relocation goal, child ISK',lat:-1.286,lng:36.817},
+      {id:genId(),kind:'retirement',name:'Lisbon',country:'Portugal',flag:'🇵🇹',costOfLiving:45000,taxRate:10,climate:'Mediterranean',healthcare:'Excellent',infrastructure:'Good',notes:'NHR tax regime, great weather',lat:38.717,lng:-9.139},
+      {id:genId(),kind:'retirement',name:'Chiang Mai',country:'Thailand',flag:'🇹🇭',costOfLiving:22000,taxRate:5,climate:'Tropical',healthcare:'Good',infrastructure:'Good',notes:'Digital nomad hub, low cost',lat:18.789,lng:98.984},
+      {id:genId(),kind:'retirement',name:'Málaga',country:'Spain',flag:'🇪🇸',costOfLiving:40000,taxRate:20,climate:'Mediterranean',healthcare:'Excellent',infrastructure:'Excellent',notes:'Beckham Law for new residents',lat:36.721,lng:-4.421},
     ],
 
     // AI keys
     aiKeys:{ claude:'', openai:'' },
     aiProvider:'claude',
     aiMessages:[],
+    // Per-panel AI conversation memory (recent user queries, newest first).
+    aiHistoryByPanel:{},
   };
 }
 
@@ -915,16 +1113,101 @@ let state = defaultState();
 let charts = {};
 let saveTimer = null;
 
+// ─── EVENT BUS ──────────────────────────────────────────────────────────────
+// Tiny pub/sub so panels, sidebar, and the AI panel can react to state /
+// navigation changes without each mutator having to know every consumer.
+const bus = {
+  _h: {},
+  on(event, handler){ (this._h[event]=this._h[event]||[]).push(handler); return ()=>this.off(event,handler); },
+  off(event, handler){ this._h[event] = (this._h[event]||[]).filter(h=>h!==handler); },
+  emit(event, data){ (this._h[event]||[]).forEach(h=>{try{h(data)}catch(e){console.warn('bus handler error',e)}}); }
+};
+
+// ─── SELECTOR MEMOIZATION ───────────────────────────────────────────────────
+// Cheap generation-based cache: bump _selGen on every state write so the
+// next selector call recomputes lazily. Selectors are pure w.r.t. state,
+// so this is safe. Memoization matters because render cycles can call
+// getRetirementNumbers / getProjection / get12Months 5+ times per paint.
+let _selGen = 0;
+const _selCache = {};
+function memoSelect(key, fn){
+  const hit = _selCache[key];
+  if(hit && hit.gen === _selGen) return hit.v;
+  const v = fn();
+  _selCache[key] = {gen:_selGen, v};
+  return v;
+}
+function invalidateSelectors(){ _selGen++; }
+
 // ─── PERSISTENCE ────────────────────────────────────────────────────────────
+// State schema version. Bump this and add a branch to migrate() whenever the
+// shape of `state` changes in a backwards-incompatible way.
+const STATE_VERSION = 5;
+function migrate(s) {
+  const from = s.version || 1;
+  if(from >= STATE_VERSION) { s.version = STATE_VERSION; return s; }
+  // v1 → v2: ensure every location has a lat/lng, and external assets have
+  //          an assetType. These fields were added mid-flight; old saves
+  //          may lack them.
+  if(from < 2) {
+    (s.retireLocations||[]).forEach(l=>{
+      if(typeof l.lat!=='number') l.lat = 0;
+      if(typeof l.lng!=='number') l.lng = 0;
+    });
+    (s.externalAssets||[]).forEach(a=>{
+      if(!a.assetType) a.assetType = 'investment';
+    });
+  }
+  // v2 → v3: introduce selectedMonth default if missing, and ensure
+  //          baseSavings / activePanel are present. No destructive changes.
+  if(from < 3) {
+    if(typeof s.baseSavings!=='number') s.baseSavings = 0;
+    if(!s.activePanel) s.activePanel = 'dashboard';
+    if(!s.monthlyOverrides) s.monthlyOverrides = {};
+    if(!s.yearlyBases) s.yearlyBases = {};
+  }
+  // v3 → v4: unify retireLocations + (future) property markets under a
+  //          single `places` array with a `kind` discriminator.
+  if(from < 4) {
+    if(!Array.isArray(s.places)) s.places = [];
+    if(Array.isArray(s.retireLocations) && s.retireLocations.length && !s.places.length) {
+      s.places = s.retireLocations.map(l => ({...l, kind: l.kind || 'retirement'}));
+    } else {
+      // Ensure every existing place has a kind so filters work.
+      s.places.forEach(p => { if(!p.kind) p.kind = 'retirement'; });
+    }
+    // Leave s.retireLocations in place as a frozen snapshot for rollback.
+    if(!s.categoryMap) s.categoryMap = {}; // Transactions → Budget mapping
+  }
+  // v4 → v5: per-panel AI conversation memory
+  if(from < 5) {
+    if(!s.aiHistoryByPanel || typeof s.aiHistoryByPanel !== 'object') s.aiHistoryByPanel = {};
+  }
+  s.version = STATE_VERSION;
+  return s;
+}
+// Helper for reading retirement-kind places (what Retire Anywhere uses).
+function retirePlaces() { return (state.places||[]).filter(p => (p.kind||'retirement') === 'retirement'); }
 function loadState() {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
-    if (raw) { const d = JSON.parse(raw); Object.assign(state, d); }
-  } catch(e) {}
+    if (raw) {
+      const d = JSON.parse(raw);
+      Object.assign(state, d);
+      migrate(state);
+    } else {
+      state.version = STATE_VERSION;
+    }
+  } catch(e) { console.warn('loadState failed:', e); }
 }
 function save() {
   clearTimeout(saveTimer);
   showSave('saving');
+  state.version = STATE_VERSION;
+  // Invalidate selector memo cache — any save could change computed values.
+  _selGen++;
+  // Notify subscribers before the debounced write, so UI reacts instantly.
+  if(typeof bus!=='undefined') bus.emit('state:changed', {panel: state.activePanel});
   saveTimer = setTimeout(() => {
     try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch(e) {}
     showSave('saved');
@@ -980,19 +1263,21 @@ function getEffective(year, month) {
 }
 
 function get12Months() {
-  const months = [];
-  for (let i=0; i<=12; i++) {
-    const d = new Date(CY, CM+i, 1);
-    const year=d.getFullYear(), month=d.getMonth();
-    const key=`${year}-${String(month+1).padStart(2,'0')}`;
-    const v = getEffective(year, month);
-    months.push({ key, label:`${MONTH_NAMES[month]} ${year}`, short:`${MONTH_NAMES[month]} '${String(year).slice(2)}`,
-      income:v.income, expenses:v.expenses, savings:v.savings,
-      incomeItems:v.incomeItems, expenseItems:v.expenseItems,
-      surplus:v.income-v.expenses, funFund:v.income-v.expenses-v.savings,
-      isCurrent:i===0, hasOverride:v.hasOverride });
-  }
-  return months;
+  return memoSelect('12mo', () => {
+    const months = [];
+    for (let i=0; i<=12; i++) {
+      const d = new Date(CY, CM+i, 1);
+      const year=d.getFullYear(), month=d.getMonth();
+      const key=`${year}-${String(month+1).padStart(2,'0')}`;
+      const v = getEffective(year, month);
+      months.push({ key, label:`${MONTH_NAMES[month]} ${year}`, short:`${MONTH_NAMES[month]} '${String(year).slice(2)}`,
+        income:v.income, expenses:v.expenses, savings:v.savings,
+        incomeItems:v.incomeItems, expenseItems:v.expenseItems,
+        surplus:v.income-v.expenses, funFund:v.income-v.expenses-v.savings,
+        isCurrent:i===0, hasOverride:v.hasOverride });
+    }
+    return months;
+  });
 }
 
 function futureValue(P, PMT, r, years) {
@@ -1004,35 +1289,36 @@ function futureValue(P, PMT, r, years) {
 }
 
 function getProjection() {
-  const ytr = Math.max(0, state.retirementAge - state.currentAge);
-  const investments = state.externalAssets.filter(a=>(a.assetType||'investment')==='investment');
-  const assetBals = investments.map(a=>a.balance);
-  let appAcc=0;
-  const data=[];
+  return memoSelect('proj', () => {
+    const ytr = Math.max(0, state.retirementAge - state.currentAge);
+    const investments = state.externalAssets.filter(a=>(a.assetType||'investment')==='investment');
+    const assetBals = investments.map(a=>a.balance);
+    let appAcc=0;
+    const data=[];
 
-  for (let y=0; y<=ytr; y++) {
-    const year=CY+y;
-    const startMo=y===0?CM:0, months=y===0?12-CM:12;
-    let totalSav=0;
-    for (let m=startMo; m<12; m++) totalSav+=getEffective(year,m).savings;
-    const ms=months>0?totalSav/months:0;
-    const rApp=state.growthRate/100/12;
-    const prevApp=appAcc;
-    if(y===0) appAcc=ms*months;
-    else appAcc=appAcc*Math.pow(1+rApp,12)+ms*((Math.pow(1+rApp,12)-1)/(rApp||1));
-    let ext=0;
-    investments.forEach((a,idx) => {
-      const ra=(a.growthRate??state.growthRate)/100/12;
-      if(y===0) assetBals[idx]=a.balance*Math.pow(1+ra,months)+a.monthlyContribution*((Math.pow(1+ra,months)-1)/(ra||1));
-      else assetBals[idx]=assetBals[idx]*Math.pow(1+ra,12)+a.monthlyContribution*((Math.pow(1+ra,12)-1)/(ra||1));
-      ext+=assetBals[idx];
-    });
-    const total=Math.round(appAcc+ext);
-    const realTotal=Math.round(total/Math.pow(1+state.inflationRate/100,y));
-    const yearlyContrib=Math.round(ms*months+investments.reduce((s,a)=>s+a.monthlyContribution*months,0));
-    data.push({ year, age:state.currentAge+y, appSavings:Math.round(appAcc), external:Math.round(ext), total, realTotal, yearlyContrib });
-  }
-  return data;
+    for (let y=0; y<=ytr; y++) {
+      const year=CY+y;
+      const startMo=y===0?CM:0, months=y===0?12-CM:12;
+      let totalSav=0;
+      for (let m=startMo; m<12; m++) totalSav+=getEffective(year,m).savings;
+      const ms=months>0?totalSav/months:0;
+      const rApp=state.growthRate/100/12;
+      if(y===0) appAcc=ms*months;
+      else appAcc=appAcc*Math.pow(1+rApp,12)+ms*((Math.pow(1+rApp,12)-1)/(rApp||1));
+      let ext=0;
+      investments.forEach((a,idx) => {
+        const ra=(a.growthRate??state.growthRate)/100/12;
+        if(y===0) assetBals[idx]=a.balance*Math.pow(1+ra,months)+a.monthlyContribution*((Math.pow(1+ra,months)-1)/(ra||1));
+        else assetBals[idx]=assetBals[idx]*Math.pow(1+ra,12)+a.monthlyContribution*((Math.pow(1+ra,12)-1)/(ra||1));
+        ext+=assetBals[idx];
+      });
+      const total=Math.round(appAcc+ext);
+      const realTotal=Math.round(total/Math.pow(1+state.inflationRate/100,y));
+      const yearlyContrib=Math.round(ms*months+investments.reduce((s,a)=>s+a.monthlyContribution*months,0));
+      data.push({ year, age:state.currentAge+y, appSavings:Math.round(appAcc), external:Math.round(ext), total, realTotal, yearlyContrib });
+    }
+    return data;
+  });
 }
 
 function getPensionAssets() { return state.externalAssets.filter(a=>a.assetType==='pension'); }
@@ -1046,44 +1332,94 @@ function getTotalPensionIncome() {
 
 const RET_SCENARIOS = {lean:0.75,baseline:1.0,comfortable:1.3};
 function getRetirementNumbers() {
-  const sc = state.retirementScenario||'baseline';
-  const mult = RET_SCENARIOS[sc];
-  const ytr = Math.max(0,state.retirementAge-state.currentAge);
-  const totalExp = sumArr(state.retirementExpenses||[],'amount')*mult;
-  const pension = getTotalPensionIncome();
-  const taxRate = Math.min((state.withdrawTaxRate??0)/100, 0.99);
-  const totalGross = taxRate>0?totalExp/(1-taxRate):totalExp;
-  const grossNeeded = Math.max(0,totalGross-pension);
-  const proj = getProjection();
-  const nestEgg = proj.length?proj[proj.length-1].realTotal:0;
-  const realRate = Math.max(0.001,(state.retirementPostGrowth||4)-state.inflationRate)/100/12;
-  const retMonths = Math.max(1,(state.lifeExp-state.retirementAge)*12);
-  const sustainableMonthly = realRate>0?nestEgg*realRate/(1-Math.pow(1+realRate,-retMonths)):nestEgg/retMonths;
-  const sustainableAfterTax = sustainableMonthly*(1-taxRate);
-  const gap = sustainableAfterTax-totalExp;
-  const coveragePct = totalExp>0?(sustainableAfterTax/totalExp)*100:100;
-  let verdict,verdictIcon,verdictClass;
-  if(coveragePct>=100){verdict='Well Funded';verdictIcon='✅';verdictClass='overfunded';}
-  else if(coveragePct>=80){verdict='On Track';verdictIcon='🎯';verdictClass='ontarget';}
-  else{verdict='Underfunded';verdictIcon='❌';verdictClass='underfunded';}
+  return memoSelect('retnums', () => {
+    const sc = state.retirementScenario||'baseline';
+    const mult = RET_SCENARIOS[sc];
+    const ytr = Math.max(0,state.retirementAge-state.currentAge);
+    const totalExp = sumArr(state.retirementExpenses||[],'amount')*mult;
+    const pension = getTotalPensionIncome();
+    const taxRate = Math.min((state.withdrawTaxRate??0)/100, 0.99);
+    const totalGross = taxRate>0?totalExp/(1-taxRate):totalExp;
+    const grossNeeded = Math.max(0,totalGross-pension);
+    const proj = getProjection();
+    const nestEgg = proj.length?proj[proj.length-1].realTotal:0;
+    const realRate = Math.max(0.001,(state.retirementPostGrowth||4)-state.inflationRate)/100/12;
+    const retMonths = Math.max(1,(state.lifeExp-state.retirementAge)*12);
+    const sustainableMonthly = realRate>0?nestEgg*realRate/(1-Math.pow(1+realRate,-retMonths)):nestEgg/retMonths;
+    const sustainableAfterTax = sustainableMonthly*(1-taxRate);
+    const gap = sustainableAfterTax-totalExp;
+    const coveragePct = totalExp>0?(sustainableAfterTax/totalExp)*100:100;
+    let verdict,verdictIcon,verdictClass;
+    if(coveragePct>=100){verdict='Well Funded';verdictIcon='✅';verdictClass='overfunded';}
+    else if(coveragePct>=80){verdict='On Track';verdictIcon='🎯';verdictClass='ontarget';}
+    else{verdict='Underfunded';verdictIcon='❌';verdictClass='underfunded';}
 
-  // Runway simulation
-  let balance=nestEgg, months=0;
-  const runwayData=[{age:state.retirementAge,balance:nestEgg}];
-  const maxMonths=(state.lifeExp-state.retirementAge)*12+120;
-  while(balance>0&&months<maxMonths){
-    balance=balance*(1+realRate)-grossNeeded;
-    months++;
-    if(months%12===0) runwayData.push({age:state.retirementAge+months/12,balance:Math.max(0,Math.round(balance))});
-  }
-  const runoutAge=balance<=0?state.retirementAge+months/12:null;
+    // Runway simulation
+    let balance=nestEgg, months=0;
+    const runwayData=[{age:state.retirementAge,balance:nestEgg}];
+    const maxMonths=(state.lifeExp-state.retirementAge)*12+120;
+    while(balance>0&&months<maxMonths){
+      balance=balance*(1+realRate)-grossNeeded;
+      months++;
+      if(months%12===0) runwayData.push({age:state.retirementAge+months/12,balance:Math.max(0,Math.round(balance))});
+    }
+    const runoutAge=balance<=0?Math.round(state.retirementAge+months/12):null;
 
-  return {totalExp,totalGross,pension,grossNeeded,nestEgg,sustainableMonthly,sustainableAfterTax,gap,coveragePct,verdict,verdictIcon,verdictClass,ytr,runwayData,runoutAge,taxRate,sc,mult};
+    return {totalExp,totalGross,pension,grossNeeded,nestEgg,sustainableMonthly,sustainableAfterTax,gap,coveragePct,verdict,verdictIcon,verdictClass,ytr,runwayData,runoutAge,taxRate,sc,mult};
+  });
 }
 
 function getMonthlyFunFundBalance() {
   const m = get12Months();
   return m.reduce((s,mo)=>s+mo.funFund,0);
+}
+
+// ─── TRANSACTIONS → BUDGET MAPPING ──────────────────────────────────────────
+// Computes per-line-item actuals from the current bank transactions and
+// returns a map keyed by baseline-expense line-item id. Category → line-item
+// matching works in two layers:
+//   1) explicit overrides from state.categoryMap  (bank category → line id)
+//   2) case-insensitive name match fallback       (category name === line name)
+// Anything that doesn't match is ignored. Income and positive amounts are
+// skipped so we only report spend-side variance.
+function getMonthlyActuals() {
+  return memoSelect('actuals', () => {
+    const result = {}; // {lineItemId: {actual, category}}
+    if(!state.bankConnected || !state.transactions || !state.transactions.length) return result;
+    const now = new Date();
+    const ym = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
+    // Index baselines by normalized name for fallback matching
+    const byName = {};
+    (state.baseExpenses||[]).forEach(item => { byName[(item.name||'').toLowerCase().trim()] = item.id; });
+    // Build category → total spend map for the current month
+    const catTotals = {};
+    state.transactions.forEach(tx => {
+      if(tx.type !== 'debit') return;
+      if(tx.date && !tx.date.startsWith(ym)) return;
+      const cat = tx.category || 'Other';
+      catTotals[cat] = (catTotals[cat] || 0) + Math.abs(tx.amount || 0);
+    });
+    // Resolve each category into a baseline line item
+    Object.entries(catTotals).forEach(([cat, amt]) => {
+      const explicit = (state.categoryMap||{})[cat];
+      let lineId = explicit;
+      if(!lineId) {
+        // Fallback: match by name (case-insensitive)
+        const norm = cat.toLowerCase().trim();
+        lineId = byName[norm];
+        // Common aliases for the demo data
+        if(!lineId && norm === 'mortgage') lineId = byName['mortgage'] || byName['rent'] || byName['housing'];
+        if(!lineId && norm === 'mortgage/rent') lineId = byName['mortgage'] || byName['rent'];
+      }
+      if(lineId) {
+        const prev = result[lineId] || {actual:0, categories:[]};
+        prev.actual += amt;
+        prev.categories.push(cat);
+        result[lineId] = prev;
+      }
+    });
+    return result;
+  });
 }
 
 // ─── TRANSACTIONS / BANK ────────────────────────────────────────────────────
@@ -1119,7 +1455,8 @@ function connectBankDemo() {
   renderAll();
 }
 function connectBankLive() {
-  const bank=document.getElementById('bank-select').value;
+  const sel=document.getElementById('bank-select');
+  const bank=sel?sel.value:'';
   if(!bank){alert('Please select your bank.');return;}
   alert(`Open Banking connection to ${bank} would redirect to their PSD2 consent flow.\n\nFor this demo, loading sample data instead.`);
   connectBankDemo();
@@ -1127,21 +1464,38 @@ function connectBankLive() {
 
 // ─── RETIRE ANYWHERE SCORING ────────────────────────────────────────────────
 function scoreLocation(loc) {
-  const nums = getRetirementNumbers();
-  const monthlyIncome = nums.sustainableAfterTax + nums.pension;
-  const ratio = monthlyIncome>0 ? loc.costOfLiving/monthlyIncome : 2;
-  const taxPenalty = loc.taxRate/100;
-  const affordabilityScore = Math.max(0, Math.min(1, (1-ratio)*(1-taxPenalty*0.5)));
-  let verdict='infeasible', label='INFEASIBLE';
-  if(ratio<=0.7){ verdict='feasible'; label='FEASIBLE'; }
-  else if(ratio<=0.9){ verdict='conditional'; label='CONDITIONAL'; }
-  const surplus = monthlyIncome-loc.costOfLiving;
-  return { ...loc, verdict, label, ratio, surplus, affordabilityScore, monthlyIncome };
+  // Keyed memo: the retirement numbers are shared across locations, so we
+  // only recompute per-location fields and cache per id.
+  return memoSelect('loc:'+(loc.id||loc.name), () => {
+    const nums = getRetirementNumbers();
+    const monthlyIncome = nums.sustainableAfterTax + nums.pension;
+    const ratio = monthlyIncome>0 ? loc.costOfLiving/monthlyIncome : 2;
+    const taxPenalty = loc.taxRate/100;
+    const affordabilityScore = Math.max(0, Math.min(1, (1-ratio)*(1-taxPenalty*0.5)));
+    let verdict='infeasible', label='INFEASIBLE';
+    if(ratio<=0.7){ verdict='feasible'; label='FEASIBLE'; }
+    else if(ratio<=0.9){ verdict='conditional'; label='CONDITIONAL'; }
+    const surplus = monthlyIncome-loc.costOfLiving;
+    return { ...loc, verdict, label, ratio, surplus, affordabilityScore, monthlyIncome };
+  });
 }
 
 // ─── NAVIGATION ─────────────────────────────────────────────────────────────
-function nav(panel) {
+// Hash routing: #panel or #panel/section — panel drives nav(), section is
+// remembered so downstream renderers can scroll / pulse a target card.
+const VALID_PANELS = ['dashboard','transactions','monthly','yearly','retirement','funfund','retireanywhere','propiq','settings'];
+let _navFromHash = false;
+function parseHash() {
+  const raw = (location.hash||'').replace(/^#/,'');
+  if(!raw) return {panel:null, section:null};
+  const [panel, section] = raw.split('/');
+  return { panel: VALID_PANELS.includes(panel)?panel:null, section: section||null };
+}
+function nav(panel, opts) {
+  if(!VALID_PANELS.includes(panel)) return;
   state.activePanel=panel;
+  state.activeSection = (opts&&opts.section)||null;
+  if(typeof bus!=='undefined') bus.emit('panel:changed', {panel});
   document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
   document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
   const p=document.getElementById('panel-'+panel);
@@ -1149,7 +1503,70 @@ function nav(panel) {
   const n=document.querySelector(`.nav-item[data-panel="${panel}"]`);
   if(n) n.classList.add('active');
   renderPanel(panel);
+  // Post-render chrome (breadcrumb + related-row)
+  if(typeof decoratePanel==='function') decoratePanel(panel);
+  // Context-aware AI chips
+  if(typeof renderAIPChips==='function') renderAIPChips();
+  // Scope chip reflects the panel's time dimension
+  if(typeof updateScopeChip==='function') updateScopeChip();
+  // Scroll to top of content on nav
+  const content=document.querySelector('.content'); if(content) content.scrollTop=0;
+  // Push hash (without triggering recursion via hashchange listener)
+  if(!_navFromHash){
+    const target = '#'+panel + (state.activeSection?('/'+state.activeSection):'');
+    if(location.hash!==target) {
+      _navFromHash = true;
+      location.hash = target;
+      _navFromHash = false;
+    }
+  }
+  // Scroll/pulse target section after render settles
+  if(state.activeSection) setTimeout(()=>pulseSection(state.activeSection), 120);
 }
+function pulseSection(section){
+  const el = document.querySelector(`[data-section="${section}"]`);
+  if(!el) return;
+  el.scrollIntoView({behavior:'smooth', block:'start'});
+  el.classList.add('section-pulse');
+  setTimeout(()=>el.classList.remove('section-pulse'), 1400);
+}
+// ─── DIRTY TRACKING (sidebar nav dots) ──────────────────────────────────────
+// When state changes while the user is on panel X, mark every other panel
+// as "dirty" so the sidebar surfaces that something downstream has shifted.
+// Visiting a panel clears its dot.
+const _dirtyPanels = new Set();
+function markDirtyExcept(panel){
+  VALID_PANELS.forEach(p=>{ if(p!==panel) _dirtyPanels.add(p); });
+  renderDirtyDots();
+}
+function clearDirty(panel){
+  if(_dirtyPanels.delete(panel)) renderDirtyDots();
+}
+function renderDirtyDots(){
+  document.querySelectorAll('.nav-item').forEach(el=>{
+    const p = el.getAttribute('data-panel');
+    el.classList.toggle('dirty', _dirtyPanels.has(p));
+  });
+}
+bus.on('state:changed', (data)=>{
+  const active = (data&&data.panel) || state.activePanel || 'dashboard';
+  markDirtyExcept(active);
+});
+bus.on('panel:changed', (data)=>{
+  if(data&&data.panel) clearDirty(data.panel);
+});
+
+window.addEventListener('hashchange', ()=>{
+  const {panel, section} = parseHash();
+  if(panel && panel!==state.activePanel){
+    _navFromHash = true;
+    nav(panel, {section});
+    _navFromHash = false;
+  } else if(panel && section && section!==state.activeSection){
+    state.activeSection = section;
+    pulseSection(section);
+  }
+});
 
 function renderPanel(panel) {
   const fns = {
@@ -1157,20 +1574,419 @@ function renderPanel(panel) {
     transactions:renderTransactions,
     monthly:renderMonthly,
     yearly:renderYearly,
-    portfolio:renderPortfolio,
     retirement:renderRetirement,
     funfund:renderFunFund,
     retireanywhere:renderRetireAnywhere,
+    propiq:typeof renderPropIQ==='function'?renderPropIQ:null,
     settings:renderSettings,
   };
   if(fns[panel]) fns[panel]();
 }
 
+// ─── PANEL META (labels, breadcrumbs, related cross-links) ──────────────────
+const PANEL_META = {
+  dashboard:      {label:'Dashboard',        group:'Overview',          icon:'◉'},
+  transactions:   {label:'Bank & Transactions', group:'Personal Finances', icon:'🏦'},
+  monthly:        {label:'Monthly Review',   group:'Personal Finances', icon:'☰'},
+  yearly:         {label:'Yearly Forecast',  group:'Personal Finances', icon:'▦'},
+  retirement:     {label:'Retirement Plan',  group:'Personal Finances', icon:'🌅'},
+  funfund:        {label:'Fun Fund',         group:'Planning',          icon:'✦'},
+  retireanywhere: {label:'Retire Anywhere',  group:'Planning',          icon:'🌍'},
+  propiq:         {label:'Property IQ',      group:'Planning',          icon:'🏠'},
+  settings:       {label:'Settings',         group:'System',            icon:'⚙'},
+};
+// Hand-curated cross-links: "if you're here, you might next want..."
+const RELATED_MAP = {
+  dashboard:      ['monthly','retirement','retireanywhere'],
+  transactions:   ['monthly','funfund','dashboard'],
+  monthly:        ['yearly','funfund','retirement'],
+  yearly:         ['retirement','monthly','funfund'],
+  retirement:     ['retireanywhere','yearly','funfund'],
+  funfund:        ['monthly','retireanywhere','dashboard'],
+  retireanywhere: ['retirement','propiq','funfund'],
+  propiq:         ['retireanywhere','retirement','dashboard'],
+  settings:       ['dashboard','retirement','transactions'],
+};
+function esc2(str){const d=document.createElement('div');d.textContent=str;return d.innerHTML;}
+
+// Tracks the most recent plain-text value rendered for each KPI label so
+// that ui.kpi() can pulse tiles whose value just changed. Panel re-renders
+// that produce the same value produce no pulse.
+const _lastKpiValues = {};
+
+// ─── COMPONENT HELPERS ──────────────────────────────────────────────────────
+// Zero-framework string-template components. Use these in renderers instead
+// of hand-rolling card/KPI/stat markup so the whole app shares one visual
+// vocabulary. Every helper tolerates missing fields and escapes user text.
+const ui = {
+  // Page header: <tag>, <title>, optional subtitle. Pass `titleHtml` to
+  // embed raw HTML in the title (e.g. a subtitle span).
+  ph({tag, title, titleHtml, sub}){
+    return `<div class="ph">
+      ${tag?`<div class="ph-tag">${esc2(tag)}</div>`:''}
+      <div class="ph-title">${titleHtml || esc2(title||'')}</div>
+      ${sub?`<div class="ph-sub">${sub}</div>`:''}
+    </div>`;
+  },
+  // Card wrapper. `title` can be a string or raw HTML (for actions).
+  card({title, body, actions, section, className, onClick}){
+    const secAttr = section?` data-section="${esc2(section)}"`:'';
+    const cls = 'card'+(className?' '+className:'');
+    const click = onClick?` style="cursor:pointer" onclick="${onClick}"`:'';
+    const titleHtml = title?`<div class="card-title">${title}${actions?`<div class="ct-actions">${actions}</div>`:''}</div>`:'';
+    return `<div class="${cls}"${secAttr}${click}>${titleHtml}${body||''}</div>`;
+  },
+  // KPI tile. `tone` ∈ pos/neg/amb/neu; `link` makes it clickable to a panel.
+  // Remembers the last value seen per label so we can pulse tiles whose
+  // value changed since the last render ("what changed" affordance).
+  kpi({icon, label, value, sub, tone, link, section}){
+    const toneClass = tone==='pos'?'pos':tone==='neg'?'neg':tone==='amb'?'amb':'';
+    const click = link?` style="cursor:pointer" onclick="nav('${link}'${section?`,{section:'${section}'}`:''})" role="button" tabindex="0"`:'';
+    // Normalize the value to a plain string for diffing (strip tags).
+    const key = 'kpi:'+label;
+    const plain = String(value||'').replace(/<[^>]*>/g,'');
+    const prev = _lastKpiValues[key];
+    const changed = prev !== undefined && prev !== plain;
+    _lastKpiValues[key] = plain;
+    const pulseClass = changed ? ' kpi-pulse' : '';
+    return `<div class="kpi${pulseClass}"${click}>
+      ${icon?`<div class="kpi-icon">${icon}</div>`:''}
+      <div class="kpi-lbl">${esc2(label||'')}</div>
+      <div class="kpi-val ${toneClass}">${value??'—'}</div>
+      ${sub?`<div class="kpi-sub">${sub}</div>`:''}
+    </div>`;
+  },
+  // Stat row — used inside cards for label/value lists.
+  stat(label, value, tone){
+    const toneClass = tone==='pos'?'pos':tone==='neg'?'neg':tone==='amb'?'amb':'';
+    return `<div class="ui-stat">
+      <span class="ui-stat-lbl">${esc2(label||'')}</span>
+      <span class="ui-stat-val ${toneClass}">${value??'—'}</span>
+    </div>`;
+  },
+  // KPI row wrapper — convenience for a grid of kpi() items.
+  kpiRow(items){ return `<div class="kpi-row">${items.map(i=>ui.kpi(i)).join('')}</div>`; },
+  // Empty state — for panels/cards that have no content yet.
+  empty({icon, title, sub, cta}){
+    return `<div class="state state-empty">
+      ${icon?`<div class="state-icon">${icon}</div>`:''}
+      <div class="state-title">${esc2(title||'Nothing here yet')}</div>
+      ${sub?`<div class="state-sub">${sub}</div>`:''}
+      ${cta?`<div class="state-cta">${cta}</div>`:''}
+    </div>`;
+  },
+  // Inline loading spinner + optional label.
+  loading(label){
+    return `<div class="state state-loading">
+      <div class="state-spinner" aria-hidden="true"></div>
+      <div class="state-sub">${esc2(label||'Loading…')}</div>
+    </div>`;
+  },
+  // Error state with optional retry button (string onclick).
+  error({title, msg, retry}){
+    return `<div class="state state-error">
+      <div class="state-icon">⚠</div>
+      <div class="state-title">${esc2(title||'Something went wrong')}</div>
+      ${msg?`<div class="state-sub">${msg}</div>`:''}
+      ${retry?`<div class="state-cta"><button class="btn btn-danger" onclick="${retry}">Try again</button></div>`:''}
+    </div>`;
+  },
+};
+// Matching CSS for ui.stat lives alongside the existing utilities (.pos/.neg
+// already exist on kpi-val). Add the generic stat-row look.
+
+// ─── WORLD MAP (shared Leaflet helper) ──────────────────────────────────────
+// One place to build a Leaflet map — both Retire Anywhere and (future) the
+// Property IQ markets panel can share tile styling, theme awareness, and
+// invalidateSize quirks. Returns the map instance so callers can attach
+// more behavior if they need to.
+function createWorldMap(containerId, points, opts){
+  const el = document.getElementById(containerId);
+  if(!el || typeof L === 'undefined') return null;
+  const o = {
+    center: [20, 20], zoom: 2, zoomControl: true, scrollWheelZoom: false,
+    ...(opts||{})
+  };
+  const tileUrl = isLight()
+    ? 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png'
+    : 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png';
+  let map;
+  try {
+    map = L.map(containerId, {zoomControl:o.zoomControl, scrollWheelZoom:o.scrollWheelZoom}).setView(o.center, o.zoom);
+    L.tileLayer(tileUrl, {attribution:'© CartoDB', maxZoom:18}).addTo(map);
+    (points||[]).forEach(pt => {
+      if(typeof pt.lat!=='number' || typeof pt.lng!=='number') return;
+      const color = pt.color || '#4d9fff';
+      const m = L.circleMarker([pt.lat, pt.lng], {
+        radius: pt.radius || 10, color, fillColor: color,
+        fillOpacity: pt.fillOpacity ?? 0.7, weight: pt.weight || 2
+      });
+      if(pt.popup) m.bindPopup(pt.popup);
+      if(pt.onClick) m.on('click', pt.onClick);
+      m.addTo(map);
+    });
+    // Re-measure after the container settles (panel just became visible).
+    setTimeout(() => { try { map.invalidateSize(); } catch(e){} }, 60);
+  } catch(e) {
+    console.warn('createWorldMap error:', e);
+    return null;
+  }
+  return map;
+}
+function decoratePanel(panel){
+  const meta = PANEL_META[panel]; if(!meta) return;
+  const panelEl = document.getElementById('panel-'+panel); if(!panelEl) return;
+  // 1) Breadcrumb: prepend inside the .ph header (or before first child).
+  const ph = panelEl.querySelector('.ph');
+  const crumb = document.createElement('div');
+  crumb.className = 'breadcrumb';
+  crumb.innerHTML = `
+    <button onclick="nav('dashboard')">Horizon</button>
+    <span class="bc-sep">›</span>
+    <span class="bc-current">${esc2(meta.group)}</span>
+    <span class="bc-sep">›</span>
+    <span class="bc-current" style="color:var(--text)">${esc2(meta.label)}</span>`;
+  if(ph) ph.insertBefore(crumb, ph.firstChild);
+  else panelEl.insertBefore(crumb, panelEl.firstChild);
+  // 2) Related row appended to bottom
+  const related = (RELATED_MAP[panel]||[]).filter(k=>k!==panel && PANEL_META[k]);
+  if(related.length){
+    const row = document.createElement('div');
+    row.className = 'related-row';
+    row.innerHTML = `<span class="related-row-lbl">Next ↗</span>` + related.map(k=>{
+      const m = PANEL_META[k];
+      return `<button class="related-link" onclick="nav('${k}')">
+        <span class="rl-icon">${m.icon}</span>
+        <span>${esc2(m.label)}</span>
+        <span class="rl-arrow">→</span>
+      </button>`;
+    }).join('');
+    panelEl.appendChild(row);
+  }
+}
+
+// ─── SCOPE CHIP (persistent time indicator) ─────────────────────────────────
+function updateScopeChip(){
+  const label = document.getElementById('sc-label');
+  const chip = document.getElementById('scope-chip');
+  if(!label||!chip) return;
+  const panel = state.activePanel||'dashboard';
+  chip.classList.toggle('is-year', panel==='yearly');
+  if(panel==='yearly'){
+    label.textContent = String(state.selectedYear||CY);
+  } else {
+    // default: show selectedMonth (Monthly) or current month otherwise
+    const key = state.selectedMonth || `${CY}-${String(new Date().getMonth()+1).padStart(2,'0')}`;
+    const [y,m] = key.split('-').map(Number);
+    const monthName = MONTH_NAMES[(m-1)]||'';
+    label.textContent = `${monthName} ${y}`;
+  }
+}
+function scopeShift(dir){
+  const panel = state.activePanel||'dashboard';
+  if(panel==='yearly'){
+    state.selectedYear = Math.max(CY, (state.selectedYear||CY+1) + dir);
+    save(); renderAll();
+  } else {
+    // advance selectedMonth; clamp into the 12-month forward window
+    const months = get12Months();
+    const cur = state.selectedMonth || months[0].key;
+    let idx = months.findIndex(m=>m.key===cur);
+    if(idx<0) idx=0;
+    idx = Math.max(0, Math.min(months.length-1, idx+dir));
+    state.selectedMonth = months[idx].key;
+    save();
+    // Re-render only if we're on a panel that cares about the month.
+    if(panel==='monthly'||panel==='dashboard'||panel==='funfund') renderAll();
+    else updateScopeChip();
+  }
+}
+function scopeChipClick(){
+  const panel = state.activePanel||'dashboard';
+  // Yearly panel handles year scope; everything else delegates to Monthly
+  if(panel==='yearly') nav('yearly');
+  else nav('monthly');
+}
+
+// ─── COMMAND PALETTE (⌘K / Ctrl+K) ──────────────────────────────────────────
+// A keyboard-first command runner that indexes panels, deep-link sections,
+// common actions, and AI suggestions. Everything the user can reach from
+// the sidebar is reachable in two keystrokes.
+let _cmdpSelectedIdx = 0;
+let _cmdpFilteredItems = [];
+function buildCmdpItems(){
+  const items = [];
+  // Panels
+  VALID_PANELS.forEach(p => {
+    const m = PANEL_META[p]; if(!m) return;
+    items.push({
+      group:'Go to', icon:m.icon, label:m.label, hint:m.group,
+      keywords:`${m.label} ${m.group} ${p}`.toLowerCase(),
+      action:()=>nav(p)
+    });
+  });
+  // Deep-link sections
+  const sections = [
+    {panel:'retirement',     section:'runway',   icon:'📊', label:'Retirement → Longevity Runway', hint:'Section'},
+    {panel:'dashboard',      section:'cashflow', icon:'📈', label:'Dashboard → Cash Flow',         hint:'Section'},
+    {panel:'dashboard',      section:'nestegg',  icon:'🎯', label:'Dashboard → Nest Egg Curve',    hint:'Section'},
+    {panel:'retireanywhere', section:'map',      icon:'🌍', label:'Retire Anywhere → World Map',    hint:'Section'},
+  ];
+  sections.forEach(s => {
+    items.push({
+      group:'Go to', icon:s.icon, label:s.label, hint:s.hint,
+      keywords:`${s.label} ${s.panel} ${s.section}`.toLowerCase(),
+      action:()=>nav(s.panel, {section:s.section})
+    });
+  });
+  // Actions
+  items.push(
+    {group:'Action', icon:'🌙', label:'Toggle theme (dark / light)', hint:'⌘⇧L', keywords:'theme dark light toggle', action:()=>toggleTheme()},
+    {group:'Action', icon:'✦', label:'Open AI advisor', hint:'', keywords:'ai advisor chat assistant', action:()=>openAIPanel()},
+    {group:'Action', icon:'⚡', label:'Toggle yearly cascade', hint:'', keywords:'cascade yearly forecast toggle', action:()=>{state.cascadeEnabled=!state.cascadeEnabled;save();renderAll();}},
+    {group:'Action', icon:'✈️', label:'Add a new trip', hint:'Fun Fund', keywords:'trip travel add new', action:()=>{state.trips.push({id:genId(),name:'New Trip',country:'',budget:50000,spent:0,date:`${CY}-06`,status:'planning',icon:'✈️'});save();nav('funfund');}},
+    {group:'Action', icon:'📍', label:'Add a retirement destination', hint:'Retire Anywhere', keywords:'location destination city retire add', action:()=>{nav('retireanywhere');setTimeout(()=>{if(typeof addLocation==='function')addLocation();},300);}},
+    {group:'Action', icon:'🏦', label:'Connect bank (demo data)', hint:'', keywords:'bank connect transactions demo', action:()=>{if(typeof connectBankDemo==='function')connectBankDemo();}},
+    {group:'Action', icon:'🧹', label:'Clear AI chat history', hint:'', keywords:'clear reset ai chat history', action:()=>{if(typeof clearAIChat==='function'){clearAIChat();openAIPanel();}}},
+  );
+  // Currency quick-switch
+  Object.keys(CURRENCY_SYMBOLS||{SEK:1}).forEach(c => {
+    items.push({
+      group:'Currency', icon:'💱', label:`Switch currency to ${c}`, hint:CURRENCY_SYMBOLS[c],
+      keywords:`currency ${c} swap change`.toLowerCase(),
+      action:()=>{state.currency=c;save();renderAll();}
+    });
+  });
+  // AI chip suggestions — execute the active panel's contextual chips
+  const chips = aipChipsFor(state.activePanel||'dashboard');
+  chips.forEach(chip => {
+    items.push({
+      group:'Ask AI', icon:'✦', label:chip, hint:'AI',
+      keywords:('ai '+chip).toLowerCase(),
+      action:()=>{ openAIPanel(); setTimeout(()=>{ if(typeof aipChip==='function') aipChip(chip); },120); }
+    });
+  });
+  return items;
+}
+function cmdpFilter(query){
+  const all = buildCmdpItems();
+  const q = (query||'').trim().toLowerCase();
+  if(!q) return all;
+  // Simple subsequence / substring score: prefer label-start matches, then
+  // any substring, then keyword hits. Zero-score items are dropped.
+  const tokens = q.split(/\s+/).filter(Boolean);
+  return all.map(it => {
+    const label = it.label.toLowerCase();
+    let score = 0;
+    tokens.forEach(tok => {
+      if(label.startsWith(tok)) score += 10;
+      else if(label.includes(tok)) score += 5;
+      else if(it.keywords.includes(tok)) score += 2;
+      else score -= 100; // token not found — drop
+    });
+    return {it, score};
+  }).filter(x => x.score > 0)
+    .sort((a,b) => b.score - a.score)
+    .map(x => x.it);
+}
+function renderCmdpResults(){
+  const el = document.getElementById('cmdp-results');
+  if(!el) return;
+  if(!_cmdpFilteredItems.length){
+    el.innerHTML = `<div class="cmdp-empty">No matches. Try "retire", "trip", or "theme".</div>`;
+    return;
+  }
+  // Group by .group
+  const byGroup = {};
+  const order = [];
+  _cmdpFilteredItems.forEach((it, idx) => {
+    if(!byGroup[it.group]) { byGroup[it.group] = []; order.push(it.group); }
+    byGroup[it.group].push({it, idx});
+  });
+  el.innerHTML = order.map(g => `
+    <div class="cmdp-group">${esc2(g)}</div>
+    ${byGroup[g].map(({it, idx}) => `
+      <div class="cmdp-item ${idx===_cmdpSelectedIdx?'active':''}" data-idx="${idx}" onclick="cmdpRun(${idx})" onmouseenter="cmdpSelect(${idx})">
+        <span class="cmdp-item-icon">${it.icon||'•'}</span>
+        <span class="cmdp-item-label">${esc2(it.label)}</span>
+        ${it.hint?`<span class="cmdp-item-hint">${esc2(it.hint)}</span>`:''}
+      </div>
+    `).join('')}
+  `).join('');
+  // Keep the active item in view
+  const active = el.querySelector('.cmdp-item.active');
+  if(active) active.scrollIntoView({block:'nearest'});
+}
+function cmdpSelect(idx){
+  if(_cmdpFilteredItems.length===0) return;
+  _cmdpSelectedIdx = Math.max(0, Math.min(_cmdpFilteredItems.length-1, idx));
+  document.querySelectorAll('.cmdp-item').forEach(el => {
+    el.classList.toggle('active', +el.getAttribute('data-idx') === _cmdpSelectedIdx);
+  });
+}
+function cmdpRun(idx){
+  const it = _cmdpFilteredItems[idx];
+  if(!it) return;
+  cmdpClose();
+  try { it.action(); } catch(e) { console.warn('command error', e); }
+}
+function cmdpOpen(){
+  const panel = document.getElementById('cmdp');
+  const backdrop = document.getElementById('cmdp-backdrop');
+  const input = document.getElementById('cmdp-input');
+  if(!panel||!backdrop||!input) return;
+  panel.classList.add('open');
+  backdrop.classList.add('open');
+  input.value = '';
+  _cmdpSelectedIdx = 0;
+  _cmdpFilteredItems = cmdpFilter('');
+  renderCmdpResults();
+  setTimeout(()=>input.focus(), 20);
+}
+function cmdpClose(){
+  const panel = document.getElementById('cmdp');
+  const backdrop = document.getElementById('cmdp-backdrop');
+  if(panel) panel.classList.remove('open');
+  if(backdrop) backdrop.classList.remove('open');
+}
+function cmdpIsOpen(){ return document.getElementById('cmdp')?.classList.contains('open'); }
+// Global keyboard handler: ⌘K / Ctrl+K to open; arrow keys / Enter / Esc
+// while open.
+window.addEventListener('keydown', (e) => {
+  const meta = e.metaKey || e.ctrlKey;
+  if(meta && (e.key === 'k' || e.key === 'K')) {
+    e.preventDefault();
+    cmdpIsOpen() ? cmdpClose() : cmdpOpen();
+    return;
+  }
+  if(!cmdpIsOpen()) return;
+  if(e.key === 'Escape') { e.preventDefault(); cmdpClose(); return; }
+  if(e.key === 'ArrowDown') { e.preventDefault(); cmdpSelect(_cmdpSelectedIdx + 1); return; }
+  if(e.key === 'ArrowUp')   { e.preventDefault(); cmdpSelect(_cmdpSelectedIdx - 1); return; }
+  if(e.key === 'Enter')     { e.preventDefault(); cmdpRun(_cmdpSelectedIdx); return; }
+});
+// Live filter on input (attach immediately — script runs after <body>).
+(function attachCmdpInput(){
+  const input = document.getElementById('cmdp-input');
+  if(!input) return;
+  input.addEventListener('input', (e) => {
+    _cmdpFilteredItems = cmdpFilter(e.target.value);
+    _cmdpSelectedIdx = 0;
+    renderCmdpResults();
+  });
+})();
+
 function renderAll() {
   renderTicker();
   renderCurrencyToggle();
   updateSidebar();
-  renderPanel(state.activePanel||'dashboard');
+  const panel=state.activePanel||'dashboard';
+  renderPanel(panel);
+  // Decorate the panel with breadcrumb + related-row, and refresh the
+  // topbar scope chip + AI chips so they always reflect the active panel.
+  if(typeof decoratePanel==='function') decoratePanel(panel);
+  if(typeof updateScopeChip==='function') updateScopeChip();
+  if(typeof renderAIPChips==='function') renderAIPChips();
 }
 
 function updateSidebar() {
@@ -1231,8 +2047,8 @@ function applyTheme() {
 }
 
 // ─── MODAL ──────────────────────────────────────────────────────────────────
-function openModal(id) { document.getElementById(id).classList.add('open'); }
-function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+function openModal(id) { const el=document.getElementById(id); if(el) el.classList.add('open'); }
+function closeModal(id) { const el=document.getElementById(id); if(el) el.classList.remove('open'); }
 
 // ─── CHART HELPERS ──────────────────────────────────────────────────────────
 const isLight=()=>document.body.classList.contains('light');
@@ -1248,22 +2064,69 @@ function chartDefaults() {
     tooltipBody: isLight()?'#3a4d6e':'#7a8fb0',
   };
 }
+// Shared Chart.js options preset — single source of truth for padding,
+// tooltip styling, legend, and axis defaults. Individual renderers can
+// override any key by deep-merging their own options on top.
+function chartPreset(overrides){
+  const cd = chartDefaults();
+  const base = {
+    responsive:true,
+    maintainAspectRatio:false,
+    interaction:{mode:'index',intersect:false},
+    layout:{padding:{top:4,right:4,bottom:2,left:2}},
+    plugins:{
+      legend:{labels:{color:cd.legendColor,font:cd.tickFont,boxWidth:10,padding:10,usePointStyle:true}},
+      tooltip:{
+        backgroundColor:cd.tooltipBg,borderColor:cd.tooltipBorder,borderWidth:1,
+        titleColor:cd.tooltipTitle,bodyColor:cd.tooltipBody,
+        bodyFont:{family:'JetBrains Mono',size:11},padding:10,
+        callbacks:{label:c=>'  '+c.dataset.label+': '+fmt(c.raw)}
+      }
+    },
+    scales:{
+      x:{ticks:{color:cd.textColor,font:cd.tickFont},grid:{color:cd.gridColor}},
+      y:{ticks:{color:cd.textColor,callback:v=>fmtC(v),font:cd.tickFont,maxTicksLimit:6},grid:{color:cd.gridColor}}
+    }
+  };
+  // Shallow-deep merge for the two known nested shapes (plugins, scales).
+  if(overrides){
+    if(overrides.plugins) base.plugins = {...base.plugins, ...overrides.plugins};
+    if(overrides.scales)  base.scales  = {...base.scales,  ...overrides.scales};
+    for(const k of Object.keys(overrides)) if(k!=='plugins'&&k!=='scales') base[k]=overrides[k];
+  }
+  return base;
+}
 function destroyChart(key) { if(charts[key]){charts[key].destroy();delete charts[key];} }
 
 // ─── SHARED LINE ITEM RENDERER ───────────────────────────────────────────────
 function renderLineItems(containerId, items, stateKey, readOnly, showPaid) {
   const el=document.getElementById(containerId); if(!el) return;
   const r=rate(); const s=sym();
-  el.innerHTML=items.map((it,idx)=>`
-    <div class="line-item">
+  // Variance data is only meaningful for expense line items and only when
+  // we're viewing a monthly override that corresponds to the current month.
+  const isExpense = stateKey === 'baseExpenses' || stateKey.startsWith('mo-exp') || stateKey.startsWith('yr-exp');
+  const actuals = (isExpense && state.bankConnected) ? getMonthlyActuals() : {};
+  el.innerHTML=items.map((it,idx)=>{
+    const variance = actuals[it.id];
+    let variancePill = '';
+    if(variance && it.amount > 0) {
+      const deltaPct = Math.round(((variance.actual - it.amount) / it.amount) * 100);
+      const overBudget = variance.actual > it.amount;
+      const tone = overBudget ? 'neg' : 'pos';
+      const arrow = overBudget ? '↑' : '↓';
+      variancePill = `<span class="line-variance ${tone}" title="Actual spend this month from bank data: ${fmt(variance.actual)} (${variance.categories.join(', ')})">${arrow} ${Math.abs(deltaPct)}% · ${fmt(variance.actual)}</span>`;
+    }
+    return `<div class="line-item">
       <input class="line-name" value="${esc(it.name)}" placeholder="Name" ${readOnly?'disabled':''} oninput="updateLineItem('${stateKey}','${it.id}','name',this.value)">
       <div class="line-amt-wrap"><span class="line-cur">${s}</span><input class="line-amt" type="number" value="${Math.round(it.amount*r)}" ${readOnly?'disabled':''} oninput="updateLineItem('${stateKey}','${it.id}','amount',this.value/${r})"></div>
       <select class="line-type" ${readOnly?'disabled':''} onchange="updateLineItem('${stateKey}','${it.id}','type',this.value)">
         <option value="fixed" ${it.type==='fixed'?'selected':''}>Fixed</option>
         <option value="variable" ${it.type==='variable'?'selected':''}>Variable</option>
       </select>
+      ${variancePill}
       ${readOnly?'':`<button class="line-rm" onclick="removeLineItem('${stateKey}','${it.id}')">×</button>`}
-    </div>`).join('');
+    </div>`;
+  }).join('');
 }
 function esc(str){const d=document.createElement('div');d.textContent=str;return d.innerHTML;}
 function updateLineItem(key,id,field,val) {
@@ -1314,28 +2177,25 @@ function renderDashboard() {
   const extBal=state.externalAssets.filter(a=>(a.assetType||'investment')==='investment').reduce((s,a)=>s+a.balance,0);
 
   const el=document.getElementById('panel-dashboard');
+  if(!el) return;
   el.innerHTML=`
-    <div class="ph">
-      <div class="ph-tag">HORIZON FINANCE OS</div>
-      <div class="ph-title">Your Financial Dashboard</div>
-      <div class="ph-sub">360° view — cash flow, portfolio, retirement health, and lifestyle planning</div>
-    </div>
+    ${ui.ph({tag:'HORIZON FINANCE OS', title:'Your Financial Dashboard', sub:'360° view — cash flow, portfolio, retirement health, and lifestyle planning'})}
 
-    <!-- KPI Row 1: Cash Flow -->
-    <div class="kpi-row">
-      <div class="kpi"><div class="kpi-icon">💰</div><div class="kpi-lbl">MONTHLY INCOME</div><div class="kpi-val pos">${fmt(ti)}</div><div class="kpi-sub">${state.baseIncome.length} income streams</div></div>
-      <div class="kpi"><div class="kpi-icon">📤</div><div class="kpi-lbl">MONTHLY EXPENSES</div><div class="kpi-val neg">${fmt(te)}</div><div class="kpi-sub">${ti>0?Math.round(te/ti*100):0}% of income</div></div>
-      <div class="kpi"><div class="kpi-icon">🏦</div><div class="kpi-lbl">MONTHLY SAVINGS</div><div class="kpi-val" style="color:var(--amber)">${fmt(state.baseSavings)}</div><div class="kpi-sub">${ti>0?Math.round(state.baseSavings/ti*100):0}% savings rate</div></div>
-      <div class="kpi"><div class="kpi-icon">✦</div><div class="kpi-lbl">FUN FUND (12MO)</div><div class="kpi-val" style="color:var(--cyan)">${fmt(funFundTotal)}</div><div class="kpi-sub">${fmt(funFundTotal/12)}/mo average</div></div>
-    </div>
+    <!-- KPI Row 1: Cash Flow (each KPI drills into its owning panel) -->
+    ${ui.kpiRow([
+      {icon:'💰', label:'MONTHLY INCOME',   value:fmt(ti),               tone:'pos', sub:`${state.baseIncome.length} income streams`,       link:'monthly'},
+      {icon:'📤', label:'MONTHLY EXPENSES', value:fmt(te),               tone:'neg', sub:`${ti>0?Math.round(te/ti*100):0}% of income`,      link:'monthly'},
+      {icon:'🏦', label:'MONTHLY SAVINGS',  value:`<span class="amb">${fmt(state.baseSavings)}</span>`, sub:`${ti>0?Math.round(state.baseSavings/ti*100):0}% savings rate`, link:'monthly'},
+      {icon:'✦', label:'FUN FUND (12MO)',  value:`<span style="color:var(--cyan)">${fmt(funFundTotal)}</span>`, sub:`${fmt(funFundTotal/12)}/mo average`, link:'funfund'},
+    ])}
 
     <!-- KPI Row 2: Retirement -->
-    <div class="kpi-row">
-      <div class="kpi"><div class="kpi-icon">◈</div><div class="kpi-lbl">NEST EGG (NOMINAL)</div><div class="kpi-val pos">${fmt(nestEgg)}</div><div class="kpi-sub">At age ${state.retirementAge} · ${state.growthRate}% growth</div></div>
-      <div class="kpi"><div class="kpi-icon">◈</div><div class="kpi-lbl">NEST EGG (TODAY'S MONEY)</div><div class="kpi-val" style="color:var(--cyan)">${fmt(realNestEgg)}</div><div class="kpi-sub">Inflation-adjusted · ${(state.growthRate-state.inflationRate).toFixed(1)}% real</div></div>
-      <div class="kpi"><div class="kpi-icon">⏱</div><div class="kpi-lbl">YEARS TO RETIRE</div><div class="kpi-val">${ytr}</div><div class="kpi-sub">Age ${state.currentAge} → ${state.retirementAge}</div></div>
-      <div class="kpi"><div class="kpi-icon">${retNums.verdictIcon}</div><div class="kpi-lbl">RETIREMENT STATUS</div><div class="kpi-val ${retNums.verdictClass}">${retNums.verdict}</div><div class="kpi-sub">${retNums.coveragePct.toFixed(0)}% funded · ${fmt(retNums.sustainableAfterTax)}/mo after tax</div></div>
-    </div>
+    ${ui.kpiRow([
+      {icon:'◈', label:'NEST EGG (NOMINAL)',      value:fmt(nestEgg),     tone:'pos', sub:`At age ${state.retirementAge} · ${state.growthRate}% growth`, link:'retirement', section:'runway'},
+      {icon:'◈', label:"NEST EGG (TODAY'S MONEY)", value:`<span style="color:var(--cyan)">${fmt(realNestEgg)}</span>`, sub:`Inflation-adjusted · ${(state.growthRate-state.inflationRate).toFixed(1)}% real`, link:'retirement'},
+      {icon:'⏱', label:'YEARS TO RETIRE',         value:ytr,              sub:`Age ${state.currentAge} → ${state.retirementAge}`, link:'retirement'},
+      {icon:retNums.verdictIcon, label:'RETIREMENT STATUS', value:`<span class="${retNums.verdictClass==='overfunded'?'pos':retNums.verdictClass==='ontarget'?'amb':'neg'}">${retNums.verdict}</span>`, sub:`${retNums.coveragePct.toFixed(0)}% funded · ${fmt(retNums.sustainableAfterTax)}/mo after tax`, link:'retirement', section:'runway'},
+    ])}
 
     <!-- Bank status -->
     <div class="callout ${state.bankConnected?'':'callout-warn'}">
@@ -1348,16 +2208,16 @@ function renderDashboard() {
 
     <div class="two-col">
       <!-- 12-month cash flow chart -->
-      <div class="card">
+      <div class="card" data-section="cashflow">
         <div class="card-title">📈 12-Month Cash Flow
           <div class="ct-actions"><span class="conn-badge demo">PROJECTION</span></div>
         </div>
-        <div class="chart-wrap"><canvas id="dash-cashflow-chart" height="160"></canvas></div>
+        <div class="chart-wrap sm"><canvas id="dash-cashflow-chart"></canvas></div>
       </div>
       <!-- Nest Egg Projection -->
-      <div class="card">
+      <div class="card" data-section="nestegg">
         <div class="card-title">🎯 Nest Egg Growth Curve</div>
-        <div class="chart-wrap"><canvas id="dash-nestegg-chart" height="160"></canvas></div>
+        <div class="chart-wrap sm"><canvas id="dash-nestegg-chart"></canvas></div>
       </div>
     </div>
 
@@ -1379,7 +2239,7 @@ function renderDashboard() {
         <div class="kpi-icon">🌍</div>
         <div style="font-size:13px;font-weight:700;margin-bottom:3px">Retire Anywhere</div>
         <div style="font-size:11px;color:var(--text2)">AI-powered retirement location analysis</div>
-        <div style="margin-top:6px;font-family:var(--fm);font-size:10px;color:var(--amber)">${state.retireLocations.filter(l=>scoreLocation(l).verdict==='feasible').length} feasible destinations →</div>
+        <div style="margin-top:6px;font-family:var(--fm);font-size:10px;color:var(--amber)">${retirePlaces().filter(l=>scoreLocation(l).verdict==='feasible').length} feasible destinations →</div>
       </div>
     </div>`;
 
@@ -1388,8 +2248,6 @@ function renderDashboard() {
     destroyChart('dash-cf');
     const cf=document.getElementById('dash-cashflow-chart');
     if(cf) {
-      const cd=chartDefaults();
-      destroyChart('dash-cf');
       charts['dash-cf']=new Chart(cf.getContext('2d'),{
         type:'line',
         data:{
@@ -1400,7 +2258,7 @@ function renderDashboard() {
             {label:'Fun Fund',data:months.map(m=>m.funFund),borderColor:'#00d4ff',fill:false,tension:.35,pointRadius:2,borderWidth:1.5,borderDash:[4,3]},
           ]
         },
-        options:{responsive:true,interaction:{mode:'index',intersect:false},plugins:{legend:{labels:{color:cd.legendColor,font:cd.tickFont}},tooltip:{backgroundColor:cd.tooltipBg,borderColor:cd.tooltipBorder,borderWidth:1,titleColor:cd.tooltipTitle,bodyColor:cd.tooltipBody,bodyFont:{family:'JetBrains Mono',size:11},callbacks:{label:c=>'  '+c.dataset.label+': '+fmt(c.raw)}}},scales:{x:{ticks:{color:cd.textColor,font:cd.tickFont},grid:{color:cd.gridColor}},y:{ticks:{color:cd.textColor,callback:v=>fmtC(v),font:cd.tickFont},grid:{color:cd.gridColor}}}}
+        options:chartPreset()
       });
     }
     destroyChart('dash-ne');
@@ -1417,7 +2275,10 @@ function renderDashboard() {
             {label:"Today's Money",data:proj.map(p=>p.realTotal),borderColor:'#4d9fff',fill:false,tension:.3,pointRadius:0,borderWidth:1.5,borderDash:[4,3]},
           ]
         },
-        options:{responsive:true,interaction:{mode:'index',intersect:false},plugins:{legend:{labels:{color:cd.legendColor,font:cd.tickFont}},tooltip:{backgroundColor:cd.tooltipBg,borderColor:cd.tooltipBorder,borderWidth:1,titleColor:cd.tooltipTitle,bodyColor:cd.tooltipBody,bodyFont:{family:'JetBrains Mono',size:11},callbacks:{label:c=>'  '+c.dataset.label+': '+fmt(c.raw)}}},scales:{x:{ticks:{color:cd.textColor,font:cd.tickFont,maxTicksLimit:8},grid:{color:cd.gridColor}},y:{ticks:{color:cd.textColor,callback:v=>fmtC(v),font:cd.tickFont},grid:{color:cd.gridColor}}}}
+        options:chartPreset({scales:{
+          x:{ticks:{color:cd.textColor,font:cd.tickFont,maxTicksLimit:8},grid:{color:cd.gridColor}},
+          y:{ticks:{color:cd.textColor,callback:v=>fmtC(v),font:cd.tickFont,maxTicksLimit:6},grid:{color:cd.gridColor}}
+        }})
       });
     }
   },50);
@@ -1429,20 +2290,20 @@ function renderTransactions() {
   if(!el) return;
 
   if(!state.bankConnected) {
-    el.innerHTML=`
-      <div class="ph"><div class="ph-tag">PERSONAL FINANCES</div><div class="ph-title">Bank & Transactions</div><div class="ph-sub">Connect your bank account to view real transaction data and spending patterns</div></div>
-      <div class="bank-empty">
-        <div class="bank-empty-icon">🏦</div>
-        <div class="bank-empty-title">No Bank Connected</div>
-        <div class="bank-empty-sub">Connect via Open Banking (PSD2) to automatically import transactions from your bank. Supported banks:</div>
-        <div style="margin-bottom:18px">
-          <span class="bank-badge">🇸🇪 SEB</span><span class="bank-badge">🇸🇪 Swedbank</span><span class="bank-badge">🇸🇪 Handelsbanken</span>
-          <span class="bank-badge">🇸🇪 Nordea</span><span class="bank-badge">🇩🇰 Danske Bank</span><span class="bank-badge">🇪🇺 All PSD2</span>
-        </div>
-        <button class="btn btn-g" onclick="openModal('bank-modal')">🏦 Connect Bank Account</button>
-        <p style="font-size:11px;color:var(--text3);margin-top:12px">Or load demo data to explore the features</p>
-        <button class="btn btn-o btn-sm" style="margin-top:6px" onclick="connectBankDemo()">📊 Load Demo Data</button>
-      </div>`;
+    el.innerHTML = `
+      ${ui.ph({tag:'PERSONAL FINANCES', title:'Bank & Transactions', sub:'Connect your bank account to view real transaction data and spending patterns'})}
+      ${ui.empty({
+        icon:'🏦',
+        title:'No Bank Connected',
+        sub:`Connect via Open Banking (PSD2) to automatically import transactions from your bank. Supported banks:
+          <div style="margin-top:14px;display:flex;gap:6px;flex-wrap:wrap;justify-content:center">
+            <span class="bank-badge">🇸🇪 SEB</span><span class="bank-badge">🇸🇪 Swedbank</span><span class="bank-badge">🇸🇪 Handelsbanken</span>
+            <span class="bank-badge">🇸🇪 Nordea</span><span class="bank-badge">🇩🇰 Danske Bank</span><span class="bank-badge">🇪🇺 All PSD2</span>
+          </div>`,
+        cta:`<button class="btn btn-g" onclick="openModal('bank-modal')">🏦 Connect Bank Account</button>
+             <button class="btn btn-o btn-sm" onclick="connectBankDemo()">📊 Load Demo Data</button>`
+      })}
+    `;
     return;
   }
 
@@ -1482,7 +2343,7 @@ function renderTransactions() {
       <div class="kpi"><div class="kpi-lbl">TOTAL INCOME (MTH)</div><div class="kpi-val pos">${fmt(state.transactions.filter(t=>t.type==='credit').reduce((s,t)=>s+t.amount,0))}</div></div>
       <div class="kpi"><div class="kpi-lbl">TOTAL SPEND (MTH)</div><div class="kpi-val neg">${fmt(Math.abs(state.transactions.filter(t=>t.type==='debit').reduce((s,t)=>s+t.amount,0)))}</div></div>
       <div class="kpi"><div class="kpi-lbl">TRANSACTIONS</div><div class="kpi-val">${state.transactions.length}</div></div>
-      <div class="kpi"><div class="kpi-lbl">LARGEST EXPENSE</div><div class="kpi-val neg">${fmt(Math.abs(Math.min(...state.transactions.filter(t=>t.type==='debit').map(t=>t.amount))))}</div><div class="kpi-sub">Mortgage</div></div>
+      <div class="kpi"><div class="kpi-lbl">LARGEST EXPENSE</div><div class="kpi-val neg">${(()=>{const debits=state.transactions.filter(t=>t.type==='debit').map(t=>t.amount);return debits.length?fmt(Math.abs(Math.min(...debits))):fmt(0);})()}</div><div class="kpi-sub">Mortgage</div></div>
     </div>
 
     <div class="two-col">
@@ -1515,7 +2376,7 @@ function renderTransactions() {
     <!-- Spending chart -->
     <div class="card">
       <div class="card-title">📊 12-Month Spending vs Income Trend</div>
-      <div class="chart-wrap"><canvas id="tx-chart" height="140"></canvas></div>
+      <div class="chart-wrap md"><canvas id="tx-chart"></canvas></div>
     </div>
 
     <!-- AI Patterns -->
@@ -1532,7 +2393,6 @@ function renderTransactions() {
     destroyChart('tx');
     const ctx=document.getElementById('tx-chart');
     if(ctx){
-      const cd=chartDefaults();
       const months=MONTH_NAMES.slice(4).concat(MONTH_NAMES.slice(0,4));
       const income=[127000,127000,206000,131800,127000,127000,127000,127000,127000,127000,127000,127000];
       const expenses=[132500,178264,88545,91500,103500,91500,108636,63945,81636,91500,56590,107090];
@@ -1542,7 +2402,7 @@ function renderTransactions() {
           {label:'Income',data:income,backgroundColor:'#00e8a030',borderColor:'#00e8a0',borderWidth:1.5,borderRadius:3},
           {label:'Expenses',data:expenses,backgroundColor:'#ff4d6d20',borderColor:'#ff4d6d',borderWidth:1.5,borderRadius:3},
         ]},
-        options:{responsive:true,interaction:{mode:'index',intersect:false},plugins:{legend:{labels:{color:cd.legendColor,font:cd.tickFont}},tooltip:{backgroundColor:cd.tooltipBg,borderColor:cd.tooltipBorder,borderWidth:1,titleColor:cd.tooltipTitle,bodyColor:cd.tooltipBody,bodyFont:{family:'JetBrains Mono',size:11},callbacks:{label:c=>'  '+c.dataset.label+': '+fmt(c.raw)}}},scales:{x:{ticks:{color:cd.textColor,font:cd.tickFont},grid:{color:cd.gridColor}},y:{ticks:{color:cd.textColor,callback:v=>fmtC(v),font:cd.tickFont},grid:{color:cd.gridColor}}}}
+        options:chartPreset()
       });
     }
   },50);
@@ -1551,8 +2411,12 @@ function renderTransactions() {
 // ══ MONTHLY ══════════════════════════════════════════════════════════════════
 function renderMonthly() {
   const months=get12Months();
-  const selKey=state.selectedMonth||months[0].key;
-  if(!months.find(m=>m.key===selKey)) state.selectedMonth=months[0].key;
+  let selKey=state.selectedMonth||months[0].key;
+  if(!months.find(m=>m.key===selKey)) {
+    selKey=months[0].key;
+    state.selectedMonth=selKey;
+    save();
+  }
   const sel=months.find(m=>m.key===selKey)||months[0];
   const el=document.getElementById('panel-monthly');
   if(!el) return;
@@ -1596,7 +2460,7 @@ function renderMonthly() {
       </div>
     </div>
 
-    <div class="card"><div class="card-title">12-Month Forward Overview</div><div class="chart-wrap"><canvas id="mo-chart" height="130"></canvas></div></div>`;
+    <div class="card"><div class="card-title">12-Month Forward Overview</div><div class="chart-wrap md"><canvas id="mo-chart"></canvas></div></div>`;
 
   const incKey=state.monthlyOverrides[selKey]?.income?`mo-inc:${selKey}`:'baseIncome';
   const expKey=state.monthlyOverrides[selKey]?.expenses?`mo-exp:${selKey}`:'baseExpenses';
@@ -1607,15 +2471,15 @@ function renderMonthly() {
     destroyChart('mo');
     const ctx=document.getElementById('mo-chart');
     if(ctx){
-      const cd=chartDefaults();
       const all=get12Months();
       charts['mo']=new Chart(ctx.getContext('2d'),{type:'bar',data:{labels:all.map(m=>m.short),datasets:[
         {label:'Income',data:all.map(m=>m.income),backgroundColor:'#00e8a018',borderColor:'#00e8a0',borderWidth:1.5,borderRadius:3},
         {label:'Expenses',data:all.map(m=>m.expenses),backgroundColor:'#ff4d6d14',borderColor:'#ff4d6d',borderWidth:1.5,borderRadius:3},
         {label:'Fun Fund',data:all.map(m=>Math.max(0,m.funFund)),type:'line',borderColor:'#00d4ff',fill:false,tension:.3,pointRadius:2,borderWidth:1.5,yAxisID:'y'},
-      ]},options:{responsive:true,interaction:{mode:'index',intersect:false},plugins:{legend:{labels:{color:cd.legendColor,font:cd.tickFont}},tooltip:{backgroundColor:cd.tooltipBg,borderColor:cd.tooltipBorder,borderWidth:1,titleColor:cd.tooltipTitle,bodyColor:cd.tooltipBody,bodyFont:{family:'JetBrains Mono',size:11},callbacks:{label:c=>'  '+c.dataset.label+': '+fmt(c.raw)}}},scales:{x:{ticks:{color:cd.textColor,font:cd.tickFont},grid:{color:cd.gridColor}},y:{ticks:{color:cd.textColor,callback:v=>fmtC(v),font:cd.tickFont},grid:{color:cd.gridColor}}}}});
+      ]},options:chartPreset()});
     }
   },50);
+  if(typeof updateScopeChip==='function') updateScopeChip();
 }
 window.addMonthlyItem=function(key,field){
   if(!state.monthlyOverrides[key]) state.monthlyOverrides[key]={};
@@ -1645,7 +2509,9 @@ function renderYearly() {
   const sav=yb?.savings??cascBase?.savings??state.baseSavings;
   const r=rate(); const s=sym();
 
-  document.getElementById('panel-yearly').innerHTML=`
+  const panelYearly=document.getElementById('panel-yearly');
+  if(!panelYearly) return;
+  panelYearly.innerHTML=`
     <div class="ph"><div class="ph-tag">PERSONAL FINANCES</div><div class="ph-title">Yearly Forecast</div><div class="ph-sub">Set base values for a given year. Enable cascade to apply to all future years.</div></div>
     <div style="display:flex;align-items:center;gap:16px;margin-bottom:14px;flex-wrap:wrap">
       <div style="display:flex;align-items:center;gap:10px">
@@ -1674,6 +2540,7 @@ function renderYearly() {
 
   renderYearlyLineItems('yr-inc',incItems,'income');
   renderYearlyLineItems('yr-exp',expItems,'expenses');
+  if(typeof updateScopeChip==='function') updateScopeChip();
 }
 function renderYearlyLineItems(cid,items,field){
   const el=document.getElementById(cid); if(!el) return;
@@ -1727,9 +2594,6 @@ window.syncYearCascade=function(){
   if(state.yearlyBases[y]) state.yearlyBases[y].cascade=state.cascadeEnabled;
   renderYearly();
 };
-
-// ══ PORTFOLIO — redirects to unified retirement page ══════════════════════════
-function renderPortfolio() { nav('retirement'); }
 
 // ══ RETIREMENT — unified 3-section collapsible page ═══════════════════════════
 // Helper: build runway Chart.js data from simulation
@@ -1820,7 +2684,7 @@ function renderRetirement() {
 
   // ── SECTION 1: SUSTAINABILITY & RUNWAY ──────────────────────────────────────
   const s1 = `
-    <div class="sust-card" style="margin-bottom:0;border:none;padding:14px 16px 10px">
+    <div class="sust-card" data-section="runway" style="margin-bottom:0;border:none;padding:14px 16px 10px">
       <div class="sust-verdict" style="margin-bottom:10px">
         <div class="sust-verdict-icon">${nums.verdictIcon}</div>
         <div>
@@ -1845,7 +2709,7 @@ function renderRetirement() {
       <div style="padding:0 0 4px">
         <div style="font-size:11px;font-weight:600;letter-spacing:.02em;margin-bottom:2px">Longevity Runway</div>
         <div style="font-size:10px;color:var(--text2);margin-bottom:8px" id="runway-subtitle">How long your real nest egg lasts</div>
-        <div style="position:relative;height:200px;max-height:200px"><canvas id="runway-chart" style="height:200px!important;max-height:200px!important"></canvas></div>
+        <div class="chart-wrap lg"><canvas id="runway-chart"></canvas></div>
         <div style="display:flex;gap:12px;margin-top:6px;font-size:10px;color:var(--text2);flex-wrap:wrap" id="runway-legend"></div>
         <div class="runway-milestones" id="runway-milestones"></div>
       </div>
@@ -2207,7 +3071,7 @@ function renderFunFund() {
       <div>
         <div class="card">
           <div class="card-title">Fun Fund vs Travel Budget by Month</div>
-          <div class="chart-wrap"><canvas id="ff-chart" height="200"></canvas></div>
+          <div class="chart-wrap md"><canvas id="ff-chart"></canvas></div>
         </div>
         <div class="card">
           <div class="card-title">Monthly Fun Fund Settings</div>
@@ -2223,13 +3087,12 @@ function renderFunFund() {
     destroyChart('ff');
     const ctx=document.getElementById('ff-chart');
     if(ctx){
-      const cd=chartDefaults();
       const tripByMonth={};
       state.trips.forEach(t=>{ const key=t.date.slice(0,7); tripByMonth[key]=(tripByMonth[key]||0)+t.budget; });
       charts['ff']=new Chart(ctx.getContext('2d'),{type:'bar',data:{labels:months.map(m=>m.short),datasets:[
         {label:'Fun Fund',data:months.map(m=>Math.max(0,m.funFund)),backgroundColor:'#00d4ff18',borderColor:'#00d4ff',borderWidth:1.5,borderRadius:3},
         {label:'Trip Budget',data:months.map(m=>tripByMonth[m.key]||0),backgroundColor:'#f5a62325',borderColor:'#f5a623',borderWidth:1.5,borderRadius:3},
-      ]},options:{responsive:true,interaction:{mode:'index',intersect:false},plugins:{legend:{labels:{color:cd.legendColor,font:cd.tickFont}},tooltip:{backgroundColor:cd.tooltipBg,borderColor:cd.tooltipBorder,borderWidth:1,titleColor:cd.tooltipTitle,bodyColor:cd.tooltipBody,bodyFont:{family:'JetBrains Mono',size:11},callbacks:{label:c=>'  '+c.dataset.label+': '+fmt(c.raw)}}},scales:{x:{ticks:{color:cd.textColor,font:cd.tickFont},grid:{color:cd.gridColor}},y:{ticks:{color:cd.textColor,callback:v=>fmtC(v),font:cd.tickFont},grid:{color:cd.gridColor}}}}});
+      ]},options:chartPreset()});
     }
   },50);
 }
@@ -2237,7 +3100,7 @@ function renderFunFund() {
 // ══ RETIRE ANYWHERE ══════════════════════════════════════════════════════════
 let retireMap=null;
 function renderRetireAnywhere() {
-  const scored=state.retireLocations.map(scoreLocation);
+  const scored=retirePlaces().map(scoreLocation);
   const r=rate();
   const nums=getRetirementNumbers();
   const monthlyIncome=nums.sustainableAfterTax+nums.pension;
@@ -2269,13 +3132,13 @@ function renderRetireAnywhere() {
       <br>Destinations are rated by whether your income can comfortably cover local cost of living, after accounting for local tax.</div>
     </div>
 
-    <div class="kpi-row">
-      <div class="kpi"><div class="kpi-icon">✅</div><div class="kpi-lbl">FEASIBLE DESTINATIONS</div><div class="kpi-val pos">${scored.filter(l=>l.verdict==='feasible').length}</div><div class="kpi-sub">Income > 100% of costs</div></div>
-      <div class="kpi"><div class="kpi-icon">🎯</div><div class="kpi-lbl">CONDITIONAL</div><div class="kpi-val amb">${scored.filter(l=>l.verdict==='conditional').length}</div><div class="kpi-sub">Income 80–100% of costs</div></div>
-      <div class="kpi"><div class="kpi-icon">💰</div><div class="kpi-lbl">YOUR MONTHLY INCOME</div><div class="kpi-val">${fmt(monthlyIncome)}</div><div class="kpi-sub">At retirement age ${state.retirementAge}</div></div>
-    </div>
+    ${ui.kpiRow([
+      {icon:'✅', label:'FEASIBLE DESTINATIONS', value:scored.filter(l=>l.verdict==='feasible').length, tone:'pos', sub:'Income > 100% of costs'},
+      {icon:'🎯', label:'CONDITIONAL',           value:`<span class="amb">${scored.filter(l=>l.verdict==='conditional').length}</span>`, sub:'Income 80–100% of costs'},
+      {icon:'💰', label:'YOUR MONTHLY INCOME',   value:fmt(monthlyIncome), sub:`At retirement age ${state.retirementAge}`, link:'retirement', section:'runway'},
+    ])}
 
-    <div id="retire-map"></div>
+    <div id="retire-map" data-section="map"></div>
 
     <div class="loc-grid">${locCards}</div>
 
@@ -2286,25 +3149,23 @@ function renderRetireAnywhere() {
 
     <div id="ai-loc-output" style="display:none" class="card"></div>`;
 
-  // Render Leaflet map
+  // Render the shared world map via createWorldMap()
   setTimeout(()=>{
-    const mapEl=document.getElementById('retire-map');
-    if(!mapEl) return;
-    try {
-      if(retireMap) { retireMap.remove(); retireMap=null; }
-      retireMap=L.map('retire-map',{zoomControl:true}).setView([20,20],2);
-      L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',{attribution:'© CartoDB',maxZoom:18}).addTo(retireMap);
-      scored.forEach(loc=>{
-        const color=loc.verdict==='feasible'?'#00e8a0':loc.verdict==='conditional'?'#f5a623':'#ff4d6d';
-        const marker=L.circleMarker([loc.lat,loc.lng],{radius:10,color,fillColor:color,fillOpacity:.7,weight:2});
-        marker.bindPopup(`<strong>${loc.flag} ${loc.name}</strong><br><span style="color:${color};font-weight:700">${loc.label}</span><br>Cost: ${fmt(loc.costOfLiving)}/mo<br>Surplus: ${fmt(loc.surplus)}/mo`);
-        marker.addTo(retireMap);
-      });
-    } catch(e) { console.log('Map error:',e); }
-  },100);
+    if(retireMap) { try{retireMap.remove();}catch(e){} retireMap=null; }
+    const points = scored.map(loc => {
+      const color = loc.verdict==='feasible' ? '#00e8a0'
+                  : loc.verdict==='conditional' ? '#f5a623'
+                  : '#ff4d6d';
+      return {
+        lat: loc.lat, lng: loc.lng, color,
+        popup: `<strong>${loc.flag} ${loc.name}</strong><br><span style="color:${color};font-weight:700">${loc.label}</span><br>Cost: ${fmt(loc.costOfLiving)}/mo<br>Surplus: ${fmt(loc.surplus)}/mo`
+      };
+    });
+    retireMap = createWorldMap('retire-map', points, {center:[20,20], zoom:2});
+  }, 100);
 }
 window.showLocDetail=function(id){
-  const loc=scoreLocation(state.retireLocations.find(l=>l.id===id));
+  const loc=scoreLocation(retirePlaces().find(l=>l.id===id));
   if(!loc) return;
   const r=rate(); const s=sym();
   const months=get12Months();
@@ -2334,12 +3195,12 @@ window.showLocDetail=function(id){
     <div id="loc-ai-out" style="margin-top:12px;font-size:12px;line-height:1.6;color:var(--text2)"></div>`;
   openModal('loc-modal');
 };
-window.updateLocCost=function(id,val){ const l=state.retireLocations.find(l=>l.id===id); if(l){l.costOfLiving=+val;save();} };
-window.updateLocTax=function(id,val){ const l=state.retireLocations.find(l=>l.id===id); if(l){l.taxRate=+val;save();} };
-window.updateLocNotes=function(id,val){ const l=state.retireLocations.find(l=>l.id===id); if(l){l.notes=val;save();} };
-window.removeLoc=function(id){ state.retireLocations=state.retireLocations.filter(l=>l.id!==id);save();closeModal('loc-modal');renderRetireAnywhere(); };
+window.updateLocCost=function(id,val){ const l=state.places.find(l=>l.id===id); if(l){l.costOfLiving=+val;save();} };
+window.updateLocTax=function(id,val){ const l=state.places.find(l=>l.id===id); if(l){l.taxRate=+val;save();} };
+window.updateLocNotes=function(id,val){ const l=state.places.find(l=>l.id===id); if(l){l.notes=val;save();} };
+window.removeLoc=function(id){ state.places=state.places.filter(l=>l.id!==id);save();closeModal('loc-modal');renderRetireAnywhere(); };
 window.addLocation=function(){
-  state.retireLocations.push({id:genId(),name:'New City',country:'',flag:'🌍',costOfLiving:40000,taxRate:15,climate:'Temperate',healthcare:'Good',infrastructure:'Good',notes:'',lat:0,lng:0});
+  state.places.push({id:genId(),kind:'retirement',name:'New City',country:'',flag:'🌍',costOfLiving:40000,taxRate:15,climate:'Temperate',healthcare:'Good',infrastructure:'Good',notes:'',lat:0,lng:0});
   save();renderRetireAnywhere();
 };
 window.aiAnalyzeLocations=async function(){
@@ -2355,7 +3216,7 @@ window.aiAnalyzeLocations=async function(){
   } catch(e){ el.innerHTML=`<span style="color:var(--red);font-size:12px">Error: ${e.message}</span>`; }
 };
 window.aiAnalyzeLoc=async function(id){
-  const loc=state.retireLocations.find(l=>l.id===id); if(!loc) return;
+  const loc=state.places.find(l=>l.id===id); if(!loc) return;
   const key=state.aiKeys?.claude;
   if(!key){alert('Add your Claude API key in Settings first.');return;}
   const nums=getRetirementNumbers();
@@ -2424,14 +3285,29 @@ function renderSettings() {
         </div>
       </div>
       <!-- Data management -->
-      <div class="card">
+      <div class="card" style="grid-column:1/-1">
         <div class="card-title">💾 Data Management</div>
-        <p style="font-size:12px;color:var(--text2);margin-bottom:12px;line-height:1.5">All data is saved locally in your browser. Export a backup JSON to move between devices.</p>
-        <div style="display:flex;gap:8px;flex-wrap:wrap">
-          <button class="btn btn-o btn-sm" onclick="exportData()">⬇ Export JSON</button>
-          <button class="btn btn-o btn-sm" onclick="document.getElementById('import-input').click()">⬆ Import JSON</button>
-          <input id="import-input" type="file" accept=".json" style="display:none" onchange="importData(this)">
-          <button class="btn btn-danger" onclick="if(confirm('Reset all data?')){localStorage.removeItem('${STORAGE_KEY}');location.reload()}">⚠ Reset All</button>
+        <p style="font-size:12px;color:var(--text2);margin-bottom:12px;line-height:1.5">All data is saved locally in your browser. Export a slice or the full backup to move between devices. Imports merge into your current state (they don't replace the whole thing unless you pick "Everything").</p>
+        <div class="data-mgmt-grid">
+          ${EXPORT_SLICES.map(slice => `
+            <div class="data-mgmt-row">
+              <div class="data-mgmt-meta">
+                <div class="data-mgmt-icon">${slice.icon}</div>
+                <div>
+                  <div class="data-mgmt-title">${esc2(slice.label)}</div>
+                  <div class="data-mgmt-sub">${esc2(slice.sub)}</div>
+                </div>
+              </div>
+              <div class="data-mgmt-btns">
+                <button class="btn btn-o btn-xs" onclick="exportSlice('${slice.key}')">⬇ Export</button>
+                <button class="btn btn-o btn-xs" onclick="document.getElementById('import-input-${slice.key}').click()">⬆ Import</button>
+                <input id="import-input-${slice.key}" type="file" accept=".json" style="display:none" onchange="importSlice(this, '${slice.key}')">
+              </div>
+            </div>
+          `).join('')}
+        </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:14px;padding-top:12px;border-top:1px solid var(--border)">
+          <button class="btn btn-danger" onclick="if(confirm('Reset all data? This cannot be undone.')){localStorage.removeItem('${STORAGE_KEY}');location.reload()}">⚠ Reset All</button>
         </div>
       </div>
     </div>`;
@@ -2440,19 +3316,78 @@ function renderSettings() {
 }
 
 // ══ EXPORT / IMPORT ══════════════════════════════════════════════════════════
-window.exportData=function(){
-  const blob=new Blob([JSON.stringify(state,null,2)],{type:'application/json'});
+// Each slice knows how to extract + restore its own subset of state so
+// Settings can offer one button per section (A17). The `all` slice is
+// the traditional full-state roundtrip.
+const EXPORT_SLICES = [
+  { key:'baseline',   icon:'💰', label:'Baseline',        sub:'Income, expenses, savings target', fields:['baseIncome','baseExpenses','baseSavings'] },
+  { key:'retirement', icon:'🎯', label:'Retirement',      sub:'Portfolio assets, scenarios, ages, tax', fields:['externalAssets','retirementExpenses','retirementScenario','currentAge','retirementAge','lifeExp','withdrawTaxRate','growthRate','inflationRate','retirementPostGrowth'] },
+  { key:'places',     icon:'🌍', label:'Places',          sub:'Retire Anywhere destinations', fields:['places'] },
+  { key:'trips',      icon:'✈️', label:'Trips & Fun Fund', sub:'Planned travel and lifestyle budget', fields:['trips'] },
+  { key:'overrides',  icon:'📆', label:'Overrides',       sub:'Monthly overrides + yearly bases', fields:['monthlyOverrides','yearlyBases','cascadeEnabled'] },
+  { key:'settings',   icon:'⚙', label:'Preferences',     sub:'Theme, currency, exchange rates, AI keys', fields:['currency','exchangeRates','darkMode','tickerQuote','aiKeys','aiProvider','categoryMap'] },
+  { key:'all',        icon:'📦', label:'Everything',      sub:'Full state backup (overwrites on import)', fields:null },
+];
+function downloadJSON(filename, data){
+  const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});
   const url=URL.createObjectURL(blob);
-  const a=document.createElement('a');a.href=url;a.download='horizon-finance-backup.json';a.click();
+  const a=document.createElement('a');a.href=url;a.download=filename;a.click();
   URL.revokeObjectURL(url);
+}
+window.exportSlice=function(sliceKey){
+  const slice = EXPORT_SLICES.find(s=>s.key===sliceKey);
+  if(!slice) return;
+  let payload;
+  if(slice.fields === null) {
+    payload = state; // full export
+  } else {
+    payload = {version: STATE_VERSION, _slice: slice.key};
+    slice.fields.forEach(f => { if(state[f] !== undefined) payload[f] = state[f]; });
+  }
+  downloadJSON(`horizon-${slice.key}.json`, payload);
 };
+window.importSlice=function(input, sliceKey){
+  const file=input.files[0]; if(!file) return;
+  const slice = EXPORT_SLICES.find(s=>s.key===sliceKey);
+  if(!slice) return;
+  const reader=new FileReader();
+  reader.onload=e=>{
+    try{
+      const d=JSON.parse(e.target.result);
+      if(slice.fields === null) {
+        // Full import — replace wholesale, then migrate.
+        Object.assign(state, d);
+        migrate(state);
+      } else {
+        // Slice import: merge only the fields this slice owns.
+        // Refuse if the file was exported as a different slice (unless it's "all").
+        if(d._slice && d._slice !== slice.key) {
+          if(!confirm(`This file was exported as "${d._slice}" but you're importing it into "${slice.key}". Continue anyway?`)) {
+            input.value = ''; return;
+          }
+        }
+        slice.fields.forEach(f => { if(d[f] !== undefined) state[f] = d[f]; });
+      }
+      invalidateSelectors();
+      save();
+      renderAll();
+      alert(`Imported ${slice.label.toLowerCase()}.`);
+    }catch(err){
+      alert('Invalid backup file: '+err.message);
+    }
+    input.value = '';
+  };
+  reader.readAsText(file);
+};
+// Legacy full-state exporters (kept for any external callers).
+window.exportData=function(){ exportSlice('all'); };
 window.importData=function(input){
   const file=input.files[0]; if(!file) return;
   const reader=new FileReader();
   reader.onload=e=>{
     try{
       const d=JSON.parse(e.target.result);
-      Object.assign(state,d);save();renderAll();
+      Object.assign(state,d); migrate(state); invalidateSelectors(); save(); renderAll();
     }catch(e){alert('Invalid backup file: '+e.message);}
   };
   reader.readAsText(file);
@@ -2462,46 +3397,63 @@ window.importData=function(input){
 let aiChatHistory=[];
 let aipTyping=false;
 const AIP_CHIPS=['📊 Analyse my spending','🎯 Am I on track for retirement?','💡 Grow my nest egg','🌍 Where should I retire?','✈️ Can I afford my trips?','⚠️ Biggest financial risks?'];
+// Per-panel suggestion prompts — AI chips reflect the user's current view so
+// the conversation feels contextual rather than generic.
+const AIP_CHIPS_BY_PANEL = {
+  dashboard:      ['📊 Explain my current month','🎯 Am I on track for retirement?','⚠️ Biggest risks in my plan?','💡 What should I focus on next?'],
+  transactions:   ['📊 Where is my money going?','🔍 Unusual spending this month?','💰 How can I cut 10% of expenses?','📈 Compare vs last month'],
+  monthly:        ['📊 Is this month healthy?','💰 Can I raise my savings rate?','✈️ Can I fit a trip this month?','🎯 How does this hit retirement?'],
+  yearly:         ['📈 Project my next 3 years','💰 Best yearly savings target?','⚠️ Any cash-flow risks?','🎯 Stress-test my plan'],
+  retirement:     ['🎯 Can I retire 2 years earlier?','💡 Grow my nest egg','⚠️ What if markets drop 30%?','🔍 Review my withdrawal rate'],
+  funfund:        ['✈️ Can I afford my trips?','💡 Best months to travel?','💰 Stretch my Fun Fund','🎯 Prioritise my wishlist'],
+  retireanywhere: ['🌍 Where should I retire?','🔍 Compare my top 3 destinations','💰 Cheapest feasible option?','🎯 Tax-optimal choice'],
+  propiq:         ['🏠 Is this deal reasonable?','📊 Yield vs local average?','💰 Mortgage stress test','⚠️ What am I missing?'],
+  settings:       ['⚙️ Review my baseline','💡 Am I using sensible defaults?','🔍 Explain my assumptions','🎯 What should I tune?'],
+};
+function aipChipsFor(panel){
+  return AIP_CHIPS_BY_PANEL[panel] || AIP_CHIPS;
+}
 
+function _ai(){
+  return {
+    panel:document.getElementById('ai-panel'),
+    backdrop:document.getElementById('ai-backdrop'),
+    fab:document.getElementById('ai-fab'),
+    minTab:document.getElementById('ai-min-tab'),
+    minSub:document.getElementById('ai-min-sub'),
+  };
+}
 function toggleAIPanel(){
-  const panel=document.getElementById('ai-panel');
-  const isOpen=panel.classList.contains('open');
-  if(isOpen){ closePanel(); } else { openAIPanel(); }
+  const {panel}=_ai(); if(!panel) return;
+  panel.classList.contains('open') ? closePanel() : openAIPanel();
 }
 function openAIPanel(){
-  const panel=document.getElementById('ai-panel');
-  const backdrop=document.getElementById('ai-backdrop');
-  const fab=document.getElementById('ai-fab');
-  const minTab=document.getElementById('ai-min-tab');
-  panel.classList.add('open');
-  backdrop.classList.add('open');
-  fab.style.display='none';
-  minTab.style.display='none';
+  const {panel,backdrop,fab,minTab}=_ai();
+  if(panel) panel.classList.add('open');
+  if(backdrop) backdrop.classList.add('open');
+  if(fab) fab.style.display='none';
+  if(minTab) minTab.style.display='none';
   updateAIPPills();
   renderAIPChips();
 }
 function closePanel(){
-  const panel=document.getElementById('ai-panel');
-  const backdrop=document.getElementById('ai-backdrop');
-  const fab=document.getElementById('ai-fab');
-  panel.classList.remove('open');
-  backdrop.classList.remove('open');
-  fab.style.display='flex';
+  const {panel,backdrop,fab}=_ai();
+  if(panel) panel.classList.remove('open');
+  if(backdrop) backdrop.classList.remove('open');
+  if(fab) fab.style.display='flex';
 }
 function aiMinimize(){
-  const panel=document.getElementById('ai-panel');
-  const backdrop=document.getElementById('ai-backdrop');
-  const fab=document.getElementById('ai-fab');
-  const minTab=document.getElementById('ai-min-tab');
-  panel.classList.remove('open');
-  backdrop.classList.remove('open');
-  fab.style.display='none';
+  const {panel,backdrop,fab,minTab,minSub}=_ai();
+  if(panel) panel.classList.remove('open');
+  if(backdrop) backdrop.classList.remove('open');
+  if(fab) fab.style.display='none';
   const msgCount=aiChatHistory.filter(m=>m.role==='user').length;
-  document.getElementById('ai-min-sub').textContent=msgCount>0?`${msgCount} message${msgCount!==1?'s':''} · click to expand`:'Click to expand';
-  minTab.style.display='flex';
+  if(minSub) minSub.textContent=msgCount>0?`${msgCount} message${msgCount!==1?'s':''} · click to expand`:'Click to expand';
+  if(minTab) minTab.style.display='flex';
 }
 function aiUnminimize(){
-  document.getElementById('ai-min-tab').style.display='none';
+  const {minTab}=_ai();
+  if(minTab) minTab.style.display='none';
   openAIPanel();
 }
 
@@ -2520,7 +3472,36 @@ function renderAIPChips(){
   const el=document.getElementById('aip-chips');
   if(!el) return;
   el.style.display=aiChatHistory.length>0?'none':'flex';
-  el.innerHTML=AIP_CHIPS.map(c=>`<button class="aip-chip" onclick="aipChip('${c.replace(/'/g,"\\'")}')">${c}</button>`).join('');
+  const panel = state.activePanel||'dashboard';
+  const chips = aipChipsFor(panel);
+  const recent = getAIHistoryFor(panel).slice(0, 4); // up to 4 recent queries
+  // Suggestions group + (optional) recent group, separated visually.
+  let html = chips.map(c=>`<button class="aip-chip" onclick="aipChip('${c.replace(/'/g,"\\'")}')">${c}</button>`).join('');
+  if(recent.length){
+    html += `<div class="aip-chip-divider"></div>
+      <div class="aip-chip-group-lbl">Recent on ${esc2((PANEL_META[panel]&&PANEL_META[panel].label)||panel)}</div>
+      ${recent.map(q=>`<button class="aip-chip aip-chip-recent" onclick="aipChip('${q.replace(/'/g,"\\'").replace(/"/g,'&quot;')}')" title="${esc2(q)}">↺ ${esc2(q.length>42?q.slice(0,40)+'…':q)}</button>`).join('')}`;
+  }
+  el.innerHTML = html;
+}
+
+// Per-panel conversation memory — stores the last few user queries made
+// while each panel was active so renderAIPChips can surface them as a
+// "Recent" row under the suggestion chips. Lives inside state so it
+// persists across reloads.
+function getAIHistoryFor(panel){
+  if(!state.aiHistoryByPanel) state.aiHistoryByPanel = {};
+  return state.aiHistoryByPanel[panel] || [];
+}
+function pushAIHistory(panel, query){
+  if(!query || !query.trim()) return;
+  if(!state.aiHistoryByPanel) state.aiHistoryByPanel = {};
+  const list = state.aiHistoryByPanel[panel] || [];
+  // Dedupe: if this query is already recent, move it to the front.
+  const filtered = list.filter(q => q !== query);
+  filtered.unshift(query);
+  state.aiHistoryByPanel[panel] = filtered.slice(0, 8);
+  save();
 }
 
 function clearAIChat(){
@@ -2538,8 +3519,13 @@ function buildAIContext() {
   const nums=getRetirementNumbers();
   const months=get12Months(); const cm=months[0];
   const ti=sumArr(state.baseIncome,'amount'); const te=sumArr(state.baseExpenses,'amount');
-  const scored=state.retireLocations.map(scoreLocation);
+  const scored=retirePlaces().map(scoreLocation);
+  const panel=state.activePanel||'dashboard';
+  const viewLabel=(PANEL_META[panel]&&PANEL_META[panel].label)||panel;
+  const section=state.activeSection?` (focused on: ${state.activeSection})`:'';
   return `You are HORIZON AI — a personal finance and life planning assistant embedded in Horizon Finance OS.
+
+CURRENT VIEW: The user is looking at the "${viewLabel}" panel${section}. Tailor your answer to what's visible on this screen first, then zoom out if helpful.
 
 User's financial snapshot (SEK):
 - Monthly income: ${Math.round(ti).toLocaleString()} kr | Expenses: ${Math.round(te).toLocaleString()} kr | Savings: ${Math.round(state.baseSavings).toLocaleString()} kr/mo
@@ -2574,6 +3560,9 @@ async function aipSend() {
   ta.value=''; ta.style.height='38px';
   aipAddMsg('user',msg);
   aiChatHistory.push({role:'user',content:msg});
+  // Remember this query against the panel the user was looking at so the
+  // "Recent on <Panel>" row in renderAIPChips can surface it next time.
+  pushAIHistory(state.activePanel||'dashboard', msg);
   aipTyping=true;
   document.getElementById('aip-chips').style.display='none';
   const typWrap=document.createElement('div');
@@ -2617,8 +3606,23 @@ renderAIPChips();
 // ══ INIT ═════════════════════════════════════════════════════════════════════
 loadState();
 applyTheme();
+// Honor deep-link hash on first load (#retirement or #retirement/runway).
+(()=>{
+  const {panel, section} = parseHash();
+  if(panel) { state.activePanel = panel; if(section) state.activeSection = section; }
+})();
 renderAll();
-renderAIPChips();
+if(state.activeSection) setTimeout(()=>pulseSection(state.activeSection), 200);
+
+// Keep Leaflet tiles correct after layout changes, and re-render active panel
+// so Chart.js updates legibly across viewport width changes.
+let _resizeTimer=null;
+window.addEventListener('resize',()=>{
+  clearTimeout(_resizeTimer);
+  _resizeTimer=setTimeout(()=>{
+    if(typeof retireMap!=='undefined' && retireMap){ try{ retireMap.invalidateSize(); }catch(e){} }
+  },150);
+});
 </script>
 
 <script>
@@ -2685,10 +3689,11 @@ function renderPropIQ(){
 
   document.getElementById('panel-propiq').innerHTML = `
     <div class="piq">
-      <div class="ph"><div class="ph-tag">REAL ESTATE INTELLIGENCE</div>
-        <div class="ph-title">Property IQ <span style="font-size:13px;font-weight:400;color:var(--text2)">Kenya & Sweden</span></div>
-        <div class="ph-sub">AI-powered analysis · Live signals · Mortgage calculator · Legal risk scoring</div>
-      </div>
+      ${(typeof ui!=='undefined'&&ui.ph)?ui.ph({
+        tag:'REAL ESTATE INTELLIGENCE',
+        titleHtml:'Property IQ <span style="font-size:13px;font-weight:400;color:var(--text2)">Kenya & Sweden</span>',
+        sub:'AI-powered analysis · Live signals · Mortgage calculator · Legal risk scoring'
+      }):`<div class="ph"><div class="ph-tag">REAL ESTATE INTELLIGENCE</div><div class="ph-title">Property IQ</div><div class="ph-sub">AI-powered analysis</div></div>`}
 
       <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;flex-wrap:wrap">
         <div class="piq-mtog-wrap">
@@ -2723,9 +3728,11 @@ function renderPropIQ(){
           </div>
 
           <div id="piq-results">
-            <div class="piq-empty"><div class="piq-empty-t">Search a location to begin</div>
-              <div class="piq-empty-s">PropIQ fetches live signals, generates an investment thesis,<br>calculates mortgage payments, and flags legal risks.</div>
-            </div>
+            ${(typeof ui!=='undefined'&&ui.empty)?ui.empty({
+              icon:'🏠',
+              title:'Search a location to begin',
+              sub:'PropIQ fetches live signals, generates an investment thesis, calculates mortgage payments, and flags legal risks.'
+            }):`<div class="piq-empty"><div class="piq-empty-t">Search a location to begin</div><div class="piq-empty-s">PropIQ fetches live signals and analyses mortgages.</div></div>`}
           </div>
         </div>
       </div>
@@ -2747,7 +3754,9 @@ function piq_setMarket(m){
   // re-render qtags
   const qt=document.querySelector('.piq-qtags');
   if(qt) qt.innerHTML=cfg.tags.map(t=>`<span class="piq-qtag" onclick="piq_quickSearch('${t}')">${t}</span>`).join('');
-  document.getElementById('piq-results').innerHTML=`<div class="piq-empty"><div class="piq-empty-t">Search a ${cfg.name} location to begin</div><div class="piq-empty-s">Live signals · Investment analysis · Mortgage calculator · Legal risk</div></div>`;
+  document.getElementById('piq-results').innerHTML = (typeof ui!=='undefined'&&ui.empty)
+    ? ui.empty({icon:'🏠', title:`Search a ${cfg.name} location to begin`, sub:'Live signals · Investment analysis · Mortgage calculator · Legal risk'})
+    : `<div class="piq-empty"><div class="piq-empty-t">Search a ${cfg.name} location to begin</div><div class="piq-empty-s">Live signals · Investment analysis · Mortgage calculator · Legal risk</div></div>`;
 }
 
 // ── HISTORY ───────────────────────────────────────────────────────────────────
@@ -3091,12 +4100,12 @@ function piq_injectSettingsKey(){
 // Load propiq history on app init
 piq_loadHistLS();
 
-// Hook into nav so renderPropIQ runs when tab is opened
+// propiq is now wired into renderPanel's fns map directly; we only need to
+// inject the Perplexity API key field when the user opens Settings.
 const _origNav = typeof nav === 'function' ? nav : null;
 if(_origNav){
   window.nav = function(panel){
     _origNav(panel);
-    if(panel==='propiq') renderPropIQ();
     if(panel==='settings') setTimeout(piq_injectSettingsKey, 50);
   };
 }
