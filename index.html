@@ -340,6 +340,185 @@
       </div>
     </div>
 
+    <!-- ════════════════ FUN FUND ════════════════ -->
+    <div class="panel" id="panel-vacation">
+      <div class="ph">
+        <div class="ph-tag">LIFESTYLE · FUN FUND</div>
+        <div class="ph-title">Fun Fund Planner</div>
+        <div class="ph-sub">Project your discretionary fund forward and plan your next trip.</div>
+      </div>
+
+      <!-- KPI ROW -->
+      <div class="kpi-row">
+        <div class="kpi">
+          <div class="kpi-lbl">FUN FUND BALANCE</div>
+          <div class="kpi-val pos" id="ff-balance">—</div>
+        </div>
+        <div class="kpi">
+          <div class="kpi-lbl">MONTHLY ALLOCATION</div>
+          <div class="kpi-val" id="ff-monthly">—</div>
+        </div>
+      </div>
+
+      <div class="two-col">
+        <!-- TIER GRID -->
+        <div class="card">
+          <div class="card-title">✦ What Can You Afford?</div>
+          <div class="vac-tier-grid" id="ff-tier-grid"></div>
+
+          <!-- AFFORDABILITY SLIDER -->
+          <div style="display:flex;align-items:center;gap:10px;margin-top:10px">
+            <span style="font-size:12px;color:var(--text3);font-family:var(--fm)">Months to save:</span>
+            <input type="range" id="ff-months-slider" min="1" max="24" value="6" oninput="updateLineItem('vacMonths',null,'value',+this.value)" style="flex:1;accent-color:var(--green)">
+            <span id="ff-months-val" class="mono" style="font-size:12px;color:var(--green);min-width:30px">6</span>
+          </div>
+          <div id="ff-next-tier" style="font-size:12px;color:var(--text2);margin-top:8px;font-family:var(--fm)"></div>
+        </div>
+
+        <!-- SAVED TRIPS -->
+        <div class="card">
+          <div class="card-title">💼 Saved Trips
+            <div class="card-actions">
+              <button class="btn btn-g btn-xs" onclick="saveTrip()">+ Plan Trip</button>
+            </div>
+          </div>
+          <div id="ff-saved-trips"></div>
+        </div>
+      </div>
+
+      <!-- FUND TIMELINE -->
+      <div class="card">
+        <div class="card-title">📅 Fun Fund Accumulation Timeline</div>
+        <div class="fund-tl" id="ff-timeline"></div>
+      </div>
+
+      <!-- DESTINATION PULSE -->
+      <div class="card">
+        <div class="card-title">🌍 Destination Pulse
+          <div class="card-actions">
+            <button class="btn btn-o btn-xs ff-filter active" data-filter="all" onclick="setVacFilter('all')">All</button>
+            <button class="btn btn-o btn-xs ff-filter" data-filter="beach" onclick="setVacFilter('beach')">Beach</button>
+            <button class="btn btn-o btn-xs ff-filter" data-filter="city" onclick="setVacFilter('city')">City</button>
+            <button class="btn btn-o btn-xs ff-filter" data-filter="adventure" onclick="setVacFilter('adventure')">Adventure</button>
+            <button class="btn btn-o btn-xs ff-filter" data-filter="luxury" onclick="setVacFilter('luxury')">Luxury</button>
+          </div>
+        </div>
+        <div class="pulse-grid" id="ff-pulse-grid"></div>
+      </div>
+
+      <!-- LEAFLET MAP -->
+      <div class="card">
+        <div class="card-title">🗺 Destination Map</div>
+        <div id="ff-map" style="width:100%;height:360px;border-radius:12px;overflow:hidden;border:1px solid var(--border)"></div>
+      </div>
+    </div>
+
+    <!-- ════════════════ RETIRE ANYWHERE ════════════════ -->
+    <div class="panel" id="panel-retirement">
+      <div class="ph">
+        <div class="ph-tag">LIFESTYLE · RETIREMENT</div>
+        <div class="ph-title">Retire Anywhere</div>
+        <div class="ph-sub">Your dream retirement, wherever in the world that may be.</div>
+      </div>
+
+      <!-- KPI ROW -->
+      <div class="kpi-row">
+        <div class="kpi">
+          <div class="kpi-lbl">YEARS TO RETIRE</div>
+          <div class="kpi-val" id="ret-years-to">—</div>
+        </div>
+        <div class="kpi">
+          <div class="kpi-lbl">YEARS IN RETIREMENT</div>
+          <div class="kpi-val" id="ret-years-in">—</div>
+        </div>
+        <div class="kpi">
+          <div class="kpi-lbl">NEST EGG @ RETIRE</div>
+          <div class="kpi-val pos" id="ret-nest-egg">—</div>
+        </div>
+        <div class="kpi">
+          <div class="kpi-lbl">MONTHLY INCOME</div>
+          <div class="kpi-val" id="ret-monthly-income">—</div>
+        </div>
+        <div class="kpi">
+          <div class="kpi-lbl">MONTHLY TARGET</div>
+          <div class="kpi-val" id="ret-monthly-target">—</div>
+        </div>
+        <div class="kpi">
+          <div class="kpi-lbl">PENSION TOTAL</div>
+          <div class="kpi-val" id="ret-pen-total">—</div>
+        </div>
+        <div class="kpi">
+          <div class="kpi-lbl">FIRE NUMBER</div>
+          <div class="kpi-val" id="ret-fire">—</div>
+        </div>
+        <div class="kpi">
+          <div class="kpi-lbl">GAP</div>
+          <div class="kpi-val" id="ret-gap">—</div>
+        </div>
+      </div>
+      <div id="ret-gap-status"></div>
+
+      <!-- SCENARIOS -->
+      <div class="card">
+        <div class="card-title">🔀 Retirement Scenarios — What-If</div>
+        <div class="scenario-grid" id="ret-scenarios"></div>
+      </div>
+
+      <!-- SWEDISH PENSION INPUTS -->
+      <div class="card">
+        <div class="card-title">🏛 Swedish Pension Integration</div>
+        <div class="three-col">
+          <div class="field">
+            <label>Allmänpension est. (SEK/mo at 65)</label>
+            <input type="number" class="mono" id="ret-pen-allman" placeholder="12000" oninput="updateRetField('penAllman', +this.value)">
+          </div>
+          <div class="field">
+            <label>ITP / Tjänstepension est. (SEK/mo)</label>
+            <input type="number" class="mono" id="ret-pen-itp" placeholder="18000" oninput="updateRetField('penITP', +this.value)">
+          </div>
+          <div class="field">
+            <label>Other pension / annuity (SEK/mo)</label>
+            <input type="number" class="mono" id="ret-pen-other" placeholder="0" oninput="updateRetField('penOther', +this.value)">
+          </div>
+        </div>
+      </div>
+
+      <!-- DREAM CHIP SELECTOR -->
+      <div class="card">
+        <div class="card-title">💭 Your Dream Retirement</div>
+        <div class="dream-grid" id="ret-dream-chips"></div>
+      </div>
+
+      <!-- EXPENSE MODEL -->
+      <div class="card">
+        <div class="card-title">🧮 Retirement Expense Model</div>
+        <div id="ret-exp-model"></div>
+      </div>
+
+      <!-- DESTINATION CARDS -->
+      <div class="card">
+        <div class="card-title">📍 Destinations</div>
+        <div class="dest-cards" id="ret-dest-cards"></div>
+      </div>
+
+      <!-- LEAFLET WORLD MAP -->
+      <div class="card">
+        <div class="card-title">🗺 Retirement World Map</div>
+        <div id="retire-map" style="width:100%;height:360px;border-radius:12px;overflow:hidden;border:1px solid var(--border)"></div>
+      </div>
+
+      <!-- APEX TERMINAL -->
+      <div class="apex-shell">
+        <div class="apex-hdr">
+          <div class="apex-logo">APEX <span>RETIREMENT FEASIBILITY TERMINAL</span></div>
+          <div class="apex-status" id="ret-apex-status">STANDBY</div>
+        </div>
+        <div class="apex-body">
+          <div id="ret-apex-output" class="apex-out"></div>
+        </div>
+      </div>
+    </div>
+
 <script>
 // ═══════════════════════════════════════════════════════════════════
 // CONSTANTS & DEFAULTS
