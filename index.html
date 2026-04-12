@@ -501,6 +501,30 @@ body.light .runway-svg-host { background:var(--bg3); }
 .runway-svg .runway-annot-label.runout  { fill:#ff4d6d; }
 .runway-svg .runway-annot-label.surplus { fill:#00e8a0; }
 .runway-svg .runway-start-label { fill:#4d9fff; font-family:'DM Sans', sans-serif; font-size:10px; font-weight:600; }
+.runway-svg .runway-hover-line { stroke:var(--text2); stroke-width:1; stroke-dasharray:3,3; opacity:.55; pointer-events:none; }
+.runway-svg .runway-hover-dot  { fill:var(--text); stroke:var(--bg2); stroke-width:1.5; pointer-events:none; }
+
+/* ── SHARED CHART TOOLTIP (Chart.js + runway SVG) ───────────────────
+   All chart tooltips render through .chart-tooltip so there's one
+   visual vocabulary across the app: same background, same font, same
+   padding, same border radius. Chart.js tooltips use their own
+   external HTML renderer wired through chartPreset(); the runway
+   SVG chart uses the shared _getChartTooltipEl() helper above. */
+.chart-tooltip {
+  position:fixed; z-index:9999; pointer-events:none;
+  background:var(--bg2); border:1px solid var(--border2); border-radius:8px;
+  box-shadow:0 8px 26px -8px rgba(0,0,0,0.55);
+  padding:9px 12px; min-width:180px; max-width:280px;
+  font-family:var(--fb); font-size:11px; color:var(--text);
+  line-height:1.55;
+}
+body.light .chart-tooltip { box-shadow:0 6px 18px -6px rgba(60,40,10,0.2); }
+.chart-tt-title { font-family:var(--fm); font-weight:700; font-size:11px; letter-spacing:.04em; text-transform:uppercase; color:var(--text); margin-bottom:6px; padding-bottom:5px; border-bottom:1px solid var(--border); }
+.chart-tt-row { display:flex; align-items:center; gap:7px; font-size:11px; color:var(--text2); margin:3px 0; }
+.chart-tt-row .chart-tt-val { margin-left:auto; font-family:var(--fm); font-weight:700; color:var(--text); font-variant-numeric:tabular-nums; }
+.chart-tt-sw { display:inline-block; width:9px; height:9px; border-radius:2px; flex-shrink:0; }
+.chart-tt-total { display:flex; align-items:center; justify-content:space-between; margin-top:6px; padding-top:6px; border-top:1px dashed var(--border); font-size:11px; color:var(--text); font-weight:700; }
+.chart-tt-total .chart-tt-val { font-family:var(--fm); font-variant-numeric:tabular-nums; }
 .runway-milestones-wrap { margin-top:14px; padding-top:12px; border-top:1px dashed var(--border); }
 .runway-ms-hd { font-family:var(--fm); font-size:9px; letter-spacing:.14em; text-transform:uppercase; color:var(--text3); margin-bottom:8px; }
 .runway-milestones { display:grid; grid-template-columns:repeat(auto-fill, minmax(108px, 1fr)); gap:8px; }
@@ -2530,6 +2554,10 @@ function chartDefaults() {
 // Shared Chart.js options preset — single source of truth for padding,
 // tooltip styling, legend, and axis defaults. Individual renderers can
 // override any key by deep-merging their own options on top.
+//
+// Chart.js tooltips are routed through an HTML external renderer so
+// they use the same .chart-tooltip styling as the runway SVG tooltip.
+// No visual drift between chart types.
 function chartPreset(overrides){
   const cd = chartDefaults();
   const base = {
@@ -2540,15 +2568,17 @@ function chartPreset(overrides){
     plugins:{
       legend:{labels:{color:cd.legendColor,font:cd.tickFont,boxWidth:10,padding:10,usePointStyle:true}},
       tooltip:{
-        backgroundColor:cd.tooltipBg,borderColor:cd.tooltipBorder,borderWidth:1,
-        titleColor:cd.tooltipTitle,bodyColor:cd.tooltipBody,
-        bodyFont:{family:'JetBrains Mono',size:11},padding:10,
-        callbacks:{label:c=>'  '+c.dataset.label+': '+fmt(c.raw)}
+        enabled:false, // disable Chart.js built-in — we render our own
+        external: chartHtmlTooltip,
+        mode:'index', intersect:false,
       }
     },
     scales:{
-      x:{ticks:{color:cd.textColor,font:cd.tickFont},grid:{color:cd.gridColor}},
-      y:{ticks:{color:cd.textColor,callback:v=>fmtC(v),font:cd.tickFont,maxTicksLimit:6},grid:{color:cd.gridColor}}
+      // Grid lines removed uniformly across every chart; axis lines + tick
+      // labels stay (border.display defaults to true) but the lines that
+      // cross through the chart canvas are suppressed.
+      x:{ticks:{color:cd.textColor,font:cd.tickFont},grid:{display:false}},
+      y:{ticks:{color:cd.textColor,callback:v=>fmtC(v),font:cd.tickFont,maxTicksLimit:6},grid:{display:false}}
     }
   };
   // Shallow-deep merge for the two known nested shapes (plugins, scales).
@@ -2560,6 +2590,48 @@ function chartPreset(overrides){
   return base;
 }
 function destroyChart(key) { if(charts[key]){charts[key].destroy();delete charts[key];} }
+
+// External HTML tooltip renderer for Chart.js — builds the same
+// .chart-tooltip DOM used by the runway SVG chart so every chart in
+// the app has a consistent tooltip appearance. Chart.js calls this on
+// every tooltip tick with {chart, tooltip}.
+function chartHtmlTooltip(context){
+  const {chart, tooltip} = context;
+  const el = _getChartTooltipEl();
+  if(tooltip.opacity === 0){ el.style.display = 'none'; return; }
+  const title = (tooltip.title && tooltip.title[0]) || '';
+  const rows = (tooltip.dataPoints || []).map(dp => {
+    const color = dp.dataset.borderColor || dp.dataset.backgroundColor || '#4d9fff';
+    const sw = (typeof color === 'string') ? color : '#4d9fff';
+    const label = dp.dataset.label || '';
+    const raw = Number(dp.raw);
+    const val = Number.isFinite(raw) ? (typeof fmt==='function'?fmt(raw):String(raw)) : String(dp.raw);
+    return `<div class="chart-tt-row"><span class="chart-tt-sw" style="background:${sw}"></span><span>${label}</span><span class="chart-tt-val">${val}</span></div>`;
+  }).join('');
+  // For stacked bars, show a total row automatically.
+  let totalRow = '';
+  if((tooltip.dataPoints||[]).length >= 2){
+    const sum = tooltip.dataPoints.reduce((s,dp) => s + (Number(dp.raw)||0), 0);
+    totalRow = `<div class="chart-tt-total"><span>Total</span><span class="chart-tt-val">${typeof fmt==='function'?fmt(sum):sum}</span></div>`;
+  }
+  el.innerHTML = `
+    ${title ? `<div class="chart-tt-title">${title}</div>` : ''}
+    ${rows}
+    ${totalRow}
+  `;
+  // Position near the cursor relative to the canvas
+  const canvasRect = chart.canvas.getBoundingClientRect();
+  const x = canvasRect.left + tooltip.caretX;
+  const y = canvasRect.top  + tooltip.caretY;
+  el.style.display = 'block';
+  const r = el.getBoundingClientRect();
+  let left = x + 14;
+  let top  = y + 14;
+  if(left + r.width  > window.innerWidth - 8) left = x - r.width - 14;
+  if(top  + r.height > window.innerHeight - 8) top  = y - r.height - 14;
+  el.style.left = left + 'px';
+  el.style.top  = top + 'px';
+}
 
 // ─── SHARED LINE ITEM RENDERER ───────────────────────────────────────────────
 // `showPaid` — pass a month key string (e.g. "2026-04") to enable the
@@ -2894,8 +2966,8 @@ function renderDashboard() {
           ]
         },
         options:chartPreset({scales:{
-          x:{ticks:{color:cd.textColor,font:cd.tickFont,maxTicksLimit:8},grid:{color:cd.gridColor}},
-          y:{ticks:{color:cd.textColor,callback:v=>fmtC(v),font:cd.tickFont,maxTicksLimit:6},grid:{color:cd.gridColor}}
+          x:{ticks:{color:cd.textColor,font:cd.tickFont,maxTicksLimit:8},grid:{display:false}},
+          y:{ticks:{color:cd.textColor,callback:v=>fmtC(v),font:cd.tickFont,maxTicksLimit:6},grid:{display:false}}
         }})
       });
     }
@@ -3034,25 +3106,20 @@ function renderTransactions() {
         options:chartPreset({
           layout:{ padding:{ top:10, right:10, bottom:4, left:4 } },
           plugins:{
+            // Tooltip config omitted so it inherits the unified HTML
+            // renderer from chartPreset. Legend gets a size bump for
+            // the focal chart's larger proportions.
             legend:{ labels:{ color:cd.legendColor, font:{family:'JetBrains Mono',size:12,weight:'600'}, boxWidth:14, padding:16, usePointStyle:true } },
-            tooltip:{
-              backgroundColor:cd.tooltipBg, borderColor:cd.tooltipBorder, borderWidth:1,
-              titleColor:cd.tooltipTitle, bodyColor:cd.tooltipBody,
-              titleFont:{family:'JetBrains Mono',size:12,weight:'700'},
-              bodyFont:{family:'JetBrains Mono',size:12},
-              padding:12, cornerRadius:6, boxPadding:4,
-              callbacks:{ label:c=>'  '+c.dataset.label+': '+fmt(c.raw) }
-            }
           },
           scales:{
             x:{
               ticks:{ color:cd.textColor, font:{family:'JetBrains Mono',size:11}, padding:6 },
-              grid:{ color:cd.gridColor, drawOnChartArea:false },
+              grid:{ display:false },
               border:{ color:cd.gridColor }
             },
             y:{
               ticks:{ color:cd.textColor, callback:v=>fmtC(v), font:{family:'JetBrains Mono',size:11}, maxTicksLimit:8, padding:8 },
-              grid:{ color:cd.gridColor },
+              grid:{ display:false },
               border:{ color:cd.gridColor, dash:[2,3] }
             }
           }
@@ -3078,6 +3145,12 @@ function renderMonthly() {
 
   el.innerHTML=`
     <div class="ph"><div class="ph-tag">PERSONAL FINANCES</div><div class="ph-title">Monthly Review</div><div class="ph-sub">Each month inherits your baseline. Edit any field to create a monthly override.</div></div>
+
+    <!-- 12-month spending/income trend chart — promoted to the top of
+         the Monthly Review tab per UX feedback. Sits above the month
+         pills, summary, and Income Streams / Expenses cards. -->
+    <div class="card"><div class="card-title">12-Month Forward Overview</div><div class="chart-wrap md"><canvas id="mo-chart"></canvas></div></div>
+
     <div class="month-pills">${months.map(m=>`<button class="month-pill ${m.key===selKey?'active':''} ${m.isCurrent?'current':''} ${m.hasOverride?'has-override':''}" onclick="state.selectedMonth='${m.key}';renderMonthly()">${m.short}${m.hasOverride?' ✎':''}</button>`).join('')}</div>
     ${sel.hasOverride?`<div style="display:inline-flex;align-items:center;gap:8px;margin-bottom:12px"><span style="background:var(--violet-dim);color:var(--violet);padding:3px 9px;border-radius:5px;font-size:11px;font-weight:700;font-family:var(--fm)">✎ CUSTOM OVERRIDE ACTIVE</span><button style="background:none;border:1px solid var(--border);color:var(--text2);padding:3px 9px;border-radius:5px;font-size:11px;cursor:pointer" onclick="delete state.monthlyOverrides['${selKey}'];save();renderMonthly()">Reset</button></div>`:'<div style="margin-bottom:12px;font-size:12px;color:var(--text3)">Showing inherited baseline — edit any field to create an override</div>'}
 
@@ -3112,9 +3185,7 @@ function renderMonthly() {
           <input type="number" value="${Math.round(sel.savings*r)}" style="background:transparent;border:none;color:var(--text);font-family:var(--fm);font-size:20px;font-weight:700;padding:10px 0;outline:none;width:200px" oninput="setMonthSavings('${selKey}',this.value/${r})">
         </div>
       </div>
-    </div>
-
-    <div class="card"><div class="card-title">12-Month Forward Overview</div><div class="chart-wrap md"><canvas id="mo-chart"></canvas></div></div>`;
+    </div>`;
 
   const incKey=state.monthlyOverrides[selKey]?.income?`mo-inc:${selKey}`:'baseIncome';
   const expKey=state.monthlyOverrides[selKey]?.expenses?`mo-exp:${selKey}`:'baseExpenses';
@@ -3658,13 +3729,18 @@ function renderRunwayChart(){
     </linearGradient>
   </defs>`);
 
-  // Layer 1: horizontal grid lines + left balance axis labels (0/25/50/75/100%)
+  // Layer 1: left balance axis labels only — grid lines that cross the
+  // chart area are suppressed uniformly across the app. The baseline
+  // axis line at 0% is kept to anchor the x-axis; higher tick labels
+  // float without a horizontal rule behind them.
   const gridLevels = [0, 0.25, 0.5, 0.75, 1];
   gridLevels.forEach(pct => {
     const y = pad.t + ph - pct * ph;
     const val = maxBal * pct;
-    const dash = pct === 0 ? '' : ' stroke-dasharray="2,4"';
-    parts.push(`<line x1="${pad.l}" y1="${y}" x2="${pad.l + pw}" y2="${y}" class="runway-grid"${dash}/>`);
+    if(pct === 0) {
+      // Keep a single baseline so the bars visually sit on something.
+      parts.push(`<line x1="${pad.l}" y1="${y}" x2="${pad.l + pw}" y2="${y}" class="runway-grid"/>`);
+    }
     parts.push(`<text x="${pad.l - 8}" y="${y + 3}" text-anchor="end" class="runway-axis-label">${_svgEsc(fmtC(val))}</text>`);
   });
 
@@ -3752,11 +3828,107 @@ function renderRunwayChart(){
   parts.push(`<circle cx="${sx}" cy="${sy}" r="5" fill="#4d9fff" stroke="var(--bg2)" stroke-width="1.5"/>`);
   parts.push(`<text x="${sx + 10}" y="${sy + 4}" class="runway-start-label">Retire age ${retAge}</text>`);
 
+  // Tooltip hover indicator (hidden by default, moved by JS on mousemove)
+  parts.push(`<line id="runway-hover-line" x1="0" y1="${pad.t}" x2="0" y2="${pad.t + ph}" class="runway-hover-line" style="display:none"/>`);
+  parts.push(`<circle id="runway-hover-dot" cx="0" cy="0" r="4" class="runway-hover-dot" style="display:none"/>`);
+  // Invisible hit area that captures mousemove across the plot region
+  parts.push(`<rect id="runway-hover-hit" x="${pad.l}" y="${pad.t}" width="${pw}" height="${ph}" fill="transparent" style="cursor:crosshair"/>`);
+
   parts.push('</svg>');
   host.innerHTML = parts.join('');
 
   // ── CHROME: subtitle, legend, milestones, verdict chip ──────────────────
   _runwayUpdateChrome(cdata, nums, lifeExp, lineColor);
+
+  // ── INTERACTIVE TOOLTIP ─────────────────────────────────────────────────
+  // Hover anywhere in the plot area → find the nearest age → show a
+  // floating HTML tooltip that lists balance, portfolio withdrawal,
+  // pension income, and combined annual income for that year.
+  _attachRunwayHover(host, {
+    cdata, pad, pw, ph, xScale, yBal,
+  });
+}
+
+// Floating HTML tooltip element shared by the runway chart (SVG) and any
+// other hand-rolled chart. Matches .chart-tooltip styling defined in CSS.
+let _runwayTooltipEl = null;
+function _getChartTooltipEl(){
+  if(!_runwayTooltipEl){
+    _runwayTooltipEl = document.createElement('div');
+    _runwayTooltipEl.className = 'chart-tooltip';
+    _runwayTooltipEl.style.display = 'none';
+    document.body.appendChild(_runwayTooltipEl);
+  }
+  return _runwayTooltipEl;
+}
+function _hideChartTooltip(){
+  const t = _runwayTooltipEl;
+  if(t) t.style.display = 'none';
+}
+function _attachRunwayHover(host, {cdata, pad, pw, ph, xScale, yBal}){
+  const svg = host.querySelector('svg');
+  const hit = host.querySelector('#runway-hover-hit');
+  const hoverLine = host.querySelector('#runway-hover-line');
+  const hoverDot  = host.querySelector('#runway-hover-dot');
+  if(!svg || !hit) return;
+  const tooltip = _getChartTooltipEl();
+  // svg viewBox is fixed at W×H; we convert client coordinates to viewBox
+  // coordinates via the SVG's CTM so the math works regardless of CSS size.
+  const ptToView = (clientX, clientY) => {
+    const pt = svg.createSVGPoint();
+    pt.x = clientX; pt.y = clientY;
+    const ctm = svg.getScreenCTM();
+    if(!ctm) return null;
+    return pt.matrixTransform(ctm.inverse());
+  };
+  const onMove = (e) => {
+    const p = ptToView(e.clientX, e.clientY); if(!p) return;
+    // Find the nearest index by x distance.
+    const n = cdata.labels.length;
+    let nearest = 0, best = Infinity;
+    for(let i = 0; i < n; i++){
+      const d = Math.abs(xScale(i) - p.x);
+      if(d < best){ best = d; nearest = i; }
+    }
+    const age = cdata.labels[nearest];
+    const balance = cdata.balData[nearest];
+    const port    = cdata.portWithdrawal[nearest] || 0;
+    const pen     = cdata.pensionData[nearest]    || 0;
+    const total   = port + pen;
+    const dep     = balance === 0;
+    // Move the on-SVG indicator
+    const cx = xScale(nearest);
+    const cy = yBal(balance);
+    hoverLine.setAttribute('x1', cx); hoverLine.setAttribute('x2', cx);
+    hoverLine.style.display = '';
+    hoverDot.setAttribute('cx', cx); hoverDot.setAttribute('cy', cy);
+    hoverDot.style.display = '';
+    // Render the floating HTML tooltip
+    tooltip.innerHTML = `
+      <div class="chart-tt-title">Age ${age}</div>
+      <div class="chart-tt-row"><span class="chart-tt-sw" style="background:${dep?'#ff4d6d':'#00e8a0'}"></span><span>Portfolio balance</span><span class="chart-tt-val">${fmt(balance)}</span></div>
+      <div class="chart-tt-row"><span class="chart-tt-sw" style="background:#f5a623"></span><span>Portfolio withdrawal</span><span class="chart-tt-val">${fmt(port)}/yr</span></div>
+      ${pen > 0 ? `<div class="chart-tt-row"><span class="chart-tt-sw" style="background:#4d9fff"></span><span>Pension income</span><span class="chart-tt-val">${fmt(pen)}/yr</span></div>` : ''}
+      <div class="chart-tt-total"><span>Total income</span><span class="chart-tt-val">${fmt(total)}/yr</span></div>
+    `;
+    // Position tooltip near cursor, avoiding right/bottom edge clipping
+    const margin = 14;
+    const rect = tooltip.getBoundingClientRect();
+    let left = e.clientX + margin;
+    let top  = e.clientY + margin;
+    if(left + rect.width  > window.innerWidth - 8) left = e.clientX - rect.width - margin;
+    if(top  + rect.height > window.innerHeight - 8) top  = e.clientY - rect.height - margin;
+    tooltip.style.left = left + 'px';
+    tooltip.style.top  = top + 'px';
+    tooltip.style.display = 'block';
+  };
+  const onLeave = () => {
+    _hideChartTooltip();
+    if(hoverLine) hoverLine.style.display = 'none';
+    if(hoverDot)  hoverDot.style.display  = 'none';
+  };
+  hit.addEventListener('mousemove', onMove);
+  hit.addEventListener('mouseleave', onLeave);
 }
 
 // Escape minimal set of chars that matter inside SVG text content.
@@ -5084,27 +5256,37 @@ function piq_clearHistory(){
 }
 
 // ── PROGRESS ──────────────────────────────────────────────────────────────────
+// Null-safe progress indicator. The DOM for this panel gets replaced every
+// time the user navigates back to Property IQ, so every child-element access
+// must tolerate `null`, and we always clear the previous timer before starting
+// a new one so we never leave a zombie setInterval running after a re-render.
 function piq_startProgress(){
+  if(piq_progressTimer){ clearInterval(piq_progressTimer); piq_progressTimer=null; }
   const wrap=document.getElementById('piq-progress');
   const fill=document.getElementById('piq-prog-fill');
   const label=document.getElementById('piq-prog-label');
   const steps=document.getElementById('piq-prog-steps');
   if(!wrap) return;
-  wrap.classList.add('on'); fill.style.width='0%';
-  steps.innerHTML=PIQ_STEPS.map((s,i)=>`<div class="piq-pstep${i===0?' active':''}" id="piq-pstep-${i}"><div class="piq-pstep-dot"></div>${s}</div>`).join('');
-  let pct=0,step=0; label.textContent=PIQ_STEPS[0]+'...';
+  wrap.classList.add('on');
+  if(fill)  fill.style.width='0%';
+  if(steps) steps.innerHTML=PIQ_STEPS.map((s,i)=>`<div class="piq-pstep${i===0?' active':''}" id="piq-pstep-${i}"><div class="piq-pstep-dot"></div>${s}</div>`).join('');
+  let pct=0,step=0;
+  if(label) label.textContent=PIQ_STEPS[0]+'...';
   piq_progressTimer=setInterval(()=>{
+    // Re-resolve every time in case the DOM was replaced mid-flight.
+    const f=document.getElementById('piq-prog-fill');
+    const l=document.getElementById('piq-prog-label');
     pct+=Math.random()*8+2; if(pct>92)pct=92;
-    fill.style.width=pct+'%';
+    if(f) f.style.width=pct+'%';
     const ns=pct<30?0:pct<55?1:pct<78?2:3;
     if(ns!==step){ document.getElementById('piq-pstep-'+step)?.classList.replace('active','done'); step=ns;
       const el=document.getElementById('piq-pstep-'+step);
-      if(el){el.classList.add('active');label.textContent=PIQ_STEPS[step]+'...'} }
+      if(el){el.classList.add('active'); if(l) l.textContent=PIQ_STEPS[step]+'...';} }
   },400);
 }
 
 function piq_finishProgress(){
-  clearInterval(piq_progressTimer);
+  if(piq_progressTimer){ clearInterval(piq_progressTimer); piq_progressTimer=null; }
   const fill=document.getElementById('piq-prog-fill');
   const label=document.getElementById('piq-prog-label');
   if(fill) fill.style.width='100%';
@@ -5151,6 +5333,16 @@ function piq_renderBgSearchUI(){
   const cfg = PIQ_MC[piq_market];
   if(status === 'running') {
     if(btn) { btn.disabled = true; btn.textContent = 'Analysing…'; }
+    // Replace whatever's in #piq-results (usually the empty-state
+    // placeholder that renderPropIQ just injected) with a dedicated
+    // loading card so the user's return to a mid-flight analysis is
+    // unambiguous — the fetch is still running in the background, the
+    // result just isn't ready yet.
+    const meta = state.searchCache && state.searchCache[bgKey] && state.searchCache[bgKey].meta;
+    const q = (meta && meta.query) || piq_lastQuery || '';
+    resultsEl.innerHTML = (typeof ui!=='undefined' && ui.loading)
+      ? ui.loading(`Analysing ${q?esc(q)+' in ':''}${cfg.name}… you can switch tabs and come back.`)
+      : `<div class="piq-loading">Analysing… you can switch tabs and come back.</div>`;
     if(!document.getElementById('piq-progress')?.classList.contains('on')) piq_startProgress();
     return;
   }
