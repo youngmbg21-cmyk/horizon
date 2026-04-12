@@ -667,6 +667,269 @@
       </div>
     </div>
 
+    <!-- ════════════════ PROPIQ ════════════════ -->
+    <div class="propiq-wrapper" id="propiq-wrapper">
+
+      <!-- SEARCH VIEW -->
+      <div class="piq-view active" id="piq-search">
+
+        <!-- MARKET BANNER -->
+        <div class="market-banner ke" id="piq-market-banner">🇰🇪 &nbsp; Kenya market · Prices in KES · Nairobi focus</div>
+
+        <!-- DISCLAIMER STRIP -->
+        <div class="disclaimer">
+          <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><circle cx="8" cy="8" r="6"/><line x1="8" y1="5" x2="8" y2="8"/><circle cx="8" cy="11" r=".5" fill="currentColor"/></svg>
+          AI-generated analysis only. Not financial or legal advice. Always verify with a licensed professional before making any property purchase decision.
+        </div>
+
+        <!-- SEARCH BAR -->
+        <div class="search-label" id="piq-search-label">Search any Nairobi location or property type</div>
+        <div class="search-row">
+          <input class="search-input" id="piq-search-input" placeholder="e.g. Westlands 2BR apartment..." onkeydown="if(event.key==='Enter')piqSearch()">
+          <button class="search-btn" id="piq-search-btn" onclick="piqSearch()">Analyse</button>
+        </div>
+
+        <!-- QUICK TAGS -->
+        <div class="quick-tags" id="piq-quick-tags"></div>
+
+        <!-- 4-STEP PROGRESS BAR -->
+        <div class="progress-wrap" id="piq-progress">
+          <div class="progress-label" id="piq-progress-label">Fetching live signals...</div>
+          <div class="progress-track">
+            <div class="progress-fill" id="piq-progress-bar"></div>
+          </div>
+          <div class="progress-steps" id="piq-progress-steps">
+            <div class="piq-step pstep" id="piq-step-signals">
+              <div class="pstep-dot"></div>
+              <span class="piq-step-msg">Signals</span>
+            </div>
+            <div class="piq-step pstep" id="piq-step-analysis">
+              <div class="pstep-dot"></div>
+              <span class="piq-step-msg">Analysis</span>
+            </div>
+            <div class="piq-step pstep" id="piq-step-thesis">
+              <div class="pstep-dot"></div>
+              <span class="piq-step-msg">Thesis</span>
+            </div>
+            <div class="piq-step pstep" id="piq-step-legal">
+              <div class="pstep-dot"></div>
+              <span class="piq-step-msg">Legal</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- EMPTY STATE -->
+        <div class="empty" id="piq-empty">
+          <div class="empty-title">Search a location to begin</div>
+          <div class="empty-sub">PropIQ fetches live signals, generates an investment thesis,<br>calculates mortgage payments, and flags legal risks — all in one place.</div>
+        </div>
+
+        <!-- RESULTS AREA -->
+        <div id="piq-results-area" style="display:none">
+
+          <!-- RESULT HEADER -->
+          <div class="piq-result-header">
+            <div class="piq-result-flag" id="piq-result-flag">🇰🇪</div>
+            <div class="piq-result-title" id="piq-result-title">—</div>
+            <div class="piq-result-meta" id="piq-result-meta">—</div>
+            <div class="piq-result-query" id="piq-result-query">—</div>
+          </div>
+
+          <!-- 5-COLUMN KPI ROW -->
+          <div class="piq-kpi-row kpi-row">
+            <div class="piq-kpi kpi">
+              <div class="piq-kpi-lbl kpi-label">PRICE</div>
+              <div class="piq-kpi-val kpi-value" id="piq-kpi-price">—</div>
+              <div class="piq-kpi-sub kpi-sub" id="piq-kpi-price-sub"></div>
+            </div>
+            <div class="piq-kpi kpi">
+              <div class="piq-kpi-lbl kpi-label">YIELD</div>
+              <div class="piq-kpi-val kpi-value" id="piq-kpi-yield">—</div>
+              <div class="piq-kpi-sub kpi-sub" id="piq-kpi-yield-sub"></div>
+            </div>
+            <div class="piq-kpi kpi">
+              <div class="piq-kpi-lbl kpi-label">GROWTH</div>
+              <div class="piq-kpi-val kpi-value" id="piq-kpi-growth">—</div>
+              <div class="piq-kpi-sub kpi-sub" id="piq-kpi-growth-sub"></div>
+            </div>
+            <div class="piq-kpi kpi">
+              <div class="piq-kpi-lbl kpi-label">RISK</div>
+              <div class="piq-kpi-val kpi-value" id="piq-kpi-risk">—</div>
+              <div class="piq-kpi-sub kpi-sub" id="piq-kpi-risk-sub"></div>
+            </div>
+            <div class="piq-kpi kpi">
+              <div class="piq-kpi-lbl kpi-label">SCORE</div>
+              <div class="piq-kpi-val kpi-value" id="piq-kpi-score">—</div>
+              <div class="piq-kpi-sub kpi-sub" id="piq-kpi-score-sub"></div>
+            </div>
+          </div>
+
+          <!-- TAB STRIP -->
+          <div class="piq-tabs tabs" id="piq-tabs">
+            <button class="piq-tab tab on" data-tab="investment" onclick="piqSwitchTab('investment')">
+              <span class="piq-tab-icon">📈</span><span class="piq-tab-lbl">Investment</span>
+            </button>
+            <button class="piq-tab tab" data-tab="mortgage" onclick="piqSwitchTab('mortgage')">
+              <span class="piq-tab-icon">🏦</span><span class="piq-tab-lbl">Mortgage</span>
+            </button>
+            <button class="piq-tab tab" data-tab="pipeline" onclick="piqSwitchTab('pipeline')">
+              <span class="piq-tab-icon">⚙</span><span class="piq-tab-lbl">Pipeline</span>
+            </button>
+            <button class="piq-tab tab" data-tab="signals" onclick="piqSwitchTab('signals')">
+              <span class="piq-tab-icon">📡</span><span class="piq-tab-lbl">Signals</span>
+            </button>
+            <button class="piq-tab tab" data-tab="legal" onclick="piqSwitchTab('legal')">
+              <span class="piq-tab-icon">⚖</span><span class="piq-tab-lbl">Legal</span>
+            </button>
+            <button class="piq-tab tab" data-tab="currency" onclick="piqSwitchTab('currency')">
+              <span class="piq-tab-icon">💱</span><span class="piq-tab-lbl">Currency</span>
+            </button>
+            <button class="piq-tab tab" data-tab="share" onclick="piqSwitchTab('share')">
+              <span class="piq-tab-icon">↗</span><span class="piq-tab-lbl">Share</span>
+            </button>
+          </div>
+
+          <!-- TAB BODY -->
+          <div id="piq-tab-body">
+            <!-- INVESTMENT PANE -->
+            <div class="pane on" id="piq-pane-investment">
+              <div class="piq-investment" id="piq-investment">
+                <div class="piq-investment-main" id="piq-investment-main"></div>
+                <div class="piq-investment-side" id="piq-investment-side"></div>
+              </div>
+              <div class="piq-thesis" id="piq-thesis"></div>
+              <div class="piq-verdict-card" id="piq-verdict-card">
+                <div class="piq-verdict-hd">
+                  <div class="piq-verdict-lbl" id="piq-verdict-lbl">VERDICT</div>
+                  <div class="piq-verdict-big" id="piq-verdict-big">—</div>
+                  <div class="piq-verdict-score" id="piq-verdict-score">—</div>
+                </div>
+                <div class="piq-verdict-meta" id="piq-verdict-meta"></div>
+                <div class="piq-verdict-reason" id="piq-verdict-reason"></div>
+              </div>
+            </div>
+
+            <!-- MORTGAGE PANE -->
+            <div class="pane" id="piq-pane-mortgage">
+              <div class="piq-mortgage" id="piq-mortgage">
+                <div class="piq-mortgage-form" id="piq-mortgage-form">
+                  <div class="calc-grid">
+                    <div class="calc-field">
+                      <label>Property Price</label>
+                      <input type="number" class="mono" id="mort-price" placeholder="0" oninput="piqCalcMortgage()">
+                    </div>
+                    <div class="calc-field">
+                      <label>Deposit (%)</label>
+                      <input type="number" class="mono" id="mort-deposit" placeholder="20" oninput="piqCalcMortgage()">
+                    </div>
+                    <div class="calc-field">
+                      <label>Interest Rate (%)</label>
+                      <input type="number" step=".01" class="mono" id="mort-rate" placeholder="5.5" oninput="piqCalcMortgage()">
+                    </div>
+                    <div class="calc-field">
+                      <label>Term (months)</label>
+                      <input type="number" class="mono" id="mort-term" placeholder="240" oninput="piqCalcMortgage()">
+                    </div>
+                  </div>
+                </div>
+                <div class="piq-mortgage-output" id="piq-mortgage-output"></div>
+              </div>
+            </div>
+
+            <!-- PIPELINE PANE -->
+            <div class="pane" id="piq-pane-pipeline">
+              <div class="piq-table-wrap" id="piq-pipeline-wrap"></div>
+            </div>
+
+            <!-- SIGNALS PANE -->
+            <div class="pane" id="piq-pane-signals">
+              <div class="piq-signals" id="piq-signals"></div>
+              <div class="piq-sentiment-summary" id="piq-sentiment-summary"></div>
+            </div>
+
+            <!-- LEGAL PANE -->
+            <div class="pane" id="piq-pane-legal">
+              <div class="piq-legal" id="piq-legal">
+                <div class="piq-score-bar">
+                  <div class="piq-score-num" id="piq-legal-score">—</div>
+                  <div class="piq-score-fill" id="piq-legal-score-fill"></div>
+                </div>
+                <div class="flags" id="piq-legal-flags"></div>
+                <div class="legal-note" id="piq-legal-note"></div>
+              </div>
+            </div>
+
+            <!-- CURRENCY PANE -->
+            <div class="pane" id="piq-pane-currency">
+              <div class="piq-currency" id="piq-currency">
+                <div class="fx-row">
+                  <div class="fx-field">
+                    <label>Amount</label>
+                    <input type="number" class="mono" id="fx-amount" placeholder="100000" oninput="piqFxConvert()">
+                  </div>
+                  <div class="fx-arrow">→</div>
+                  <div class="fx-field">
+                    <label>To</label>
+                    <select class="fx-select" id="fx-target" onchange="piqFxConvert()">
+                      <option value="USD">USD</option>
+                      <option value="EUR">EUR</option>
+                      <option value="GBP">GBP</option>
+                      <option value="SEK">SEK</option>
+                      <option value="KES">KES</option>
+                    </select>
+                  </div>
+                </div>
+                <div class="fx-rate" id="fx-result">—</div>
+              </div>
+            </div>
+
+            <!-- SHARE PANE -->
+            <div class="pane" id="piq-pane-share">
+              <div class="piq-share" id="piq-share">
+                <div class="share-grid">
+                  <button class="share-btn" onclick="piqShareCopy()">
+                    <div class="share-icon">📋</div>
+                    <div class="share-label">Copy</div>
+                    <div class="share-sub">Clipboard</div>
+                  </button>
+                  <button class="share-btn" onclick="piqShareWhatsapp()">
+                    <div class="share-icon">💬</div>
+                    <div class="share-label">WhatsApp</div>
+                    <div class="share-sub">Send link</div>
+                  </button>
+                  <button class="share-btn" onclick="piqShareExport()">
+                    <div class="share-icon">⬇</div>
+                    <div class="share-label">Export</div>
+                    <div class="share-sub">Markdown</div>
+                  </button>
+                </div>
+                <div class="copy-toast" id="piq-share-toast">Copied to clipboard</div>
+                <div class="feedback-row">
+                  <span class="feedback-label">Was this useful?</span>
+                  <button class="fb-btn up" onclick="piqFeedback('up')">👍</button>
+                  <button class="fb-btn down" onclick="piqFeedback('down')">👎</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div><!-- /piq-results-area -->
+
+        <!-- PLACEHOLDER (used by some renderers) -->
+        <div id="piq-placeholder"></div>
+      </div><!-- /piq-search view -->
+
+      <!-- COMPARE VIEW -->
+      <div class="piq-view" id="piq-compare">
+        <div id="piq-compare-area">
+          <div class="piq-compare-hd" id="piq-compare-hd">
+            <div class="card-title">⚖ Compare Properties</div>
+          </div>
+          <div class="piq-compare-wrap compare-grid" id="piq-compare-wrap"></div>
+          <button class="btn btn-o btn-sm" onclick="piqBackToResults()">← Back</button>
+        </div>
+      </div>
+    </div><!-- /propiq-wrapper -->
+
 <script>
 // ═══════════════════════════════════════════════════════════════════
 // CONSTANTS & DEFAULTS
