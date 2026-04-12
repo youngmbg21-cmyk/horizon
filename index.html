@@ -1699,6 +1699,58 @@ function getAllPensionIncome() {
 }
 
 const RET_SCENARIOS = {lean:0.75,baseline:1.0,comfortable:1.3};
+
+// ─── SHARED RETIREMENT SIMULATION ───────────────────────────────────────────
+// Single source of truth for the year-by-year retirement draw-down. Both
+// getRetirementNumbers (for the headline "Depletion Age" card + verdict)
+// and buildRunwayChartData (for the Longevity Runway chart) call through
+// this helper so the two surfaces can never disagree on runoutAge or the
+// bar composition.
+//
+// Crucially, this loop reads pension income per-age via pensionAtAge(age),
+// so delayed pensions correctly reduce the portfolio draw only AFTER they
+// start — no more "portfolio depletes at 75 according to the card but
+// 81 according to the chart" split.
+function _simulateRetirementYears({nestEgg, totalExp, taxRate, realRateMonthly, startAge, endAge, pensions}) {
+  const annualGrossNeeded = (totalExp / Math.max(0.001, 1 - taxRate)) * 12;
+  const pensionAtAge = (age) => pensions.reduce((s, p) => {
+    const pStart = p.startAge ?? startAge;
+    const pEnd   = p.endAge   || 999;
+    return (age >= pStart && age < pEnd) ? s + (p.monthlyPayout || 0) : s;
+  }, 0);
+  const earliestPension = pensions.length > 0
+    ? Math.min(...pensions.map(p => p.startAge ?? startAge))
+    : null;
+  const labels = [], balData = [], portWithdrawal = [], pensionData = [];
+  let balance = nestEgg;
+  let runoutAge = null;
+  for (let age = startAge; age <= endAge; age++) {
+    labels.push(age);
+    balData.push(Math.max(0, Math.round(balance)));
+    const annualPen  = pensionAtAge(age) * 12;
+    const annualPort = Math.max(0, annualGrossNeeded - annualPen);
+    portWithdrawal.push(Math.round(annualPort));
+    pensionData.push(Math.round(annualPen));
+    // Evolve balance over 12 monthly steps using the annual draw.
+    const portMonthly = annualPort / 12;
+    for (let m = 0; m < 12; m++) {
+      balance = balance * (1 + realRateMonthly) - portMonthly;
+      if (balance <= 0) {
+        balance = 0;
+        if (runoutAge === null) runoutAge = age + (m + 1) / 12;
+        break;
+      }
+    }
+  }
+  const runoutAgeRounded = runoutAge !== null ? Math.round(runoutAge) : null;
+  return {
+    labels, balData, portWithdrawal, pensionData, earliestPension,
+    runoutAge: runoutAgeRounded,
+    lifeExpIdx: labels.indexOf(endAge),
+    runoutIdx:  runoutAgeRounded !== null ? labels.findIndex(a => a >= runoutAgeRounded) : -1,
+  };
+}
+
 function getRetirementNumbers() {
   return memoSelect('retnums', () => {
     const sc = state.retirementScenario||'baseline';
@@ -1722,18 +1774,23 @@ function getRetirementNumbers() {
     else if(coveragePct>=80){verdict='On Track';verdictIcon='🎯';verdictClass='ontarget';}
     else{verdict='Underfunded';verdictIcon='❌';verdictClass='underfunded';}
 
-    // Runway simulation
-    let balance=nestEgg, months=0;
-    const runwayData=[{age:state.retirementAge,balance:nestEgg}];
-    const maxMonths=(state.lifeExp-state.retirementAge)*12+120;
-    while(balance>0&&months<maxMonths){
-      balance=balance*(1+realRate)-grossNeeded;
-      months++;
-      if(months%12===0) runwayData.push({age:state.retirementAge+months/12,balance:Math.max(0,Math.round(balance))});
-    }
-    const runoutAge=balance<=0?Math.round(state.retirementAge+months/12):null;
+    // Run the pension-aware simulation once. runoutAge is taken from it
+    // (replaces the old constant-grossNeeded loop that ignored pension
+    // timing). The full sim result is also cached on _simResult so
+    // buildRunwayChartData can reuse it — the chart and the headline
+    // card now share one computation.
+    const simResult = _simulateRetirementYears({
+      nestEgg,
+      totalExp,
+      taxRate,
+      realRateMonthly: realRate,
+      startAge: state.retirementAge,
+      endAge: state.lifeExp || 90,
+      pensions: getPensionAssets(),
+    });
+    const runoutAge = simResult.runoutAge;
 
-    return {totalExp,totalGross,pension,grossNeeded,nestEgg,sustainableMonthly,sustainableAfterTax,gap,coveragePct,verdict,verdictIcon,verdictClass,ytr,runwayData,runoutAge,taxRate,sc,mult};
+    return {totalExp,totalGross,pension,grossNeeded,nestEgg,sustainableMonthly,sustainableAfterTax,gap,coveragePct,verdict,verdictIcon,verdictClass,ytr,runoutAge,taxRate,sc,mult,_simResult:simResult};
   });
 }
 
@@ -3160,58 +3217,21 @@ window.syncYearCascade=function(){
 // ══ RETIREMENT — unified 3-section collapsible page ═══════════════════════════
 // Helper: build runway Chart.js data from simulation
 function buildRunwayChartData(nums) {
-  // We need per-year: portfolio balance (line), portfolio withdrawal (bar), pension income (bar)
-  // Re-run simulation year by year to get annual income breakdown.
-  // The x-axis ends at the user's life expectancy — no bars or data
-  // points are emitted beyond it.
-  const lifeExp = state.lifeExp||90;
-  const maxAge = lifeExp;
-  const pensions = getPensionAssets();
-  const taxRate = nums.taxRate;
-  const realRate = Math.max(0.001,(state.retirementPostGrowth||4)-state.inflationRate)/100/12;
-
-  function pensionAtAge(age) {
-    return pensions.reduce((s,p)=>{
-      const start=p.startAge??state.retirementAge, end=p.endAge||999;
-      return (age>=start&&age<end)?s+(p.monthlyPayout||0):s;
-    },0);
-  }
-
-  const labels=[]; const balData=[]; const portWithdrawal=[]; const pensionData=[];
-  let balance = nums.nestEgg;
-  // earliest pension start for gap label
-  const earliestPension = pensions.length>0?Math.min(...pensions.map(p=>p.startAge??state.retirementAge)):null;
-
-  // All values inside this loop are ANNUAL — this matters because the
-  // chart's right axis is "Income/yr". `nums.totalExp` is already monthly
-  // with the scenario multiplier baked in, so we just × 12 once. The
-  // earlier version mistakenly multiplied `totalExp` by `nums.mult` again
-  // AND mixed monthly expense amounts with annual pension amounts in the
-  // same subtraction, which clamped portWithdrawal to 0 the moment any
-  // pension started — leaving the pre-pension gap correctly orange but
-  // turning every year after pension start into pure-blue pension bars.
-  const annualGrossNeeded = (nums.totalExp / Math.max(0.001, 1 - taxRate)) * 12;
-
-  for(let age=state.retirementAge; age<=maxAge; age++) {
-    labels.push(age);
-    balData.push(Math.max(0, Math.round(balance)));
-    const annualPen = pensionAtAge(age) * 12;
-    // What the portfolio has to cover this year, after pension income
-    // pays down whatever it can.
-    const annualPort = Math.max(0, annualGrossNeeded - annualPen);
-    portWithdrawal.push(Math.round(annualPort));
-    pensionData.push(Math.round(annualPen));
-    // Evolve the balance over 12 monthly steps using the annual draw.
-    const portMonthly = annualPort / 12;
-    for(let m=0;m<12;m++) {
-      balance = balance*(1+realRate) - portMonthly;
-      if(balance<=0){balance=0;break;}
-    }
-  }
-
-  return { labels, balData, portWithdrawal, pensionData, earliestPension,
-    lifeExpIdx: labels.indexOf(lifeExp),
-    runoutIdx: nums.runoutAge?labels.findIndex(a=>a>=Math.round(nums.runoutAge)):-1 };
+  // Single source of truth — the pension-aware year-by-year simulation
+  // runs exactly once inside getRetirementNumbers() and is cached on
+  // nums._simResult. This wrapper just hands it back so the chart and
+  // the "Depletion Age" headline card always agree.
+  if (nums && nums._simResult) return nums._simResult;
+  // Defensive fallback for any caller that passes a bare nums object.
+  return _simulateRetirementYears({
+    nestEgg: nums.nestEgg,
+    totalExp: nums.totalExp,
+    taxRate: nums.taxRate,
+    realRateMonthly: Math.max(0.001, (state.retirementPostGrowth||4) - state.inflationRate) / 100 / 12,
+    startAge: state.retirementAge,
+    endAge: state.lifeExp || 90,
+    pensions: getPensionAssets(),
+  });
 }
 
 // Collapse state
@@ -3578,10 +3598,13 @@ function renderRunwayChart(){
   // Bar width scales inversely with year count, clamped [3, 12].
   const barW = Math.max(3, Math.min(12, Math.floor(pw / (n * 1.4))));
 
-  // Runout detection — the first index where balance hits zero.
-  const runoutIdx = cdata.balData.findIndex((b, i) => i > 0 && b <= 0);
-  const hasRunout = runoutIdx > 0;
-  const survives = !hasRunout;
+  // Runout detection — read from the shared simulation result so the
+  // chart annotation can never disagree with the Depletion Age card.
+  // `cdata.runoutIdx` and `cdata.runoutAge` are both set by
+  // _simulateRetirementYears() inside getRetirementNumbers().
+  const hasRunout = cdata.runoutIdx >= 0 && cdata.runoutAge !== null;
+  const runoutIdx = hasRunout ? cdata.runoutIdx : -1;
+  const survives  = !hasRunout;
   const lineColor   = survives ? '#00e8a0' : '#ff4d6d';
   const lineColorLt = survives ? '#00c889' : '#e53b55';
 
@@ -3665,7 +3688,10 @@ function renderRunwayChart(){
   }
   if(hasRunout){
     const x = xScale(runoutIdx);
-    const runoutAge = cdata.labels[runoutIdx];
+    // Use the shared sim's runoutAge (not cdata.labels[runoutIdx]) so the
+    // chart label and the "Depletion Age" card always show the same
+    // number — Math.round is applied inside _simulateRetirementYears.
+    const runoutAge = cdata.runoutAge;
     parts.push(`<line x1="${x}" y1="${pad.t}" x2="${x}" y2="${pad.t + ph}" class="runway-annot-line runout"/>`);
     const atEnd = runoutIdx >= n - 2;
     const lx = atEnd ? x - 6 : x + 6;
