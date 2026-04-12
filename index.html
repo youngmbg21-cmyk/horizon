@@ -813,6 +813,20 @@ body.light .md tbody tr:nth-child(even) { background:rgba(0,0,0,0.015); }
 .loc-add-sub { font-size:12px; color:var(--text2); line-height:1.5; }
 .loc-add-search-wrap { position:relative; margin-bottom:12px; }
 
+/* ── PROPERTY IQ FULL REPORT TAB ───────────────────────────────────── */
+.piq-tab.piq-tab-report { background:var(--accent-positive-dim); color:var(--accent-positive); border-radius:6px 6px 0 0; font-weight:600; }
+.piq-tab.piq-tab-report.on { background:var(--accent-positive-dim); color:var(--accent-positive); }
+.piq-report-wrap { background:var(--bg2); border:1px solid var(--border); border-radius:12px; padding:18px 22px; }
+.piq-report-actions { display:flex; flex-wrap:wrap; align-items:center; gap:10px; padding-bottom:14px; margin-bottom:18px; border-bottom:1px solid var(--border); }
+.piq-report-hint { font-size:11px; color:var(--text3); font-family:var(--fm); flex:1; min-width:0; }
+.piq-report-body { font-size:13px; line-height:1.7; }
+.piq-report-body .md { font-size:13px; }
+.piq-report-body .md h1 { font-size:22px; margin-top:0; }
+.piq-report-body .md h2 { font-size:16px; margin-top:22px; }
+.piq-report-body .md h3 { font-size:13px; }
+.piq-report-body .md .md-table-wrap { margin:12px 0 18px; }
+.piq-report-body .md blockquote { margin-top:14px; }
+
 /* ── VAULT ──────────────────────────────────────────────────────────── */
 .vault-grid { display:grid; grid-template-columns:340px 1fr; gap:14px; align-items:start; }
 @media (max-width:1000px){ .vault-grid { grid-template-columns:1fr; } }
@@ -825,7 +839,10 @@ body.light .md tbody tr:nth-child(even) { background:rgba(0,0,0,0.015); }
 .vault-row-flag { font-size:20px; flex-shrink:0; width:26px; text-align:center; }
 .vault-row-meta { flex:1; min-width:0; }
 .vault-row-title { font-size:13px; font-weight:700; color:var(--text); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-.vault-row-sub { font-family:var(--fm); font-size:10px; color:var(--text3); margin-top:2px; }
+.vault-row-sub { font-family:var(--fm); font-size:10px; color:var(--text3); margin-top:2px; display:flex; align-items:center; gap:6px; }
+.vault-type-badge { display:inline-block; font-family:var(--fm); font-size:8px; font-weight:700; letter-spacing:.08em; padding:2px 6px; border-radius:3px; }
+.vault-type-badge.piq { background:var(--accent-positive-dim); color:var(--accent-positive); }
+.vault-type-badge.deepdive { background:var(--accent-info-dim); color:var(--accent-info); }
 .vault-row .btn-xs { flex-shrink:0; }
 .vault-row .line-rm { flex-shrink:0; }
 .vault-open-wrap { background:var(--bg2); border:1px solid var(--border); border-radius:10px; padding:18px 22px; min-height:540px; }
@@ -5034,9 +5051,10 @@ One paragraph. Recommendation: "proceed", "proceed with caveats", or "reconsider
   (async () => {
     try {
       const reply = await callClaude(prompt, 3000, key);
-      // Save to Vault
+      // Save to Vault (Retire Anywhere Deep Dive)
       const entry = {
         id: 'dd-' + Date.now(),
+        type: 'deepdive',
         locationId: id,
         location: loc.name,
         country: loc.country,
@@ -5229,22 +5247,26 @@ function renderVault(){
         const d = new Date(v.date);
         const when = d.toLocaleDateString(undefined, {day:'numeric',month:'short',year:'numeric'}) + ' · ' + d.toLocaleTimeString(undefined, {hour:'2-digit',minute:'2-digit'});
         const active = v.id === openId ? ' active' : '';
+        // Badge distinguishes Retire Anywhere Deep Dives from Property IQ Full Reports
+        const typeLabel = v.type === 'piq' ? 'PROPERTY IQ' : 'DEEP DIVE';
+        const typeClass = v.type === 'piq' ? 'piq' : 'deepdive';
         return `<div class="vault-row${active}" onclick="openVaultEntry('${v.id}')">
           <div class="vault-row-flag">${v.flag || '🌍'}</div>
           <div class="vault-row-meta">
             <div class="vault-row-title">${esc2(v.location)}${v.country?`, ${esc2(v.country)}`:''}</div>
-            <div class="vault-row-sub">${esc2(when)}</div>
+            <div class="vault-row-sub"><span class="vault-type-badge ${typeClass}">${typeLabel}</span> ${esc2(when)}</div>
           </div>
           <button class="btn btn-o btn-xs" onclick="event.stopPropagation();exportVaultEntryPdf('${v.id}')" title="Download as PDF">📄 PDF</button>
           <button class="line-rm" onclick="event.stopPropagation();deleteVaultEntry('${v.id}')" title="Delete">×</button>
         </div>`;
       }).join('');
 
+  const openTag = open?.type === 'piq' ? 'PROPERTY IQ FULL REPORT' : 'DEEP DIVE REPORT';
   const openPane = open
     ? `<div class="vault-open">
         <div class="vault-open-head">
           <div>
-            <div class="vault-open-tag">DEEP DIVE REPORT</div>
+            <div class="vault-open-tag">${openTag}</div>
             <div class="vault-open-title">${esc2(open.location)}${open.country?`, ${esc2(open.country)}`:''}</div>
             <div class="vault-open-sub">${esc2(new Date(open.date).toLocaleString())}${open.citizenship?` · tailored for ${esc2((countryInfo(open.citizenship)||{}).name||open.citizenship)} citizen based in ${esc2((countryInfo(open.homeBase)||{}).name||open.homeBase||'')}`:''}</div>
           </div>
@@ -6329,6 +6351,341 @@ function piq_calcMortgage(){
   </div>`;
 }
 
+// ── FULL REPORT (consolidates all PIQ data into one document) ──────────────
+// Compute a mortgage scenario from the calculator inputs if the user has
+// filled them in, otherwise fall back to a sensible default derived from
+// the analysis's avgPrice / priceRange.
+function piq_getMortgageScenario(a, cfg){
+  const inpPrice = parseFloat(document.getElementById('piq-mc-price')?.value.replace(/[^0-9.]/g,'') || '0');
+  // Derive a default price from the analysis if the calculator is empty.
+  let price = inpPrice;
+  if(!price){
+    const raw = (a.kpis?.avgPrice || a.priceRange || '').replace(/[^0-9.MkK]/g,'');
+    const m = raw.match(/([0-9.]+)([Mk]?)/);
+    if(m){
+      const n = parseFloat(m[1]) * (m[2]==='M' ? 1e6 : (m[2].toLowerCase()==='k' ? 1e3 : 1));
+      price = Math.round(n);
+    }
+  }
+  const deposit = parseFloat(document.getElementById('piq-mc-deposit')?.value || cfg.mortgageDeposit);
+  const rate    = parseFloat(document.getElementById('piq-mc-rate')?.value || cfg.mortgageRates[0].v);
+  const months  = parseInt(document.getElementById('piq-mc-term')?.value || cfg.mortgageTerm[0].v);
+  const loan    = price * (1 - deposit/100);
+  const mr      = rate/100/12;
+  const monthly = mr ? loan * mr * Math.pow(1+mr, months) / (Math.pow(1+mr, months) - 1) : loan/months;
+  const total   = monthly * months;
+  const interest= total - loan;
+  const fmtN    = n => Math.round(n).toLocaleString(cfg.locale || 'en-US');
+  return {
+    hasPrice: price > 0,
+    price, deposit, rate, months, years: Math.round(months/12),
+    loan, monthly, total, interest,
+    priceStr: `${cfg.currency} ${fmtN(price)}`,
+    loanStr: `${cfg.currency} ${fmtN(loan)}`,
+    monthlyStr: `${cfg.currency} ${fmtN(monthly)}`,
+    totalStr: `${cfg.currency} ${fmtN(total)}`,
+    interestStr: `${cfg.currency} ${fmtN(interest)}`,
+  };
+}
+// Sentiment glyph for Signals section
+function piq_sentimentGlyph(s){
+  if(s === 'positive') return '✓';
+  if(s === 'negative') return '✗';
+  return '•';
+}
+// Risk-level glyph for Legal Risk section
+function piq_riskGlyph(l){
+  if(l === 'danger') return '⛔';
+  if(l === 'warn')   return '⚠';
+  return '✓';
+}
+// Assemble the consolidated markdown report. `narrative` is the optional
+// AI-generated paragraph synthesis; if missing, the AI Narrative section
+// renders a placeholder.
+function piq_buildReportMarkdown(query, a, cfg, narrative){
+  const date = new Date();
+  const dateStr = date.toLocaleDateString(undefined, {day:'numeric',month:'long',year:'numeric'});
+  const verdict = (a.verdict || 'HOLD').toUpperCase();
+  const verdictIcon = verdict === 'BUY' ? '▲' : verdict === 'AVOID' ? '▼' : '►';
+  const mortgage = piq_getMortgageScenario(a, cfg);
+
+  // ── Market metrics table ──
+  const metricsTable = `| Metric | Value | Context |
+|---|---|---|
+| Average price | ${piq_cleanKpi(a.kpis?.avgPrice || a.priceRange)} | ${query} |
+| Price per m² | ${piq_cleanKpi(a.pricePerSqm)} | ${cfg.currency}/sqm |
+| Rental yield | ${piq_cleanKpi(a.kpis?.yield || a.rentalYield)} | Gross annual |
+| Annual appreciation | ${piq_cleanKpi(a.kpis?.appreciation)} | Year-on-year estimate |
+| Liquidity | ${piq_cleanKpi(a.kpis?.liquidity)} | Market depth |`;
+
+  // ── Mortgage breakdown ──
+  const mortgageSection = mortgage.hasPrice ? `**Scenario:** ${mortgage.priceStr} property · ${mortgage.deposit}% deposit · ${mortgage.rate}% interest · ${mortgage.years}-year term
+
+| Metric | Value |
+|---|---|
+| Property price | ${mortgage.priceStr} |
+| Loan amount | ${mortgage.loanStr} (${100-mortgage.deposit}% LTV) |
+| Monthly repayment | **${mortgage.monthlyStr}** |
+| Total interest paid | ${mortgage.interestStr} |
+| Total cost over ${mortgage.years} years | ${mortgage.totalStr} |
+
+_Affordability rule of thumb: monthly payment should not exceed ~30% of gross household income. At ${mortgage.monthlyStr}/mo this implies a minimum monthly income of ~${cfg.currency} ${Math.round(mortgage.monthly / 0.3).toLocaleString(cfg.locale||'en-US')}._`
+    : `_No specific scenario entered in the Mortgage tab. Use the Mortgage Calculator to model a property price, deposit, rate, and term for a repayment breakdown. Local market rates available: ${cfg.mortgageRates.map(r => r.l).join(' · ')}. Typical deposit requirement for this market: ${cfg.mortgageDeposit}%._`;
+
+  // ── Development pipeline ──
+  const pipe = a.pipeline || [];
+  const pipelineSection = pipe.length
+    ? `| Project | Developer | Units | Status | Completion | Price from |
+|---|---|---|---|---|---|
+${pipe.map(p => `| ${p.name||'—'} | ${p.developer||'—'} | ${p.units||'—'} | ${p.status||'—'} | ${p.completion||'—'} | ${p.priceFrom||'—'} |`).join('\n')}
+
+_Active and planned developments in the vicinity affect both supply dynamics and medium-term price appreciation. Projects in "Planning" or "Approved" status typically add inventory within 18–36 months; projects "Under Construction" will land in the next 6–18 months._`
+    : `_No pipeline developments returned from the analysis. This can mean either a mature market with limited new supply, or insufficient data coverage for this specific query. Check local municipal records for planning applications._`;
+
+  // ── Market signals ──
+  const sigs = a.signals || [];
+  const signalsSection = sigs.length
+    ? sigs.map(s => `- ${piq_sentimentGlyph(s.sentiment)} **${(s.sentiment||'neutral').toUpperCase()}** — ${s.text} _(${s.source||'Market data'})_`).join('\n')
+    : '_No live market signals returned. This does not mean the market is inactive — it may reflect a data gap for this specific query._';
+
+  // ── Legal risk ──
+  const risks = a.titleRisks || [];
+  const legalSection = `${risks.length ? risks.map(f => `- ${piq_riskGlyph(f.level)} **${f.title}** — ${f.detail}`).join('\n') : '_No title-level risks flagged by the analysis._'}
+
+> ${cfg.legalNote}`;
+
+  // ── Currency & FX ──
+  const hbInfo = countryInfo(state.homeBase);
+  const hbCurrency = hbInfo ? (COUNTRY_CURRENCY[hbInfo.code] || 'USD') : null;
+  const fxNote = hbCurrency && hbCurrency !== cfg.currency
+    ? `You are holding assets in **${hbCurrency}** (${hbInfo.name} home base) and are considering purchase in **${cfg.currency}** (${cfg.name}). This introduces FX exposure on the down payment, monthly servicing, and eventual exit. Consider: natural hedging via local rental income, forward contracts for the deposit transfer, and the historical volatility of ${cfg.currency}/${hbCurrency} over the last 5 years when sizing your margin of safety.`
+    : `Local and home currency are the same (${cfg.currency}). No direct FX exposure on this purchase — but if ${cfg.name} is a commodity or export-sensitive economy, indirect exposure may still apply.`;
+  const fxSection = `**Local currency:** ${cfg.currency} · **Home base currency:** ${hbCurrency || '—'}
+
+${fxNote}
+
+_Use the Currency tab for live conversion between ${cfg.currency}, ${hbCurrency || 'your home currency'}, and major reserve currencies (USD / EUR)._`;
+
+  // ── AI Narrative section ──
+  const narrativeSection = narrative
+    ? narrative.trim()
+    : '_AI narrative has not been generated yet. Click **Generate Full Report** above to produce a professionally written synthesis contextualised to your citizenship and home base._';
+
+  // ── Final assembly ──
+  return `# ${query}, ${cfg.name}
+
+**Verdict:** ${verdictIcon} ${verdict}
+**Analysis date:** ${dateStr}
+
+## Executive Summary
+
+${a.summary || '_Executive summary not returned by the analysis._'}
+
+**Verdict rationale:** ${a.verdictReason || '—'}
+
+## Market Metrics
+
+${metricsTable}
+
+## Investment Analysis
+
+${a.investmentThesis || '_Investment thesis not returned by the analysis._'}
+
+**Price range:** ${a.priceRange || '—'} · **Verdict:** ${verdictIcon} ${verdict}
+
+## Mortgage Breakdown
+
+${mortgageSection}
+
+## Development Pipeline
+
+${pipelineSection}
+
+## Market Signals
+
+${signalsSection}
+
+## Legal Risk Assessment
+
+${legalSection}
+
+## Currency & FX Exposure
+
+${fxSection}
+
+## AI Narrative
+
+${narrativeSection}
+
+---
+
+_Generated by Horizon Finance OS · ${dateStr} · AI-generated analysis, not financial or legal advice._`;
+}
+
+// Initialise the Report tab pane. Shows either the "Generate" CTA, the
+// cached full report, or the loading state while the AI narrative is
+// being fetched. Called every time the user clicks the Full Report tab.
+function piq_reportPaneInit(){
+  const host = document.getElementById('piq-report-host'); if(!host) return;
+  const a = piq_currentResult;
+  const query = piq_lastQuery;
+  const cfg = piq_getConfig(piq_country);
+  if(!a || !query){
+    host.innerHTML = `<div class="state state-empty"><div class="state-icon">📋</div><div class="state-title">No analysis loaded</div><div class="state-sub">Run a Property IQ search first — the full report will consolidate every tab's data here.</div></div>`;
+    return;
+  }
+  // Has the user already generated the AI narrative for this result?
+  const narrative = a._aiNarrative || null;
+  const md = piq_buildReportMarkdown(query, a, cfg, narrative);
+  const actionBar = narrative
+    ? `<div class="piq-report-actions">
+         <button class="btn btn-g btn-sm" onclick="piq_saveReportToVault()">🗄 Save to Vault</button>
+         <button class="btn btn-o btn-sm" onclick="piq_exportReportPdf()">📄 Download PDF</button>
+         <button class="btn btn-o btn-sm" onclick="piq_generateFullReport(true)" title="Regenerate AI narrative">↻ Re-run Narrative</button>
+       </div>`
+    : `<div class="piq-report-actions">
+         <button class="btn btn-g btn-sm" onclick="piq_generateFullReport()">✨ Generate Full Report</button>
+         <span class="piq-report-hint">Click to run a secondary AI call that writes the Narrative section. All other data is already available from your analysis.</span>
+       </div>`;
+  host.innerHTML = `
+    <div class="piq-report-wrap" id="piq-report-wrap">
+      ${actionBar}
+      <div class="piq-report-body">${mdParse(md)}</div>
+    </div>`;
+}
+// Kick off the AI narrative call and cache the result on piq_currentResult
+// so switching tabs doesn't re-trigger it. `force` re-runs even if cached.
+window.piq_generateFullReport = async function(force){
+  const a = piq_currentResult; if(!a) return;
+  if(a._aiNarrative && !force) { piq_reportPaneInit(); return; }
+  const key = piq_getAnthropicKey();
+  if(!key){ alert('Add your Claude API key in Settings → AI Keys to generate the Full Report.'); return; }
+  const cfg = piq_getConfig(piq_country);
+  const query = piq_lastQuery;
+  // Show loading state inside the Report pane
+  const host = document.getElementById('piq-report-host');
+  if(host){
+    host.innerHTML = `
+      <div class="piq-report-wrap">
+        <div class="piq-report-actions">
+          <div style="display:flex;align-items:center;gap:10px">
+            <span class="state-spinner" style="width:16px;height:16px;border-width:2px"></span>
+            <span style="font-family:var(--fm);font-size:12px;color:var(--accent-positive)">Generating AI narrative… this takes 15–25 seconds.</span>
+          </div>
+        </div>
+        <div class="piq-report-body">${mdParse(piq_buildReportMarkdown(query, a, cfg, null))}</div>
+      </div>`;
+  }
+  // Build the narrative prompt with personal context
+  const ctx = (typeof buildPersonalContext === 'function') ? buildPersonalContext() : '';
+  const summary = a.summary || '';
+  const thesis  = a.investmentThesis || '';
+  const risks   = (a.titleRisks||[]).map(r => `${r.level}: ${r.title} — ${r.detail}`).join('; ');
+  const signals = (a.signals||[]).map(s => `${s.sentiment}: ${s.text} (${s.source||''})`).join('; ');
+  const pipeline= (a.pipeline||[]).map(p => `${p.name} (${p.developer}, ${p.units} units, ${p.status}, ${p.completion})`).join('; ');
+  const prompt = `${ctx}
+
+You are writing the "AI Narrative" section of a Property IQ Full Report — a professionally written, paragraph-form synthesis of a property investment analysis. Your audience is the specific user above (citizenship + home base already given).
+
+TARGET PROPERTY / AREA: ${query}, ${cfg.name}
+VERDICT: ${a.verdict || 'HOLD'} — ${a.verdictReason || ''}
+PRICE RANGE: ${a.priceRange || '—'}
+KPIs: ${JSON.stringify(a.kpis || {})}
+EXECUTIVE SUMMARY (from earlier analysis): ${summary}
+INVESTMENT THESIS (from earlier analysis): ${thesis}
+SIGNALS: ${signals || 'none'}
+PIPELINE: ${pipeline || 'none'}
+TITLE RISKS: ${risks || 'none'}
+
+REQUIREMENTS
+- Produce 4–6 flowing paragraphs. No headings inside the narrative (the "## AI Narrative" heading is already added externally).
+- Write in third person, professional-analyst voice. No bullet lists. No JSON. No markdown syntax except **bold** for ≤3 emphases.
+- Open with a one-sentence restatement of the verdict grounded in the headline numbers.
+- Weave the structured data into a story: who this property makes sense for, where the risk sits, what the pipeline means, how signals shift the picture.
+- Explicitly address tax and legal implications for a citizen of the user's nationality, currently based in the user's home base country. Reference tax treaties, visa considerations, and exit/entry tax where relevant.
+- Close with a concrete next-step checklist in a single paragraph (not a list): what the user should verify, who to engage, and what to watch over the next 12 months.
+- No hedging filler. No "it depends". Commit.`;
+  try {
+    const reply = await callClaude(prompt, 1500, key);
+    // Cache on the current result AND on any matching vault cache entry
+    a._aiNarrative = reply.trim();
+    piq_reportPaneInit();
+  } catch(e) {
+    if(host){
+      host.innerHTML = `
+        <div class="piq-report-wrap">
+          <div class="state state-error">
+            <div class="state-icon">⚠</div>
+            <div class="state-title">Narrative generation failed</div>
+            <div class="state-sub">${esc(e.message || String(e))}</div>
+            <div class="state-cta"><button class="btn btn-o btn-sm" onclick="piq_generateFullReport()">Retry</button></div>
+          </div>
+        </div>`;
+    }
+  }
+};
+// Save the current Full Report to state.vault. The entry includes the
+// cached markdown so re-opening it from the Vault doesn't require a new
+// API call — PDF export and in-app rendering both re-use this snapshot.
+window.piq_saveReportToVault = function(){
+  const a = piq_currentResult; if(!a){ alert('No analysis loaded.'); return; }
+  if(!a._aiNarrative){
+    if(!confirm('The AI Narrative has not been generated yet. Save the report without it?')) return;
+  }
+  const cfg = piq_getConfig(piq_country);
+  const query = piq_lastQuery;
+  const md = piq_buildReportMarkdown(query, a, cfg, a._aiNarrative || null);
+  const entry = {
+    id: 'piq-report-' + Date.now(),
+    type: 'piq',
+    location: query,
+    country: cfg.name,
+    flag: cfg.flag,
+    date: new Date().toISOString(),
+    citizenship: state.citizenship,
+    homeBase: state.homeBase,
+    verdict: a.verdict,
+    markdown: md,
+  };
+  if(!Array.isArray(state.vault)) state.vault = [];
+  state.vault.unshift(entry);
+  if(state.vault.length > 50) state.vault = state.vault.slice(0, 50);
+  save();
+  if(typeof piq_showToast === 'function') piq_showToast('Saved to Vault ✓');
+  // Offer a jump to the Vault
+  if(confirm('Full Report saved to Vault. Open the Vault now?')) nav('vault');
+};
+// Print-to-PDF for the CURRENT (possibly unsaved) Full Report. Reuses the
+// same rendering pipeline as Vault entries so the PDF looks identical.
+window.piq_exportReportPdf = function(){
+  const a = piq_currentResult; if(!a){ alert('No analysis loaded.'); return; }
+  const cfg = piq_getConfig(piq_country);
+  const query = piq_lastQuery;
+  const md = piq_buildReportMarkdown(query, a, cfg, a._aiNarrative || null);
+  // Build a transient vault-shaped object and feed it through the shared
+  // PDF exporter. It's not persisted — just used for the print window.
+  const transient = {
+    id: 'transient-' + Date.now(),
+    type: 'piq',
+    location: query,
+    country: cfg.name,
+    flag: cfg.flag,
+    date: new Date().toISOString(),
+    citizenship: state.citizenship,
+    homeBase: state.homeBase,
+    markdown: md,
+  };
+  // Install briefly into window so exportVaultEntryPdf can find it by id
+  if(!Array.isArray(state.vault)) state.vault = [];
+  state.vault.unshift(transient);
+  try { exportVaultEntryPdf(transient.id); }
+  finally {
+    // Clean up — remove the transient entry so it doesn't pollute the
+    // user's saved library.
+    state.vault = state.vault.filter(v => v.id !== transient.id);
+  }
+};
+
 // ── FX CONVERTER ──────────────────────────────────────────────────────────────
 const PIQ_FX={KESKES:1,SEKSEK:1,KESUSD:0.0077,USDKES:129.5,SEKUSD:0.093,USDSEK:10.75,KESSEK:0.12,SEKKES:8.33,KESEUR:0.0071,SEKEUR:0.086,EURKES:140.5,EURSEK:11.6,USDEUR:0.925,EURUSD:1.081};
 function piq_convertFX(){
@@ -6409,6 +6766,7 @@ function piq_renderResults(query,a,cfg){
       <button class="piq-tab" onclick="piq_switchTab('sig',this)">Signals</button>
       <button class="piq-tab" onclick="piq_switchTab('title',this)">Legal Risk</button>
       <button class="piq-tab" onclick="piq_switchTab('fx',this)">Currency</button>
+      <button class="piq-tab piq-tab-report" onclick="piq_switchTab('report',this);piq_reportPaneInit()">📋 Full Report</button>
       <button class="piq-tab" onclick="piq_switchTab('share',this)">Share</button>
     </div>
 
@@ -6478,6 +6836,10 @@ function piq_renderResults(query,a,cfg){
           <div style="margin-top:10px;padding:8px 10px;background:var(--bg3);border-radius:6px;font-size:10px;color:var(--text3);font-family:var(--fm)">Quick reference: KES 1M ≈ USD 7,700 ≈ SEK 120,000 · KES 10M ≈ USD 77,000 ≈ SEK 1.2M · Rates indicative only</div>
         </div>
       </div>
+    </div>
+
+    <div id="piq-pane-report" class="piq-pane">
+      <div id="piq-report-host"></div>
     </div>
 
     <div id="piq-pane-share" class="piq-pane">
