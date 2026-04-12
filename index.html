@@ -2431,6 +2431,19 @@ function renderAll() {
   renderCurrencyToggle();
   updateSidebar();
   const panel=state.activePanel||'dashboard';
+  // Sync the `.active` class on panels and sidebar nav-items to whatever
+  // state.activePanel currently says. The static HTML ships with dashboard
+  // marked active, so if the user's last-visited panel (restored from
+  // localStorage) is anything else, the static markup is wrong and the
+  // wrong panel stays visible — an empty one — until nav() is called.
+  // Sync-on-every-render keeps the two in lockstep for every renderAll
+  // caller (init, theme toggle, currency toggle, import, date rollover).
+  document.querySelectorAll('.panel').forEach(p => {
+    p.classList.toggle('active', p.id === 'panel-' + panel);
+  });
+  document.querySelectorAll('.nav-item').forEach(n => {
+    n.classList.toggle('active', n.getAttribute('data-panel') === panel);
+  });
   renderPanel(panel);
   // Decorate the panel with breadcrumb + related-row, and refresh the
   // topbar scope chip + AI chips so they always reflect the active panel.
