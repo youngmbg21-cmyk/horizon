@@ -3934,5 +3934,201 @@ async function claudeFetch(systemPrompt, userMessage) {
 }
 </script>
 
+<script>
+// ═══════════════════════════════════════════════════════════════════
+// AI FAB CHAT PANEL (Part 5E-5)
+// ═══════════════════════════════════════════════════════════════════
+
+let chatHistory = [];       // [{ role: 'user'|'assistant', text: '...' }]
+let chatBusy = false;
+
+function openChat() {
+  const panel = document.getElementById('chat-panel');
+  if (!panel) return;
+  panel.classList.add('open');
+  panel.style.display = 'flex';
+  // Focus input
+  setTimeout(() => {
+    const input = document.getElementById('chat-input');
+    if (input) input.focus();
+  }, 60);
+  // Seed welcome bubble on first open
+  const msgs = document.getElementById('chat-messages');
+  if (msgs && !msgs.childElementCount) {
+    const ctx = (typeof currentApp !== 'undefined' && currentApp === 'property')
+      ? 'Hi! I\u2019m your PropIQ property analyst. Ask me about any location, comparable deals, legal risks, or mortgage options.'
+      : 'Hi! I\u2019m your Money OS financial assistant. Ask me anything about your cashflow, nest egg, retirement plan, or fun fund.';
+    appendChatBubble('assistant', ctx);
+  }
+}
+
+function closeChat() {
+  const panel = document.getElementById('chat-panel');
+  if (!panel) return;
+  panel.classList.remove('open');
+  panel.style.display = 'none';
+}
+
+function toggleChat() {
+  const panel = document.getElementById('chat-panel');
+  if (!panel) return;
+  if (panel.classList.contains('open')) closeChat();
+  else openChat();
+}
+
+function appendChatBubble(role, text) {
+  const msgs = document.getElementById('chat-messages');
+  if (!msgs) return null;
+  const div = document.createElement('div');
+  div.className = 'chat-bubble ' + (role === 'user' ? 'user' : 'assistant');
+  // Render markdown for assistant, plaintext (escaped) for user
+  if (role === 'assistant' && typeof renderMarkdown === 'function') {
+    div.innerHTML = renderMarkdown(text);
+  } else {
+    // Fallback escape — mirrors piqEscape to avoid injection from user input
+    const esc = String(text == null ? '' : text)
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;').replace(/'/g, '&#39;')
+      .replace(/\n/g, '<br>');
+    div.innerHTML = esc;
+  }
+  msgs.appendChild(div);
+  chatScrollBottom();
+  return div;
+}
+
+function chatScrollBottom() {
+  const msgs = document.getElementById('chat-messages');
+  if (msgs) msgs.scrollTop = msgs.scrollHeight;
+}
+
+// ── Context-aware system prompt ────────────────────────────────────
+function buildChatSystemPrompt() {
+  const app = (typeof currentApp !== 'undefined') ? currentApp : 'money';
+
+  if (app === 'property') {
+    ensurePropiqState();
+    const market = state.propiq && state.propiq.market ? state.propiq.market : 'ke';
+    const cfg = MARKETS[market] || {};
+    const last = piqCurrentResult;
+    const ctxParts = [
+      'You are PropIQ, an AI property investment analyst embedded in the Horizon app.',
+      `Active market: ${cfg.flag || ''} ${cfg.name || market} (currency ${cfg.currency || ''}).`,
+      'Be concise, cite ranges in the local currency, and focus on rental yield, capital appreciation, legal risk, and mortgage math when relevant.'
+    ];
+    if (last) {
+      const a = last.analysis || {};
+      ctxParts.push(
+        `The user is currently viewing the analysis for "${last.query}" with verdict ${last.verdict || '—'} (score ${last.score || 0}/100). `
+        + `Price range: ${a.priceRange || '—'}. Yield: ${a.rentalYield || '—'}. Summary: ${a.summary || '—'}`
+      );
+    }
+    ctxParts.push('Format answers in short Markdown (headings, bullets, bold). Never invent API data — only reason from what is stated.');
+    return ctxParts.join('\n\n');
+  }
+
+  // Money OS context — pull live calc values
+  try {
+    const inc = calcIncome();
+    const exp = calcExpenses();
+    const sav = calcSavings();
+    const nw  = calcNetWorth();
+    const egg = calcNestEgg();
+    const ret = calcRetirement();
+    const ff  = calcFunFund();
+    const cur = state.currency || 'SEK';
+
+    return [
+      'You are the Money OS financial assistant inside the Horizon app — a personal CFO for the user.',
+      'Answer questions about cashflow, net worth, nest egg, retirement plan, and the fun fund.',
+      `Base currency: ${cur}. The user is ${state.currentAge} years old, targeting retirement at ${state.retirementAge} (life expectancy ${state.lifeExp}).`,
+      'Live snapshot (all figures in base currency):',
+      `- Monthly income: ${Math.round(inc.total)}`,
+      `- Monthly expenses: ${Math.round(exp.total)} (${exp.paid.length}/${exp.items.length} paid)`,
+      `- Monthly surplus: ${Math.round(sav.surplus)}`,
+      `- Base savings: ${Math.round(sav.baseSavings)} (${sav.savingsRate.toFixed(1)}% of income)`,
+      `- Fun fund balance: ${Math.round(ff.balance)}`,
+      `- Net worth: ${Math.round(nw.netWorth)} (assets ${Math.round(nw.assets.total)}, liabilities ${Math.round(nw.liabilities.total)})`,
+      `- Nest egg projection at retirement: ${Math.round(ret.nestEggAtRetirement)} (nominal)`,
+      `- Pension monthly: ${Math.round(ret.pension.monthlyTotal)}; drawdown after tax: ${Math.round(ret.monthlyDrawdownAfterTax)}; total retirement income: ${Math.round(ret.monthlyRetirementIncome)}`,
+      `- Retirement gap vs current expenses: ${Math.round(ret.gap)} (${ret.onTrack ? 'ON TRACK' : 'SHORTFALL'})`,
+      `- FIRE number: ${Math.round(ret.fireNumber)}`,
+      'Use short Markdown (bold, bullets, inline code for numbers when helpful). Never fabricate numbers beyond the snapshot — if the user asks something you cannot compute from it, say so and suggest what to enter in the app.'
+    ].join('\n');
+  } catch (e) {
+    return 'You are the Money OS financial assistant inside the Horizon app. Help the user think about cashflow, savings, net worth, retirement, and the fun fund. Keep answers concise, use Markdown.';
+  }
+}
+
+// ── Send handler ──────────────────────────────────────────────────
+async function sendChat() {
+  if (chatBusy) return;
+  const input = document.getElementById('chat-input');
+  if (!input) return;
+  const text = (input.value || '').trim();
+  if (!text) return;
+
+  // Append user bubble + clear input
+  appendChatBubble('user', text);
+  chatHistory.push({ role: 'user', text });
+  input.value = '';
+  input.focus();
+
+  // Show a pending assistant bubble
+  const pending = appendChatBubble('assistant', '\u2026');
+  if (pending) pending.classList.add('pending');
+
+  chatBusy = true;
+  try {
+    // Build context-aware prompt
+    const system = buildChatSystemPrompt();
+
+    // Include recent prior exchanges (last 6 turns) as rolling context
+    const recent = chatHistory.slice(-7, -1) // exclude the just-pushed user turn
+      .map(t => (t.role === 'user' ? 'User' : 'Assistant') + ': ' + t.text)
+      .join('\n\n');
+    const userMsg = recent
+      ? `Previous exchange:\n${recent}\n\nNew user message: ${text}`
+      : text;
+
+    const reply = await claudeFetch(system, userMsg);
+
+    // Replace pending bubble content
+    if (pending) {
+      pending.classList.remove('pending');
+      if (typeof renderMarkdown === 'function') {
+        pending.innerHTML = renderMarkdown(reply);
+      } else {
+        pending.textContent = reply;
+      }
+    } else {
+      appendChatBubble('assistant', reply);
+    }
+    chatHistory.push({ role: 'assistant', text: reply });
+  } catch (e) {
+    const errMsg = 'Sorry — chat error: ' + ((e && e.message) || e);
+    if (pending) {
+      pending.classList.remove('pending');
+      pending.textContent = errMsg;
+    } else {
+      appendChatBubble('assistant', errMsg);
+    }
+  } finally {
+    chatBusy = false;
+    chatScrollBottom();
+  }
+}
+
+// Enter-to-send wiring (attached on first open via openChat focus)
+document.addEventListener('keydown', (e) => {
+  if (e.key !== 'Enter' || e.shiftKey) return;
+  const active = document.activeElement;
+  if (active && active.id === 'chat-input') {
+    e.preventDefault();
+    sendChat();
+  }
+});
+</script>
+
 </body>
 </html>
