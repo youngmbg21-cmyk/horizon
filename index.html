@@ -4130,5 +4130,111 @@ document.addEventListener('keydown', (e) => {
 });
 </script>
 
+<script>
+// ═══════════════════════════════════════════════════════════════════
+// MARKDOWN RENDERER (Part 5E-6)
+// ═══════════════════════════════════════════════════════════════════
+
+function renderMarkdown(text) {
+  if (text == null) return '';
+  let src = String(text);
+
+  // 1) HTML-escape first so Markdown source can't inject tags.
+  src = src
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+
+  // 2) Protect inline code spans with placeholders so their content
+  //    isn't processed by bold/italic passes. `code`
+  const codeStore = [];
+  src = src.replace(/`([^`\n]+)`/g, (_, c) => {
+    codeStore.push(c);
+    return '\u0000CODE' + (codeStore.length - 1) + '\u0000';
+  });
+
+  // 3) Bold: **text** → <strong>text</strong>
+  //    Non-greedy, cannot cross newlines.
+  src = src.replace(/\*\*([^\n*][^\n*]*?)\*\*/g, '<strong>$1</strong>');
+
+  // 4) Italic: *text* → <em>text</em>
+  //    Avoid matching across whitespace boundaries that look like bullets.
+  src = src.replace(/(^|[^*])\*(?!\s)([^\n*]+?)\*(?!\*)/g, '$1<em>$2</em>');
+
+  // 5) Split into lines and walk them, grouping bullet and numbered list
+  //    runs into <ul> / <ol> blocks. Non-list lines become paragraphs
+  //    (or are joined with <br> inside a paragraph run).
+  const lines = src.split(/\n/);
+  const out = [];
+  let i = 0;
+
+  function isBullet(line) {
+    return /^\s*[-*+]\s+/.test(line);
+  }
+  function isNumbered(line) {
+    return /^\s*\d+\.\s+/.test(line);
+  }
+  function stripBullet(line) {
+    return line.replace(/^\s*[-*+]\s+/, '');
+  }
+  function stripNumbered(line) {
+    return line.replace(/^\s*\d+\.\s+/, '');
+  }
+
+  while (i < lines.length) {
+    const line = lines[i];
+
+    if (isBullet(line)) {
+      const items = [];
+      while (i < lines.length && isBullet(lines[i])) {
+        items.push('<li>' + stripBullet(lines[i]).trim() + '</li>');
+        i++;
+      }
+      out.push('<ul>' + items.join('') + '</ul>');
+      continue;
+    }
+
+    if (isNumbered(line)) {
+      const items = [];
+      while (i < lines.length && isNumbered(lines[i])) {
+        items.push('<li>' + stripNumbered(lines[i]).trim() + '</li>');
+        i++;
+      }
+      out.push('<ol>' + items.join('') + '</ol>');
+      continue;
+    }
+
+    // Paragraph run — consume consecutive non-empty, non-list lines,
+    // joined with <br>. Blank lines end the paragraph.
+    if (line.trim() === '') {
+      i++;
+      continue;
+    }
+    const paraLines = [];
+    while (
+      i < lines.length &&
+      lines[i].trim() !== '' &&
+      !isBullet(lines[i]) &&
+      !isNumbered(lines[i])
+    ) {
+      paraLines.push(lines[i]);
+      i++;
+    }
+    out.push('<p>' + paraLines.join('<br>') + '</p>');
+  }
+
+  let html = out.join('');
+
+  // 6) Restore inline code placeholders.
+  html = html.replace(/\u0000CODE(\d+)\u0000/g, (_, idx) => {
+    return '<code>' + codeStore[Number(idx)] + '</code>';
+  });
+
+  return html;
+}
+</script>
+
 </body>
 </html>
