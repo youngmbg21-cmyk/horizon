@@ -5553,5 +5553,143 @@ if (document.readyState === 'loading') {
 }
 </script>
 
+  </div><!-- /.content -->
+</div><!-- /.main-row -->
+
+<!-- ══ MODALS ══ -->
+
+<!-- API KEY MODAL -->
+<div class="modal-ov" id="key-modal">
+  <div class="modal-box">
+    <div class="modal-title">⚡ API Keys</div>
+    <div class="modal-sub">Powers all AI features — vacation ideas, retirement analysis, APEX feasibility, and PropIQ. Stored in localStorage only, never sent anywhere else.</div>
+
+    <div class="field">
+      <label>Anthropic API Key</label>
+      <input type="password" id="key-anthropic" class="modal-input mono" placeholder="sk-ant-api03-...">
+      <div style="display:flex;align-items:center;gap:8px;margin-top:6px">
+        <button class="btn btn-o btn-xs" id="test-anthropic-btn" onclick="updateSettingField('testAnthropic', true)">Test key</button>
+        <div class="key-status" id="key-anthropic-status">
+          <div class="ks-dot"></div>
+          <span class="ks-msg"></span>
+        </div>
+      </div>
+    </div>
+
+    <div class="field">
+      <label>Perplexity API Key <span style="color:var(--text3);font-size:10px">(optional — enhances live data)</span></label>
+      <input type="password" id="key-perplexity" class="modal-input mono" placeholder="pplx-...">
+      <div style="display:flex;align-items:center;gap:8px;margin-top:6px">
+        <button class="btn btn-o btn-xs" id="test-perplexity-btn" onclick="updateSettingField('testPerplexity', true)">Test key</button>
+        <div class="key-status" id="key-perplexity-status">
+          <div class="ks-dot"></div>
+          <span class="ks-msg"></span>
+        </div>
+      </div>
+    </div>
+
+    <div id="key-modal-error" style="color:var(--red);font-size:12px;font-family:var(--fm);min-height:16px;margin-top:6px"></div>
+
+    <div class="modal-acts">
+      <button class="btn btn-g" id="key-save-btn" onclick="saveKeys()">Save Keys</button>
+      <button class="btn btn-o" id="save-keys-btn" onclick="saveKeys()" style="display:none">Save</button>
+      <button class="btn btn-o" onclick="closeKeyModal()">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<!-- EXPORT / IMPORT MODAL -->
+<div class="modal-ov" id="export-import-modal">
+  <div class="modal-box">
+    <div class="modal-title">💾 Backup &amp; Restore</div>
+    <div class="modal-sub">Export your full Horizon state as a JSON file, or import a previous backup.</div>
+    <div style="display:flex;flex-direction:column;gap:10px;margin-top:8px">
+      <button class="btn btn-o" id="export-btn-modal" onclick="exportState()">⬇ Export JSON Backup</button>
+      <button class="btn btn-o" id="import-btn-modal" onclick="document.getElementById('import-file-modal').click()">⬆ Import Backup</button>
+      <input type="file" id="import-file-modal" accept=".json" style="display:none" onchange="importState(this.files[0])">
+    </div>
+    <div class="modal-acts">
+      <button class="btn btn-o" onclick="document.getElementById('export-import-modal').classList.remove('open')">Close</button>
+    </div>
+  </div>
+</div>
+
+<!-- TRIP BUILDER MODAL -->
+<div class="modal-ov" id="trip-modal">
+  <div class="modal-box">
+    <div class="modal-title">✈ Trip Budget Builder</div>
+    <div class="modal-sub">Plan a specific trip and see exactly what it does to your fun fund.</div>
+    <div class="field">
+      <label>Destination</label>
+      <input id="trip-dest" class="modal-input" placeholder="e.g. Cape Town, South Africa">
+    </div>
+    <div class="two-col">
+      <div class="field">
+        <label>When (Month / Year)</label>
+        <input id="trip-when" class="modal-input" placeholder="e.g. Dec 2025">
+      </div>
+      <div class="field">
+        <label>Duration (nights)</label>
+        <input type="number" class="modal-input mono" id="trip-nights" value="10">
+      </div>
+    </div>
+    <div class="field">
+      <label>Total Budget (SEK)</label>
+      <input type="number" class="modal-input mono" id="trip-budget" placeholder="60000">
+    </div>
+    <div id="trip-calc" style="margin-top:10px;background:var(--bg3);border-radius:8px;padding:12px;font-size:12px;line-height:1.7;font-family:var(--fm);color:var(--text2)"></div>
+    <div class="modal-acts">
+      <button class="btn btn-g" onclick="saveTrip()">Save Trip</button>
+      <button class="btn btn-o" onclick="document.getElementById('trip-modal').classList.remove('open')">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<!-- NET WORTH MODAL -->
+<div class="modal-ov" id="networth-modal">
+  <div class="modal-box">
+    <div class="modal-title">◈ Net Worth — Property &amp; Debt</div>
+    <div class="modal-sub">Assets minus liabilities = your true wealth position.</div>
+    <div class="field">
+      <label>Property Value (SEK)</label>
+      <input type="number" class="modal-input mono" id="nw-property-value" oninput="updateNwField('property', +this.value)">
+    </div>
+    <div class="field">
+      <label>Mortgage Outstanding (SEK)</label>
+      <input type="number" class="modal-input mono" id="nw-mortgage-value" oninput="updateNwField('mortgage', +this.value)">
+    </div>
+    <div class="field">
+      <label>Other Debt (SEK)</label>
+      <input type="number" class="modal-input mono" id="nw-other-debt" oninput="updateNwField('debt', +this.value)">
+    </div>
+    <div class="modal-acts">
+      <button class="btn btn-g" onclick="document.getElementById('networth-modal').classList.remove('open')">Save</button>
+      <button class="btn btn-o" onclick="document.getElementById('networth-modal').classList.remove('open')">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<!-- HIDDEN FILE INPUT FOR IMPORT (top-level) -->
+<input type="file" id="import-file-global" accept=".json" style="display:none" onchange="importState(this.files[0])">
+
+<!-- ══ AI FAB & CHAT PANEL ══ -->
+<button class="ai-fab" id="ai-fab" onclick="toggleChat()" title="Ask AI anything about your finances or properties">✦</button>
+
+<div class="ai-panel" id="chat-panel">
+  <div class="ai-panel-hdr">
+    <div class="ai-dot"></div>
+    <div class="ai-panel-hdr-title">HORIZON AI Assistant</div>
+    <button class="iBtn" style="width:28px;height:28px;font-size:12px" onclick="closeChat()">✕</button>
+  </div>
+  <div class="ai-panel-msgs" id="chat-messages">
+    <div class="ai-msg bot">Hi! I'm your HORIZON AI. Ask me anything about your finances, fun fund, retirement plan, or any property in your search history. I have full context of your data.</div>
+  </div>
+  <div class="ai-panel-input">
+    <input id="chat-input" placeholder="Ask about your finances..." onkeydown="if(event.key==='Enter')sendChat()">
+    <button class="btn btn-g btn-xs" id="chat-send" onclick="sendChat()">→</button>
+    <button class="btn btn-g btn-xs" id="chat-send-btn" onclick="sendChat()" style="display:none">Send</button>
+  </div>
+</div>
+
 </body>
 </html>
