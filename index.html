@@ -556,7 +556,66 @@ input[type="number"] { -moz-appearance:textfield; }
   border-radius:12px 12px 12px 2px;
 }
 .ai-msg.bot strong { color:var(--text); font-weight:600; }
-.ai-msg code { background:var(--bg4); padding:1px 5px; border-radius:3px; font-family:var(--fm); font-size:11px; color:var(--amber); }
+
+/* ── RENDERED MARKDOWN (.md) ─────────────────────────────────────────
+   Styling for AI-generated output wherever mdParse() lands: chatbot
+   bubbles, Retire Anywhere analysis, Property IQ insights. Every rule
+   is scoped to .md so it can't leak into the rest of the UI. */
+.md { font-size:13px; line-height:1.65; color:var(--text); }
+.md > *:first-child { margin-top:0; }
+.md > *:last-child  { margin-bottom:0; }
+.md p { margin:8px 0; }
+.md strong { color:var(--text); font-weight:700; }
+.md em     { color:var(--text); font-style:italic; }
+.md del    { color:var(--text3); text-decoration:line-through; }
+.md a      { color:var(--accent-positive); text-decoration:underline; text-underline-offset:2px; }
+.md a:hover{ color:var(--accent-positive); text-decoration:none; }
+/* Headings — descending hierarchy matching app type scale. */
+.md h1, .md h2, .md h3, .md h4, .md h5, .md h6 { font-family:var(--ff); font-weight:800; color:var(--text); line-height:1.25; letter-spacing:-.01em; margin:16px 0 8px; }
+.md h1 { font-size:20px; padding-bottom:6px; border-bottom:1px solid var(--border); }
+.md h2 { font-size:17px; color:var(--accent-positive); }
+.md h3 { font-size:14px; color:var(--accent-highlight); text-transform:uppercase; letter-spacing:.06em; font-family:var(--fm); }
+.md h4 { font-size:13px; color:var(--text); }
+.md h5 { font-size:12px; color:var(--text2); text-transform:uppercase; letter-spacing:.04em; }
+.md h6 { font-size:11px; color:var(--text3); text-transform:uppercase; letter-spacing:.06em; }
+/* Horizontal rule — visible separator, not the raw "---". */
+.md hr { height:1px; border:0; background:linear-gradient(90deg, transparent, var(--border2), transparent); margin:18px 0; }
+/* Lists — clean indentation and spacing, proper bullet/number styling. */
+.md ul, .md ol { margin:8px 0; padding-left:22px; }
+.md ul { list-style:disc; }
+.md ol { list-style:decimal; }
+.md li { margin:4px 0; padding-left:2px; }
+.md li::marker { color:var(--accent-positive); }
+.md ol li::marker { color:var(--accent-info); font-family:var(--fm); font-weight:600; }
+.md li > ul, .md li > ol { margin:4px 0 4px; }
+/* Blockquote */
+.md blockquote { margin:12px 0; padding:10px 14px; border-left:3px solid var(--accent-warning); background:var(--bg3); border-radius:0 6px 6px 0; color:var(--text2); font-style:italic; }
+/* Inline + fenced code */
+.md code { background:var(--bg4); padding:1px 6px; border-radius:4px; font-family:var(--fm); font-size:.92em; color:var(--accent-warning); border:1px solid var(--border); }
+.md pre { background:var(--bg0); border:1px solid var(--border); border-radius:8px; padding:12px 14px; margin:12px 0; overflow-x:auto; position:relative; }
+.md pre code { background:none; border:none; padding:0; color:var(--text2); font-size:11.5px; line-height:1.6; white-space:pre; }
+.md pre[data-lang]::before { content:attr(data-lang); position:absolute; top:6px; right:10px; font-family:var(--fm); font-size:9px; color:var(--text3); text-transform:uppercase; letter-spacing:.08em; }
+/* Tables — the showcase fix: clean HTML table instead of raw pipes. */
+.md .md-table-wrap { margin:14px 0; border:1px solid var(--border); border-radius:8px; overflow:auto; background:var(--bg2); }
+.md table { width:100%; border-collapse:collapse; font-size:12px; }
+.md thead { background:var(--bg3); }
+.md th { text-align:left; padding:10px 14px; font-family:var(--fm); font-size:10px; font-weight:700; letter-spacing:.06em; text-transform:uppercase; color:var(--text2); border-bottom:1px solid var(--border2); white-space:nowrap; }
+.md td { padding:10px 14px; color:var(--text); border-bottom:1px solid var(--border); vertical-align:top; line-height:1.5; }
+.md tbody tr:last-child td { border-bottom:none; }
+.md tbody tr:hover { background:var(--bg3); }
+.md tbody tr:nth-child(even) { background:rgba(255,255,255,0.008); }
+body.light .md tbody tr:nth-child(even) { background:rgba(0,0,0,0.015); }
+/* Cell emphasis */
+.md td strong { color:var(--accent-positive); }
+.md td code { font-size:11px; }
+/* Compact variant for the chatbot bubble where vertical space is tight. */
+.ai-msg .md { font-size:12.5px; line-height:1.6; }
+.ai-msg .md p { margin:6px 0; }
+.ai-msg .md h1 { font-size:16px; }
+.ai-msg .md h2 { font-size:14px; }
+.ai-msg .md h3 { font-size:12px; }
+.ai-msg .md .md-table-wrap { margin:10px 0; }
+.ai-msg .md th, .ai-msg .md td { padding:8px 10px; font-size:11px; }
 
 /* Typing dots */
 .ai-typing { display:flex; gap:4px; align-items:center; padding:2px 0; }
@@ -2375,12 +2434,164 @@ function resolveKey(key) {
 }
 
 // ─── MARKDOWN → HTML ────────────────────────────────────────────────────────
-function mdParse(t) {
-  return t.replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>')
-    .replace(/^## (.+)$/gm,'<h3 style="margin:10px 0 4px;color:var(--green);font-size:13px">$1</h3>')
-    .replace(/^### (.+)$/gm,'<h4 style="margin:8px 0 3px;font-size:12px">$1</h4>')
-    .replace(/^[-•] (.+)$/gm,'<li>$1</li>').replace(/((<li>.*<\/li>\n?)+)/g,'<ul style="padding-left:14px;margin:6px 0">$1</ul>')
-    .replace(/\n\n/g,'</p><p style="margin:6px 0">').replace(/\n/g,'<br>');
+// Single pass, block-aware Markdown renderer. Handles fenced code blocks,
+// tables, horizontal rules, ATX headings (# …), ordered + unordered lists
+// (with nesting via indentation), blockquotes, inline bold/italic/code,
+// and links. Every non-markdown chunk of text is HTML-escaped so AI
+// output can never inject tags. Output is wrapped in `.md` for styling.
+function mdParse(raw){
+  if(raw == null) return '';
+  const text = String(raw).replace(/\r\n?/g,'\n');
+  const esc = s => s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  // Inline rules run on already-escaped text, so bold/italic/code can
+  // safely wrap HTML entities.
+  function inline(s){
+    return s
+      // Inline code first — content is escaped and must not be reprocessed.
+      .replace(/`([^`\n]+)`/g, (_, c) => '<code>'+c+'</code>')
+      // Bold (** or __)
+      .replace(/\*\*([^*\n]+)\*\*/g, '<strong>$1</strong>')
+      .replace(/__([^_\n]+)__/g, '<strong>$1</strong>')
+      // Italic (* or _) — avoid matching ** already consumed
+      .replace(/(^|[^*])\*([^*\n]+)\*/g, '$1<em>$2</em>')
+      .replace(/(^|[^_])_([^_\n]+)_/g, '$1<em>$2</em>')
+      // Strikethrough
+      .replace(/~~([^~\n]+)~~/g, '<del>$1</del>')
+      // Links [label](url)
+      .replace(/\[([^\]]+)\]\(([^)\s]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>');
+  }
+  const lines = text.split('\n');
+  const out = [];
+  let i = 0;
+  // List / blockquote / paragraph accumulators
+  let listStack = []; // [{type:'ul'|'ol', indent}]
+  function closeListsDownTo(indent){
+    while(listStack.length && listStack[listStack.length-1].indent >= indent){
+      out.push('</li></' + listStack.pop().type + '>');
+    }
+  }
+  function closeAllLists(){ while(listStack.length){ out.push('</li></' + listStack.pop().type + '>'); } }
+  let paraBuf = [];
+  function flushPara(){
+    if(!paraBuf.length) return;
+    const joined = paraBuf.join(' ').trim();
+    if(joined) out.push('<p>' + inline(esc(joined)) + '</p>');
+    paraBuf = [];
+  }
+  while(i < lines.length){
+    const line = lines[i];
+    // Fenced code block ``` or ~~~
+    const fence = line.match(/^(\s*)(```|~~~)(.*)$/);
+    if(fence){
+      flushPara(); closeAllLists();
+      const marker = fence[2];
+      const lang = (fence[3]||'').trim();
+      i++;
+      const codeLines = [];
+      while(i < lines.length && !lines[i].trim().startsWith(marker)){
+        codeLines.push(lines[i]);
+        i++;
+      }
+      i++; // skip closing fence
+      const langAttr = lang ? ` data-lang="${esc(lang)}"` : '';
+      out.push('<pre'+langAttr+'><code>' + esc(codeLines.join('\n')) + '</code></pre>');
+      continue;
+    }
+    // Horizontal rule: ---, ***, ___ (alone, ignoring spaces)
+    if(/^\s*(-{3,}|\*{3,}|_{3,})\s*$/.test(line)){
+      flushPara(); closeAllLists();
+      out.push('<hr>');
+      i++; continue;
+    }
+    // Table: header row of pipes, separator row, body rows
+    // Header row must contain pipes, next line must be a separator like |---|---|
+    if(line.includes('|') && i + 1 < lines.length && /^\s*\|?[\s:\-|]+\|[\s:\-|]+\|?\s*$/.test(lines[i+1])){
+      flushPara(); closeAllLists();
+      const parseRow = (s) => s.replace(/^\s*\|/, '').replace(/\|\s*$/,'').split('|').map(c => c.trim());
+      const headers = parseRow(line);
+      // Determine column alignment from the separator row
+      const sepCells = parseRow(lines[i+1]);
+      const aligns = sepCells.map(c => {
+        const l = c.startsWith(':'), r = c.endsWith(':');
+        if(l && r) return 'center';
+        if(r) return 'right';
+        if(l) return 'left';
+        return '';
+      });
+      i += 2;
+      const bodyRows = [];
+      while(i < lines.length && lines[i].includes('|') && lines[i].trim() !== ''){
+        bodyRows.push(parseRow(lines[i]));
+        i++;
+      }
+      let table = '<div class="md-table-wrap"><table><thead><tr>' +
+        headers.map((h, c) => `<th${aligns[c]?` style="text-align:${aligns[c]}"`:''}>${inline(esc(h))}</th>`).join('') +
+        '</tr></thead><tbody>' +
+        bodyRows.map(r => '<tr>' + r.map((cell, c) => `<td${aligns[c]?` style="text-align:${aligns[c]}"`:''}>${inline(esc(cell))}</td>`).join('') + '</tr>').join('') +
+        '</tbody></table></div>';
+      out.push(table);
+      continue;
+    }
+    // ATX headings # .. ######
+    const heading = line.match(/^(#{1,6})\s+(.+?)\s*#*\s*$/);
+    if(heading){
+      flushPara(); closeAllLists();
+      const level = heading[1].length;
+      out.push(`<h${level}>${inline(esc(heading[2]))}</h${level}>`);
+      i++; continue;
+    }
+    // Blockquote (single-line; collapse consecutive lines)
+    if(/^\s*>\s?/.test(line)){
+      flushPara(); closeAllLists();
+      const buf = [];
+      while(i < lines.length && /^\s*>\s?/.test(lines[i])){
+        buf.push(lines[i].replace(/^\s*>\s?/,''));
+        i++;
+      }
+      out.push('<blockquote>' + inline(esc(buf.join(' '))) + '</blockquote>');
+      continue;
+    }
+    // Unordered list: -, *, • with indentation
+    const ul = line.match(/^(\s*)([-*•])\s+(.+)$/);
+    const ol = line.match(/^(\s*)(\d+)\.\s+(.+)$/);
+    if(ul || ol){
+      flushPara();
+      const indent = (ul ? ul[1] : ol[1]).length;
+      const type = ul ? 'ul' : 'ol';
+      const content = ul ? ul[3] : ol[3];
+      // Close deeper or mismatched lists
+      while(listStack.length && listStack[listStack.length-1].indent > indent){
+        out.push('</li></' + listStack.pop().type + '>');
+      }
+      const top = listStack[listStack.length-1];
+      if(!top || top.indent < indent){
+        // Open a new nested list
+        out.push('<' + type + '>');
+        listStack.push({type, indent});
+      } else if(top.type !== type || top.indent !== indent){
+        // Same level but type changed — close old, open new
+        out.push('</li></' + top.type + '>');
+        listStack.pop();
+        out.push('<' + type + '>');
+        listStack.push({type, indent});
+      } else {
+        // Same list, new item
+        out.push('</li>');
+      }
+      out.push('<li>' + inline(esc(content)));
+      i++; continue;
+    }
+    // Blank line = paragraph break
+    if(/^\s*$/.test(line)){
+      flushPara(); closeAllLists();
+      i++; continue;
+    }
+    // Otherwise accumulate as paragraph text
+    paraBuf.push(line);
+    i++;
+  }
+  flushPara(); closeAllLists();
+  return '<div class="md">' + out.join('\n') + '</div>';
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -3481,7 +3692,7 @@ window.showLocDetail=function(id){
       <button class="btn btn-g btn-sm" onclick="aiAnalyzeLoc('${loc.id}')">🤖 AI Deep Analysis</button>
       <button class="btn btn-danger" onclick="removeLoc('${loc.id}')">Remove</button>
     </div>
-    <div id="loc-ai-out" style="margin-top:12px;font-size:12px;line-height:1.6;color:var(--text2)"></div>`;
+    <div id="loc-ai-out" style="margin-top:12px"></div>`;
   openModal('loc-modal');
 };
 window.updateLocCost=function(id,val){ const l=state.places.find(l=>l.id===id); if(l){l.costOfLiving=+val;save();} };
@@ -3657,7 +3868,7 @@ function renderRetireAIOutput(){
     el.innerHTML = `<div class="card-title" style="margin-bottom:10px">🤖 AI Retirement Destination Analysis
         <div class="ct-actions"><button class="btn-xs btn-o" onclick="clearSearchCache('${RETIRE_AI_KEY}');aiAnalyzeLocations()" title="Re-run">↻ Refresh</button></div>
       </div>
-      <div style="font-size:13px;line-height:1.7;color:var(--text2)">${mdParse(typeof value==='string'?value:(value.reply||''))}</div>
+      ${mdParse(typeof value==='string'?value:(value.reply||''))}
       ${ts?`<div style="font-size:10px;color:var(--text3);margin-top:10px;font-family:var(--fm)">Cached · ${esc2(ts)}</div>`:''}`;
     return;
   }
@@ -4525,12 +4736,12 @@ function piq_renderResults(query,a,cfg){
       <div class="piq-card">
         <div class="piq-card-hd"><div class="piq-card-icon" style="background:var(--green-dim)">📈</div><div><div class="piq-card-title">AI Investment Analysis</div><div class="piq-card-sub">Claude · Live signals · ${cfg.flag} ${cfg.name}</div></div></div>
         <div class="piq-card-body">
-          <div class="piq-ai-box"><div class="piq-ai-lbl">Executive Summary</div><div class="piq-ai-text">${a.summary}</div></div>
-          <div class="piq-ai-box"><div class="piq-ai-lbl">Investment Thesis</div><div class="piq-ai-text">${a.investmentThesis}</div></div>
+          <div class="piq-ai-box"><div class="piq-ai-lbl">Executive Summary</div><div class="piq-ai-text">${mdParse(a.summary||'')}</div></div>
+          <div class="piq-ai-box"><div class="piq-ai-lbl">Investment Thesis</div><div class="piq-ai-text">${mdParse(a.investmentThesis||'')}</div></div>
           <div class="piq-verdict-row">
             <div class="piq-verdict-card"><div class="piq-verdict-lbl">Price Range</div><div class="piq-verdict-val" style="color:var(--text);font-size:11px">${a.priceRange}</div></div>
             <div class="piq-verdict-card"><div class="piq-verdict-lbl">Verdict</div><div class="piq-verdict-val ${vCls}" style="font-size:20px">${vIcon} ${a.verdict}</div></div>
-            <div class="piq-verdict-card"><div class="piq-verdict-lbl">Rationale</div><div class="piq-verdict-val" style="color:var(--text2);font-size:11px;font-weight:400;line-height:1.4">${a.verdictReason}</div></div>
+            <div class="piq-verdict-card"><div class="piq-verdict-lbl">Rationale</div><div class="piq-verdict-val" style="font-weight:400">${mdParse(a.verdictReason||'')}</div></div>
           </div>
         </div>
       </div>
