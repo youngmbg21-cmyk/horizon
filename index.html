@@ -813,6 +813,77 @@ body.light .md tbody tr:nth-child(even) { background:rgba(0,0,0,0.015); }
 .loc-add-sub { font-size:12px; color:var(--text2); line-height:1.5; }
 .loc-add-search-wrap { position:relative; margin-bottom:12px; }
 
+/* ── VAULT ──────────────────────────────────────────────────────────── */
+.vault-grid { display:grid; grid-template-columns:340px 1fr; gap:14px; align-items:start; }
+@media (max-width:1000px){ .vault-grid { grid-template-columns:1fr; } }
+.vault-list-wrap { background:var(--bg2); border:1px solid var(--border); border-radius:10px; overflow:hidden; }
+.vault-list-head { padding:12px 14px; font-family:var(--fm); font-size:9px; letter-spacing:.12em; text-transform:uppercase; color:var(--text3); border-bottom:1px solid var(--border); font-weight:700; }
+.vault-list { max-height:540px; overflow-y:auto; padding:6px; }
+.vault-row { display:flex; align-items:center; gap:10px; padding:10px 12px; border-radius:8px; cursor:pointer; transition:background .1s; border:1px solid transparent; }
+.vault-row:hover { background:var(--bg3); }
+.vault-row.active { background:var(--bg3); border-color:var(--border2); box-shadow:inset 3px 0 0 var(--accent-positive); }
+.vault-row-flag { font-size:20px; flex-shrink:0; width:26px; text-align:center; }
+.vault-row-meta { flex:1; min-width:0; }
+.vault-row-title { font-size:13px; font-weight:700; color:var(--text); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.vault-row-sub { font-family:var(--fm); font-size:10px; color:var(--text3); margin-top:2px; }
+.vault-row .btn-xs { flex-shrink:0; }
+.vault-row .line-rm { flex-shrink:0; }
+.vault-open-wrap { background:var(--bg2); border:1px solid var(--border); border-radius:10px; padding:18px 22px; min-height:540px; }
+.vault-open-head { display:flex; align-items:flex-start; justify-content:space-between; gap:14px; padding-bottom:14px; border-bottom:1px solid var(--border); margin-bottom:14px; flex-wrap:wrap; }
+.vault-open-tag { font-family:var(--fm); font-size:9px; font-weight:700; letter-spacing:.12em; text-transform:uppercase; color:var(--accent-positive); margin-bottom:4px; }
+.vault-open-title { font-family:var(--ff); font-size:22px; font-weight:800; color:var(--text); letter-spacing:-.01em; line-height:1.2; }
+.vault-open-sub { font-family:var(--fm); font-size:10px; color:var(--text3); margin-top:3px; }
+.vault-open-actions { display:flex; gap:6px; flex-shrink:0; }
+.vault-open-body { font-size:13px; line-height:1.65; }
+
+/* ── ONBOARDING BLOCK (mandatory citizenship + home base) ──────────── */
+.modal.onboarding-modal { max-width:520px; text-align:center; padding:30px 28px; }
+.onboarding-icon { font-size:44px; margin-bottom:10px; }
+.onboarding-title { font-family:var(--ff); font-size:22px; font-weight:800; color:var(--text); margin-bottom:10px; letter-spacing:-.01em; }
+.onboarding-sub { font-size:13px; color:var(--text2); line-height:1.6; margin-bottom:22px; }
+.onboarding-sub strong { color:var(--text); font-weight:700; }
+.onboarding-actions { display:flex; justify-content:center; gap:10px; margin-bottom:14px; }
+.onboarding-note { font-family:var(--fm); font-size:10px; letter-spacing:.04em; color:var(--text3); }
+
+/* ── PERSONAL CONTEXT CARD (Settings) ──────────────────────────────── */
+.ctx-card { border-left:4px solid var(--accent-positive); }
+.ctx-card.ctx-incomplete { border-left-color:var(--accent-critical); background:linear-gradient(180deg, var(--accent-critical-dim), var(--bg2)); }
+.ctx-badge { margin-left:8px; font-family:var(--fm); font-size:9px; font-weight:700; letter-spacing:.08em; padding:3px 8px; border-radius:4px; text-transform:uppercase; }
+.ctx-badge.neg { background:var(--accent-critical-dim); color:var(--accent-critical); }
+.ctx-badge.pos { background:var(--accent-positive-dim); color:var(--accent-positive); }
+.ctx-blurb { font-size:12px; color:var(--text2); line-height:1.55; margin-bottom:14px; max-width:680px; }
+.ctx-grid { display:grid; grid-template-columns:1fr 1fr; gap:14px; }
+@media (max-width:720px){ .ctx-grid { grid-template-columns:1fr; } }
+.ctx-field label { display:block; font-family:var(--fm); font-size:10px; letter-spacing:.06em; text-transform:uppercase; color:var(--text2); margin-bottom:5px; font-weight:700; }
+.ctx-field .country-dd { width:100%; display:block; }
+
+/* ── SHARED COUNTRY DROPDOWN (createCountryDropdown) ───────────────── */
+.country-dd { position:relative; display:inline-block; }
+.country-dd .cd-trigger { display:inline-flex; align-items:center; gap:10px; background:var(--bg3); border:1px solid var(--border2); border-radius:10px; padding:10px 14px; color:var(--text); font-family:var(--fb); font-size:13px; font-weight:600; cursor:pointer; transition:all .18s; min-width:240px; width:100%; }
+.country-dd .cd-trigger:hover { border-color:var(--accent-positive); }
+.country-dd.open .cd-trigger { border-color:var(--accent-positive); box-shadow:var(--focus-ring); }
+.country-dd .cd-flag { font-size:18px; line-height:1; }
+.country-dd .cd-name { flex:1; text-align:left; }
+.country-dd .cd-name.cd-placeholder { color:var(--text3); font-weight:500; }
+.country-dd .cd-caret { font-size:11px; color:var(--text3); transition:transform .18s; }
+.country-dd.open .cd-caret { transform:rotate(180deg); color:var(--accent-positive); }
+.country-dd .cd-menu { position:absolute; z-index:500; top:calc(100% + 6px); left:0; width:min(360px, 95vw); background:var(--bg2); border:1px solid var(--border2); border-radius:12px; box-shadow:0 18px 40px -12px rgba(0,0,0,0.55); display:none; flex-direction:column; overflow:hidden; }
+body.light .country-dd .cd-menu { box-shadow:0 12px 28px -10px rgba(60,40,10,0.22); }
+.country-dd.open .cd-menu { display:flex; }
+.country-dd .cd-search-wrap { position:relative; padding:12px; border-bottom:1px solid var(--border); }
+.country-dd .cd-search-icon { position:absolute; left:22px; top:50%; transform:translateY(-50%); color:var(--text3); font-size:13px; pointer-events:none; }
+.country-dd .cd-search { width:100%; background:var(--bg3); border:1px solid var(--border); border-radius:8px; padding:9px 12px 9px 34px; color:var(--text); font-family:var(--fb); font-size:13px; outline:none; transition:border-color .15s; }
+.country-dd .cd-search:focus { border-color:var(--accent-positive); }
+.country-dd .cd-results { max-height:320px; overflow-y:auto; padding:6px 4px; }
+.country-dd .cd-item { display:flex; align-items:center; gap:10px; padding:9px 12px; border-radius:7px; cursor:pointer; transition:background .1s; }
+.country-dd .cd-item:hover, .country-dd .cd-item.active { background:var(--bg3); }
+.country-dd .cd-item.active { box-shadow:inset 3px 0 0 var(--accent-positive); }
+.country-dd .cd-item.selected { background:var(--accent-positive-dim); }
+.country-dd .cd-item-flag { font-size:18px; width:22px; text-align:center; flex-shrink:0; }
+.country-dd .cd-item-name { flex:1; font-size:13px; color:var(--text); font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.country-dd .cd-item-code { font-family:var(--fm); font-size:10px; color:var(--text3); text-transform:uppercase; letter-spacing:.04em; }
+.country-dd .cd-empty { padding:24px 14px; text-align:center; color:var(--text3); font-size:12px; }
+
 /* ── Geocode autocomplete dropdown (shared by Retire Anywhere + PIQ) ─ */
 .geo-dropdown {
   position:absolute; z-index:9999;
@@ -1194,6 +1265,10 @@ body.light .piq-country-menu { box-shadow:0 12px 28px -10px rgba(60,40,10,0.22);
       <div class="nav-item" data-panel="propiq" onclick="nav('propiq')"><span class="nav-icon">🏠</span>Property IQ</div>
 
       <div class="sb-sep"></div>
+      <div class="sb-section">LIBRARY</div>
+      <div class="nav-item" data-panel="vault" onclick="nav('vault')"><span class="nav-icon">🗄</span>Vault</div>
+
+      <div class="sb-sep"></div>
       <div class="sb-section">SYSTEM</div>
       <div class="nav-item" data-panel="settings" onclick="nav('settings')"><span class="nav-icon">⚙</span>Settings</div>
 
@@ -1216,6 +1291,7 @@ body.light .piq-country-menu { box-shadow:0 12px 28px -10px rgba(60,40,10,0.22);
       <div class="panel" id="panel-funfund"></div>
       <div class="panel" id="panel-retireanywhere"></div>
       <div class="panel" id="panel-propiq"></div>
+      <div class="panel" id="panel-vault"></div>
       <div class="panel" id="panel-settings"></div>
     </div>
   </div>
@@ -1314,6 +1390,19 @@ body.light .piq-country-menu { box-shadow:0 12px 28px -10px rgba(60,40,10,0.22);
       <button class="btn btn-o" onclick="connectBankLive()" style="flex:1">🏦 Connect Live</button>
     </div>
     <p style="font-size:11px;color:var(--text3);margin-top:10px;line-height:1.5">Live connection requires your bank to support PSD2 Open Banking. Credentials are passed directly to your bank — never stored here.</p>
+  </div>
+</div>
+
+<!-- Onboarding block (mandatory citizenship + home base) -->
+<div class="modal-backdrop" id="onboarding-modal">
+  <div class="modal onboarding-modal">
+    <div class="onboarding-icon">🪪</div>
+    <div class="onboarding-title">Welcome to Horizon Finance OS</div>
+    <div class="onboarding-sub">To get started, please set your <strong>Citizenship</strong> and <strong>Home Base</strong> in Settings. These are required for personalised AI analysis across the app — tax implications, pension entitlements, visa eligibility, and cost-of-living comparisons are all tailored to your specific situation.</div>
+    <div class="onboarding-actions">
+      <button class="btn btn-g" onclick="nav('settings'); hideOnboardingBlock();">Go to Settings</button>
+    </div>
+    <div class="onboarding-note">This message will reappear on every tab until both fields are completed.</div>
   </div>
 </div>
 
@@ -1473,6 +1562,14 @@ function defaultState() {
     searchCache:{},
     // Property IQ last-selected country (ISO 3166-1 alpha-2).
     piqCountry:'KE',
+    // Personal context (MANDATORY before the app is functional). ISO2
+    // country codes for the user's citizenship and current country of
+    // residence. Injected into every AI prompt so tax / pension /
+    // residency / cost-of-living analysis is personal.
+    citizenship:null,
+    homeBase:null,
+    // Vault — saved Deep Dive reports generated from Retire Anywhere.
+    vault:[],
   };
 }
 
@@ -1567,7 +1664,7 @@ function invalidateSelectors(){ _selGen++; }
 // ─── PERSISTENCE ────────────────────────────────────────────────────────────
 // State schema version. Bump this and add a branch to migrate() whenever the
 // shape of `state` changes in a backwards-incompatible way.
-const STATE_VERSION = 7;
+const STATE_VERSION = 8;
 function migrate(s) {
   const from = s.version || 1;
   if(from >= STATE_VERSION) { s.version = STATE_VERSION; return s; }
@@ -1621,6 +1718,14 @@ function migrate(s) {
       const legacy = s.piqMarket || 'ke';
       s.piqCountry = String(legacy).toUpperCase();
     }
+  }
+  // v7 → v8: mandatory personal context (citizenship + home base) and the
+  // Deep Dive report vault. Fields are explicitly set to null so the
+  // onboarding block triggers until the user completes them.
+  if(from < 8) {
+    if(s.citizenship === undefined) s.citizenship = null;
+    if(s.homeBase === undefined)    s.homeBase = null;
+    if(!Array.isArray(s.vault))     s.vault = [];
   }
   s.version = STATE_VERSION;
   return s;
@@ -1987,7 +2092,7 @@ function scoreLocation(loc) {
 // ─── NAVIGATION ─────────────────────────────────────────────────────────────
 // Hash routing: #panel or #panel/section — panel drives nav(), section is
 // remembered so downstream renderers can scroll / pulse a target card.
-const VALID_PANELS = ['dashboard','transactions','monthly','yearly','retirement','funfund','retireanywhere','propiq','settings'];
+const VALID_PANELS = ['dashboard','transactions','monthly','yearly','retirement','funfund','retireanywhere','propiq','vault','settings'];
 let _navFromHash = false;
 function parseHash() {
   const raw = (location.hash||'').replace(/^#/,'');
@@ -1995,8 +2100,32 @@ function parseHash() {
   const [panel, section] = raw.split('/');
   return { panel: VALID_PANELS.includes(panel)?panel:null, section: section||null };
 }
+// ─── ONBOARDING BLOCK ───────────────────────────────────────────────────────
+// Both citizenship and home base must be set in Settings before the app is
+// fully usable. nav() runs this gate on every navigation; if either field
+// is missing and the user is trying to go somewhere OTHER than Settings,
+// we force-redirect them to Settings and show a blocking modal.
+function onboardingComplete(){
+  return !!(state.citizenship && state.homeBase);
+}
+function showOnboardingBlock(){
+  const m = document.getElementById('onboarding-modal');
+  if(m) m.classList.add('open');
+}
+function hideOnboardingBlock(){
+  const m = document.getElementById('onboarding-modal');
+  if(m) m.classList.remove('open');
+}
+
 function nav(panel, opts) {
   if(!VALID_PANELS.includes(panel)) return;
+  // Mandatory onboarding gate: if citizenship or home base is missing,
+  // the user can only open Settings. Any other destination is redirected
+  // to Settings and a blocking modal is shown explaining why.
+  if(!onboardingComplete() && panel !== 'settings') {
+    showOnboardingBlock();
+    panel = 'settings';
+  }
   state.activePanel=panel;
   state.activeSection = (opts&&opts.section)||null;
   if(typeof bus!=='undefined') bus.emit('panel:changed', {panel});
@@ -2082,6 +2211,7 @@ function renderPanel(panel) {
     funfund:renderFunFund,
     retireanywhere:renderRetireAnywhere,
     propiq:typeof renderPropIQ==='function'?renderPropIQ:null,
+    vault:renderVault,
     settings:renderSettings,
   };
   if(fns[panel]) fns[panel]();
@@ -2097,6 +2227,7 @@ const PANEL_META = {
   funfund:        {label:'Fun Fund',         group:'Planning',          icon:'✦'},
   retireanywhere: {label:'Retire Anywhere',  group:'Planning',          icon:'🌍'},
   propiq:         {label:'Property IQ',      group:'Planning',          icon:'🏠'},
+  vault:          {label:'Vault',            group:'Library',           icon:'🗄'},
   settings:       {label:'Settings',         group:'System',            icon:'⚙'},
 };
 // Hand-curated cross-links: "if you're here, you might next want..."
@@ -2107,8 +2238,9 @@ const RELATED_MAP = {
   yearly:         ['retirement','monthly','funfund'],
   retirement:     ['retireanywhere','yearly','funfund'],
   funfund:        ['monthly','retireanywhere','dashboard'],
-  retireanywhere: ['retirement','propiq','funfund'],
-  propiq:         ['retireanywhere','retirement','dashboard'],
+  retireanywhere: ['retirement','propiq','vault'],
+  propiq:         ['retireanywhere','retirement','vault'],
+  vault:          ['retireanywhere','retirement','propiq'],
   settings:       ['dashboard','retirement','transactions'],
 };
 function esc2(str){const d=document.createElement('div');d.textContent=str;return d.innerHTML;}
@@ -4226,9 +4358,10 @@ window.showLocDetail=function(id){
     <div class="field"><label>Monthly Cost of Living (${s})</label><input type="number" value="${Math.round(loc.costOfLiving*r)}" oninput="updateLocCost('${loc.id}',this.value/${r})"></div>
     <div class="field"><label>Local Tax Rate (%)</label><input type="number" value="${loc.taxRate}" oninput="updateLocTax('${loc.id}',+this.value)"></div>
     <div class="field"><label>Notes</label><input value="${esc(loc.notes||'')}" oninput="updateLocNotes('${loc.id}',this.value)"></div>
-    <div style="display:flex;gap:8px;margin-top:4px">
-      <button class="btn btn-g btn-sm" onclick="aiAnalyzeLoc('${loc.id}')">🤖 AI Deep Analysis</button>
-      <button class="btn btn-danger" onclick="removeLoc('${loc.id}')">Remove</button>
+    <div style="display:flex;gap:8px;margin-top:4px;flex-wrap:wrap">
+      <button class="btn btn-o btn-sm" onclick="aiAnalyzeLoc('${loc.id}')">🤖 Quick Analysis</button>
+      <button class="btn btn-g btn-sm" onclick="aiDeepDive('${loc.id}')">🔬 Deep Dive Report</button>
+      <button class="btn btn-danger" onclick="removeLoc('${loc.id}')" style="margin-left:auto">Remove</button>
     </div>
     <div id="loc-ai-out" style="margin-top:12px"></div>`;
   openModal('loc-modal');
@@ -4254,6 +4387,177 @@ function _ccFlag(cc){
   if(!cc || cc.length !== 2) return '🌍';
   const base = 127397;
   return String.fromCodePoint(...[...cc.toUpperCase()].map(ch => base + ch.charCodeAt(0)));
+}
+
+// ─── GLOBAL COUNTRY DATA ────────────────────────────────────────────────────
+// Full ISO 3166-1 alpha-2 list, currency map, and a lazily-built display
+// list used by the Property IQ country picker, the Settings "Personal
+// Context" dropdowns (citizenship + home base), and any future country-
+// aware surface. Names come from Intl.DisplayNames at runtime so we don't
+// ship a 200-entry name table.
+const COUNTRY_CODES = [
+  'AF','AL','DZ','AD','AO','AG','AR','AM','AU','AT','AZ','BS','BH','BD','BB',
+  'BY','BE','BZ','BJ','BT','BO','BA','BW','BR','BN','BG','BF','BI','CV','KH',
+  'CM','CA','KY','CF','TD','CL','CN','CO','KM','CG','CD','CR','CI','HR','CU',
+  'CY','CZ','DK','DJ','DM','DO','EC','EG','SV','GQ','ER','EE','SZ','ET','FJ',
+  'FI','FR','GA','GM','GE','DE','GH','GR','GD','GT','GN','GW','GY','HT','HN',
+  'HK','HU','IS','IN','ID','IR','IQ','IE','IL','IT','JM','JP','JO','KZ','KE',
+  'KI','KW','KG','LA','LV','LB','LS','LR','LY','LI','LT','LU','MO','MG','MW',
+  'MY','MV','ML','MT','MH','MR','MU','MX','FM','MD','MC','MN','ME','MA','MZ',
+  'MM','NA','NR','NP','NL','NZ','NI','NE','NG','KP','MK','NO','OM','PK','PW',
+  'PS','PA','PG','PY','PE','PH','PL','PT','PR','QA','RO','RU','RW','KN','LC',
+  'VC','WS','SM','ST','SA','SN','RS','SC','SL','SG','SK','SI','SB','SO','ZA',
+  'KR','SS','ES','LK','SD','SR','SE','CH','SY','TW','TJ','TZ','TH','TL','TG',
+  'TO','TT','TN','TR','TM','TV','UG','UA','AE','GB','US','UY','UZ','VU','VA',
+  'VE','VN','YE','ZM','ZW'
+];
+const COUNTRY_CURRENCY = {
+  AF:'AFN',AL:'ALL',DZ:'DZD',AD:'EUR',AO:'AOA',AG:'XCD',AR:'ARS',AM:'AMD',AU:'AUD',AT:'EUR',
+  AZ:'AZN',BS:'BSD',BH:'BHD',BD:'BDT',BB:'BBD',BY:'BYN',BE:'EUR',BZ:'BZD',BJ:'XOF',BT:'BTN',
+  BO:'BOB',BA:'BAM',BW:'BWP',BR:'BRL',BN:'BND',BG:'BGN',BF:'XOF',BI:'BIF',CV:'CVE',KH:'KHR',
+  CM:'XAF',CA:'CAD',KY:'KYD',CF:'XAF',TD:'XAF',CL:'CLP',CN:'CNY',CO:'COP',KM:'KMF',CG:'XAF',
+  CD:'CDF',CR:'CRC',CI:'XOF',HR:'EUR',CU:'CUP',CY:'EUR',CZ:'CZK',DK:'DKK',DJ:'DJF',DM:'XCD',
+  DO:'DOP',EC:'USD',EG:'EGP',SV:'USD',GQ:'XAF',ER:'ERN',EE:'EUR',SZ:'SZL',ET:'ETB',FJ:'FJD',
+  FI:'EUR',FR:'EUR',GA:'XAF',GM:'GMD',GE:'GEL',DE:'EUR',GH:'GHS',GR:'EUR',GD:'XCD',GT:'GTQ',
+  GN:'GNF',GW:'XOF',GY:'GYD',HT:'HTG',HN:'HNL',HK:'HKD',HU:'HUF',IS:'ISK',IN:'INR',ID:'IDR',
+  IR:'IRR',IQ:'IQD',IE:'EUR',IL:'ILS',IT:'EUR',JM:'JMD',JP:'JPY',JO:'JOD',KZ:'KZT',KE:'KES',
+  KI:'AUD',KW:'KWD',KG:'KGS',LA:'LAK',LV:'EUR',LB:'LBP',LS:'LSL',LR:'LRD',LY:'LYD',LI:'CHF',
+  LT:'EUR',LU:'EUR',MO:'MOP',MG:'MGA',MW:'MWK',MY:'MYR',MV:'MVR',ML:'XOF',MT:'EUR',MH:'USD',
+  MR:'MRU',MU:'MUR',MX:'MXN',FM:'USD',MD:'MDL',MC:'EUR',MN:'MNT',ME:'EUR',MA:'MAD',MZ:'MZN',
+  MM:'MMK',NA:'NAD',NR:'AUD',NP:'NPR',NL:'EUR',NZ:'NZD',NI:'NIO',NE:'XOF',NG:'NGN',KP:'KPW',
+  MK:'MKD',NO:'NOK',OM:'OMR',PK:'PKR',PW:'USD',PS:'ILS',PA:'PAB',PG:'PGK',PY:'PYG',PE:'PEN',
+  PH:'PHP',PL:'PLN',PT:'EUR',PR:'USD',QA:'QAR',RO:'RON',RU:'RUB',RW:'RWF',KN:'XCD',LC:'XCD',
+  VC:'XCD',WS:'WST',SM:'EUR',ST:'STN',SA:'SAR',SN:'XOF',RS:'RSD',SC:'SCR',SL:'SLE',SG:'SGD',
+  SK:'EUR',SI:'EUR',SB:'SBD',SO:'SOS',ZA:'ZAR',KR:'KRW',SS:'SSP',ES:'EUR',LK:'LKR',SD:'SDG',
+  SR:'SRD',SE:'SEK',CH:'CHF',SY:'SYP',TW:'TWD',TJ:'TJS',TZ:'TZS',TH:'THB',TL:'USD',TG:'XOF',
+  TO:'TOP',TT:'TTD',TN:'TND',TR:'TRY',TM:'TMT',TV:'AUD',UG:'UGX',UA:'UAH',AE:'AED',GB:'GBP',
+  US:'USD',UY:'UYU',UZ:'UZS',VU:'VUV',VA:'EUR',VE:'VES',VN:'VND',YE:'YER',ZM:'ZMW',ZW:'ZWL'
+};
+let _countryList = null;
+function countryList(){
+  if(_countryList) return _countryList;
+  let dn;
+  try { dn = new Intl.DisplayNames(['en'], {type:'region'}); } catch(e) {}
+  _countryList = COUNTRY_CODES.map(code => ({
+    code,
+    name: dn ? (dn.of(code) || code) : code,
+    flag: _ccFlag(code),
+    currency: COUNTRY_CURRENCY[code] || 'USD',
+  })).sort((a,b) => a.name.localeCompare(b.name));
+  return _countryList;
+}
+// Look up a single country's display info by ISO2 code.
+function countryInfo(code){
+  if(!code) return null;
+  return countryList().find(c => c.code === String(code).toUpperCase()) || null;
+}
+
+// ─── SHARED COUNTRY DROPDOWN COMPONENT ──────────────────────────────────────
+// Mounts a searchable, keyboard-navigable country picker into the given
+// host element. Used by Settings (citizenship + home base) and any other
+// surface that needs a country selector. The Property IQ panel has its
+// own bespoke picker (built earlier) that predates this helper; both now
+// read from the same countryList() data source.
+let _cdCounter = 0;
+function createCountryDropdown({host, currentCode, placeholder, onPick}){
+  if(!host) return null;
+  const id = 'cd-' + (++_cdCounter);
+  const list = countryList();
+  let selectedCode = currentCode ? String(currentCode).toUpperCase() : null;
+  let current = list.find(c => c.code === selectedCode) || null;
+  host.innerHTML = `
+    <div class="country-dd" data-cd-id="${id}">
+      <button type="button" class="cd-trigger">
+        <span class="cd-flag">${current ? current.flag : '🌍'}</span>
+        <span class="cd-name ${current?'':'cd-placeholder'}">${current ? esc2(current.name) : esc2(placeholder||'Select a country')}</span>
+        <span class="cd-caret">▾</span>
+      </button>
+      <div class="cd-menu">
+        <div class="cd-search-wrap">
+          <span class="cd-search-icon">🔍</span>
+          <input type="text" class="cd-search" placeholder="Type to search…" autocomplete="off">
+        </div>
+        <div class="cd-results"></div>
+      </div>
+    </div>
+  `;
+  const picker  = host.querySelector('.country-dd');
+  const trigger = host.querySelector('.cd-trigger');
+  const menu    = host.querySelector('.cd-menu');
+  const search  = host.querySelector('.cd-search');
+  const results = host.querySelector('.cd-results');
+  let filtered = list.slice();
+  let activeIdx = 0;
+
+  function render(q){
+    const qq = (q||'').trim().toLowerCase();
+    filtered = !qq ? list : list.filter(c =>
+      c.name.toLowerCase().includes(qq) || c.code.toLowerCase().startsWith(qq)
+    );
+    if(activeIdx >= filtered.length) activeIdx = 0;
+    if(!filtered.length){
+      results.innerHTML = '<div class="cd-empty">No matches.</div>';
+      return;
+    }
+    results.innerHTML = filtered.slice(0, 100).map((c, i) => `
+      <div class="cd-item ${i===activeIdx?'active':''} ${c.code===selectedCode?'selected':''}" data-code="${c.code}">
+        <span class="cd-item-flag">${c.flag}</span>
+        <span class="cd-item-name">${esc2(c.name)}</span>
+        <span class="cd-item-code">${c.code}</span>
+      </div>
+    `).join('');
+  }
+  function open(){
+    picker.classList.add('open');
+    search.value = '';
+    // Start with the currently selected country highlighted.
+    const idx = list.findIndex(c => c.code === selectedCode);
+    activeIdx = idx >= 0 ? idx : 0;
+    render('');
+    setTimeout(() => { search.focus(); const el = results.querySelector('.cd-item.selected'); if(el) el.scrollIntoView({block:'nearest'}); }, 20);
+  }
+  function close(){ picker.classList.remove('open'); }
+  function pick(c){
+    if(!c) return;
+    selectedCode = c.code;
+    current = c;
+    trigger.querySelector('.cd-flag').textContent = c.flag;
+    const nameEl = trigger.querySelector('.cd-name');
+    nameEl.textContent = c.name;
+    nameEl.classList.remove('cd-placeholder');
+    close();
+    if(typeof onPick === 'function') onPick(c.code, c);
+  }
+  trigger.addEventListener('click', (e) => {
+    e.stopPropagation();
+    picker.classList.contains('open') ? close() : open();
+  });
+  search.addEventListener('input', (e) => { activeIdx = 0; render(e.target.value); });
+  search.addEventListener('keydown', (e) => {
+    if(e.key === 'Escape'){ e.preventDefault(); close(); return; }
+    if(!filtered.length) return;
+    if(e.key === 'ArrowDown'){ e.preventDefault(); activeIdx = Math.min(filtered.length-1, activeIdx+1); render(search.value); const el = results.querySelector('.cd-item.active'); if(el) el.scrollIntoView({block:'nearest'}); }
+    else if(e.key === 'ArrowUp'){ e.preventDefault(); activeIdx = Math.max(0, activeIdx-1); render(search.value); const el = results.querySelector('.cd-item.active'); if(el) el.scrollIntoView({block:'nearest'}); }
+    else if(e.key === 'Enter'){ e.preventDefault(); pick(filtered[activeIdx]); }
+  });
+  results.addEventListener('click', (e) => {
+    const item = e.target.closest('.cd-item');
+    if(!item) return;
+    const code = item.getAttribute('data-code');
+    const c = list.find(x => x.code === code);
+    pick(c);
+  });
+  // Close on outside click
+  const outsideClick = (e) => { if(!picker.contains(e.target)) close(); };
+  document.addEventListener('click', outsideClick);
+  // Return an API the caller can use to destroy the listener later
+  return {
+    setCode(code){
+      const c = list.find(x => x.code === String(code||'').toUpperCase());
+      if(c) pick(c);
+    },
+    destroy(){ document.removeEventListener('click', outsideClick); host.innerHTML = ''; }
+  };
 }
 
 // Normalize a Photon feature into the app's place shape.
@@ -4650,18 +4954,149 @@ window.aiAnalyzeLoc=async function(id){
   const nums=getRetirementNumbers();
   const income=nums.sustainableAfterTax+nums.pension;
   const el=document.getElementById('loc-ai-out'); el.innerHTML='<span class="pulse">🤖 Analyzing…</span>';
-  const prompt=`Detailed retirement feasibility analysis for ${loc.name}, ${loc.country}. The retiree has a monthly income of ${fmt(income)} (in today's money). Local cost of living: ${fmt(loc.costOfLiving)}/mo. Local income tax: ${loc.taxRate}%. Cover: actual cost of living breakdown, healthcare quality, visa/residency for Swedish citizens, quality of life, pros/cons, and an overall verdict. Be specific and practical. Under 250 words.`;
+  const ctx = buildPersonalContext();
+  const prompt=`${ctx}\n\nDetailed retirement feasibility analysis for ${loc.name}, ${loc.country}. The retiree has a monthly income of ${fmt(income)} (in today's money). Local cost of living: ${fmt(loc.costOfLiving)}/mo. Local income tax: ${loc.taxRate}%. Cover: actual cost of living breakdown, healthcare quality, visa/residency for the user's citizenship, quality of life, pros/cons, and an overall verdict. Be specific and practical. Under 250 words.`;
   try {
     const reply=await callClaude(prompt,800,key);
     el.innerHTML=mdParse(reply);
   } catch(e){ el.innerHTML=`<span style="color:var(--red)">Error: ${e.message}</span>`; }
 };
 
+// Deep Dive — long-form, structured report for a specific destination.
+// Runs a secondary Claude call with an explicit section skeleton, renders
+// the result with full markdown formatting, and saves it to the Vault on
+// completion so the user can reopen / export it later.
+window.aiDeepDive = function(id){
+  const loc = state.places.find(l => l.id === id);
+  if(!loc) return;
+  const key = state.aiKeys?.claude;
+  if(!key){ alert('Add your Claude API key in Settings first.'); return; }
+  if(!state.citizenship || !state.homeBase){
+    alert('Please complete Citizenship and Home Base in Settings first — the Deep Dive report is tailored to your personal context.');
+    nav('settings');
+    return;
+  }
+  const cz = countryInfo(state.citizenship);
+  const hb = countryInfo(state.homeBase);
+  const nums = getRetirementNumbers();
+  const income = nums.sustainableAfterTax + nums.pension;
+  const el = document.getElementById('loc-ai-out');
+  if(el) el.innerHTML = '<div class="card" style="padding:16px"><div class="state-spinner" style="display:inline-block;vertical-align:middle;margin-right:10px;width:16px;height:16px;border-width:2px"></div><span style="color:var(--accent-positive);font-family:var(--fm);font-size:12px">Generating Deep Dive report… this takes 20–40 seconds.</span></div>';
+  const ctx = buildPersonalContext();
+  const prompt = `${ctx}
+
+Generate a comprehensive, professional DEEP DIVE retirement relocation report for **${loc.name}, ${loc.country}**.
+
+CONTEXT
+- Prospective retiree holds ${cz.name} (${cz.code}) citizenship, currently based in ${hb.name} (${hb.code}).
+- Projected monthly retirement income: ${fmt(income)} (in today's money), sourced from portfolio draw-down and any pensions.
+- Target monthly cost of living at destination: ${fmt(loc.costOfLiving)}.
+- Destination headline income tax rate: ${loc.taxRate}%.
+
+REQUIREMENTS
+Return a single markdown document (no JSON, no preamble, no wrapping). Use H2 headings for each section and markdown tables where numbers help. Every section must be grounded in 2024–2025 reality and the user's specific personal context (citizenship, home base). Be honest — flag red flags, visa traps, and tax gotchas.
+
+Structure EXACTLY as follows:
+
+## Executive Summary
+One punchy paragraph: is this destination viable for this specific person? Headline numbers, surplus/shortfall, one-sentence verdict.
+
+## Cost of Living
+A markdown table with rows for Housing, Groceries, Utilities, Transport, Healthcare, Dining, Leisure — with typical monthly ranges in local currency + the user's home-base currency equivalent. One paragraph of commentary on how realistic the assumed ${fmt(loc.costOfLiving)} is.
+
+## Healthcare
+Quality of public vs private system, costs for over-65s, expat insurance expectations, any bilateral agreements with ${cz.name} or ${hb.name}, and a specific hospital/clinic recommendation if the city has one.
+
+## Visa & Residency
+Specifically for ${cz.name} citizens. What visa route applies (retirement visa, D-visa, golden visa, passive income visa)? Minimum income thresholds. Path to permanent residency. Timeline. Red flags. Cost.
+
+## Tax Implications
+Tailored to a ${cz.name} citizen currently tax-resident in ${hb.name} who is moving to ${loc.country}. Cover:
+- Whether a double-tax treaty exists between ${hb.name} and ${loc.country}
+- Treatment of pension income, portfolio withdrawals, and capital gains
+- Effective local tax rate at this income level
+- Exit-tax considerations from ${hb.name}
+- Any special regimes (NHR, Beckham, foreign-sourced income exemptions)
+
+## Climate & Lifestyle
+Month-by-month climate summary, air quality, walkability, expat community size, language requirements, major cultural notes.
+
+## Real Estate
+Buy vs rent economics at this income level. Typical purchase prices in the main expat districts. Foreigner ownership restrictions (if any). Expected rental yield and property tax. Mortgage availability for non-residents.
+
+## Pros & Cons
+Two short markdown bullet lists. Be specific and concrete — no generic filler.
+
+## Final Verdict
+One paragraph. Recommendation: "proceed", "proceed with caveats", or "reconsider". State the single biggest risk and the single biggest opportunity.`;
+  const controller = new AbortController();
+  const startedAt = Date.now();
+  (async () => {
+    try {
+      const reply = await callClaude(prompt, 3000, key);
+      // Save to Vault
+      const entry = {
+        id: 'dd-' + Date.now(),
+        locationId: id,
+        location: loc.name,
+        country: loc.country,
+        countryCode: (loc.flag||'🌍'),
+        flag: loc.flag || '🌍',
+        date: new Date().toISOString(),
+        citizenship: state.citizenship,
+        homeBase: state.homeBase,
+        markdown: reply,
+      };
+      if(!Array.isArray(state.vault)) state.vault = [];
+      state.vault.unshift(entry);
+      if(state.vault.length > 50) state.vault = state.vault.slice(0, 50);
+      save();
+      // Render inline
+      if(el) {
+        el.innerHTML = `
+          <div class="card" style="padding:18px 20px;margin-top:6px">
+            <div style="display:flex;align-items:flex-start;gap:10px;margin-bottom:10px">
+              <div style="flex:1">
+                <div style="font-family:var(--fm);font-size:9px;letter-spacing:.1em;color:var(--text3);text-transform:uppercase">Deep Dive Report · ${new Date().toLocaleString()}</div>
+                <div style="font-family:var(--ff);font-size:17px;font-weight:800;color:var(--text);margin-top:2px">${esc(loc.name)}, ${esc(loc.country)}</div>
+              </div>
+              <div style="display:flex;gap:6px;flex-shrink:0">
+                <button class="btn btn-o btn-xs" onclick="exportVaultEntryPdf('${entry.id}')">📄 Download PDF</button>
+                <button class="btn btn-o btn-xs" onclick="nav('vault')">🗄 Open Vault</button>
+              </div>
+            </div>
+            ${mdParse(reply)}
+          </div>`;
+      }
+    } catch(e) {
+      if(el) el.innerHTML = `<div class="state state-error"><div class="state-icon">⚠</div><div class="state-title">Deep Dive failed</div><div class="state-sub">${esc(e.message||String(e))}</div><div class="state-cta"><button class="btn btn-o btn-sm" onclick="aiDeepDive('${id}')">Retry</button></div></div>`;
+    }
+  })();
+};
+
 // ══ SETTINGS ═════════════════════════════════════════════════════════════════
 function renderSettings() {
   const r=rate(); const s=sym();
+  const ctxIncomplete = !state.citizenship || !state.homeBase;
   document.getElementById('panel-settings').innerHTML=`
     <div class="ph"><div class="ph-tag">SYSTEM</div><div class="ph-title">Settings & Baseline</div><div class="ph-sub">Configure your recurring income, expenses, retirement parameters, and AI keys</div></div>
+
+    <!-- Personal Context — MANDATORY before the app is functional -->
+    <div class="card ctx-card ${ctxIncomplete?'ctx-incomplete':''}">
+      <div class="card-title">🪪 Personal Context <span class="ctx-badge ${ctxIncomplete?'neg':'pos'}">${ctxIncomplete?'REQUIRED':'✓ COMPLETE'}</span></div>
+      <p class="ctx-blurb">Your citizenship and current country of residence are injected into every AI prompt across the app — tax implications, pension entitlements, visa rules, and cost-of-living comparisons are all tailored to your personal situation.</p>
+      <div class="ctx-grid">
+        <div class="ctx-field">
+          <label>Citizenship (nationality)</label>
+          <div id="set-citizenship-dd"></div>
+        </div>
+        <div class="ctx-field">
+          <label>Home Base (current residence)</label>
+          <div id="set-homebase-dd"></div>
+        </div>
+      </div>
+    </div>
+
     <div class="two-col">
       <!-- Baseline income -->
       <div class="card">
@@ -4741,7 +5176,200 @@ function renderSettings() {
     </div>`;
   renderLineItems('set-income',state.baseIncome,'baseIncome');
   renderLineItems('set-expenses',state.baseExpenses,'baseExpenses');
+  // Mount the two country dropdowns for the Personal Context card
+  const czHost = document.getElementById('set-citizenship-dd');
+  const hbHost = document.getElementById('set-homebase-dd');
+  if(czHost) createCountryDropdown({
+    host: czHost,
+    currentCode: state.citizenship,
+    placeholder: 'Select your citizenship',
+    onPick: (code) => {
+      state.citizenship = code;
+      save();
+      invalidateSelectors();
+      // Re-render so the banner updates and the onboarding block clears
+      // if both fields are now complete.
+      renderSettings();
+      if(state.citizenship && state.homeBase) hideOnboardingBlock();
+    }
+  });
+  if(hbHost) createCountryDropdown({
+    host: hbHost,
+    currentCode: state.homeBase,
+    placeholder: 'Select your home base',
+    onPick: (code) => {
+      state.homeBase = code;
+      save();
+      invalidateSelectors();
+      renderSettings();
+      if(state.citizenship && state.homeBase) hideOnboardingBlock();
+    }
+  });
 }
+
+// ══ VAULT ════════════════════════════════════════════════════════════════════
+// All generated Deep Dive reports live in state.vault. This panel gives
+// the user a chronological list + full-read view + a "Download as PDF"
+// export that opens a print-ready window.
+function renderVault(){
+  const el = document.getElementById('panel-vault'); if(!el) return;
+  const vault = Array.isArray(state.vault) ? state.vault : [];
+  const hasReports = vault.length > 0;
+  const openId = state.vaultOpenId && vault.find(v => v.id === state.vaultOpenId) ? state.vaultOpenId : (vault[0]?.id || null);
+  const open = vault.find(v => v.id === openId);
+
+  const list = !hasReports
+    ? `<div class="state state-empty" style="margin-top:14px">
+        <div class="state-icon">🗄</div>
+        <div class="state-title">No reports yet</div>
+        <div class="state-sub">Run a <strong>Deep Dive Report</strong> on any destination in Retire Anywhere and it will be saved here automatically. You can browse, reopen, and export every saved report from the Vault.</div>
+        <div class="state-cta"><button class="btn btn-o btn-sm" onclick="nav('retireanywhere')">🌍 Open Retire Anywhere</button></div>
+      </div>`
+    : vault.map(v => {
+        const d = new Date(v.date);
+        const when = d.toLocaleDateString(undefined, {day:'numeric',month:'short',year:'numeric'}) + ' · ' + d.toLocaleTimeString(undefined, {hour:'2-digit',minute:'2-digit'});
+        const active = v.id === openId ? ' active' : '';
+        return `<div class="vault-row${active}" onclick="openVaultEntry('${v.id}')">
+          <div class="vault-row-flag">${v.flag || '🌍'}</div>
+          <div class="vault-row-meta">
+            <div class="vault-row-title">${esc2(v.location)}${v.country?`, ${esc2(v.country)}`:''}</div>
+            <div class="vault-row-sub">${esc2(when)}</div>
+          </div>
+          <button class="btn btn-o btn-xs" onclick="event.stopPropagation();exportVaultEntryPdf('${v.id}')" title="Download as PDF">📄 PDF</button>
+          <button class="line-rm" onclick="event.stopPropagation();deleteVaultEntry('${v.id}')" title="Delete">×</button>
+        </div>`;
+      }).join('');
+
+  const openPane = open
+    ? `<div class="vault-open">
+        <div class="vault-open-head">
+          <div>
+            <div class="vault-open-tag">DEEP DIVE REPORT</div>
+            <div class="vault-open-title">${esc2(open.location)}${open.country?`, ${esc2(open.country)}`:''}</div>
+            <div class="vault-open-sub">${esc2(new Date(open.date).toLocaleString())}${open.citizenship?` · tailored for ${esc2((countryInfo(open.citizenship)||{}).name||open.citizenship)} citizen based in ${esc2((countryInfo(open.homeBase)||{}).name||open.homeBase||'')}`:''}</div>
+          </div>
+          <div class="vault-open-actions">
+            <button class="btn btn-g btn-sm" onclick="exportVaultEntryPdf('${open.id}')">📄 Download PDF</button>
+          </div>
+        </div>
+        <div class="vault-open-body">${mdParse(open.markdown||'')}</div>
+      </div>`
+    : (hasReports ? `<div class="state state-empty"><div class="state-sub">Select a report on the left to read it.</div></div>` : '');
+
+  el.innerHTML = `
+    ${ui.ph({tag:'LIBRARY', title:'Vault', sub:'Every Deep Dive report you generate is saved here. Reopen any report for a full read, or export it as a print-ready PDF.'})}
+    <div class="vault-grid">
+      <div class="vault-list-wrap">
+        <div class="vault-list-head">${hasReports ? `${vault.length} report${vault.length===1?'':'s'}` : 'Empty'}</div>
+        <div class="vault-list">${list}</div>
+      </div>
+      <div class="vault-open-wrap">${openPane}</div>
+    </div>`;
+}
+window.openVaultEntry = function(id){
+  state.vaultOpenId = id;
+  renderVault();
+};
+window.deleteVaultEntry = function(id){
+  if(!confirm('Delete this saved report? This cannot be undone.')) return;
+  state.vault = (state.vault || []).filter(v => v.id !== id);
+  if(state.vaultOpenId === id) state.vaultOpenId = null;
+  save();
+  renderVault();
+};
+// Export a saved Vault entry as a print-ready PDF by opening a new
+// window with a self-contained print stylesheet and triggering the
+// browser's print dialog. The user picks "Save as PDF" from the dialog.
+// The document header shows the app name, report date, and location.
+window.exportVaultEntryPdf = function(id){
+  const entry = (state.vault || []).find(v => v.id === id);
+  if(!entry){ alert('Report not found in Vault.'); return; }
+  const dateStr = new Date(entry.date).toLocaleDateString(undefined, {day:'numeric',month:'long',year:'numeric'});
+  const timeStr = new Date(entry.date).toLocaleTimeString(undefined, {hour:'2-digit',minute:'2-digit'});
+  const cz = countryInfo(entry.citizenship);
+  const hb = countryInfo(entry.homeBase);
+  const titleEsc = esc2(`${entry.location}${entry.country?', '+entry.country:''}`);
+  // Build the print-ready HTML document as a single self-contained
+  // string. Styles match the in-app .md vocabulary so the PDF keeps
+  // the same typographic hierarchy, tables, and colour semantics the
+  // user sees in the panel.
+  const bodyHtml = mdParse(entry.markdown || '');
+  const doc = `<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8">
+<title>Horizon · Deep Dive · ${titleEsc}</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root{--ink:#0c1628;--ink2:#3a4d6e;--ink3:#7a8fb0;--accent:#00a870;--line:#d6cfbf;--bg:#fdfaf6;--warn:#c47a00;--crit:#c0392b;}
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0;background:var(--bg);color:var(--ink);font-family:'DM Sans',sans-serif;font-size:12pt;line-height:1.65;}
+  .pdf-wrap{max-width:780px;margin:0 auto;padding:28pt 36pt;}
+  .pdf-head{display:flex;align-items:flex-start;justify-content:space-between;gap:20pt;padding-bottom:14pt;border-bottom:2pt solid var(--ink);margin-bottom:18pt;}
+  .pdf-app{font-family:'DM Sans',sans-serif;font-weight:800;font-size:10pt;letter-spacing:.12em;text-transform:uppercase;color:var(--accent);}
+  .pdf-title{font-family:'DM Sans',sans-serif;font-size:22pt;font-weight:800;line-height:1.15;margin-top:4pt;color:var(--ink);letter-spacing:-.01em;}
+  .pdf-meta{font-family:'JetBrains Mono',monospace;font-size:9pt;color:var(--ink3);text-align:right;line-height:1.5;}
+  .pdf-meta strong{color:var(--ink2);font-weight:700;}
+  h1,h2,h3,h4{font-family:'DM Sans',sans-serif;color:var(--ink);letter-spacing:-.005em;page-break-after:avoid;}
+  h1{font-size:18pt;border-bottom:1pt solid var(--line);padding-bottom:4pt;margin-top:20pt;}
+  h2{font-size:15pt;margin-top:18pt;color:var(--accent);}
+  h3{font-size:13pt;margin-top:14pt;font-family:'JetBrains Mono',monospace;text-transform:uppercase;letter-spacing:.04em;}
+  h4{font-size:12pt;margin-top:12pt;}
+  p{margin:6pt 0;}
+  strong{color:var(--ink);font-weight:700;}
+  em{font-style:italic;}
+  ul,ol{margin:6pt 0;padding-left:18pt;}
+  li{margin:3pt 0;}
+  hr{border:0;border-top:1pt solid var(--line);margin:16pt 0;}
+  blockquote{margin:10pt 0;padding:8pt 12pt;border-left:3pt solid var(--warn);background:#f7efe0;color:var(--ink2);font-style:italic;}
+  code{font-family:'JetBrains Mono',monospace;font-size:10pt;background:#eee;padding:1pt 4pt;border-radius:3pt;color:var(--crit);}
+  pre{background:#f5f5f5;border:1pt solid var(--line);padding:8pt;border-radius:4pt;overflow-x:auto;font-family:'JetBrains Mono',monospace;font-size:9pt;}
+  .md-table-wrap{margin:10pt 0;border:1pt solid var(--line);border-radius:4pt;overflow:hidden;}
+  table{width:100%;border-collapse:collapse;font-size:10pt;}
+  thead{background:#f5efe3;}
+  th{text-align:left;padding:6pt 10pt;font-family:'JetBrains Mono',monospace;font-size:9pt;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--ink2);border-bottom:1pt solid var(--line);}
+  td{padding:6pt 10pt;border-bottom:1pt solid var(--line);vertical-align:top;}
+  tbody tr:last-child td{border-bottom:0;}
+  tbody tr:nth-child(even){background:rgba(0,0,0,0.015);}
+  .pdf-footer{margin-top:24pt;padding-top:10pt;border-top:1pt solid var(--line);font-family:'JetBrains Mono',monospace;font-size:8pt;color:var(--ink3);text-align:center;letter-spacing:.04em;}
+  @page{margin:20mm 16mm 18mm 16mm;}
+  @media print{
+    html,body{background:#fff;}
+    .pdf-wrap{padding:0;}
+    .no-print{display:none;}
+    h2{break-after:avoid;}
+  }
+  .print-btn{position:fixed;top:14pt;right:14pt;background:var(--accent);color:#fff;border:none;border-radius:6pt;padding:8pt 14pt;font-family:'DM Sans',sans-serif;font-size:11pt;font-weight:700;cursor:pointer;box-shadow:0 4pt 12pt rgba(0,168,112,0.3);}
+</style>
+</head><body>
+<button class="print-btn no-print" onclick="window.print()">📄 Print / Save as PDF</button>
+<div class="pdf-wrap">
+  <div class="pdf-head">
+    <div>
+      <div class="pdf-app">HORIZON FINANCE OS · DEEP DIVE</div>
+      <div class="pdf-title">${titleEsc}</div>
+    </div>
+    <div class="pdf-meta">
+      <strong>${esc2(dateStr)}</strong><br>
+      ${esc2(timeStr)}<br>
+      ${cz ? `<strong>For:</strong> ${esc2(cz.name)} citizen` : ''}<br>
+      ${hb ? `<strong>From:</strong> ${esc2(hb.name)}` : ''}
+    </div>
+  </div>
+  ${bodyHtml}
+  <div class="pdf-footer">
+    Generated by Horizon Finance OS · ${esc2(dateStr)} · AI-generated analysis, not financial or legal advice
+  </div>
+</div>
+${'<'}script>window.addEventListener('load', () => setTimeout(() => window.print(), 300));${'<'}/script>
+</body></html>`;
+  const w = window.open('', '_blank');
+  if(!w){
+    alert('Pop-up blocked. Allow pop-ups for this site and try again.');
+    return;
+  }
+  w.document.open();
+  w.document.write(doc);
+  w.document.close();
+};
 
 // ══ EXPORT / IMPORT ══════════════════════════════════════════════════════════
 // Each slice knows how to extract + restore its own subset of state so
@@ -4947,6 +5575,19 @@ function clearAIChat(){
   renderAIPChips();
 }
 
+// Returns a reusable "Personal Context" block describing the user's
+// citizenship and current home base, suitable for injection into any AI
+// prompt in the app. When either field is missing the function returns
+// an empty string so prompts stay valid during onboarding.
+function buildPersonalContext(){
+  const cz = countryInfo(state.citizenship);
+  const hb = countryInfo(state.homeBase);
+  if(!cz || !hb) return '';
+  return `PERSONAL CONTEXT (use this to personalise every answer — tax, pensions, visas, residency, cost of living, currency):
+- Citizenship: ${cz.name} (${cz.code}) — evaluate passport strength, visa reciprocity, tax treaties, and pension portability based on this nationality.
+- Current home base: ${hb.name} (${hb.code}) — use this as the baseline for comparisons, assume the user currently files taxes here, and reference this country's cost of living / healthcare / rules when drawing contrasts.`;
+}
+
 function buildAIContext() {
   const nums=getRetirementNumbers();
   const months=get12Months(); const cm=months[0];
@@ -4959,7 +5600,10 @@ function buildAIContext() {
   const modeInstruction = mode === 'simple'
     ? `RESPONSE STYLE: SIMPLE. Explain like you're talking to a smart friend who is new to personal finance. Avoid jargon (or define it in 4–6 words when unavoidable). Short sentences. No bullet soup; write in plain paragraphs. Skip hedging. Use at most one number per idea and round generously. If the user asks something technical, answer it in everyday language first, then add ONE optional sentence of detail at the end.`
     : `RESPONSE STYLE: EXPERT. The user is financially literate. Use domain vocabulary (sequence-of-returns risk, real vs nominal, withdrawal rate, tax drag, basis points) without over-explaining. Be direct, reference specific numbers from their snapshot, and quote percentages to one decimal. Prefer a short narrative plus a bulleted breakdown. Call out assumptions you're making.`;
+  const ctx = buildPersonalContext();
   return `You are HORIZON AI — a personal finance and life planning assistant embedded in Horizon Finance OS.
+
+${ctx}
 
 CURRENT VIEW: The user is looking at the "${viewLabel}" panel${section}. Tailor your answer to what's visible on this screen first, then zoom out if helpful.
 
@@ -5074,7 +5718,15 @@ applyTheme();
   const {panel, section} = parseHash();
   if(panel) { state.activePanel = panel; if(section) state.activeSection = section; }
 })();
+// Onboarding gate on first load — if citizenship or home base is missing,
+// force the user into Settings and show the blocking modal.
+if(typeof onboardingComplete === 'function' && !onboardingComplete()) {
+  state.activePanel = 'settings';
+}
 renderAll();
+if(typeof onboardingComplete === 'function' && !onboardingComplete()) {
+  showOnboardingBlock();
+}
 if(state.activeSection) setTimeout(()=>pulseSection(state.activeSection), 200);
 
 // Keep Leaflet tiles correct after layout changes, and re-render active panel
@@ -5109,48 +5761,9 @@ let piq_currentResult = null;
 let piq_lastQuery = '';
 let piq_progressTimer = null;
 
-// ─── COUNTRY DATA ───────────────────────────────────────────────────────────
-// Full ISO 3166-1 alpha-2 list. Names come from Intl.DisplayNames at runtime
-// so we don't ship a 250-name string table. Currency codes are mapped here
-// because Intl doesn't expose them.
-const PIQ_COUNTRY_CODES = [
-  'AF','AL','DZ','AD','AO','AG','AR','AM','AU','AT','AZ','BS','BH','BD','BB',
-  'BY','BE','BZ','BJ','BT','BO','BA','BW','BR','BN','BG','BF','BI','CV','KH',
-  'CM','CA','KY','CF','TD','CL','CN','CO','KM','CG','CD','CR','CI','HR','CU',
-  'CY','CZ','DK','DJ','DM','DO','EC','EG','SV','GQ','ER','EE','SZ','ET','FJ',
-  'FI','FR','GA','GM','GE','DE','GH','GR','GD','GT','GN','GW','GY','HT','HN',
-  'HK','HU','IS','IN','ID','IR','IQ','IE','IL','IT','JM','JP','JO','KZ','KE',
-  'KI','KW','KG','LA','LV','LB','LS','LR','LY','LI','LT','LU','MO','MG','MW',
-  'MY','MV','ML','MT','MH','MR','MU','MX','FM','MD','MC','MN','ME','MA','MZ',
-  'MM','NA','NR','NP','NL','NZ','NI','NE','NG','KP','MK','NO','OM','PK','PW',
-  'PS','PA','PG','PY','PE','PH','PL','PT','PR','QA','RO','RU','RW','KN','LC',
-  'VC','WS','SM','ST','SA','SN','RS','SC','SL','SG','SK','SI','SB','SO','ZA',
-  'KR','SS','ES','LK','SD','SR','SE','CH','SY','TW','TJ','TZ','TH','TL','TG',
-  'TO','TT','TN','TR','TM','TV','UG','UA','AE','GB','US','UY','UZ','VU','VA',
-  'VE','VN','YE','ZM','ZW'
-];
-const PIQ_COUNTRY_CURRENCY = {
-  AF:'AFN',AL:'ALL',DZ:'DZD',AD:'EUR',AO:'AOA',AG:'XCD',AR:'ARS',AM:'AMD',AU:'AUD',AT:'EUR',
-  AZ:'AZN',BS:'BSD',BH:'BHD',BD:'BDT',BB:'BBD',BY:'BYN',BE:'EUR',BZ:'BZD',BJ:'XOF',BT:'BTN',
-  BO:'BOB',BA:'BAM',BW:'BWP',BR:'BRL',BN:'BND',BG:'BGN',BF:'XOF',BI:'BIF',CV:'CVE',KH:'KHR',
-  CM:'XAF',CA:'CAD',KY:'KYD',CF:'XAF',TD:'XAF',CL:'CLP',CN:'CNY',CO:'COP',KM:'KMF',CG:'XAF',
-  CD:'CDF',CR:'CRC',CI:'XOF',HR:'EUR',CU:'CUP',CY:'EUR',CZ:'CZK',DK:'DKK',DJ:'DJF',DM:'XCD',
-  DO:'DOP',EC:'USD',EG:'EGP',SV:'USD',GQ:'XAF',ER:'ERN',EE:'EUR',SZ:'SZL',ET:'ETB',FJ:'FJD',
-  FI:'EUR',FR:'EUR',GA:'XAF',GM:'GMD',GE:'GEL',DE:'EUR',GH:'GHS',GR:'EUR',GD:'XCD',GT:'GTQ',
-  GN:'GNF',GW:'XOF',GY:'GYD',HT:'HTG',HN:'HNL',HK:'HKD',HU:'HUF',IS:'ISK',IN:'INR',ID:'IDR',
-  IR:'IRR',IQ:'IQD',IE:'EUR',IL:'ILS',IT:'EUR',JM:'JMD',JP:'JPY',JO:'JOD',KZ:'KZT',KE:'KES',
-  KI:'AUD',KW:'KWD',KG:'KGS',LA:'LAK',LV:'EUR',LB:'LBP',LS:'LSL',LR:'LRD',LY:'LYD',LI:'CHF',
-  LT:'EUR',LU:'EUR',MO:'MOP',MG:'MGA',MW:'MWK',MY:'MYR',MV:'MVR',ML:'XOF',MT:'EUR',MH:'USD',
-  MR:'MRU',MU:'MUR',MX:'MXN',FM:'USD',MD:'MDL',MC:'EUR',MN:'MNT',ME:'EUR',MA:'MAD',MZ:'MZN',
-  MM:'MMK',NA:'NAD',NR:'AUD',NP:'NPR',NL:'EUR',NZ:'NZD',NI:'NIO',NE:'XOF',NG:'NGN',KP:'KPW',
-  MK:'MKD',NO:'NOK',OM:'OMR',PK:'PKR',PW:'USD',PS:'ILS',PA:'PAB',PG:'PGK',PY:'PYG',PE:'PEN',
-  PH:'PHP',PL:'PLN',PT:'EUR',PR:'USD',QA:'QAR',RO:'RON',RU:'RUB',RW:'RWF',KN:'XCD',LC:'XCD',
-  VC:'XCD',WS:'WST',SM:'EUR',ST:'STN',SA:'SAR',SN:'XOF',RS:'RSD',SC:'SCR',SL:'SLE',SG:'SGD',
-  SK:'EUR',SI:'EUR',SB:'SBD',SO:'SOS',ZA:'ZAR',KR:'KRW',SS:'SSP',ES:'EUR',LK:'LKR',SD:'SDG',
-  SR:'SRD',SE:'SEK',CH:'CHF',SY:'SYP',TW:'TWD',TJ:'TJS',TZ:'TZS',TH:'THB',TL:'USD',TG:'XOF',
-  TO:'TOP',TT:'TTD',TN:'TND',TR:'TRY',TM:'TMT',TV:'AUD',UG:'UGX',UA:'UAH',AE:'AED',GB:'GBP',
-  US:'USD',UY:'UYU',UZ:'UZS',VU:'VUV',VA:'EUR',VE:'VES',VN:'VND',YE:'YER',ZM:'ZMW',ZW:'ZWL'
-};
+// PIQ uses the shared COUNTRY_CODES + COUNTRY_CURRENCY + countryList()
+// helpers defined in the main script (for re-use by Settings citizenship +
+// home base dropdowns). Nothing to declare here.
 // Curated major-cities / popular-districts per country for the quick-select
 // chip row. Countries not in this map get a generic "Capital · Downtown…"
 // fallback derived from the country name.
@@ -5207,24 +5820,9 @@ const PIQ_COUNTRY_CITIES = {
 // Generic fallback chips for any country not in the map above.
 const PIQ_CITIES_FALLBACK = ['Capital district','Downtown','Waterfront','Suburbs','Beachfront','Old town','Financial district','Luxury district'];
 
-// Country list with Intl.DisplayNames → used by the dropdown. Built lazily
-// because Intl.DisplayNames is a browser-only API.
-let _piqCountryList = null;
-function piqCountryList(){
-  if(_piqCountryList) return _piqCountryList;
-  let dn;
-  try { dn = new Intl.DisplayNames(['en'], {type:'region'}); } catch(e) {}
-  _piqCountryList = PIQ_COUNTRY_CODES.map(code => {
-    const name = dn ? (dn.of(code) || code) : code;
-    return {
-      code,
-      name,
-      flag: typeof _ccFlag === 'function' ? _ccFlag(code) : '🌍',
-      currency: PIQ_COUNTRY_CURRENCY[code] || 'USD',
-    };
-  }).sort((a, b) => a.name.localeCompare(b.name));
-  return _piqCountryList;
-}
+// Thin alias over the shared main-script helper so the rest of PIQ can
+// keep using the old name.
+function piqCountryList(){ return countryList(); }
 
 // Build a PIQ market config for an arbitrary ISO2 country code. This
 // replaces the old hardcoded PIQ_MC ke/se table so the feature works with
