@@ -617,5 +617,599 @@ function calcFunFund(monthKey) {
 }
 </script>
 
+<script>
+// ═══════════════════════════════════════════════════════════════════
+// MONEY OS — PANEL RENDER FUNCTIONS
+// ═══════════════════════════════════════════════════════════════════
+
+let charts = {};
+let vacMap = null, retMap = null;
+
+// ── helpers ──
+function fmt(n) {
+  const sym = CSYM[state.currency] || 'kr';
+  if (Math.abs(n) >= 1e6) return sym + ' ' + (n / 1e6).toFixed(1) + 'M';
+  if (Math.abs(n) >= 1e3) return sym + ' ' + Math.round(n).toLocaleString('sv-SE');
+  return sym + ' ' + Math.round(n);
+}
+function pct(n) { return (Math.round(n * 10) / 10) + '%'; }
+function uid() { return '_' + Math.random().toString(36).slice(2, 9); }
+function el(id) { return document.getElementById(id); }
+
+// ─────────────────────────────────────────────────────────────────
+// renderDashboard
+// ─────────────────────────────────────────────────────────────────
+function renderDashboard() {
+  const inc = calcIncome();
+  const exp = calcExpenses();
+  const sav = calcSavings();
+  const cf = calcCashFlow();
+  const nw = calcNetWorth();
+  const egg = calcNestEgg();
+  const ret = calcRetirement();
+
+  // KPI grid
+  const kpi = el('dash-kpis');
+  if (kpi) kpi.innerHTML =
+    `<div class="kpi"><div class="kpi-label">Income</div><div class="kpi-value">${fmt(inc.total)}</div></div>` +
+    `<div class="kpi"><div class="kpi-label">Expenses</div><div class="kpi-value">${fmt(exp.total)}</div></div>` +
+    `<div class="kpi"><div class="kpi-label">Surplus</div><div class="kpi-value ${sav.surplus >= 0 ? 'positive' : 'negative'}">${fmt(sav.surplus)}</div></div>` +
+    `<div class="kpi"><div class="kpi-label">Net Worth</div><div class="kpi-value">${fmt(nw.netWorth)}</div></div>` +
+    `<div class="kpi"><div class="kpi-label">Savings Rate</div><div class="kpi-value">${pct(sav.savingsRate)}</div></div>` +
+    `<div class="kpi"><div class="kpi-label">Fun Fund</div><div class="kpi-value">${fmt(sav.funFund)}</div></div>`;
+
+  // Cash flow summary
+  const cfSummary = el('dash-cf-summary');
+  if (cfSummary) {
+    const mode = cfSummary.dataset.mode || 'month';
+    if (mode === 'month') {
+      cfSummary.innerHTML =
+        `<div class="cf-row"><span>Income</span><span>${fmt(inc.total)}</span></div>` +
+        `<div class="cf-row"><span>Expenses</span><span>${fmt(exp.total)}</span></div>` +
+        `<div class="cf-row total"><span>Surplus</span><span>${fmt(sav.surplus)}</span></div>`;
+    } else {
+      cfSummary.innerHTML =
+        `<div class="cf-row"><span>Avg Income</span><span>${fmt(cf.avgIncome)}</span></div>` +
+        `<div class="cf-row"><span>Avg Expenses</span><span>${fmt(cf.avgExpenses)}</span></div>` +
+        `<div class="cf-row total"><span>Avg Surplus</span><span>${fmt(cf.avgSurplus)}</span></div>`;
+    }
+  }
+
+  // Savings chart (Chart.js)
+  const savCanvas = el('dash-savings-chart');
+  if (savCanvas) {
+    if (charts.dashSav) charts.dashSav.destroy();
+    charts.dashSav = new Chart(savCanvas.getContext('2d'), {
+      type: 'bar',
+      data: {
+        labels: cf.months.map(m => m.label),
+        datasets: [
+          { label: 'Income', data: cf.months.map(m => m.income), backgroundColor: '#00e8a0' },
+          { label: 'Expenses', data: cf.months.map(m => m.expenses), backgroundColor: '#ff4d6d' }
+        ]
+      },
+      options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { labels: { color: '#aaa' } } }, scales: { x: { ticks: { color: '#888' } }, y: { ticks: { color: '#888' } } } }
+    });
+  }
+
+  // Nest egg milestones
+  const milestones = el('dash-milestones');
+  if (milestones) {
+    const final = egg.finalNominal;
+    const targets = [1e6, 5e6, 10e6, 20e6, 50e6];
+    milestones.innerHTML = targets.map(t => {
+      const p = Math.min(100, (final / t) * 100);
+      return `<div class="milestone"><div class="milestone-label">${fmt(t)}</div><div class="milestone-bar"><div class="milestone-fill" style="width:${p}%"></div></div><div class="milestone-pct">${pct(p)}</div></div>`;
+    }).join('');
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────
+// renderCashFlow
+// ─────────────────────────────────────────────────────────────────
+function renderCashFlow() {
+  const inc = calcIncome();
+  const exp = calcExpenses();
+  const sav = calcSavings();
+  const cf = calcCashFlow();
+
+  // Month strip
+  const strip = el('cf-month-strip');
+  if (strip) {
+    strip.innerHTML = cf.months.map(m =>
+      `<div class="month-chip${m.month === state.selectedMonth ? ' active' : ''}" onclick="state.selectedMonth='${m.month}';saveState();renderCashFlow()">${m.label.split(' ')[0]}</div>`
+    ).join('');
+  }
+
+  // Income line items
+  const incList = el('cf-income-list');
+  if (incList) {
+    incList.innerHTML = inc.items.map((it, idx) =>
+      `<div class="line-item">` +
+        `<input type="checkbox" ${it.paid ? 'checked' : ''} onchange="togglePaid('income',${idx},this.checked)">` +
+        `<input class="li-name" value="${it.name}" onchange="updateLineItem('income',${idx},'name',this.value)">` +
+        `<input class="li-amount" type="number" value="${it.amount}" onchange="updateLineItem('income',${idx},'amount',+this.value)">` +
+        `<button class="li-remove" onclick="removeLineItem('income',${idx})">✕</button>` +
+      `</div>`
+    ).join('');
+  }
+
+  const addInc = el('cf-add-income');
+  if (addInc) addInc.onclick = () => { state.income.push({ id: uid(), name: 'New Income', amount: 0, paid: false }); saveState(); renderCashFlow(); };
+
+  // Expense line items
+  const expList = el('cf-expense-list');
+  if (expList) {
+    expList.innerHTML = exp.items.map((it, idx) =>
+      `<div class="line-item${it.paid ? ' paid' : ''}">` +
+        `<input type="checkbox" ${it.paid ? 'checked' : ''} onchange="togglePaid('expenses',${idx},this.checked)">` +
+        `<input class="li-name" value="${it.name}" onchange="updateLineItem('expenses',${idx},'name',this.value)">` +
+        `<input class="li-amount" type="number" value="${it.amount}" onchange="updateLineItem('expenses',${idx},'amount',+this.value)">` +
+        `<button class="li-remove" onclick="removeLineItem('expenses',${idx})">✕</button>` +
+      `</div>`
+    ).join('');
+  }
+
+  const addExp = el('cf-add-expense');
+  if (addExp) addExp.onclick = () => { state.expenses.push({ id: uid(), name: 'New Expense', amount: 0, paid: false }); saveState(); renderCashFlow(); };
+
+  // Savings allocation slider
+  const savSlider = el('cf-savings-slider');
+  if (savSlider) {
+    savSlider.innerHTML =
+      `<div class="sav-control"><label>Monthly Savings Target</label>` +
+      `<input type="range" min="0" max="${Math.max(inc.total, 100000)}" value="${sav.baseSavings}" oninput="state.baseSavings=+this.value;saveState();renderCashFlow()">` +
+      `<span class="sav-val">${fmt(sav.baseSavings)}</span></div>` +
+      `<div class="sav-split">` +
+        `<div class="split-item"><span class="split-label">Emergency</span><span>${fmt(sav.allocation.emergency)}</span></div>` +
+        `<div class="split-item"><span class="split-label">Nest Egg</span><span>${fmt(sav.allocation.nestEgg)}</span></div>` +
+        `<div class="split-item"><span class="split-label">Fun Fund</span><span>${fmt(sav.allocation.funFund)}</span></div>` +
+      `</div>`;
+  }
+
+  // 12-month breakdown table
+  const cfTable = el('cf-table');
+  if (cfTable) {
+    cfTable.innerHTML =
+      `<table class="dt"><thead><tr><th>Month</th><th>Income</th><th>Expenses</th><th>Surplus</th><th>Cumulative</th></tr></thead><tbody>` +
+      cf.months.map(m =>
+        `<tr class="${m.month === state.selectedMonth ? 'active-row' : ''}"><td>${m.label}</td><td>${fmt(m.income)}</td><td>${fmt(m.expenses)}</td><td class="${m.surplus >= 0 ? 'positive' : 'negative'}">${fmt(m.surplus)}</td><td>${fmt(m.cumSavings)}</td></tr>`
+      ).join('') +
+      `</tbody></table>`;
+  }
+}
+
+// line item mutation helpers (minimal side effects: mutate state, save, re-render)
+function togglePaid(type, idx, val) { state[type][idx].paid = val; saveState(); renderCashFlow(); if (currentPanel === 'dashboard') renderDashboard(); }
+function updateLineItem(type, idx, field, val) { state[type][idx][field] = val; saveState(); renderCashFlow(); }
+function removeLineItem(type, idx) { state[type].splice(idx, 1); saveState(); renderCashFlow(); }
+
+// ─────────────────────────────────────────────────────────────────
+// renderNetWorth
+// ─────────────────────────────────────────────────────────────────
+function renderNetWorth() {
+  const nw = calcNetWorth();
+  const egg = calcNestEgg();
+
+  // KPI row
+  const kpiRow = el('nw-kpis');
+  if (kpiRow) kpiRow.innerHTML =
+    `<div class="kpi"><div class="kpi-label">Total Assets</div><div class="kpi-value">${fmt(nw.assets.total)}</div></div>` +
+    `<div class="kpi"><div class="kpi-label">Total Liabilities</div><div class="kpi-value negative">${fmt(nw.liabilities.total)}</div></div>` +
+    `<div class="kpi"><div class="kpi-label">Net Worth</div><div class="kpi-value ${nw.netWorth >= 0 ? 'positive' : 'negative'}">${fmt(nw.netWorth)}</div></div>`;
+
+  // Assets card list
+  const assetList = el('nw-assets');
+  if (assetList) {
+    let html = nw.assets.investments.items.map(a =>
+      `<div class="nw-card"><div class="nw-card-name">${a.name}</div><div class="nw-card-val">${fmt(a.value)}</div></div>`
+    ).join('');
+    if (nw.assets.property > 0) html += `<div class="nw-card"><div class="nw-card-name">Property</div><div class="nw-card-val">${fmt(nw.assets.property)}</div></div>`;
+    assetList.innerHTML = html;
+  }
+
+  // Liabilities card list
+  const liabList = el('nw-liabilities');
+  if (liabList) {
+    let html = '';
+    if (nw.liabilities.mortgage > 0) html += `<div class="nw-card"><div class="nw-card-name">Mortgage</div><div class="nw-card-val negative">${fmt(nw.liabilities.mortgage)}</div></div>`;
+    if (nw.liabilities.otherDebt > 0) html += `<div class="nw-card"><div class="nw-card-name">Other Debt</div><div class="nw-card-val negative">${fmt(nw.liabilities.otherDebt)}</div></div>`;
+    liabList.innerHTML = html || '<div class="nw-card"><div class="nw-card-name">No liabilities</div></div>';
+  }
+
+  // Net worth projection chart
+  const nwCanvas = el('nw-projection-chart');
+  if (nwCanvas) {
+    if (charts.nwProj) charts.nwProj.destroy();
+    charts.nwProj = new Chart(nwCanvas.getContext('2d'), {
+      type: 'line',
+      data: {
+        labels: egg.grandTotal.map(p => 'Year ' + p.year),
+        datasets: [
+          { label: 'Nominal', data: egg.grandTotal.map(p => p.nominal), borderColor: '#00e8a0', backgroundColor: 'rgba(0,232,160,0.1)', fill: true, tension: 0.3 },
+          { label: 'Real (inflation-adj)', data: egg.grandTotal.map(p => p.real), borderColor: '#4d8fff', backgroundColor: 'rgba(77,143,255,0.1)', fill: true, tension: 0.3 }
+        ]
+      },
+      options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { labels: { color: '#aaa' } } }, scales: { x: { ticks: { color: '#888', maxTicksLimit: 10 } }, y: { ticks: { color: '#888', callback: v => fmt(v) } } } }
+    });
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────
+// renderAssets
+// ─────────────────────────────────────────────────────────────────
+function renderAssets() {
+  const egg = calcNestEgg();
+
+  // Portfolio vehicle rows
+  const list = el('assets-list');
+  if (list) {
+    list.innerHTML = (state.externalAssets || []).map((a, idx) =>
+      `<div class="asset-row">` +
+        `<input class="li-name" value="${a.name}" onchange="state.externalAssets[${idx}].name=this.value;saveState();renderAssets()">` +
+        `<div class="asset-field"><label>Balance</label><input type="number" value="${a.balance}" onchange="state.externalAssets[${idx}].balance=+this.value;saveState();renderAssets()"></div>` +
+        `<div class="asset-field"><label>Growth %</label><input type="number" value="${a.growthRate}" step="0.1" onchange="state.externalAssets[${idx}].growthRate=+this.value;saveState();renderAssets()"></div>` +
+        `<div class="asset-field"><label>Monthly +</label><input type="number" value="${a.monthlyContribution}" onchange="state.externalAssets[${idx}].monthlyContribution=+this.value;saveState();renderAssets()"></div>` +
+        `<button class="li-remove" onclick="state.externalAssets.splice(${idx},1);saveState();renderAssets()">✕</button>` +
+      `</div>`
+    ).join('');
+  }
+
+  const addBtn = el('assets-add');
+  if (addBtn) addBtn.onclick = () => {
+    state.externalAssets.push({ id: uid(), name: 'New Asset', balance: 0, growthRate: state.growthRate, monthlyContribution: 0 });
+    saveState(); renderAssets();
+  };
+
+  // Real/nominal toggle
+  const toggleEl = el('assets-real-toggle');
+  if (toggleEl) {
+    toggleEl.innerHTML =
+      `<button class="itab${!state.nestEggReal ? ' active' : ''}" onclick="state.nestEggReal=false;saveState();renderAssets()">Nominal</button>` +
+      `<button class="itab${state.nestEggReal ? ' active' : ''}" onclick="state.nestEggReal=true;saveState();renderAssets()">Real</button>`;
+  }
+
+  // Summary KPIs
+  const assetKpis = el('assets-kpis');
+  if (assetKpis) {
+    const final = state.nestEggReal ? egg.finalReal : egg.finalNominal;
+    const totalBal = (state.externalAssets || []).reduce((s, a) => s + a.balance, 0);
+    assetKpis.innerHTML =
+      `<div class="kpi"><div class="kpi-label">Current Portfolio</div><div class="kpi-value">${fmt(totalBal)}</div></div>` +
+      `<div class="kpi"><div class="kpi-label">Nest Egg (${egg.years}y)</div><div class="kpi-value">${fmt(final)}</div></div>`;
+  }
+
+  // Nest egg growth chart
+  const eggCanvas = el('assets-egg-chart');
+  if (eggCanvas) {
+    if (charts.egg) charts.egg.destroy();
+    const useReal = state.nestEggReal;
+    const datasets = egg.assetProjections.map((ap, i) => ({
+      label: ap.name,
+      data: ap.timeline.map(p => useReal ? p.real : p.nominal),
+      borderColor: ['#00e8a0', '#4d8fff', '#f5a623', '#ec4899', '#8b5cf6'][i % 5],
+      fill: false,
+      tension: 0.3
+    }));
+    datasets.push({
+      label: 'Monthly Savings',
+      data: egg.savingsTimeline.map(p => useReal ? p.real : p.nominal),
+      borderColor: '#aaa',
+      borderDash: [5, 3],
+      fill: false,
+      tension: 0.3
+    });
+    charts.egg = new Chart(eggCanvas.getContext('2d'), {
+      type: 'line',
+      data: { labels: egg.grandTotal.map(p => p.year), datasets },
+      options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { labels: { color: '#aaa' } } }, scales: { x: { title: { display: true, text: 'Years', color: '#888' }, ticks: { color: '#888' } }, y: { ticks: { color: '#888', callback: v => fmt(v) } } } }
+    });
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────
+// renderFunFund (vacation panel)
+// ─────────────────────────────────────────────────────────────────
+function renderFunFund() {
+  const ff = calcFunFund();
+
+  // Tier grid
+  const tierGrid = el('vac-tier-grid');
+  if (tierGrid) {
+    tierGrid.innerHTML = ff.tiers.map(t =>
+      `<div class="tier-card${t.affordable ? ' affordable' : ''}">` +
+        `<div class="tier-name">${t.name}</div>` +
+        `<div class="tier-amount">${fmt(t.amount)}</div>` +
+        `<div class="tier-status">${t.affordable ? '✓ Affordable' : t.monthsToReach === Infinity ? 'Not yet' : t.monthsToReach + ' mo'}</div>` +
+      `</div>`
+    ).join('');
+  }
+
+  // Fund timeline bars
+  const timeline = el('vac-timeline');
+  if (timeline) {
+    const maxTier = ff.tiers[ff.tiers.length - 1].amount;
+    timeline.innerHTML = ff.tiers.map(t => {
+      const w = Math.min(100, (ff.balance / t.amount) * 100);
+      return `<div class="timeline-row"><span class="tl-label">${t.name}</span><div class="tl-bar"><div class="tl-fill${t.affordable ? ' full' : ''}" style="width:${w}%"></div></div></div>`;
+    }).join('');
+  }
+
+  // Saved trips list
+  const tripList = el('vac-trips');
+  if (tripList) {
+    if (state.savedTrips.length === 0) {
+      tripList.innerHTML = '<div class="empty-sub">No saved trips yet. Pick a destination below!</div>';
+    } else {
+      tripList.innerHTML = state.savedTrips.map((t, idx) =>
+        `<div class="trip-card"><div class="trip-dest">${t.flag || ''} ${t.dest}</div><div class="trip-cost">${t.cost || ''}</div><button class="li-remove" onclick="state.savedTrips.splice(${idx},1);saveState();renderFunFund()">✕</button></div>`
+      ).join('');
+    }
+  }
+
+  // Destination pulse grid with filters
+  const pulseGrid = el('vac-pulse-grid');
+  if (pulseGrid) {
+    const filter = pulseGrid.dataset.filter || '';
+    const dests = filter ? PULSE_DESTS.filter(d => d.vibe === filter) : PULSE_DESTS;
+    const vibes = [...new Set(PULSE_DESTS.map(d => d.vibe))];
+    let html = `<div class="pulse-filters"><button class="pfilt${!filter ? ' active' : ''}" onclick="el('vac-pulse-grid').dataset.filter='';renderFunFund()">All</button>`;
+    html += vibes.map(v => `<button class="pfilt${filter === v ? ' active' : ''}" onclick="el('vac-pulse-grid').dataset.filter='${v}';renderFunFund()">${v}</button>`).join('');
+    html += '</div><div class="pulse-cards">';
+    html += dests.map(d =>
+      `<div class="pulse-card" style="border-left:3px solid ${d.col}">` +
+        `<div class="pulse-flag">${d.flag}</div>` +
+        `<div class="pulse-info"><div class="pulse-dest">${d.dest}</div><div class="pulse-why">${d.why}</div><div class="pulse-cost">${d.cost}</div></div>` +
+        `<button class="btn-sm" onclick="state.savedTrips.push({dest:'${d.dest}',flag:'${d.flag}',cost:'${d.cost}'});saveState();renderFunFund()">+ Save</button>` +
+      `</div>`
+    ).join('');
+    html += '</div>';
+    pulseGrid.innerHTML = html;
+  }
+
+  // Leaflet map markers
+  const mapEl = el('vac-map');
+  if (mapEl && typeof L !== 'undefined') {
+    if (!vacMap) {
+      vacMap = L.map(mapEl).setView([20, 20], 2);
+      L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', { attribution: '© CartoDB' }).addTo(vacMap);
+    }
+    vacMap.eachLayer(l => { if (l instanceof L.Marker) vacMap.removeLayer(l); });
+    PULSE_DESTS.forEach(d => {
+      L.marker([d.lat, d.lng]).addTo(vacMap).bindPopup(`<b>${d.flag} ${d.dest}</b><br>${d.why}<br>${d.cost}`);
+    });
+    setTimeout(() => vacMap.invalidateSize(), 200);
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────
+// renderRetire
+// ─────────────────────────────────────────────────────────────────
+function renderRetire() {
+  const ret = calcRetirement();
+  const egg = calcNestEgg();
+
+  // Scenario cards
+  const scenarios = el('ret-scenarios');
+  if (scenarios) {
+    const ages = [55, 60, 65, 69, 75];
+    scenarios.innerHTML = ages.map(age => {
+      const ytr = age - state.currentAge;
+      if (ytr <= 0) return '';
+      const e = calcNestEgg(ytr);
+      const final = state.nestEggReal ? e.finalReal : e.finalNominal;
+      return `<div class="scenario-card${age === state.retirementAge ? ' active' : ''}" onclick="state.retirementAge=${age};saveState();renderRetire()">` +
+        `<div class="sc-age">Age ${age}</div><div class="sc-egg">${fmt(final)}</div><div class="sc-years">${ytr} years</div></div>`;
+    }).join('');
+  }
+
+  // Swedish pension inputs
+  const penInputs = el('ret-pension-inputs');
+  if (penInputs) {
+    penInputs.innerHTML =
+      `<div class="pen-field"><label>Allmän Pension (monthly)</label><input type="number" value="${state.penAllman}" onchange="state.penAllman=+this.value;saveState();renderRetire()"></div>` +
+      `<div class="pen-field"><label>ITP / Tjänstepension</label><input type="number" value="${state.penITP}" onchange="state.penITP=+this.value;saveState();renderRetire()"></div>` +
+      `<div class="pen-field"><label>Other Pension</label><input type="number" value="${state.penOther}" onchange="state.penOther=+this.value;saveState();renderRetire()"></div>`;
+  }
+
+  // Retirement KPIs
+  const retKpis = el('ret-kpis');
+  if (retKpis) retKpis.innerHTML =
+    `<div class="kpi"><div class="kpi-label">Monthly Pension</div><div class="kpi-value">${fmt(ret.pension.monthlyTotal)}</div></div>` +
+    `<div class="kpi"><div class="kpi-label">Nest Egg at Ret.</div><div class="kpi-value">${fmt(ret.nestEggAtRetirement)}</div></div>` +
+    `<div class="kpi"><div class="kpi-label">Monthly Drawdown</div><div class="kpi-value">${fmt(ret.monthlyDrawdownAfterTax)}</div></div>` +
+    `<div class="kpi"><div class="kpi-label">Total Ret. Income</div><div class="kpi-value">${fmt(ret.monthlyRetirementIncome)}</div></div>` +
+    `<div class="kpi"><div class="kpi-label">FIRE Number</div><div class="kpi-value">${fmt(ret.fireNumber)}</div></div>` +
+    `<div class="kpi"><div class="kpi-label">Gap</div><div class="kpi-value ${ret.onTrack ? 'positive' : 'negative'}">${ret.onTrack ? '✓ On track' : fmt(ret.gap) + '/mo'}</div></div>`;
+
+  // Dream chip selector
+  const dreamChips = el('ret-dream-chips');
+  if (dreamChips) {
+    dreamChips.innerHTML = DREAM_TYPES.map(d =>
+      `<button class="dream-chip${(state.selectedDreams || []).includes(d.id) ? ' active' : ''}" onclick="toggleDream('${d.id}')">${d.icon} ${d.name}</button>`
+    ).join('');
+  }
+
+  // Expense model rows
+  const expModels = el('ret-exp-models');
+  if (expModels) {
+    expModels.innerHTML = Object.entries(RET_EXP_MODELS).map(([k, v]) => {
+      const total = Object.values(v).reduce((s, n) => s + n, 0);
+      return `<div class="exp-model-row"><div class="em-tier">${k.charAt(0).toUpperCase() + k.slice(1)}</div>` +
+        Object.entries(v).map(([cat, amt]) => `<div class="em-cell"><div class="em-cat">${cat}</div><div class="em-amt">${fmt(amt)}</div></div>`).join('') +
+        `<div class="em-total">${fmt(total)}/mo</div></div>`;
+    }).join('');
+  }
+
+  // Destination cards
+  const destCards = el('ret-dest-cards');
+  if (destCards) {
+    destCards.innerHTML = RET_DESTS.map(d =>
+      `<div class="dest-card${state.selectedRetDest === d.name ? ' active' : ''}" onclick="state.selectedRetDest='${d.name}';saveState();renderRetire()">` +
+        `<div class="dc-flag">${d.flag}</div><div class="dc-name">${d.name}</div><div class="dc-country">${d.country}</div>` +
+        `<div class="dc-cost">${fmt(d.costK * 1000)}/mo</div>` +
+        `<div class="dc-tags">${d.tl.map(t => '<span class="dc-tag">' + t + '</span>').join('')}</div>` +
+      `</div>`
+    ).join('');
+  }
+
+  // Leaflet world map
+  const retMapEl = el('ret-map');
+  if (retMapEl && typeof L !== 'undefined') {
+    if (!retMap) {
+      retMap = L.map(retMapEl).setView([25, 10], 2);
+      L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', { attribution: '© CartoDB' }).addTo(retMap);
+    }
+    retMap.eachLayer(l => { if (l instanceof L.Marker) retMap.removeLayer(l); });
+    RET_DESTS.forEach(d => {
+      const marker = L.marker([d.lat, d.lng]).addTo(retMap)
+        .bindPopup(`<b>${d.flag} ${d.name}</b><br>${d.country}<br>${fmt(d.costK * 1000)}/mo`);
+      if (state.selectedRetDest === d.name) marker.openPopup();
+    });
+    setTimeout(() => retMap.invalidateSize(), 200);
+  }
+
+  // APEX terminal output area
+  const apex = el('ret-apex-terminal');
+  if (apex && !apex.dataset.init) {
+    apex.dataset.init = '1';
+    apex.innerHTML = '<div class="apex-line">APEX RETIREMENT PLANNER v2.0</div><div class="apex-line">Ready. Type a retirement scenario or question.</div>';
+  }
+}
+
+function toggleDream(id) {
+  const arr = state.selectedDreams || [];
+  const idx = arr.indexOf(id);
+  if (idx >= 0) arr.splice(idx, 1); else arr.push(id);
+  state.selectedDreams = arr;
+  saveState();
+  renderRetire();
+}
+
+// ─────────────────────────────────────────────────────────────────
+// renderSettings
+// ─────────────────────────────────────────────────────────────────
+function renderSettings() {
+  // Profile fields
+  const fields = [
+    { id: 'set-currency', key: 'currency', type: 'select', options: Object.keys(CSYM) },
+    { id: 'set-age', key: 'currentAge', type: 'number' },
+    { id: 'set-ret-age', key: 'retirementAge', type: 'number' },
+    { id: 'set-life-exp', key: 'lifeExp', type: 'number' },
+    { id: 'set-growth', key: 'growthRate', type: 'number', step: 0.1 },
+    { id: 'set-inflation', key: 'inflationRate', type: 'number', step: 0.1 },
+    { id: 'set-post-ret-growth', key: 'postRetGrowth', type: 'number', step: 0.1 },
+    { id: 'set-withdraw-tax', key: 'withdrawTaxRate', type: 'number', step: 1 },
+    { id: 'set-ticker', key: 'tickerQuote', type: 'text' }
+  ];
+  fields.forEach(f => {
+    const input = el(f.id);
+    if (!input) return;
+    if (f.type === 'select') {
+      input.innerHTML = f.options.map(o => `<option value="${o}"${state[f.key] === o ? ' selected' : ''}>${o} (${CSYM[o]})</option>`).join('');
+      input.onchange = () => { state[f.key] = input.value; saveState(); renderAll(); };
+    } else {
+      input.value = state[f.key];
+      input.onchange = () => { state[f.key] = f.type === 'number' ? +input.value : input.value; saveState(); renderAll(); };
+    }
+  });
+
+  // Dark mode toggle
+  const darkToggle = el('set-dark-mode');
+  if (darkToggle) {
+    darkToggle.checked = state.darkMode;
+    darkToggle.onchange = () => { state.darkMode = darkToggle.checked; saveState(); document.body.classList.toggle('light', !state.darkMode); };
+  }
+
+  // Nest egg real toggle
+  const realToggle = el('set-nest-real');
+  if (realToggle) {
+    realToggle.checked = state.nestEggReal;
+    realToggle.onchange = () => { state.nestEggReal = realToggle.checked; saveState(); renderAll(); };
+  }
+
+  // Exchange rate inputs
+  const exDiv = el('set-exchange-rates');
+  if (exDiv) {
+    exDiv.innerHTML = Object.entries(state.exchangeRates).map(([cur, rate]) =>
+      `<div class="ex-field"><label>${cur}</label><input type="number" step="0.01" value="${rate}" onchange="state.exchangeRates['${cur}']=+this.value;saveState()"></div>`
+    ).join('');
+  }
+
+  // Firebase status
+  const fbStatus = el('fbStatus');
+  if (fbStatus && fbReady) {
+    fbStatus.innerHTML = '<span style="color:var(--green)">✓ Connected</span>';
+  }
+
+  // Perplexity key field
+  const pxKey = el('set-perplexity-key');
+  if (pxKey) {
+    pxKey.value = localStorage.getItem('propiq_pk') || '';
+    pxKey.onchange = () => { localStorage.setItem('propiq_pk', pxKey.value); };
+  }
+
+  // Export/import buttons
+  const exportBtn = el('set-export');
+  if (exportBtn) exportBtn.onclick = () => {
+    const a = document.createElement('a');
+    a.href = 'data:application/json,' + encodeURIComponent(JSON.stringify(state, null, 2));
+    a.download = 'horizon-backup-' + new Date().toISOString().slice(0, 10) + '.json';
+    a.click();
+  };
+
+  const importInput = el('set-import');
+  if (importInput) importInput.onchange = () => {
+    const f = importInput.files[0];
+    if (!f) return;
+    const r = new FileReader();
+    r.onload = e => {
+      try {
+        Object.assign(state, JSON.parse(e.target.result));
+        saveState();
+        renderAll();
+      } catch (ex) { alert('Invalid file: ' + ex.message); }
+    };
+    r.readAsText(f);
+  };
+
+  // Reset button
+  const resetBtn = el('set-reset');
+  if (resetBtn) resetBtn.onclick = () => {
+    if (confirm('Reset all data? This cannot be undone.')) {
+      localStorage.removeItem(STORAGE_KEY);
+      location.reload();
+    }
+  };
+}
+
+// ─────────────────────────────────────────────────────────────────
+// Master render functions
+// ─────────────────────────────────────────────────────────────────
+function renderAll() {
+  renderDashboard();
+  renderCashFlow();
+  renderNetWorth();
+  renderAssets();
+  renderFunFund();
+  renderRetire();
+  renderSettings();
+}
+
+function renderActivePanel() {
+  const renderers = {
+    dashboard: renderDashboard,
+    cashflow: renderCashFlow,
+    networth: renderNetWorth,
+    assets: renderAssets,
+    vacation: renderFunFund,
+    retirement: renderRetire,
+    settings: renderSettings
+  };
+  const fn = renderers[currentPanel];
+  if (fn) fn();
+}
+</script>
+
 </body>
 </html>
