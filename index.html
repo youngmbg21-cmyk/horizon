@@ -2802,6 +2802,278 @@ function piqRenderTab(tabId) {
       break;
   }
 }
+
+function piqEscape(s) {
+  return String(s == null ? '' : s)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+
+// ───────────────────────────────────────────────────────────────────
+// piqRenderInvestment — summary, thesis bullets, verdict card
+// ───────────────────────────────────────────────────────────────────
+function piqRenderInvestment(r) {
+  const a = r.analysis || {};
+  const cfg = MARKETS[r.market] || {};
+  const verdictCls = r.verdict === 'BUY' ? 'buy'
+    : r.verdict === 'HOLD' ? 'hold' : 'avoid';
+
+  const summary = a.summary
+    ? `<p class="piq-prose">${piqEscape(a.summary)}</p>`
+    : '<p class="piq-prose piq-muted">No summary available.</p>';
+
+  // Thesis bullets — split by sentence if it's prose, or by newline
+  let thesisBullets = '';
+  if (a.investmentThesis) {
+    const raw = String(a.investmentThesis);
+    const parts = raw.indexOf('\n') >= 0
+      ? raw.split(/\n+/)
+      : raw.split(/(?<=\.)\s+(?=[A-Z])/);
+    thesisBullets = parts.filter(Boolean).map(p =>
+      `<li>${piqEscape(p.trim())}</li>`
+    ).join('');
+  }
+
+  const verdictCard = `
+    <div class="piq-verdict-card ${verdictCls}">
+      <div class="piq-verdict-hd">
+        <div class="piq-verdict-lbl">AI Verdict</div>
+        <div class="piq-verdict-big">${r.verdict || '\u2014'}</div>
+      </div>
+      <div class="piq-verdict-score">
+        <div class="piq-score-bar">
+          <div class="piq-score-fill ${verdictCls}" style="width:${r.score || 0}%"></div>
+        </div>
+        <div class="piq-score-num">${r.score || 0}/100</div>
+      </div>
+      ${r.verdictReason ? `<div class="piq-verdict-reason">${piqEscape(r.verdictReason)}</div>` : ''}
+      <div class="piq-verdict-meta">
+        ${cfg.flag || ''} ${cfg.name || ''} \u00b7 ${a.priceRange || ''}
+      </div>
+    </div>
+  `;
+
+  return `
+    <div class="piq-investment">
+      <div class="piq-investment-main">
+        <div class="piq-section">
+          <div class="piq-section-hd">Summary</div>
+          ${summary}
+        </div>
+        <div class="piq-section">
+          <div class="piq-section-hd">Investment Thesis</div>
+          ${thesisBullets
+            ? `<ul class="piq-thesis">${thesisBullets}</ul>`
+            : '<p class="piq-muted">No thesis available.</p>'}
+        </div>
+      </div>
+      <aside class="piq-investment-side">
+        ${verdictCard}
+      </aside>
+    </div>
+  `;
+}
+
+// ───────────────────────────────────────────────────────────────────
+// piqRenderMortgage — market-specific calculator
+// ───────────────────────────────────────────────────────────────────
+function piqRenderMortgage(r) {
+  const cfg = MARKETS[r.market] || {};
+  const a = r.analysis || {};
+
+  // Parse a reasonable price default from the analysis
+  function parseNum(s) {
+    if (!s) return 0;
+    const match = String(s).replace(/,/g, '').match(/[\d.]+/);
+    const n = match ? parseFloat(match[0]) : 0;
+    // Handle "M" shorthand (8M, 12M, etc.)
+    return /m/i.test(String(s)) ? n * 1000000 : n;
+  }
+
+  const priceRange = a.priceRange || '';
+  const defaultPrice = parseNum(priceRange) || (r.market === 'se' ? 5000000 : 12000000);
+  const defaultRate = cfg.mortgageRates && cfg.mortgageRates[0] ? cfg.mortgageRates[0].val : 5;
+  const defaultTerm = cfg.mortgageTerms && cfg.mortgageTerms[0] ? cfg.mortgageTerms[0].val : 300;
+  const defaultDeposit = cfg.mortgageDeposit || 20;
+
+  const rateOpts = (cfg.mortgageRates || []).map((o, i) =>
+    `<option value="${o.val}" ${i === 0 ? 'selected' : ''}>${piqEscape(o.label)}</option>`
+  ).join('');
+  const termOpts = (cfg.mortgageTerms || []).map((o, i) =>
+    `<option value="${o.val}" ${i === 0 ? 'selected' : ''}>${piqEscape(o.label)}</option>`
+  ).join('');
+
+  return `
+    <div class="piq-mortgage">
+      <div class="piq-mortgage-form">
+        <div class="piq-section-hd">${cfg.flag || ''} ${cfg.name || ''} Mortgage Calculator</div>
+        <div class="mort-field">
+          <label>Property price (${cfg.currency || ''})</label>
+          <input type="number" id="mort-price" value="${defaultPrice}" oninput="piqCalcMortgage()">
+        </div>
+        <div class="mort-field">
+          <label>Deposit %</label>
+          <input type="number" id="mort-deposit" value="${defaultDeposit}" min="0" max="100" oninput="piqCalcMortgage()">
+          <div class="mort-ltv">LTV: <span id="mort-ltv">${100 - defaultDeposit}</span>%</div>
+        </div>
+        <div class="mort-field">
+          <label>Lender / rate</label>
+          <select id="mort-rate" onchange="piqCalcMortgage()">${rateOpts}</select>
+        </div>
+        <div class="mort-field">
+          <label>Term</label>
+          <select id="mort-term" onchange="piqCalcMortgage()">${termOpts}</select>
+        </div>
+      </div>
+      <div class="piq-mortgage-output" id="mort-output">
+        <div class="mort-out-lbl">Monthly payment</div>
+        <div class="mort-out-val" id="mort-monthly">\u2014</div>
+        <div class="mort-out-sub">
+          Loan: <span id="mort-loan">\u2014</span> \u00b7
+          Total: <span id="mort-total">\u2014</span> \u00b7
+          Interest: <span id="mort-interest">\u2014</span>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function piqCalcMortgage() {
+  const price    = Number((document.getElementById('mort-price')   || {}).value) || 0;
+  const depPct   = Number((document.getElementById('mort-deposit') || {}).value) || 0;
+  const rate     = Number((document.getElementById('mort-rate')    || {}).value) || 0;
+  const termMon  = Number((document.getElementById('mort-term')    || {}).value) || 0;
+  if (!piqCurrentResult) return;
+  const cfg = MARKETS[piqCurrentResult.market] || {};
+  const cur = cfg.currencySymbol || '';
+
+  const loan = price * (1 - depPct / 100);
+  const r = rate / 100 / 12;
+  let monthly = 0;
+  if (termMon > 0) {
+    if (r > 0) {
+      monthly = loan * r / (1 - Math.pow(1 + r, -termMon));
+    } else {
+      monthly = loan / termMon;
+    }
+  }
+  const total = monthly * termMon;
+  const interest = total - loan;
+
+  const fmt = n => cur + ' ' + Math.round(n).toLocaleString('en-US');
+  const setTxt = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
+  setTxt('mort-monthly', fmt(monthly));
+  setTxt('mort-loan',    fmt(loan));
+  setTxt('mort-total',   fmt(total));
+  setTxt('mort-interest', fmt(interest));
+  setTxt('mort-ltv',     String(Math.max(0, 100 - depPct)));
+}
+
+// ───────────────────────────────────────────────────────────────────
+// piqRenderPipeline — developments table with status badges
+// ───────────────────────────────────────────────────────────────────
+function piqRenderPipeline(r) {
+  const a = r.analysis || {};
+  const pipe = Array.isArray(a.pipeline) ? a.pipeline : [];
+
+  if (pipe.length === 0) {
+    return `
+      <div class="piq-section">
+        <div class="piq-section-hd">Development Pipeline</div>
+        <div class="piq-empty">No pipeline data found for this query.</div>
+      </div>
+    `;
+  }
+
+  function statusClass(s) {
+    const t = String(s || '').toLowerCase();
+    if (t.includes('complete') || t.includes('klart')) return 'done';
+    if (t.includes('construction') || t.includes('byggnation') || t.includes('pågår')) return 'building';
+    if (t.includes('approved') || t.includes('beviljat')) return 'approved';
+    if (t.includes('planning') || t.includes('ansökt')) return 'planning';
+    return 'neutral';
+  }
+
+  const rows = pipe.map(p => `
+    <tr>
+      <td><b>${piqEscape(p.name || '\u2014')}</b></td>
+      <td>${piqEscape(p.developer || '\u2014')}</td>
+      <td>${p.units != null ? piqEscape(p.units) : '\u2014'}</td>
+      <td><span class="status-badge ${statusClass(p.status)}">${piqEscape(p.status || '\u2014')}</span></td>
+      <td>${piqEscape(p.completion || '\u2014')}</td>
+      <td>${piqEscape(p.priceFrom || '\u2014')}</td>
+    </tr>
+  `).join('');
+
+  return `
+    <div class="piq-section">
+      <div class="piq-section-hd">Development Pipeline</div>
+      <div class="piq-table-wrap">
+        <table class="dt piq-pipeline-table">
+          <thead>
+            <tr>
+              <th>Project</th>
+              <th>Developer</th>
+              <th>Units</th>
+              <th>Status</th>
+              <th>Completion</th>
+              <th>Price from</th>
+            </tr>
+          </thead>
+          <tbody>${rows}</tbody>
+        </table>
+      </div>
+    </div>
+  `;
+}
+
+// ───────────────────────────────────────────────────────────────────
+// piqRenderSignals — bullet list with sentiment dots
+// ───────────────────────────────────────────────────────────────────
+function piqRenderSignals(r) {
+  const sigs = Array.isArray(r.signals) ? r.signals : [];
+
+  if (sigs.length === 0) {
+    return `
+      <div class="piq-section">
+        <div class="piq-section-hd">Market Signals</div>
+        <div class="piq-empty">No signals returned for this query.</div>
+      </div>
+    `;
+  }
+
+  // Count by sentiment
+  const counts = { positive: 0, neutral: 0, negative: 0 };
+  sigs.forEach(s => {
+    const k = (s.sentiment || 'neutral').toLowerCase();
+    if (counts[k] != null) counts[k]++;
+  });
+
+  const bullets = sigs.map(s => {
+    const sent = (s.sentiment || 'neutral').toLowerCase();
+    return `
+      <li class="signal-item ${sent}">
+        <span class="sig-dot ${sent}"></span>
+        <div class="sig-body">
+          <div class="sig-text">${piqEscape(s.text || '')}</div>
+          ${s.source ? `<div class="sig-source">\u2014 ${piqEscape(s.source)}</div>` : ''}
+        </div>
+      </li>
+    `;
+  }).join('');
+
+  return `
+    <div class="piq-section">
+      <div class="piq-section-hd">Market Signals</div>
+      <div class="piq-sentiment-summary">
+        <span class="sig-count positive"><span class="sig-dot positive"></span> ${counts.positive} positive</span>
+        <span class="sig-count neutral"><span class="sig-dot neutral"></span> ${counts.neutral} neutral</span>
+        <span class="sig-count negative"><span class="sig-dot negative"></span> ${counts.negative} negative</span>
+      </div>
+      <ul class="piq-signals">${bullets}</ul>
+    </div>
+  `;
+}
 </script>
 
 </body>
