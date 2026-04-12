@@ -418,6 +418,42 @@ input[type="number"] { -moz-appearance:textfield; }
 /* ── RETIREMENT RUNWAY ───────────────────────────────── */
 .runway-card { background:var(--bg2); border:1px solid var(--border); border-radius:10px; padding:14px; margin-bottom:10px; }
 /* Longevity Runway — feature #4 reference-aligned styling */
+/* ── INCOME REQUIREMENTS (top of Retirement Plan tab) ──────────────── */
+.ireq-card { padding:18px 20px; margin-bottom:14px; }
+.ireq-head { margin-bottom:14px; }
+.ireq-title { font-family:var(--ff); font-size:18px; font-weight:800; color:var(--text); letter-spacing:-.01em; margin-bottom:3px; }
+.ireq-sub { font-size:12px; color:var(--text2); }
+.ireq-kpi-row { display:grid; grid-template-columns:repeat(5, minmax(0, 1fr)); gap:10px; margin-bottom:14px; }
+@media (max-width:1100px){ .ireq-kpi-row { grid-template-columns:repeat(3, minmax(0, 1fr)); } }
+@media (max-width:680px){  .ireq-kpi-row { grid-template-columns:repeat(2, minmax(0, 1fr)); } }
+.ireq-kpi { background:var(--bg3); border:1px solid var(--border); border-radius:10px; padding:14px 12px; text-align:center; min-height:96px; display:flex; flex-direction:column; justify-content:center; align-items:center; gap:4px; }
+.ireq-kpi-lbl { font-family:var(--fm); font-size:9px; font-weight:700; letter-spacing:.08em; color:var(--text2); text-transform:uppercase; margin-bottom:2px; }
+.ireq-kpi-val { font-family:var(--fm); font-size:22px; font-weight:800; color:var(--text); letter-spacing:-.01em; line-height:1.1; word-break:break-word; }
+.ireq-kpi-sub { font-size:10px; color:var(--text3); margin-top:1px; line-height:1.3; }
+.ireq-kpi-val.ireq-amber { color:#f5a623; }
+.ireq-kpi-val.ireq-red   { color:var(--accent-critical); }
+.ireq-kpi-val.ireq-green { color:var(--accent-positive); }
+/* Inline color classes used inside the formula + phase rows */
+.ireq-amber { color:#f5a623; }
+.ireq-red   { color:var(--accent-critical); }
+.ireq-green { color:var(--accent-positive); }
+.ireq-blue  { color:#4d9fff; }
+/* Formula row */
+.ireq-formula { display:flex; flex-wrap:wrap; align-items:center; gap:6px 10px; padding:12px 14px; background:var(--bg3); border:1px solid var(--border); border-radius:8px; font-family:var(--fm); font-size:11px; color:var(--text); margin-bottom:14px; line-height:1.5; }
+.ireq-formula strong { font-weight:700; }
+.ireq-formula-op { color:var(--text3); font-weight:600; }
+/* Phase 1 / Phase 2 panels */
+.ireq-phases { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+@media (max-width:760px){ .ireq-phases { grid-template-columns:1fr; } }
+.ireq-phase { background:var(--bg3); border:1px solid var(--border); border-radius:10px; padding:14px 16px; }
+.ireq-phase-1 { border-left:4px solid var(--accent-critical); }
+.ireq-phase-2 { border-left:4px solid var(--accent-positive); }
+.ireq-phase-lbl { font-family:var(--fm); font-size:10px; font-weight:800; letter-spacing:.06em; text-transform:uppercase; margin-bottom:10px; }
+.ireq-phase-1 .ireq-phase-lbl { color:var(--accent-critical); }
+.ireq-phase-2 .ireq-phase-lbl { color:var(--accent-positive); }
+.ireq-phase-row { display:flex; align-items:center; justify-content:space-between; padding:5px 0; font-size:12px; color:var(--text2); }
+.ireq-phase-row span:last-child { font-family:var(--fm); font-weight:700; color:var(--text); }
+
 .runway-wrap { margin-top:14px; padding-top:14px; border-top:1px solid var(--border); }
 .runway-hd { display:flex; align-items:flex-start; justify-content:space-between; gap:12px; margin-bottom:10px; flex-wrap:wrap; }
 .runway-title { font-family:var(--ff); font-size:16px; font-weight:800; letter-spacing:-.01em; color:var(--text); }
@@ -1640,6 +1676,14 @@ function getTotalPensionIncome() {
     if(start<=state.retirementAge&&end>state.retirementAge) return s+(p.monthlyPayout||0);
     return s;
   },0);
+}
+// Total monthly pension income across ALL pension-type accounts,
+// regardless of when each pension starts. Used for the headline
+// "Total Pension Income" card so it reflects the sum the user actually
+// entered, not just pensions that happen to be active at the precise
+// moment of retirement.
+function getAllPensionIncome() {
+  return getPensionAssets().reduce((s,p)=>s+(p.monthlyPayout||0),0);
 }
 
 const RET_SCENARIOS = {lean:0.75,baseline:1.0,comfortable:1.3};
@@ -3126,17 +3170,27 @@ function buildRunwayChartData(nums) {
   // earliest pension start for gap label
   const earliestPension = pensions.length>0?Math.min(...pensions.map(p=>p.startAge??state.retirementAge)):null;
 
+  // All values inside this loop are ANNUAL — this matters because the
+  // chart's right axis is "Income/yr". `nums.totalExp` is already monthly
+  // with the scenario multiplier baked in, so we just × 12 once. The
+  // earlier version mistakenly multiplied `totalExp` by `nums.mult` again
+  // AND mixed monthly expense amounts with annual pension amounts in the
+  // same subtraction, which clamped portWithdrawal to 0 the moment any
+  // pension started — leaving the pre-pension gap correctly orange but
+  // turning every year after pension start into pure-blue pension bars.
+  const annualGrossNeeded = (nums.totalExp / Math.max(0.001, 1 - taxRate)) * 12;
+
   for(let age=state.retirementAge; age<=maxAge; age++) {
     labels.push(age);
     balData.push(Math.max(0, Math.round(balance)));
-    // annual withdrawal this year
-    const pen = pensionAtAge(age)*12;
-    const totalGross = taxRate>0?nums.totalExp*nums.mult/(1-taxRate):nums.totalExp*nums.mult;
-    const portGross = Math.max(0, totalGross - pen);
-    portWithdrawal.push(Math.round(portGross));
-    pensionData.push(Math.round(pen));
-    // evolve balance for next year (12 monthly steps)
-    const portMonthly = portGross/12;
+    const annualPen = pensionAtAge(age) * 12;
+    // What the portfolio has to cover this year, after pension income
+    // pays down whatever it can.
+    const annualPort = Math.max(0, annualGrossNeeded - annualPen);
+    portWithdrawal.push(Math.round(annualPort));
+    pensionData.push(Math.round(annualPen));
+    // Evolve the balance over 12 monthly steps using the annual draw.
+    const portMonthly = annualPort / 12;
     for(let m=0;m<12;m++) {
       balance = balance*(1+realRate) - portMonthly;
       if(balance<=0){balance=0;break;}
@@ -3189,6 +3243,56 @@ function renderRetirement() {
   const tContrib=sumArr(investments,'monthlyContribution');
   const projNom=investments.reduce((ss,a)=>ss+futureValue(a.balance,a.monthlyContribution,a.growthRate??state.growthRate,ytr),0);
   const projReal=projNom/inflF;
+  // Earliest pension start age across all pension assets — used for the
+  // pension card subtitle and the Phase 1 / Phase 2 split.
+  const earliestPension = pensions.length > 0
+    ? Math.min(...pensions.map(p => p.startAge ?? state.retirementAge))
+    : null;
+  // Pull the runway data once so the Income Requirements section can
+  // average it without duplicating the simulation.
+  const cdataReq = buildRunwayChartData(nums);
+  // Income Requirements computed values (annual + per-phase)
+  const expensesMonthly = nums.totalExp;                               // already mult-applied
+  const expensesAnnual  = expensesMonthly * 12;
+  const grossMonthly    = nums.totalGross;                              // already / (1-tax)
+  const grossAnnual     = grossMonthly * 12;
+  const taxPct          = Math.round(nums.taxRate * 100);
+  const lifeExpReq      = state.lifeExp || 90;
+  const yearsCount      = Math.max(1, cdataReq.portWithdrawal.length);
+  const totalPortAnnual = cdataReq.portWithdrawal.reduce((a,b)=>a+b,0);
+  const avgPortAnnual   = totalPortAnnual / yearsCount;
+  const avgPortMonthly  = avgPortAnnual / 12;
+  const avgWithdrawalRate = nums.nestEgg > 0 ? (avgPortAnnual / nums.nestEgg) * 100 : 0;
+  // Phase split — uses earliestPension as the boundary
+  const hasPhaseSplit = earliestPension !== null && earliestPension > state.retirementAge && earliestPension <= lifeExpReq;
+  let phase1 = null, phase2 = null;
+  if(hasPhaseSplit){
+    const p1Start = state.retirementAge;
+    const p1EndExclusive = earliestPension;
+    const p1Years = p1EndExclusive - p1Start;
+    const p1PortAnnual = grossAnnual; // no pension offset in this period
+    const p1Rate = nums.nestEgg > 0 ? (p1PortAnnual / nums.nestEgg) * 100 : 0;
+    phase1 = {
+      label: `PHASE 1: AGE ${p1Start}–${p1EndExclusive - 1} (${p1Years} year${p1Years!==1?'s':''}, no pension)`,
+      portMonthly: grossMonthly,
+      pensionMonthly: 0,
+      withdrawalRate: p1Rate,
+    };
+    // Phase 2 — average across post-pension years from cdata
+    const p2Idx = cdataReq.labels.findIndex(a => a >= earliestPension);
+    const p2Years = cdataReq.labels.length - p2Idx;
+    const p2PortAvgAnnual  = p2Years > 0 ? cdataReq.portWithdrawal.slice(p2Idx).reduce((a,b)=>a+b,0)/p2Years : 0;
+    const p2PenAvgAnnual   = p2Years > 0 ? cdataReq.pensionData.slice(p2Idx).reduce((a,b)=>a+b,0)/p2Years    : 0;
+    phase2 = {
+      label: `PHASE 2: AGE ${earliestPension}+ (pension active)`,
+      portMonthly: p2PortAvgAnnual / 12,
+      pensionMonthly: p2PenAvgAnnual / 12,
+      withdrawalRate: nums.nestEgg > 0 ? (p2PortAvgAnnual / nums.nestEgg) * 100 : 0,
+    };
+  }
+  const fundDepletionLabel = nums.runoutAge ? `Age ${Math.round(nums.runoutAge)}` : 'Never';
+  const fundDepletionTone  = nums.runoutAge ? 'neg' : 'pos';
+  const fundDepletionSub   = nums.runoutAge ? `Runs out before life exp.` : `Surplus at ${lifeExpReq}+`;
 
   // ── SECTION 1: SUSTAINABILITY & RUNWAY ──────────────────────────────────────
   const s1 = `
@@ -3275,7 +3379,7 @@ function renderRetirement() {
         <div class="kpi"><div class="kpi-icon">◈</div><div class="kpi-lbl">TOTAL INVESTMENT BALANCE</div><div class="kpi-val pos">${fmt(tBal)}</div><div class="kpi-sub">${investments.length} investment account${investments.length!==1?'s':''}</div></div>
         <div class="kpi"><div class="kpi-icon">▲</div><div class="kpi-lbl">MONTHLY CONTRIBUTIONS</div><div class="kpi-val" style="color:var(--amber)">${fmt(tContrib)}</div><div class="kpi-sub">Into investment accounts</div></div>
         <div class="kpi"><div class="kpi-icon">☀</div><div class="kpi-lbl">PROJECTED (TODAY'S MONEY)</div><div class="kpi-val" style="color:var(--cyan)">${fmt(projReal)}</div><div class="kpi-sub">${ytr} yrs · ${(investments.length>0?(investments.reduce((ss,a)=>ss+(a.growthRate??state.growthRate)*(a.balance||1),0)/Math.max(1,tBal)-infl):state.growthRate-infl).toFixed(1)}% real avg</div></div>
-        ${pensions.length>0?`<div class="kpi"><div class="kpi-icon">🏛</div><div class="kpi-lbl">TOTAL PENSION INCOME</div><div class="kpi-val" style="color:var(--amber)">${fmt(getTotalPensionIncome())}/mo</div><div class="kpi-sub">${pensions.length} pension plan${pensions.length!==1?'s':''}</div></div>`:''}
+        ${pensions.length>0?`<div class="kpi"><div class="kpi-icon">🏛</div><div class="kpi-lbl">TOTAL PENSION INCOME</div><div class="kpi-val" style="color:var(--amber)">${fmt(getAllPensionIncome())}/mo</div><div class="kpi-sub">${pensions.length} pension plan${pensions.length!==1?'s':''} · ${earliestPension>state.retirementAge?`starts age ${earliestPension}`:'active at retirement'}</div></div>`:''}
       </div>
       ${assetRows}
       <div style="display:flex;gap:8px">
@@ -3333,8 +3437,72 @@ function renderRetirement() {
       </div>
     </div>`;
 
+  // ── INCOME REQUIREMENTS SECTION (top of the tab) ────────────────────────
+  const ireq = `
+    <div class="card ireq-card">
+      <div class="ireq-head">
+        <div class="ireq-title">Income Requirements</div>
+        <div class="ireq-sub">What your retirement expenses demand from your portfolio (${esc(scenLabels[sc]||'Baseline')})</div>
+      </div>
+      <div class="ireq-kpi-row">
+        <div class="ireq-kpi">
+          <div class="ireq-kpi-lbl">EXPENSES (AFTER TAX)</div>
+          <div class="ireq-kpi-val">${fmt(expensesMonthly)}</div>
+          <div class="ireq-kpi-sub">${fmt(expensesAnnual)}/yr</div>
+        </div>
+        <div class="ireq-kpi">
+          <div class="ireq-kpi-lbl">TOTAL GROSS INCOME NEEDED</div>
+          <div class="ireq-kpi-val">${fmt(grossMonthly)}</div>
+          <div class="ireq-kpi-sub">${fmt(grossAnnual)}/yr · ÷(1−${taxPct}% tax)</div>
+        </div>
+        <div class="ireq-kpi">
+          <div class="ireq-kpi-lbl">AVG PORTFOLIO WITHDRAWAL</div>
+          <div class="ireq-kpi-val ireq-amber">${fmt(avgPortMonthly)}</div>
+          <div class="ireq-kpi-sub">${fmt(avgPortAnnual)}/yr · weighted across phases</div>
+        </div>
+        <div class="ireq-kpi">
+          <div class="ireq-kpi-lbl">AVG WITHDRAWAL RATE</div>
+          <div class="ireq-kpi-val ${avgWithdrawalRate>4?'ireq-red':'ireq-green'}">${avgWithdrawalRate.toFixed(1)}%</div>
+          <div class="ireq-kpi-sub">${avgWithdrawalRate>4?'Above':'Within'} the 4% safe rate</div>
+        </div>
+        <div class="ireq-kpi">
+          <div class="ireq-kpi-lbl">FUND DEPLETION</div>
+          <div class="ireq-kpi-val ${fundDepletionTone==='neg'?'ireq-red':'ireq-green'}">${fundDepletionLabel}</div>
+          <div class="ireq-kpi-sub">${fundDepletionSub}</div>
+        </div>
+      </div>
+      <div class="ireq-formula">
+        <span><strong>${fmt(expensesMonthly)}/mo</strong> expenses</span>
+        <span class="ireq-formula-op">÷ ${(1-nums.taxRate).toFixed(2)}</span>
+        <span>= <strong>${fmt(grossMonthly)}</strong> gross needed</span>
+        <span class="ireq-formula-op">=</span>
+        <span class="ireq-amber"><strong>${fmt(avgPortMonthly)}/mo</strong> avg from portfolio</span>
+        <span class="ireq-formula-op">→ ÷</span>
+        <span><strong>${fmt(nums.nestEgg)}</strong> nest egg</span>
+        <span class="ireq-formula-op">=</span>
+        <span class="${avgWithdrawalRate>4?'ireq-red':'ireq-green'}"><strong>${avgWithdrawalRate.toFixed(1)}%</strong> avg withdrawal rate</span>
+      </div>
+      ${hasPhaseSplit ? `
+      <div class="ireq-phases">
+        <div class="ireq-phase ireq-phase-1">
+          <div class="ireq-phase-lbl">${esc(phase1.label)}</div>
+          <div class="ireq-phase-row"><span>Portfolio withdrawal</span><span class="ireq-amber">${fmt(phase1.portMonthly)}/mo</span></div>
+          <div class="ireq-phase-row"><span>Pension income</span><span>${fmt(phase1.pensionMonthly)}</span></div>
+          <div class="ireq-phase-row"><span>Withdrawal rate</span><span class="${phase1.withdrawalRate>4?'ireq-red':'ireq-green'}">${phase1.withdrawalRate.toFixed(1)}%</span></div>
+        </div>
+        <div class="ireq-phase ireq-phase-2">
+          <div class="ireq-phase-lbl">${esc(phase2.label)}</div>
+          <div class="ireq-phase-row"><span>Portfolio withdrawal</span><span class="ireq-amber">${fmt(phase2.portMonthly)}/mo</span></div>
+          <div class="ireq-phase-row"><span>Pension income</span><span class="ireq-blue">${fmt(phase2.pensionMonthly)}/mo</span></div>
+          <div class="ireq-phase-row"><span>Withdrawal rate</span><span class="${phase2.withdrawalRate>4?'ireq-red':'ireq-green'}">${phase2.withdrawalRate.toFixed(1)}%</span></div>
+        </div>
+      </div>
+      ` : ''}
+    </div>`;
+
   document.getElementById('panel-retirement').innerHTML=`
     <div class="ph"><div class="ph-tag">RETIREMENT PLANNING</div><div class="ph-title">Retirement Plan</div><div class="ph-sub">Three interconnected sections — changes anywhere update everything instantly</div></div>
+    ${ireq}
     ${sectionWrap(1,'📊','Sustainability & Longevity Runway',`${nums.verdict} · ${nums.coveragePct.toFixed(0)}% funded · ${nums.runoutAge?'Depletes age '+Math.round(nums.runoutAge):'Never depletes'}`,s1)}
     ${sectionWrap(2,'◈','Portfolio & Pension Accounts',`${fmt(tBal)} invested · ${fmt(projReal)} projected in today's money`,s2)}
     ${sectionWrap(3,'📝','Retirement Expenses & Parameters',`${fmt(nums.totalExp)}/mo needed · ${state.currentAge}→${state.retirementAge} · ${nums.ytr} years away`,s3)}`;
