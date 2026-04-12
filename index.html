@@ -47,6 +47,73 @@
   </div>
 </div>
 
+<!-- ══ MAIN LAYOUT ══ -->
+<div class="main-row">
+
+  <!-- ── MONEY OS SIDEBAR ── -->
+  <div class="sidebar money-sidebar" id="sidebar-money">
+    <div class="sb-section">FINANCIAL CORE</div>
+    <div class="nav-item active" id="nav-dashboard" data-panel="dashboard" onclick="showPanel('dashboard')">
+      <span class="nav-icon">◈</span>Dashboard
+    </div>
+    <div class="nav-item" id="nav-cashflow" data-panel="cashflow" onclick="showPanel('cashflow')">
+      <span class="nav-icon">⇄</span>Cash Flow
+    </div>
+    <div class="nav-item" id="nav-networth" data-panel="networth" onclick="showPanel('networth')">
+      <span class="nav-icon">◆</span>Net Worth
+    </div>
+    <div class="nav-item" id="nav-assets" data-panel="assets" onclick="showPanel('assets')">
+      <span class="nav-icon">📈</span>Assets &amp; Nest Egg
+    </div>
+    <div class="sb-sep"></div>
+    <div class="sb-section">LIFESTYLE PLANNING</div>
+    <div class="nav-item" id="nav-vacation" data-panel="vacation" onclick="showPanel('vacation')">
+      <span class="nav-icon">✈</span>Fun Fund
+    </div>
+    <div class="nav-item" id="nav-retirement" data-panel="retirement" onclick="showPanel('retirement')">
+      <span class="nav-icon">🌅</span>Retire Anywhere
+    </div>
+    <div class="sb-sep"></div>
+    <div class="sb-section">SYSTEM</div>
+    <div class="nav-item" id="nav-settings" data-panel="settings" onclick="showPanel('settings')">
+      <span class="nav-icon">⚙</span>Settings
+    </div>
+
+    <!-- Mini stats widget -->
+    <div class="sb-bot">
+      <div class="sb-mini">
+        <div class="sb-mini-label">MONTHLY SURPLUS</div>
+        <div class="sb-mini-val" id="sbSurplus">—</div>
+        <div class="sb-mini-sub" id="sbFunFund">Fun Fund: —</div>
+        <div class="sb-mini-sub" id="sbSyncTime" style="color:var(--text3)"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── PROPIQ SIDEBAR ── -->
+  <div class="sidebar propiq-sidebar" id="sidebar-property" style="display:none">
+    <div class="sidebar-section">MARKET</div>
+    <div class="market-toggle">
+      <button class="mtog ke on market-toggle-btn" id="tog-ke" data-market="ke" onclick="setMarket('ke')">🇰🇪 Kenya</button>
+      <button class="mtog se market-toggle-btn" id="tog-se" data-market="se" onclick="setMarket('se')">🇸🇪 Sweden</button>
+    </div>
+
+    <div class="sidebar-section">SEARCH</div>
+    <button class="sidebar-new" id="piq-new-search-btn" onclick="showPiqPanel('search')">+ New Search</button>
+
+    <div class="sidebar-section">HISTORY</div>
+    <div id="piq-history-list">
+      <div class="sidebar-empty">No searches yet.<br>Results saved automatically.</div>
+    </div>
+    <button class="sidebar-clear" id="piq-clear-history" onclick="piqClearHistory()" style="display:none">Clear history</button>
+
+    <div class="sidebar-section">COMPARE</div>
+    <button class="btn-compare" id="piq-compare-btn" onclick="piqCompare()">Compare selected</button>
+  </div>
+
+  <!-- ── CONTENT AREA ── -->
+  <div class="content" id="content">
+
 <script>
 // ═══════════════════════════════════════════════════════════════════
 // CONSTANTS & DEFAULTS
