@@ -2246,5 +2246,181 @@ function renderActivePanel() {
 }
 </script>
 
+<script>
+// ═══════════════════════════════════════════════════════════════════
+// PROPIQ — SEARCH ENGINE + RESULTS RENDERING (Part 4)
+// ═══════════════════════════════════════════════════════════════════
+
+// ───────────────────────────────────────────────────────────────────
+// MARKET CONFIG
+// ───────────────────────────────────────────────────────────────────
+const MARKETS = {
+  ke: {
+    code: 'ke',
+    name: 'Kenya',
+    flag: '\ud83c\uddf0\ud83c\uddea',
+    currency: 'KES',
+    currencySymbol: 'KSh',
+    locale: 'en-KE',
+    banner: '\ud83c\uddf0\ud83c\uddea &nbsp; Kenya market \u00b7 Prices in KES \u00b7 Nairobi focus',
+    searchLabel: 'Search any Nairobi location or property type',
+    placeholder: 'e.g. Westlands 2BR, Karen villa, Kilimani off-plan...',
+    quickTags: [
+      'Westlands', 'Kilimani', 'Karen', 'Kileleshwa',
+      'Lavington', 'Runda', 'Parklands', 'Nairobi CBD'
+    ],
+    mortgageRates: [
+      { label: 'KCB (13.5%)',       val: 13.5 },
+      { label: 'Equity Bank (14%)', val: 14 },
+      { label: 'Stanbic (13%)',     val: 13 },
+      { label: 'NCBA (14.5%)',      val: 14.5 }
+    ],
+    mortgageTerms: [
+      { label: '20 years', val: 240 },
+      { label: '25 years', val: 300 },
+      { label: '15 years', val: 180 }
+    ],
+    mortgageDeposit: 20,
+    propertyTerms: {
+      freehold: 'Freehold title',
+      leasehold: '99-year leasehold',
+      search: 'Ardhi House title search',
+      advocate: 'Kenya-registered advocate',
+      stampDuty: '4% (urban) / 2% (rural)',
+      landRates: 'Nairobi County land rates'
+    },
+    pensionTerms: {
+      mandatory: 'NSSF',
+      voluntary: 'Individual Pension Plan (IPP)',
+      retirementAge: 60
+    },
+    legalFlags: [
+      { key: 'title',    label: 'Title search',     required: true },
+      { key: 'advocate', label: 'Advocate engaged', required: true },
+      { key: 'rates',    label: 'Land rates clear', required: true },
+      { key: 'survey',   label: 'Survey plan',      required: true },
+      { key: 'consent',  label: 'Spousal consent',  required: false }
+    ],
+    legalNote: 'Always conduct an official title search at Ardhi House (Lands Registry, Upper Hill, Nairobi) before paying any deposit. Official search costs KES 500 and takes 3\u20135 working days. Instruct a Kenya-registered advocate to conduct the search on your behalf.',
+    perplexityContext: `You are a Kenya real estate analyst. Research: "{q}" in Nairobi, Kenya.
+Provide: prices in KES, price per sqm, rental yields (%), recent transactions, comparable properties, infrastructure nearby, and market risks/positives. Focus on 2024-2025 data.`,
+    analysisContext: `You are PropIQ Kenya - AI property investment analyst for Nairobi. Query: "{q}". Research signals: {signals}
+Return ONLY valid JSON:
+{"summary":"2-3 sentence overview","priceRange":"e.g. KES 8M-15M","pricePerSqm":"e.g. KES 95,000/m^2","rentalYield":"e.g. 5.8%","capitalAppreciation":"e.g. 8-12% annually","verdict":"BUY|HOLD|AVOID","verdictReason":"one sentence","investmentThesis":"3-4 sentences","signals":[{"sentiment":"positive|negative|neutral","text":"text","source":"source"}],"pipeline":[{"name":"name","developer":"dev","units":50,"status":"Planning|Approved|Under Construction|Complete","completion":"Q4 2025","priceFrom":"KES 9M"}],"titleRisks":[{"level":"ok|warn|danger","title":"title","detail":"detail"}],"kpis":{"avgPrice":"KES 12M","yield":"5.8%","appreciation":"9%","liquidity":"Medium"}}`
+  },
+
+  se: {
+    code: 'se',
+    name: 'Sweden',
+    flag: '\ud83c\uddf8\ud83c\uddea',
+    currency: 'SEK',
+    currencySymbol: 'kr',
+    locale: 'sv-SE',
+    banner: '\ud83c\uddf8\ud83c\uddea &nbsp; Swedish market \u00b7 Prices in SEK \u00b7 Stockholm & major cities',
+    searchLabel: 'Search any Swedish location or property type',
+    placeholder: 'e.g. \u00d6stermalm l\u00e4genhet, Liding\u00f6 villa, Nacka bostadsr\u00e4tt...',
+    quickTags: [
+      '\u00d6stermalm', 'Liding\u00f6', 'Nacka', 'Bromma',
+      'Djursholm', 'Solna', 'Gothenburg', 'Malm\u00f6'
+    ],
+    mortgageRates: [
+      { label: 'Riksbank rate + 1% (4.5%)', val: 4.5 },
+      { label: 'Swedbank (4.2%)',           val: 4.2 },
+      { label: 'SEB (4.4%)',                val: 4.4 },
+      { label: 'Handelsbanken (4.3%)',      val: 4.3 }
+    ],
+    mortgageTerms: [
+      { label: '30 years', val: 360 },
+      { label: '25 years', val: 300 },
+      { label: '15 years', val: 180 }
+    ],
+    mortgageDeposit: 15,
+    propertyTerms: {
+      freehold: 'Fastighet (villa)',
+      leasehold: 'Bostadsr\u00e4tt (co-op)',
+      search: 'Lantm\u00e4teriregistret search',
+      advocate: 'Fastighetsm\u00e4klare',
+      stampDuty: 'Lagfart 1.5% + pantbrev 2%',
+      landRates: 'Kommunal fastighetsavgift'
+    },
+    pensionTerms: {
+      mandatory: 'Allm\u00e4n pension',
+      voluntary: 'ITP / Tj\u00e4nstepension',
+      retirementAge: 65
+    },
+    legalFlags: [
+      { key: 'lagfart',  label: 'Lagfart clear',         required: true },
+      { key: 'pantbrev', label: 'Pantbrev status',       required: true },
+      { key: 'brf',      label: 'BRF \u00e5rsredovisning', required: true },
+      { key: 'energy',   label: 'Energideklaration',     required: true },
+      { key: 'survey',   label: 'Besiktning',            required: false }
+    ],
+    legalNote: 'Engage a licensed Swedish fastighetsm\u00e4klare and conduct a full Lantm\u00e4teriregistret search before signing. Confirm pantbrev status and inteckningar with the seller. For bostadsr\u00e4tt, review the bostadsr\u00e4ttsf\u00f6reningens \u00e5rsredovisning and check the association debt (skuld per andel). An energideklaration is required by law.',
+    perplexityContext: `You are a Swedish real estate analyst. Research: "{q}" in Sweden.
+Provide: prices in SEK (including SEK/m^2), HOX/Valueguard trends, rental yields, Riksbank rate impact, nyproduktion nearby, comparables with SEK prices, risks and positives. Focus on 2024-2025 Swedish housing data.`,
+    analysisContext: `You are PropIQ Sweden - AI property investment analyst for Swedish real estate. Query: "{q}". Research signals: {signals}
+Return ONLY valid JSON:
+{"summary":"2-3 sentence overview","priceRange":"e.g. SEK 4M-8M","pricePerSqm":"e.g. SEK 85,000/m^2","rentalYield":"e.g. 2.8%","capitalAppreciation":"e.g. 3-5% annually","verdict":"BUY|HOLD|AVOID","verdictReason":"one sentence","investmentThesis":"3-4 sentences including Riksbank context","signals":[{"sentiment":"positive|negative|neutral","text":"text","source":"Hemnet|Valueguard|Riksbank|etc"}],"pipeline":[{"name":"name","developer":"dev","units":60,"status":"Bygglov ans\u00f6kt|Bygglov beviljat|Byggnation p\u00e5g\u00e5r|Klart","completion":"2026","priceFrom":"SEK 5.5M"}],"titleRisks":[{"level":"ok|warn|danger","title":"title","detail":"Sweden-specific legal detail about lagfart, pantbrev, bostadsr\u00e4tt etc"}],"kpis":{"avgPrice":"SEK 6M","yield":"2.8%","appreciation":"4%","liquidity":"High"}}`
+  }
+};
+
+// Ensure state.propiq exists, migrating from legacy flat keys if needed
+function ensurePropiqState() {
+  if (!state.propiq || typeof state.propiq !== 'object') {
+    state.propiq = {
+      market:    state.ppiMarket    || 'ke',
+      history:   state.ppiHistory   || [],
+      lastQuery: state.ppiLastQuery || ''
+    };
+  }
+  if (!state.propiq.market) state.propiq.market = 'ke';
+  if (!state.propiq.history) state.propiq.history = [];
+  if (typeof state.propiq.lastQuery !== 'string') state.propiq.lastQuery = '';
+}
+
+// ───────────────────────────────────────────────────────────────────
+// setMarket — switches active market (KE/SE)
+// ───────────────────────────────────────────────────────────────────
+function setMarket(market) {
+  if (!MARKETS[market]) return;
+  ensurePropiqState();
+  state.propiq.market = market;
+  saveState();
+
+  const cfg = MARKETS[market];
+
+  // Market banner
+  const banner = document.getElementById('piq-market-banner');
+  if (banner) {
+    banner.className = 'market-banner ' + market;
+    banner.innerHTML = cfg.banner;
+  }
+
+  // Search label + placeholder
+  const label = document.getElementById('piq-search-label');
+  if (label) label.textContent = cfg.searchLabel;
+  const input = document.getElementById('piq-search-input');
+  if (input) input.placeholder = cfg.placeholder;
+
+  // Swap quick tags
+  const tagsEl = document.getElementById('piq-quick-tags');
+  if (tagsEl) {
+    tagsEl.innerHTML = cfg.quickTags.map(t =>
+      `<span class="qtag" onclick="piqQuickSearch('${t.replace(/'/g, "\\'")}')">${t}</span>`
+    ).join('');
+  }
+
+  // Sidebar toggle state — top-of-sidebar KE/SE switcher
+  document.querySelectorAll('.market-toggle-btn').forEach(btn => {
+    btn.classList.toggle('on', btn.dataset.market === market);
+  });
+  // Legacy toggle IDs (tog-ke / tog-se) — keep compatible
+  const togKe = document.getElementById('tog-ke');
+  const togSe = document.getElementById('tog-se');
+  if (togKe) togKe.classList.toggle('on', market === 'ke');
+  if (togSe) togSe.classList.toggle('on', market === 'se');
+}
+</script>
+
 </body>
 </html>
