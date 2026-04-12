@@ -118,7 +118,7 @@ input[type="number"] { -moz-appearance:textfield; }
 
 /* ── CONTENT ─────────────────────────────────────────── */
 .content { flex:1; overflow-y:auto; scrollbar-gutter:stable; }
-.panel { display:none; padding:20px 24px 36px; max-width:1320px; margin:0 auto; animation:fadeIn .25s ease; }
+.panel { display:none; padding:20px 24px 36px; max-width:1320px; margin:0 auto; }
 .panel.active { display:block; }
 @media (max-width:720px){ .panel { padding:16px 14px 28px; } }
 
@@ -146,6 +146,34 @@ input[type="number"] { -moz-appearance:textfield; }
 .scope-chip .sc-label { padding:0 4px; font-weight:600; min-width:86px; text-align:center; }
 .scope-chip.is-year .sc-label { min-width:54px; }
 
+/* ── COMMAND PALETTE HINT BUTTON (topbar) ────────────── */
+.cmdp-hint { display:inline-flex; align-items:center; gap:4px; background:var(--bg0); border:1px solid var(--border); border-radius:7px; padding:5px 8px; color:var(--text3); cursor:pointer; font-family:var(--fm); font-size:10px; letter-spacing:.04em; transition:all .18s; }
+.cmdp-hint:hover { border-color:var(--accent-positive); color:var(--accent-positive); }
+.cmdp-hint-icon { font-size:12px; font-weight:700; }
+.cmdp-hint-lbl { font-weight:700; }
+
+/* ── COMMAND PALETTE (⌘K) ────────────────────────────── */
+.cmdp-backdrop { position:fixed; inset:0; background:rgba(5,8,15,0.72); backdrop-filter:blur(4px); z-index:9998; opacity:0; pointer-events:none; transition:opacity .18s ease; }
+.cmdp-backdrop.open { opacity:1; pointer-events:auto; }
+.cmdp { position:fixed; top:12vh; left:50%; transform:translateX(-50%) translateY(-12px); width:min(640px, calc(100vw - 32px)); max-height:70vh; background:var(--bg2); border:1px solid var(--border2); border-radius:14px; box-shadow:0 24px 60px -20px rgba(0,0,0,0.7), 0 0 0 1px rgba(255,255,255,0.02) inset; z-index:9999; display:flex; flex-direction:column; overflow:hidden; opacity:0; pointer-events:none; transition:opacity .2s ease, transform .22s cubic-bezier(.2,.7,.2,1); }
+.cmdp.open { opacity:1; transform:translateX(-50%) translateY(0); pointer-events:auto; }
+.cmdp-head { display:flex; align-items:center; gap:10px; padding:14px 16px; border-bottom:1px solid var(--border); }
+.cmdp-icon { font-family:var(--fm); color:var(--accent-positive); font-size:16px; font-weight:700; }
+.cmdp-input { flex:1; background:transparent; border:none; outline:none; color:var(--text); font-size:15px; font-family:var(--fb); padding:2px 0; }
+.cmdp-input::placeholder { color:var(--text3); }
+.cmdp-kbd { font-family:var(--fm); font-size:10px; color:var(--text3); background:var(--bg3); border:1px solid var(--border); border-radius:4px; padding:2px 6px; letter-spacing:.04em; }
+.cmdp-results { flex:1; overflow-y:auto; padding:6px 0; }
+.cmdp-group { padding:8px 16px 4px; font-family:var(--fm); font-size:9px; letter-spacing:.12em; text-transform:uppercase; color:var(--text3); }
+.cmdp-item { display:flex; align-items:center; gap:12px; padding:9px 16px; cursor:pointer; color:var(--text2); font-size:13px; transition:background .1s, color .1s; border-left:2px solid transparent; }
+.cmdp-item:hover { color:var(--text); background:var(--bg3); }
+.cmdp-item.active { color:var(--text); background:var(--bg3); border-left-color:var(--accent-positive); }
+.cmdp-item-icon { font-size:15px; width:20px; text-align:center; flex-shrink:0; }
+.cmdp-item-label { flex:1; }
+.cmdp-item-hint { font-family:var(--fm); font-size:10px; color:var(--text3); letter-spacing:.03em; }
+.cmdp-empty { padding:30px 20px; text-align:center; color:var(--text3); font-size:13px; }
+.cmdp-foot { display:flex; gap:16px; padding:8px 16px; border-top:1px solid var(--border); font-family:var(--fm); font-size:10px; color:var(--text3); letter-spacing:.04em; }
+.cmdp-foot .cmdp-kbd { margin-right:4px; }
+
 /* ── SECTION PULSE (deep-link highlight) ─────────────── */
 .section-pulse { animation:sectionPulse 1.4s ease-out; }
 @keyframes sectionPulse {
@@ -153,7 +181,24 @@ input[type="number"] { -moz-appearance:textfield; }
   15% { box-shadow:0 0 0 3px rgba(0,232,160,0.45), 0 0 24px 2px rgba(0,232,160,0.25); }
   100% { box-shadow:0 0 0 0 rgba(0,232,160,0.0), 0 0 0 0 rgba(0,232,160,0.0); }
 }
-@keyframes fadeIn { from{opacity:0;transform:translateY(4px)} to{opacity:1;transform:translateY(0)} }
+/* FLIP-ish transition: incoming panel slides up from 8px with a short
+   translate + fade; topbar/ticker/sidebar stay still to reinforce
+   "same app, new lens." The page title does a letter-spacing tighten
+   so nav reads as intentional rather than a straight swap. */
+@keyframes fadeIn {
+  from { opacity:0; transform:translateY(8px); }
+  to   { opacity:1; transform:translateY(0); }
+}
+.panel.active { animation:fadeIn .28s cubic-bezier(.2,.7,.2,1); }
+.panel.active .ph-title { animation:phTitleIn .42s cubic-bezier(.2,.7,.2,1); }
+@keyframes phTitleIn {
+  0%   { opacity:0; letter-spacing:.04em; transform:translateY(4px); }
+  60%  { opacity:1; }
+  100% { opacity:1; letter-spacing:-.01em; transform:translateY(0); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .panel.active, .panel.active .ph-title { animation:none !important; }
+}
 
 /* ── PAGE HEADER ─────────────────────────────────────── */
 .ph { margin-bottom:16px; }
@@ -171,8 +216,16 @@ input[type="number"] { -moz-appearance:textfield; }
 
 /* ── KPI GRID ────────────────────────────────────────── */
 .kpi-row { display:grid; grid-template-columns:repeat(auto-fit,minmax(190px,1fr)); gap:10px; margin-bottom:14px; }
-.kpi { background:var(--bg2); border:1px solid var(--border); border-radius:10px; padding:14px 16px; transition:border-color .2s, transform .2s; cursor:default; min-height:86px; display:flex; flex-direction:column; justify-content:center; }
+.kpi { background:var(--bg2); border:1px solid var(--border); border-radius:10px; padding:14px 16px; transition:border-color .2s, transform .2s, box-shadow .2s; cursor:default; min-height:86px; display:flex; flex-direction:column; justify-content:center; position:relative; }
 .kpi:hover { border-color:var(--border2); }
+/* Flash when the displayed value changed since last render */
+.kpi.kpi-pulse { animation:kpiPulse 1.6s cubic-bezier(.2,.7,.2,1); }
+@keyframes kpiPulse {
+  0%   { box-shadow:0 0 0 0 rgba(0,232,160,0.0); border-color:var(--border); }
+  15%  { box-shadow:0 0 0 3px rgba(0,232,160,0.35), 0 0 18px 1px rgba(0,232,160,0.25); border-color:var(--accent-positive); }
+  100% { box-shadow:0 0 0 0 rgba(0,232,160,0.0); border-color:var(--border); }
+}
+@media (prefers-reduced-motion: reduce) { .kpi.kpi-pulse { animation:none; } }
 .kpi-icon { font-size:18px; margin-bottom:4px; line-height:1; }
 .kpi-lbl { font-size:9px; letter-spacing:.08em; color:var(--text3); text-transform:uppercase; margin-bottom:4px; font-weight:600; }
 .kpi-val { font-family:var(--fm); font-size:20px; font-weight:700; color:var(--text); line-height:1.15; word-break:break-word; }
@@ -217,6 +270,10 @@ input[type="number"] { -moz-appearance:textfield; }
 .line-type { background:var(--bg3); border:1px solid var(--border); border-radius:4px; padding:6px 7px; color:var(--text2); font-size:10px; outline:none; }
 .line-rm { background:transparent; border:none; color:var(--red); font-size:15px; cursor:pointer; opacity:.5; transition:opacity .2s; padding:2px 5px; }
 .line-rm:hover { opacity:1; }
+/* Actual-vs-budget variance pill (Transactions → Budget mapping) */
+.line-variance { font-family:var(--fm); font-size:10px; font-weight:600; padding:3px 8px; border-radius:4px; white-space:nowrap; cursor:help; letter-spacing:.01em; }
+.line-variance.pos { background:var(--accent-positive-dim); color:var(--accent-positive); border:1px solid var(--accent-positive-dim); }
+.line-variance.neg { background:var(--accent-critical-dim); color:var(--accent-critical); border:1px solid var(--accent-critical-dim); }
 
 /* ── MONTH SELECTOR ──────────────────────────────────── */
 .month-pills { display:flex; gap:4px; overflow-x:auto; padding-bottom:6px; margin-bottom:12px; }
@@ -740,6 +797,24 @@ input[type="number"] { -moz-appearance:textfield; }
 <body>
 
 <!-- ══════════════════════════════════════
+     COMMAND PALETTE (⌘K / Ctrl+K)
+══════════════════════════════════════ -->
+<div class="cmdp-backdrop" id="cmdp-backdrop" onclick="cmdpClose()"></div>
+<div class="cmdp" id="cmdp" role="dialog" aria-modal="true" aria-label="Command palette">
+  <div class="cmdp-head">
+    <span class="cmdp-icon">⌘</span>
+    <input type="text" id="cmdp-input" class="cmdp-input" placeholder="Type a command, panel, or setting…" autocomplete="off" spellcheck="false">
+    <span class="cmdp-kbd">Esc</span>
+  </div>
+  <div class="cmdp-results" id="cmdp-results"></div>
+  <div class="cmdp-foot">
+    <span><span class="cmdp-kbd">↑</span><span class="cmdp-kbd">↓</span> navigate</span>
+    <span><span class="cmdp-kbd">↵</span> select</span>
+    <span><span class="cmdp-kbd">Esc</span> close</span>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════
      MAIN APP SHELL
 ══════════════════════════════════════ -->
 <div class="app" id="app">
@@ -754,6 +829,9 @@ input[type="number"] { -moz-appearance:textfield; }
       <div class="logo-text">HORIZON <span>FINANCE OS</span></div>
     </div>
     <div class="topbar-right">
+      <button class="cmdp-hint" id="cmdp-hint" onclick="cmdpOpen()" title="Command palette">
+        <span class="cmdp-hint-icon">⌘</span><span class="cmdp-hint-lbl">K</span>
+      </button>
       <div class="scope-chip" id="scope-chip" title="Current time scope — click to jump to relevant panel" onclick="scopeChipClick()">
         <button class="sc-arrow" onclick="event.stopPropagation();scopeShift(-1)" title="Previous">◀</button>
         <span class="sc-label" id="sc-label">—</span>
@@ -983,11 +1061,15 @@ function defaultState() {
     transactions:[],
 
     // Retire Anywhere
-    retireLocations:[
-      {id:genId(),name:'Nairobi',country:'Kenya',flag:'🇰🇪',costOfLiving:35000,taxRate:10,climate:'Warm',healthcare:'Good',infrastructure:'Moderate',notes:'Long-term relocation goal, child ISK',lat:-1.286,lng:36.817},
-      {id:genId(),name:'Lisbon',country:'Portugal',flag:'🇵🇹',costOfLiving:45000,taxRate:10,climate:'Mediterranean',healthcare:'Excellent',infrastructure:'Good',notes:'NHR tax regime, great weather',lat:38.717,lng:-9.139},
-      {id:genId(),name:'Chiang Mai',country:'Thailand',flag:'🇹🇭',costOfLiving:22000,taxRate:5,climate:'Tropical',healthcare:'Good',infrastructure:'Good',notes:'Digital nomad hub, low cost',lat:18.789,lng:98.984},
-      {id:genId(),name:'Málaga',country:'Spain',flag:'🇪🇸',costOfLiving:40000,taxRate:20,climate:'Mediterranean',healthcare:'Excellent',infrastructure:'Excellent',notes:'Beckham Law for new residents',lat:36.721,lng:-4.421},
+    retireLocations:[ /* deprecated — merged into `places` on migrate v3→v4; keep key here for older snapshots */ ],
+    // Unified "places" collection. Each entry has a `kind` discriminator
+    // ('retirement' today, 'market' reserved for Property IQ). Retire
+    // Anywhere, Property IQ, and the global world map all read from here.
+    places:[
+      {id:genId(),kind:'retirement',name:'Nairobi',country:'Kenya',flag:'🇰🇪',costOfLiving:35000,taxRate:10,climate:'Warm',healthcare:'Good',infrastructure:'Moderate',notes:'Long-term relocation goal, child ISK',lat:-1.286,lng:36.817},
+      {id:genId(),kind:'retirement',name:'Lisbon',country:'Portugal',flag:'🇵🇹',costOfLiving:45000,taxRate:10,climate:'Mediterranean',healthcare:'Excellent',infrastructure:'Good',notes:'NHR tax regime, great weather',lat:38.717,lng:-9.139},
+      {id:genId(),kind:'retirement',name:'Chiang Mai',country:'Thailand',flag:'🇹🇭',costOfLiving:22000,taxRate:5,climate:'Tropical',healthcare:'Good',infrastructure:'Good',notes:'Digital nomad hub, low cost',lat:18.789,lng:98.984},
+      {id:genId(),kind:'retirement',name:'Málaga',country:'Spain',flag:'🇪🇸',costOfLiving:40000,taxRate:20,climate:'Mediterranean',healthcare:'Excellent',infrastructure:'Excellent',notes:'Beckham Law for new residents',lat:36.721,lng:-4.421},
     ],
 
     // AI keys
@@ -1030,7 +1112,7 @@ function invalidateSelectors(){ _selGen++; }
 // ─── PERSISTENCE ────────────────────────────────────────────────────────────
 // State schema version. Bump this and add a branch to migrate() whenever the
 // shape of `state` changes in a backwards-incompatible way.
-const STATE_VERSION = 3;
+const STATE_VERSION = 4;
 function migrate(s) {
   const from = s.version || 1;
   if(from >= STATE_VERSION) { s.version = STATE_VERSION; return s; }
@@ -1054,9 +1136,24 @@ function migrate(s) {
     if(!s.monthlyOverrides) s.monthlyOverrides = {};
     if(!s.yearlyBases) s.yearlyBases = {};
   }
+  // v3 → v4: unify retireLocations + (future) property markets under a
+  //          single `places` array with a `kind` discriminator.
+  if(from < 4) {
+    if(!Array.isArray(s.places)) s.places = [];
+    if(Array.isArray(s.retireLocations) && s.retireLocations.length && !s.places.length) {
+      s.places = s.retireLocations.map(l => ({...l, kind: l.kind || 'retirement'}));
+    } else {
+      // Ensure every existing place has a kind so filters work.
+      s.places.forEach(p => { if(!p.kind) p.kind = 'retirement'; });
+    }
+    // Leave s.retireLocations in place as a frozen snapshot for rollback.
+    if(!s.categoryMap) s.categoryMap = {}; // Transactions → Budget mapping
+  }
   s.version = STATE_VERSION;
   return s;
 }
+// Helper for reading retirement-kind places (what Retire Anywhere uses).
+function retirePlaces() { return (state.places||[]).filter(p => (p.kind||'retirement') === 'retirement'); }
 function loadState() {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
@@ -1241,6 +1338,54 @@ function getRetirementNumbers() {
 function getMonthlyFunFundBalance() {
   const m = get12Months();
   return m.reduce((s,mo)=>s+mo.funFund,0);
+}
+
+// ─── TRANSACTIONS → BUDGET MAPPING ──────────────────────────────────────────
+// Computes per-line-item actuals from the current bank transactions and
+// returns a map keyed by baseline-expense line-item id. Category → line-item
+// matching works in two layers:
+//   1) explicit overrides from state.categoryMap  (bank category → line id)
+//   2) case-insensitive name match fallback       (category name === line name)
+// Anything that doesn't match is ignored. Income and positive amounts are
+// skipped so we only report spend-side variance.
+function getMonthlyActuals() {
+  return memoSelect('actuals', () => {
+    const result = {}; // {lineItemId: {actual, category}}
+    if(!state.bankConnected || !state.transactions || !state.transactions.length) return result;
+    const now = new Date();
+    const ym = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
+    // Index baselines by normalized name for fallback matching
+    const byName = {};
+    (state.baseExpenses||[]).forEach(item => { byName[(item.name||'').toLowerCase().trim()] = item.id; });
+    // Build category → total spend map for the current month
+    const catTotals = {};
+    state.transactions.forEach(tx => {
+      if(tx.type !== 'debit') return;
+      if(tx.date && !tx.date.startsWith(ym)) return;
+      const cat = tx.category || 'Other';
+      catTotals[cat] = (catTotals[cat] || 0) + Math.abs(tx.amount || 0);
+    });
+    // Resolve each category into a baseline line item
+    Object.entries(catTotals).forEach(([cat, amt]) => {
+      const explicit = (state.categoryMap||{})[cat];
+      let lineId = explicit;
+      if(!lineId) {
+        // Fallback: match by name (case-insensitive)
+        const norm = cat.toLowerCase().trim();
+        lineId = byName[norm];
+        // Common aliases for the demo data
+        if(!lineId && norm === 'mortgage') lineId = byName['mortgage'] || byName['rent'] || byName['housing'];
+        if(!lineId && norm === 'mortgage/rent') lineId = byName['mortgage'] || byName['rent'];
+      }
+      if(lineId) {
+        const prev = result[lineId] || {actual:0, categories:[]};
+        prev.actual += amt;
+        prev.categories.push(cat);
+        result[lineId] = prev;
+      }
+    });
+    return result;
+  });
 }
 
 // ─── TRANSACTIONS / BANK ────────────────────────────────────────────────────
@@ -1430,6 +1575,11 @@ const RELATED_MAP = {
 };
 function esc2(str){const d=document.createElement('div');d.textContent=str;return d.innerHTML;}
 
+// Tracks the most recent plain-text value rendered for each KPI label so
+// that ui.kpi() can pulse tiles whose value just changed. Panel re-renders
+// that produce the same value produce no pulse.
+const _lastKpiValues = {};
+
 // ─── COMPONENT HELPERS ──────────────────────────────────────────────────────
 // Zero-framework string-template components. Use these in renderers instead
 // of hand-rolling card/KPI/stat markup so the whole app shares one visual
@@ -1452,10 +1602,19 @@ const ui = {
     return `<div class="${cls}"${secAttr}${click}>${titleHtml}${body||''}</div>`;
   },
   // KPI tile. `tone` ∈ pos/neg/amb/neu; `link` makes it clickable to a panel.
+  // Remembers the last value seen per label so we can pulse tiles whose
+  // value changed since the last render ("what changed" affordance).
   kpi({icon, label, value, sub, tone, link, section}){
     const toneClass = tone==='pos'?'pos':tone==='neg'?'neg':tone==='amb'?'amb':'';
     const click = link?` style="cursor:pointer" onclick="nav('${link}'${section?`,{section:'${section}'}`:''})" role="button" tabindex="0"`:'';
-    return `<div class="kpi"${click}>
+    // Normalize the value to a plain string for diffing (strip tags).
+    const key = 'kpi:'+label;
+    const plain = String(value||'').replace(/<[^>]*>/g,'');
+    const prev = _lastKpiValues[key];
+    const changed = prev !== undefined && prev !== plain;
+    _lastKpiValues[key] = plain;
+    const pulseClass = changed ? ' kpi-pulse' : '';
+    return `<div class="kpi${pulseClass}"${click}>
       ${icon?`<div class="kpi-icon">${icon}</div>`:''}
       <div class="kpi-lbl">${esc2(label||'')}</div>
       <div class="kpi-val ${toneClass}">${value??'—'}</div>
@@ -1475,6 +1634,45 @@ const ui = {
 };
 // Matching CSS for ui.stat lives alongside the existing utilities (.pos/.neg
 // already exist on kpi-val). Add the generic stat-row look.
+
+// ─── WORLD MAP (shared Leaflet helper) ──────────────────────────────────────
+// One place to build a Leaflet map — both Retire Anywhere and (future) the
+// Property IQ markets panel can share tile styling, theme awareness, and
+// invalidateSize quirks. Returns the map instance so callers can attach
+// more behavior if they need to.
+function createWorldMap(containerId, points, opts){
+  const el = document.getElementById(containerId);
+  if(!el || typeof L === 'undefined') return null;
+  const o = {
+    center: [20, 20], zoom: 2, zoomControl: true, scrollWheelZoom: false,
+    ...(opts||{})
+  };
+  const tileUrl = isLight()
+    ? 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png'
+    : 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png';
+  let map;
+  try {
+    map = L.map(containerId, {zoomControl:o.zoomControl, scrollWheelZoom:o.scrollWheelZoom}).setView(o.center, o.zoom);
+    L.tileLayer(tileUrl, {attribution:'© CartoDB', maxZoom:18}).addTo(map);
+    (points||[]).forEach(pt => {
+      if(typeof pt.lat!=='number' || typeof pt.lng!=='number') return;
+      const color = pt.color || '#4d9fff';
+      const m = L.circleMarker([pt.lat, pt.lng], {
+        radius: pt.radius || 10, color, fillColor: color,
+        fillOpacity: pt.fillOpacity ?? 0.7, weight: pt.weight || 2
+      });
+      if(pt.popup) m.bindPopup(pt.popup);
+      if(pt.onClick) m.on('click', pt.onClick);
+      m.addTo(map);
+    });
+    // Re-measure after the container settles (panel just became visible).
+    setTimeout(() => { try { map.invalidateSize(); } catch(e){} }, 60);
+  } catch(e) {
+    console.warn('createWorldMap error:', e);
+    return null;
+  }
+  return map;
+}
 function decoratePanel(panel){
   const meta = PANEL_META[panel]; if(!meta) return;
   const panelEl = document.getElementById('panel-'+panel); if(!panelEl) return;
@@ -1549,6 +1747,174 @@ function scopeChipClick(){
   if(panel==='yearly') nav('yearly');
   else nav('monthly');
 }
+
+// ─── COMMAND PALETTE (⌘K / Ctrl+K) ──────────────────────────────────────────
+// A keyboard-first command runner that indexes panels, deep-link sections,
+// common actions, and AI suggestions. Everything the user can reach from
+// the sidebar is reachable in two keystrokes.
+let _cmdpSelectedIdx = 0;
+let _cmdpFilteredItems = [];
+function buildCmdpItems(){
+  const items = [];
+  // Panels
+  VALID_PANELS.forEach(p => {
+    const m = PANEL_META[p]; if(!m) return;
+    items.push({
+      group:'Go to', icon:m.icon, label:m.label, hint:m.group,
+      keywords:`${m.label} ${m.group} ${p}`.toLowerCase(),
+      action:()=>nav(p)
+    });
+  });
+  // Deep-link sections
+  const sections = [
+    {panel:'retirement',     section:'runway',   icon:'📊', label:'Retirement → Longevity Runway', hint:'Section'},
+    {panel:'dashboard',      section:'cashflow', icon:'📈', label:'Dashboard → Cash Flow',         hint:'Section'},
+    {panel:'dashboard',      section:'nestegg',  icon:'🎯', label:'Dashboard → Nest Egg Curve',    hint:'Section'},
+    {panel:'retireanywhere', section:'map',      icon:'🌍', label:'Retire Anywhere → World Map',    hint:'Section'},
+  ];
+  sections.forEach(s => {
+    items.push({
+      group:'Go to', icon:s.icon, label:s.label, hint:s.hint,
+      keywords:`${s.label} ${s.panel} ${s.section}`.toLowerCase(),
+      action:()=>nav(s.panel, {section:s.section})
+    });
+  });
+  // Actions
+  items.push(
+    {group:'Action', icon:'🌙', label:'Toggle theme (dark / light)', hint:'⌘⇧L', keywords:'theme dark light toggle', action:()=>toggleTheme()},
+    {group:'Action', icon:'✦', label:'Open AI advisor', hint:'', keywords:'ai advisor chat assistant', action:()=>openAIPanel()},
+    {group:'Action', icon:'⚡', label:'Toggle yearly cascade', hint:'', keywords:'cascade yearly forecast toggle', action:()=>{state.cascadeEnabled=!state.cascadeEnabled;save();renderAll();}},
+    {group:'Action', icon:'✈️', label:'Add a new trip', hint:'Fun Fund', keywords:'trip travel add new', action:()=>{state.trips.push({id:genId(),name:'New Trip',country:'',budget:50000,spent:0,date:`${CY}-06`,status:'planning',icon:'✈️'});save();nav('funfund');}},
+    {group:'Action', icon:'📍', label:'Add a retirement destination', hint:'Retire Anywhere', keywords:'location destination city retire add', action:()=>{nav('retireanywhere');setTimeout(()=>{if(typeof addLocation==='function')addLocation();},300);}},
+    {group:'Action', icon:'🏦', label:'Connect bank (demo data)', hint:'', keywords:'bank connect transactions demo', action:()=>{if(typeof connectBankDemo==='function')connectBankDemo();}},
+    {group:'Action', icon:'🧹', label:'Clear AI chat history', hint:'', keywords:'clear reset ai chat history', action:()=>{if(typeof clearAIChat==='function'){clearAIChat();openAIPanel();}}},
+  );
+  // Currency quick-switch
+  Object.keys(CURRENCY_SYMBOLS||{SEK:1}).forEach(c => {
+    items.push({
+      group:'Currency', icon:'💱', label:`Switch currency to ${c}`, hint:CURRENCY_SYMBOLS[c],
+      keywords:`currency ${c} swap change`.toLowerCase(),
+      action:()=>{state.currency=c;save();renderAll();}
+    });
+  });
+  // AI chip suggestions — execute the active panel's contextual chips
+  const chips = aipChipsFor(state.activePanel||'dashboard');
+  chips.forEach(chip => {
+    items.push({
+      group:'Ask AI', icon:'✦', label:chip, hint:'AI',
+      keywords:('ai '+chip).toLowerCase(),
+      action:()=>{ openAIPanel(); setTimeout(()=>{ if(typeof aipChip==='function') aipChip(chip); },120); }
+    });
+  });
+  return items;
+}
+function cmdpFilter(query){
+  const all = buildCmdpItems();
+  const q = (query||'').trim().toLowerCase();
+  if(!q) return all;
+  // Simple subsequence / substring score: prefer label-start matches, then
+  // any substring, then keyword hits. Zero-score items are dropped.
+  const tokens = q.split(/\s+/).filter(Boolean);
+  return all.map(it => {
+    const label = it.label.toLowerCase();
+    let score = 0;
+    tokens.forEach(tok => {
+      if(label.startsWith(tok)) score += 10;
+      else if(label.includes(tok)) score += 5;
+      else if(it.keywords.includes(tok)) score += 2;
+      else score -= 100; // token not found — drop
+    });
+    return {it, score};
+  }).filter(x => x.score > 0)
+    .sort((a,b) => b.score - a.score)
+    .map(x => x.it);
+}
+function renderCmdpResults(){
+  const el = document.getElementById('cmdp-results');
+  if(!el) return;
+  if(!_cmdpFilteredItems.length){
+    el.innerHTML = `<div class="cmdp-empty">No matches. Try "retire", "trip", or "theme".</div>`;
+    return;
+  }
+  // Group by .group
+  const byGroup = {};
+  const order = [];
+  _cmdpFilteredItems.forEach((it, idx) => {
+    if(!byGroup[it.group]) { byGroup[it.group] = []; order.push(it.group); }
+    byGroup[it.group].push({it, idx});
+  });
+  el.innerHTML = order.map(g => `
+    <div class="cmdp-group">${esc2(g)}</div>
+    ${byGroup[g].map(({it, idx}) => `
+      <div class="cmdp-item ${idx===_cmdpSelectedIdx?'active':''}" data-idx="${idx}" onclick="cmdpRun(${idx})" onmouseenter="cmdpSelect(${idx})">
+        <span class="cmdp-item-icon">${it.icon||'•'}</span>
+        <span class="cmdp-item-label">${esc2(it.label)}</span>
+        ${it.hint?`<span class="cmdp-item-hint">${esc2(it.hint)}</span>`:''}
+      </div>
+    `).join('')}
+  `).join('');
+  // Keep the active item in view
+  const active = el.querySelector('.cmdp-item.active');
+  if(active) active.scrollIntoView({block:'nearest'});
+}
+function cmdpSelect(idx){
+  if(_cmdpFilteredItems.length===0) return;
+  _cmdpSelectedIdx = Math.max(0, Math.min(_cmdpFilteredItems.length-1, idx));
+  document.querySelectorAll('.cmdp-item').forEach(el => {
+    el.classList.toggle('active', +el.getAttribute('data-idx') === _cmdpSelectedIdx);
+  });
+}
+function cmdpRun(idx){
+  const it = _cmdpFilteredItems[idx];
+  if(!it) return;
+  cmdpClose();
+  try { it.action(); } catch(e) { console.warn('command error', e); }
+}
+function cmdpOpen(){
+  const panel = document.getElementById('cmdp');
+  const backdrop = document.getElementById('cmdp-backdrop');
+  const input = document.getElementById('cmdp-input');
+  if(!panel||!backdrop||!input) return;
+  panel.classList.add('open');
+  backdrop.classList.add('open');
+  input.value = '';
+  _cmdpSelectedIdx = 0;
+  _cmdpFilteredItems = cmdpFilter('');
+  renderCmdpResults();
+  setTimeout(()=>input.focus(), 20);
+}
+function cmdpClose(){
+  const panel = document.getElementById('cmdp');
+  const backdrop = document.getElementById('cmdp-backdrop');
+  if(panel) panel.classList.remove('open');
+  if(backdrop) backdrop.classList.remove('open');
+}
+function cmdpIsOpen(){ return document.getElementById('cmdp')?.classList.contains('open'); }
+// Global keyboard handler: ⌘K / Ctrl+K to open; arrow keys / Enter / Esc
+// while open.
+window.addEventListener('keydown', (e) => {
+  const meta = e.metaKey || e.ctrlKey;
+  if(meta && (e.key === 'k' || e.key === 'K')) {
+    e.preventDefault();
+    cmdpIsOpen() ? cmdpClose() : cmdpOpen();
+    return;
+  }
+  if(!cmdpIsOpen()) return;
+  if(e.key === 'Escape') { e.preventDefault(); cmdpClose(); return; }
+  if(e.key === 'ArrowDown') { e.preventDefault(); cmdpSelect(_cmdpSelectedIdx + 1); return; }
+  if(e.key === 'ArrowUp')   { e.preventDefault(); cmdpSelect(_cmdpSelectedIdx - 1); return; }
+  if(e.key === 'Enter')     { e.preventDefault(); cmdpRun(_cmdpSelectedIdx); return; }
+});
+// Live filter on input (attach immediately — script runs after <body>).
+(function attachCmdpInput(){
+  const input = document.getElementById('cmdp-input');
+  if(!input) return;
+  input.addEventListener('input', (e) => {
+    _cmdpFilteredItems = cmdpFilter(e.target.value);
+    _cmdpSelectedIdx = 0;
+    renderCmdpResults();
+  });
+})();
 
 function renderAll() {
   renderTicker();
@@ -1676,16 +2042,31 @@ function destroyChart(key) { if(charts[key]){charts[key].destroy();delete charts
 function renderLineItems(containerId, items, stateKey, readOnly, showPaid) {
   const el=document.getElementById(containerId); if(!el) return;
   const r=rate(); const s=sym();
-  el.innerHTML=items.map((it,idx)=>`
-    <div class="line-item">
+  // Variance data is only meaningful for expense line items and only when
+  // we're viewing a monthly override that corresponds to the current month.
+  const isExpense = stateKey === 'baseExpenses' || stateKey.startsWith('mo-exp') || stateKey.startsWith('yr-exp');
+  const actuals = (isExpense && state.bankConnected) ? getMonthlyActuals() : {};
+  el.innerHTML=items.map((it,idx)=>{
+    const variance = actuals[it.id];
+    let variancePill = '';
+    if(variance && it.amount > 0) {
+      const deltaPct = Math.round(((variance.actual - it.amount) / it.amount) * 100);
+      const overBudget = variance.actual > it.amount;
+      const tone = overBudget ? 'neg' : 'pos';
+      const arrow = overBudget ? '↑' : '↓';
+      variancePill = `<span class="line-variance ${tone}" title="Actual spend this month from bank data: ${fmt(variance.actual)} (${variance.categories.join(', ')})">${arrow} ${Math.abs(deltaPct)}% · ${fmt(variance.actual)}</span>`;
+    }
+    return `<div class="line-item">
       <input class="line-name" value="${esc(it.name)}" placeholder="Name" ${readOnly?'disabled':''} oninput="updateLineItem('${stateKey}','${it.id}','name',this.value)">
       <div class="line-amt-wrap"><span class="line-cur">${s}</span><input class="line-amt" type="number" value="${Math.round(it.amount*r)}" ${readOnly?'disabled':''} oninput="updateLineItem('${stateKey}','${it.id}','amount',this.value/${r})"></div>
       <select class="line-type" ${readOnly?'disabled':''} onchange="updateLineItem('${stateKey}','${it.id}','type',this.value)">
         <option value="fixed" ${it.type==='fixed'?'selected':''}>Fixed</option>
         <option value="variable" ${it.type==='variable'?'selected':''}>Variable</option>
       </select>
+      ${variancePill}
       ${readOnly?'':`<button class="line-rm" onclick="removeLineItem('${stateKey}','${it.id}')">×</button>`}
-    </div>`).join('');
+    </div>`;
+  }).join('');
 }
 function esc(str){const d=document.createElement('div');d.textContent=str;return d.innerHTML;}
 function updateLineItem(key,id,field,val) {
@@ -1798,7 +2179,7 @@ function renderDashboard() {
         <div class="kpi-icon">🌍</div>
         <div style="font-size:13px;font-weight:700;margin-bottom:3px">Retire Anywhere</div>
         <div style="font-size:11px;color:var(--text2)">AI-powered retirement location analysis</div>
-        <div style="margin-top:6px;font-family:var(--fm);font-size:10px;color:var(--amber)">${state.retireLocations.filter(l=>scoreLocation(l).verdict==='feasible').length} feasible destinations →</div>
+        <div style="margin-top:6px;font-family:var(--fm);font-size:10px;color:var(--amber)">${retirePlaces().filter(l=>scoreLocation(l).verdict==='feasible').length} feasible destinations →</div>
       </div>
     </div>`;
 
@@ -2659,7 +3040,7 @@ function renderFunFund() {
 // ══ RETIRE ANYWHERE ══════════════════════════════════════════════════════════
 let retireMap=null;
 function renderRetireAnywhere() {
-  const scored=state.retireLocations.map(scoreLocation);
+  const scored=retirePlaces().map(scoreLocation);
   const r=rate();
   const nums=getRetirementNumbers();
   const monthlyIncome=nums.sustainableAfterTax+nums.pension;
@@ -2708,30 +3089,23 @@ function renderRetireAnywhere() {
 
     <div id="ai-loc-output" style="display:none" class="card"></div>`;
 
-  // Render Leaflet map
+  // Render the shared world map via createWorldMap()
   setTimeout(()=>{
-    const mapEl=document.getElementById('retire-map');
-    if(!mapEl) return;
-    try {
-      if(retireMap) { retireMap.remove(); retireMap=null; }
-      const tileUrl=isLight()
-        ? 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png'
-        : 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png';
-      retireMap=L.map('retire-map',{zoomControl:true,scrollWheelZoom:false}).setView([20,20],2);
-      L.tileLayer(tileUrl,{attribution:'© CartoDB',maxZoom:18}).addTo(retireMap);
-      scored.forEach(loc=>{
-        const color=loc.verdict==='feasible'?'#00e8a0':loc.verdict==='conditional'?'#f5a623':'#ff4d6d';
-        const marker=L.circleMarker([loc.lat,loc.lng],{radius:10,color,fillColor:color,fillOpacity:.7,weight:2});
-        marker.bindPopup(`<strong>${loc.flag} ${loc.name}</strong><br><span style="color:${color};font-weight:700">${loc.label}</span><br>Cost: ${fmt(loc.costOfLiving)}/mo<br>Surplus: ${fmt(loc.surplus)}/mo`);
-        marker.addTo(retireMap);
-      });
-      // Fix blank/miscalculated tiles when the container became visible just now
-      setTimeout(()=>{ if(retireMap) retireMap.invalidateSize(); }, 60);
-    } catch(e) { console.log('Map error:',e); retireMap=null; }
-  },100);
+    if(retireMap) { try{retireMap.remove();}catch(e){} retireMap=null; }
+    const points = scored.map(loc => {
+      const color = loc.verdict==='feasible' ? '#00e8a0'
+                  : loc.verdict==='conditional' ? '#f5a623'
+                  : '#ff4d6d';
+      return {
+        lat: loc.lat, lng: loc.lng, color,
+        popup: `<strong>${loc.flag} ${loc.name}</strong><br><span style="color:${color};font-weight:700">${loc.label}</span><br>Cost: ${fmt(loc.costOfLiving)}/mo<br>Surplus: ${fmt(loc.surplus)}/mo`
+      };
+    });
+    retireMap = createWorldMap('retire-map', points, {center:[20,20], zoom:2});
+  }, 100);
 }
 window.showLocDetail=function(id){
-  const loc=scoreLocation(state.retireLocations.find(l=>l.id===id));
+  const loc=scoreLocation(retirePlaces().find(l=>l.id===id));
   if(!loc) return;
   const r=rate(); const s=sym();
   const months=get12Months();
@@ -2761,12 +3135,12 @@ window.showLocDetail=function(id){
     <div id="loc-ai-out" style="margin-top:12px;font-size:12px;line-height:1.6;color:var(--text2)"></div>`;
   openModal('loc-modal');
 };
-window.updateLocCost=function(id,val){ const l=state.retireLocations.find(l=>l.id===id); if(l){l.costOfLiving=+val;save();} };
-window.updateLocTax=function(id,val){ const l=state.retireLocations.find(l=>l.id===id); if(l){l.taxRate=+val;save();} };
-window.updateLocNotes=function(id,val){ const l=state.retireLocations.find(l=>l.id===id); if(l){l.notes=val;save();} };
-window.removeLoc=function(id){ state.retireLocations=state.retireLocations.filter(l=>l.id!==id);save();closeModal('loc-modal');renderRetireAnywhere(); };
+window.updateLocCost=function(id,val){ const l=state.places.find(l=>l.id===id); if(l){l.costOfLiving=+val;save();} };
+window.updateLocTax=function(id,val){ const l=state.places.find(l=>l.id===id); if(l){l.taxRate=+val;save();} };
+window.updateLocNotes=function(id,val){ const l=state.places.find(l=>l.id===id); if(l){l.notes=val;save();} };
+window.removeLoc=function(id){ state.places=state.places.filter(l=>l.id!==id);save();closeModal('loc-modal');renderRetireAnywhere(); };
 window.addLocation=function(){
-  state.retireLocations.push({id:genId(),name:'New City',country:'',flag:'🌍',costOfLiving:40000,taxRate:15,climate:'Temperate',healthcare:'Good',infrastructure:'Good',notes:'',lat:0,lng:0});
+  state.places.push({id:genId(),kind:'retirement',name:'New City',country:'',flag:'🌍',costOfLiving:40000,taxRate:15,climate:'Temperate',healthcare:'Good',infrastructure:'Good',notes:'',lat:0,lng:0});
   save();renderRetireAnywhere();
 };
 window.aiAnalyzeLocations=async function(){
@@ -2782,7 +3156,7 @@ window.aiAnalyzeLocations=async function(){
   } catch(e){ el.innerHTML=`<span style="color:var(--red);font-size:12px">Error: ${e.message}</span>`; }
 };
 window.aiAnalyzeLoc=async function(id){
-  const loc=state.retireLocations.find(l=>l.id===id); if(!loc) return;
+  const loc=state.places.find(l=>l.id===id); if(!loc) return;
   const key=state.aiKeys?.claude;
   if(!key){alert('Add your Claude API key in Settings first.');return;}
   const nums=getRetirementNumbers();
@@ -2983,7 +3357,7 @@ function buildAIContext() {
   const nums=getRetirementNumbers();
   const months=get12Months(); const cm=months[0];
   const ti=sumArr(state.baseIncome,'amount'); const te=sumArr(state.baseExpenses,'amount');
-  const scored=state.retireLocations.map(scoreLocation);
+  const scored=retirePlaces().map(scoreLocation);
   const panel=state.activePanel||'dashboard';
   const viewLabel=(PANEL_META[panel]&&PANEL_META[panel].label)||panel;
   const section=state.activeSection?` (focused on: ${state.activeSection})`:'';
