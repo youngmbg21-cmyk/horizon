@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>HORIZON FINANCE OS</title>
-<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=JetBrains+Mono:wght@300;400;500;600&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"/>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
@@ -40,7 +40,14 @@
   --focus-ring:0 0 0 2px rgba(0,232,160,0.35);
   --card-shadow:0 1px 0 rgba(255,255,255,0.02) inset;
   --card-shadow-hover:0 8px 24px -12px rgba(0,0,0,0.55);
-  --ff:'Syne',sans-serif; --fb:'DM Sans',sans-serif; --fm:'JetBrains Mono',monospace;
+  /* Typography — a two-font system across the entire app.
+     DM Sans covers all interface text (body, headings, labels, buttons,
+     navigation, chrome); JetBrains Mono is reserved for monetary and
+     numeric values (KPI cards, table columns, chart axes, number inputs).
+     The legacy `--ff` token used to point at Syne and is retained as an
+     alias for DM Sans so existing heading call sites don't need to be
+     rewritten. */
+  --ff:'DM Sans',sans-serif; --fb:'DM Sans',sans-serif; --fm:'JetBrains Mono',monospace;
   --r:10px; --rl:14px;
   --sidebar-w:220px;
 }
@@ -63,6 +70,11 @@ body.light {
 html,body { height:100%; overflow:hidden; }
 body { font-family:var(--fb); background:var(--bg0); color:var(--text); }
 input,select,button,textarea { font-family:inherit; }
+/* Number inputs always render in the mono face regardless of what the
+   ambient body font is — keeps financial values visually aligned. */
+input[type="number"] { font-family:var(--fm); font-variant-numeric:tabular-nums; }
+/* Tabular numerals on every element that displays money / counts. */
+.kpi-val, .runway-ms-val, .ireq-kpi-val, .tk, .tkv, .line-amt, .sb-mini-val { font-variant-numeric:tabular-nums; }
 input[type="number"]::-webkit-outer-spin-button,
 input[type="number"]::-webkit-inner-spin-button { -webkit-appearance:none; }
 input[type="number"] { -moz-appearance:textfield; }
@@ -687,7 +699,7 @@ body.light .runway-svg-host { background:var(--bg3); }
 .md table { width:100%; border-collapse:collapse; font-size:12px; }
 .md thead { background:var(--bg3); }
 .md th { text-align:left; padding:10px 14px; font-family:var(--fm); font-size:10px; font-weight:700; letter-spacing:.06em; text-transform:uppercase; color:var(--text2); border-bottom:1px solid var(--border2); white-space:nowrap; }
-.md td { padding:10px 14px; color:var(--text); border-bottom:1px solid var(--border); vertical-align:top; line-height:1.5; }
+.md td { padding:10px 14px; color:var(--text); border-bottom:1px solid var(--border); vertical-align:top; line-height:1.5; font-variant-numeric:tabular-nums; }
 .md tbody tr:last-child td { border-bottom:none; }
 .md tbody tr:hover { background:var(--bg3); }
 .md tbody tr:nth-child(even) { background:rgba(255,255,255,0.008); }
