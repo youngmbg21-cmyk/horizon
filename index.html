@@ -492,6 +492,168 @@ input[type="number"] { -moz-appearance:textfield; }
   .sidebar { display:none; }
   .kpi-row { grid-template-columns:1fr 1fr; }
 }
+
+/* ══════════════════════════════════════════════════════
+   PROPERTY IQ — scoped under .piq
+══════════════════════════════════════════════════════ */
+.piq { --piq-green:#00e8a0; --piq-amber:#f5a623; --piq-red:#ff4d6d; --piq-blue:#4d9fff;
+  --piq-ke-pale:rgba(0,232,160,0.10); --piq-se-pale:rgba(77,159,255,0.10); }
+.piq-top { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px; margin-bottom:14px; }
+.piq-title { font-size:22px; font-weight:800; }
+.piq-sub { font-size:12px; color:var(--text2); margin-top:2px; }
+/* Market toggle */
+.piq-mtog-wrap { display:flex; background:var(--bg3); border:1px solid var(--border); border-radius:20px; padding:3px; gap:2px; }
+.piq-mtog { display:flex; align-items:center; gap:5px; padding:4px 12px; border-radius:16px; font-size:12px; font-weight:600; cursor:pointer; border:none; background:transparent; color:var(--text2); transition:all .2s; }
+.piq-mtog.ke.on { background:var(--green-dim); color:var(--green); }
+.piq-mtog.se.on { background:var(--blue-dim); color:var(--blue); }
+/* Market banner */
+.piq-banner { padding:8px 12px; font-family:var(--fm); font-size:10px; letter-spacing:.1em; text-transform:uppercase; border-radius:6px; margin-bottom:12px; display:flex; align-items:center; gap:8px; }
+.piq-banner.ke { background:var(--green-dim); color:var(--green); border:1px solid #00e8a022; }
+.piq-banner.se { background:var(--blue-dim); color:var(--blue); border:1px solid #4d9fff22; }
+/* Disclaimer */
+.piq-disclaimer { background:var(--amber-dim); border:1px solid #f5a62330; border-radius:6px; padding:8px 12px; font-size:11px; color:var(--amber); margin-bottom:12px; font-family:var(--fm); }
+/* Search */
+.piq-search-row { display:flex; gap:8px; margin-bottom:8px; }
+.piq-search-input { flex:1; background:var(--bg3); border:1px solid var(--border); border-radius:4px; padding:10px 13px; color:var(--text); font-size:13px; outline:none; transition:border-color .15s; }
+.piq-search-input:focus { border-color:var(--green); }
+.piq-search-input::placeholder { color:var(--text3); }
+.piq-search-btn { background:var(--green); color:#000; border:none; border-radius:4px; padding:10px 18px; font-weight:700; cursor:pointer; font-size:12px; white-space:nowrap; transition:opacity .15s; }
+.piq-search-btn:hover { opacity:.9; }
+.piq-search-btn:disabled { opacity:.4; cursor:not-allowed; }
+/* Quick tags */
+.piq-qtags { display:flex; gap:5px; flex-wrap:wrap; margin-bottom:14px; }
+.piq-qtag { background:var(--bg3); border:1px solid var(--border); border-radius:20px; padding:3px 10px; font-size:10px; color:var(--text2); cursor:pointer; transition:all .15s; font-family:var(--fm); }
+.piq-qtag:hover { border-color:var(--green); color:var(--green); }
+/* Progress */
+.piq-progress { margin-bottom:14px; display:none; }
+.piq-progress.on { display:block; }
+.piq-prog-label { font-family:var(--fm); font-size:10px; color:var(--text2); margin-bottom:5px; }
+.piq-prog-track { height:3px; background:var(--bg3); border-radius:2px; overflow:hidden; }
+.piq-prog-fill { height:100%; background:var(--green); border-radius:2px; transition:width .4s ease; width:0%; }
+.piq-prog-steps { display:flex; gap:12px; margin-top:6px; flex-wrap:wrap; }
+.piq-pstep { font-family:var(--fm); font-size:10px; color:var(--text3); display:flex; align-items:center; gap:5px; }
+.piq-pstep.done { color:var(--green); }
+.piq-pstep.active { color:var(--text2); }
+.piq-pstep-dot { width:5px; height:5px; border-radius:50%; background:var(--text3); flex-shrink:0; }
+.piq-pstep.done .piq-pstep-dot { background:var(--green); }
+.piq-pstep.active .piq-pstep-dot { background:var(--amber); animation:pulse .8s infinite; }
+/* Layout: sidebar history + main */
+.piq-body { display:grid; grid-template-columns:220px 1fr; gap:12px; align-items:start; }
+@media(max-width:900px) { .piq-body { grid-template-columns:1fr; } }
+.piq-hist { background:var(--bg2); border:1px solid var(--border); border-radius:10px; overflow:hidden; }
+.piq-hist-hd { padding:8px 12px; font-size:9px; letter-spacing:.14em; text-transform:uppercase; color:var(--text3); font-family:var(--fm); border-bottom:1px solid var(--border); }
+.piq-hist-empty { padding:14px 12px; font-size:11px; color:var(--text3); line-height:1.6; font-family:var(--fm); }
+.piq-hist-item { padding:9px 12px; cursor:pointer; border-bottom:1px solid var(--border); transition:background .1s; }
+.piq-hist-item:last-child { border-bottom:none; }
+.piq-hist-item:hover { background:var(--bg3); }
+.piq-hist-item.active { background:var(--bg4); border-left:2px solid var(--green); }
+.piq-hi-q { font-size:12px; font-weight:600; color:var(--text); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; margin-bottom:2px; }
+.piq-hi-m { font-family:var(--fm); font-size:10px; color:var(--text3); display:flex; gap:8px; align-items:center; }
+.piq-hi-verdict { font-size:9px; padding:1px 5px; border-radius:3px; font-weight:600; }
+.piq-hv-buy { background:var(--green-dim); color:var(--green); }
+.piq-hv-hold { background:var(--amber-dim); color:var(--amber); }
+.piq-hv-avoid { background:var(--red-dim); color:var(--red); }
+.piq-hist-clear { margin:6px 10px; background:transparent; border:1px solid var(--border); border-radius:4px; padding:5px; width:calc(100% - 20px); color:var(--text3); font-size:11px; cursor:pointer; font-family:var(--fm); transition:all .15s; }
+.piq-hist-clear:hover { border-color:var(--red); color:var(--red); }
+/* Results */
+.piq-main { min-width:0; }
+.piq-empty { padding:36px 16px; text-align:center; color:var(--text3); }
+.piq-empty-t { font-size:14px; font-weight:600; margin-bottom:6px; color:var(--text2); }
+.piq-empty-s { font-size:12px; line-height:1.7; }
+/* KPIs */
+.piq-kpi-row { display:grid; grid-template-columns:repeat(5,1fr); gap:8px; margin-bottom:12px; }
+@media(max-width:1100px) { .piq-kpi-row { grid-template-columns:repeat(3,1fr); } }
+.piq-kpi { background:var(--bg2); border:1px solid var(--border); border-radius:8px; padding:10px 12px; }
+.piq-kpi-lbl { font-family:var(--fm); font-size:9px; letter-spacing:.1em; text-transform:uppercase; color:var(--text3); margin-bottom:4px; }
+.piq-kpi-val { font-family:var(--fm); font-size:16px; font-weight:700; line-height:1.1; }
+.piq-kpi-sub { font-size:10px; color:var(--text2); margin-top:2px; }
+/* Tabs */
+.piq-tabs { display:flex; border-bottom:1px solid var(--border); margin-bottom:12px; overflow-x:auto; gap:0; }
+.piq-tab { font-size:12px; font-weight:500; padding:8px 14px; border:none; background:none; color:var(--text2); cursor:pointer; border-bottom:2px solid transparent; margin-bottom:-1px; transition:all .15s; white-space:nowrap; }
+.piq-tab:hover { color:var(--text); }
+.piq-tab.on { color:var(--green); border-bottom-color:var(--green); }
+/* Pane */
+.piq-pane { display:none; }
+.piq-pane.on { display:block; }
+/* Panel card */
+.piq-card { background:var(--bg2); border:1px solid var(--border); border-radius:10px; overflow:hidden; margin-bottom:10px; }
+.piq-card-hd { padding:10px 14px; border-bottom:1px solid var(--border); display:flex; align-items:center; gap:9px; background:var(--bg3); }
+.piq-card-icon { width:24px; height:24px; border-radius:6px; display:flex; align-items:center; justify-content:center; flex-shrink:0; font-size:13px; }
+.piq-card-title { font-weight:600; font-size:12px; }
+.piq-card-sub { font-size:10px; color:var(--text2); font-family:var(--fm); }
+.piq-card-body { padding:12px 14px; }
+/* AI box */
+.piq-ai-box { background:var(--bg3); border:1px solid #00e8a022; border-radius:6px; padding:12px; margin-bottom:10px; }
+.piq-ai-lbl { font-family:var(--fm); font-size:9px; letter-spacing:.14em; text-transform:uppercase; color:var(--green); margin-bottom:6px; }
+.piq-ai-text { font-size:12px; line-height:1.7; color:var(--text); }
+/* Verdict row */
+.piq-verdict-row { display:grid; grid-template-columns:repeat(3,1fr); gap:8px; margin-top:10px; }
+.piq-verdict-card { background:var(--bg3); border:1px solid var(--border); border-radius:6px; padding:10px; text-align:center; }
+.piq-verdict-lbl { font-family:var(--fm); font-size:9px; letter-spacing:.1em; text-transform:uppercase; color:var(--text3); margin-bottom:4px; }
+.piq-verdict-val { font-weight:700; font-size:13px; }
+.piq-v-buy { color:var(--green); } .piq-v-hold { color:var(--amber); } .piq-v-avoid { color:var(--red); }
+/* Flags */
+.piq-flags { display:flex; flex-direction:column; gap:7px; }
+.piq-flag { display:flex; align-items:flex-start; gap:9px; padding:9px 11px; border-radius:6px; border:1px solid; }
+.piq-flag.ok { background:var(--green-dim); border-color:#00e8a022; }
+.piq-flag.warn { background:var(--amber-dim); border-color:#f5a62322; }
+.piq-flag.danger { background:var(--red-dim); border-color:#ff4d6d22; }
+.piq-flag-dot { width:6px; height:6px; border-radius:50%; margin-top:4px; flex-shrink:0; }
+.piq-flag.ok .piq-flag-dot { background:var(--green); } .piq-flag.warn .piq-flag-dot { background:var(--amber); } .piq-flag.danger .piq-flag-dot { background:var(--red); }
+.piq-flag-t { font-weight:600; font-size:11px; margin-bottom:2px; }
+.piq-flag.ok .piq-flag-t { color:var(--green); } .piq-flag.warn .piq-flag-t { color:var(--amber); } .piq-flag.danger .piq-flag-t { color:var(--red); }
+.piq-flag-txt { font-size:11px; line-height:1.5; color:var(--text2); }
+/* Signals */
+.piq-signal { display:flex; gap:9px; padding:9px 0; border-bottom:1px solid var(--border); }
+.piq-signal:last-child { border-bottom:none; }
+.piq-signal-dot { width:6px; height:6px; border-radius:50%; margin-top:4px; flex-shrink:0; }
+.piq-signal-txt { font-size:12px; line-height:1.5; color:var(--text); }
+.piq-signal-src { font-family:var(--fm); font-size:10px; color:var(--text3); margin-top:2px; }
+/* Table */
+.piq-table { width:100%; border-collapse:collapse; font-size:11px; }
+.piq-table thead th { font-family:var(--fm); font-size:9px; letter-spacing:.1em; text-transform:uppercase; color:var(--text3); text-align:left; padding:7px 9px; border-bottom:1px solid var(--border); background:var(--bg3); }
+.piq-table tbody tr { border-bottom:1px solid var(--border); transition:background .1s; }
+.piq-table tbody tr:last-child { border-bottom:none; }
+.piq-table tbody tr:hover { background:var(--bg3); }
+.piq-table td { padding:8px 9px; vertical-align:middle; }
+.piq-badge { display:inline-flex; padding:2px 6px; border-radius:3px; font-family:var(--fm); font-size:9px; font-weight:600; }
+.piq-b-plan { background:var(--blue-dim); color:var(--blue); }
+.piq-b-appr { background:var(--amber-dim); color:var(--amber); }
+.piq-b-cons { background:var(--green-dim); color:var(--green); }
+.piq-b-done { background:var(--bg4); color:var(--text2); }
+/* Mortgage calc */
+.piq-calc-grid { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:12px; }
+.piq-calc-result { background:var(--bg3); border:1px solid #00e8a022; border-radius:6px; padding:14px; display:grid; grid-template-columns:repeat(3,1fr); gap:10px; }
+.piq-cr-lbl { font-family:var(--fm); font-size:9px; letter-spacing:.1em; text-transform:uppercase; color:var(--text3); margin-bottom:4px; }
+.piq-cr-val { font-size:18px; font-weight:700; color:var(--green); font-family:var(--fm); }
+.piq-cr-sub { font-size:10px; color:var(--text2); margin-top:2px; }
+/* FX converter */
+.piq-fx-row { display:flex; align-items:flex-end; gap:8px; background:var(--bg3); border-radius:8px; padding:12px; flex-wrap:wrap; }
+.piq-fx-f { flex:1; min-width:80px; }
+.piq-fx-f label { display:block; font-family:var(--fm); font-size:9px; letter-spacing:.1em; text-transform:uppercase; color:var(--text3); margin-bottom:5px; }
+.piq-fx-f input { width:100%; background:var(--bg2); border:1px solid var(--border); border-radius:4px; padding:7px 10px; color:var(--text); font-family:var(--fm); font-size:12px; outline:none; }
+.piq-fx-f input:focus { border-color:var(--green); }
+.piq-fx-arrow { color:var(--text3); font-size:16px; flex-shrink:0; padding-bottom:8px; }
+.piq-fx-sel { background:var(--bg2); border:1px solid var(--border); border-radius:4px; padding:7px 8px; color:var(--text); font-family:var(--fm); font-size:11px; outline:none; cursor:pointer; }
+.piq-fx-rate { font-family:var(--fm); font-size:10px; color:var(--text3); margin-top:8px; }
+/* Compare bar */
+.piq-compare-bar { display:flex; align-items:center; justify-content:space-between; padding:6px 10px; background:var(--bg3); border:1px solid var(--border); border-radius:6px; margin-bottom:10px; font-size:11px; color:var(--text2); font-family:var(--fm); }
+.piq-compare-btn { background:var(--blue-dim); border:1px solid #4d9fff30; border-radius:4px; padding:4px 10px; color:var(--blue); font-size:11px; cursor:pointer; font-family:var(--fm); transition:all .15s; }
+/* Share */
+.piq-share-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:8px; margin-bottom:12px; }
+.piq-share-btn { background:var(--bg3); border:1px solid var(--border); border-radius:8px; padding:12px 8px; text-align:center; cursor:pointer; transition:all .15s; }
+.piq-share-btn:hover { border-color:var(--border2); background:var(--bg4); }
+.piq-share-icon { font-size:18px; margin-bottom:5px; }
+.piq-share-lbl { font-size:11px; font-weight:600; color:var(--text); }
+.piq-share-sub { font-size:10px; color:var(--text3); margin-top:1px; font-family:var(--fm); }
+.piq-toast { background:var(--green); color:#000; border-radius:6px; padding:7px 12px; font-size:11px; font-family:var(--fm); text-align:center; margin-top:8px; display:none; font-weight:600; }
+/* Legal note */
+.piq-legal { margin-top:10px; padding:10px 12px; background:var(--bg3); border-radius:6px; font-size:10px; color:var(--text3); line-height:1.6; font-family:var(--fm); border:1px solid var(--border); }
+/* Error */
+.piq-error { background:var(--red-dim); border:1px solid #ff4d6d30; border-radius:8px; padding:12px; margin-bottom:12px; }
+.piq-error-t { color:var(--red); font-weight:600; font-size:12px; margin-bottom:3px; }
+.piq-error-m { font-size:11px; color:var(--text2); line-height:1.5; margin-bottom:8px; }
+.piq-retry { background:var(--red-dim); border:1px solid #ff4d6d30; border-radius:4px; padding:5px 12px; color:var(--red); font-size:11px; cursor:pointer; font-family:var(--fm); }
 </style>
 </head>
 <body>
@@ -536,6 +698,7 @@ input[type="number"] { -moz-appearance:textfield; }
       <div class="sb-section">PLANNING</div>
       <div class="nav-item" data-panel="funfund" onclick="nav('funfund')"><span class="nav-icon">✦</span>Fun Fund</div>
       <div class="nav-item" data-panel="retireanywhere" onclick="nav('retireanywhere')"><span class="nav-icon">🌍</span>Retire Anywhere</div>
+      <div class="nav-item" data-panel="propiq" onclick="nav('propiq')"><span class="nav-icon">🏠</span>Property IQ</div>
 
       <div class="sb-sep"></div>
       <div class="sb-section">SYSTEM</div>
@@ -559,6 +722,7 @@ input[type="number"] { -moz-appearance:textfield; }
       <div class="panel" id="panel-retirement"></div>
       <div class="panel" id="panel-funfund"></div>
       <div class="panel" id="panel-retireanywhere"></div>
+      <div class="panel" id="panel-propiq"></div>
       <div class="panel" id="panel-settings"></div>
     </div>
   </div>
@@ -2240,10 +2404,11 @@ function renderSettings() {
         </div>
       </div>
       <!-- AI Keys -->
-      <div class="card">
+      <div class="card" id="set-ai-keys-section">
         <div class="card-title">🤖 AI Keys</div>
         <div class="field"><label>Claude (Anthropic) API Key</label><input type="password" value="${state.aiKeys?.claude||''}" placeholder="sk-ant-…" oninput="if(!state.aiKeys)state.aiKeys={};state.aiKeys.claude=this.value;save()"></div>
         <div class="field"><label>OpenAI API Key</label><input type="password" value="${state.aiKeys?.openai||''}" placeholder="sk-…" oninput="if(!state.aiKeys)state.aiKeys={};state.aiKeys.openai=this.value;save()"></div>
+        <div class="field"><label>Perplexity API Key <span style="font-size:10px;color:var(--text3)">(optional — enhances Property IQ with live web data)</span></label><input type="password" value="${state.aiKeys?.perplexity||''}" placeholder="pplx-…" oninput="if(!state.aiKeys)state.aiKeys={};state.aiKeys.perplexity=this.value;save()"></div>
         <p style="font-size:11px;color:var(--text3);line-height:1.5">Keys are stored only in your browser's localStorage. They're never sent to any server — only directly to the AI provider's API.</p>
       </div>
       <!-- Ticker quote -->
@@ -2454,6 +2619,487 @@ loadState();
 applyTheme();
 renderAll();
 renderAIPChips();
+</script>
+
+<script>
+// ══════════════════════════════════════════════════════════════════════════════
+// PROPERTY IQ — embedded module
+// Uses state.aiKeys.claude (Horizon's key) + state.aiKeys.perplexity (optional)
+// All globals prefixed piq_ to avoid collisions
+// ══════════════════════════════════════════════════════════════════════════════
+
+let piq_market = 'ke';
+let piq_history = [];
+let piq_currentResult = null;
+let piq_lastQuery = '';
+let piq_progressTimer = null;
+
+const PIQ_MC = {
+  ke:{name:'Kenya',flag:'🇰🇪',currency:'KES',locale:'en-KE',
+    banner:'🇰🇪 Kenya market · Prices in KES · Nairobi focus',
+    placeholder:'e.g. Westlands 2BR, Karen villa, Kilimani off-plan…',
+    tags:['Westlands','Kilimani','Karen','Kileleshwa','Lavington','Runda','Parklands','Nairobi CBD'],
+    mortgageRates:[{l:'KCB (13.5%)',v:13.5},{l:'Equity Bank (14%)',v:14},{l:'Stanbic (13%)',v:13},{l:'NCBA (14.5%)',v:14.5}],
+    mortgageTerm:[{l:'20 years',v:240},{l:'25 years',v:300},{l:'15 years',v:180}],
+    mortgageDeposit:20,
+    legalNote:'Always conduct an official title search at Ardhi House (Lands Registry, Upper Hill, Nairobi) before paying any deposit. Official search costs KES 500 and takes 3–5 working days. Instruct a Kenya-registered advocate to conduct the search on your behalf.',
+    contextPrompt:`You are a Kenya real estate analyst. Research: "{q}" in Nairobi, Kenya. Provide: prices in KES, price per sqm, rental yields (%), recent transactions, comparable properties, infrastructure nearby, market risks/positives. Focus on 2024–2025 data.`,
+    analysisPrompt:`You are PropIQ Kenya — AI property investment analyst for Nairobi. Query: "{q}". Research: {signals}\nReturn ONLY valid JSON:\n{"summary":"2-3 sentence overview","priceRange":"e.g. KES 8M–15M","pricePerSqm":"e.g. KES 95,000/m²","rentalYield":"e.g. 5.8%","capitalAppreciation":"e.g. 8–12% annually","verdict":"BUY|HOLD|AVOID","verdictReason":"one sentence","investmentThesis":"3-4 sentences","signals":[{"sentiment":"positive|negative|neutral","text":"text","source":"source"}],"pipeline":[{"name":"name","developer":"dev","units":50,"status":"Planning|Approved|Under Construction|Complete","completion":"Q4 2025","priceFrom":"KES 9M"}],"titleRisks":[{"level":"ok|warn|danger","title":"title","detail":"detail"}],"kpis":{"avgPrice":"KES 12M","yield":"5.8%","appreciation":"9%","liquidity":"Medium"}}`
+  },
+  se:{name:'Sweden',flag:'🇸🇪',currency:'SEK',locale:'sv-SE',
+    banner:'🇸🇪 Swedish market · Prices in SEK · Stockholm & major cities',
+    placeholder:'e.g. Östermalm lägenhet, Lidingö villa, Nacka bostadsrätt…',
+    tags:['Östermalm','Lidingö','Nacka','Bromma','Djursholm','Solna','Gothenburg','Malmö'],
+    mortgageRates:[{l:'Riksbank rate + 1% (4.5%)',v:4.5},{l:'Swedbank (4.2%)',v:4.2},{l:'SEB (4.4%)',v:4.4},{l:'Handelsbanken (4.3%)',v:4.3}],
+    mortgageTerm:[{l:'30 years',v:360},{l:'25 years',v:300},{l:'15 years',v:180}],
+    mortgageDeposit:15,
+    legalNote:'Engage a licensed Swedish fastighetsmäklare and conduct a full Lantmäteriregistret search before signing. Confirm pantbrev status and inteckningar with the seller. For bostadsrätt, review the bostadsrättsföreningens årsredovisning and check the association debt (skuld per andel). An energideklaration is required by law.',
+    contextPrompt:`You are a Swedish real estate analyst. Research: "{q}" in Sweden. Provide: prices in SEK (including SEK/m²), HOX/Valueguard trends, rental yields, Riksbank rate impact, nyproduktion nearby, comparables with SEK prices, risks and positives. Focus on 2024–2025 Swedish housing data.`,
+    analysisPrompt:`You are PropIQ Sweden — AI property investment analyst for Swedish real estate. Query: "{q}". Research: {signals}\nReturn ONLY valid JSON:\n{"summary":"2-3 sentence overview","priceRange":"e.g. SEK 4M–8M","pricePerSqm":"e.g. SEK 85,000/m²","rentalYield":"e.g. 2.8%","capitalAppreciation":"e.g. 3–5% annually","verdict":"BUY|HOLD|AVOID","verdictReason":"one sentence","investmentThesis":"3-4 sentences including Riksbank context","signals":[{"sentiment":"positive|negative|neutral","text":"text","source":"Hemnet|Valueguard|Riksbank|etc"}],"pipeline":[{"name":"name","developer":"dev","units":60,"status":"Bygglov ansökt|Bygglov beviljat|Byggnation pågår|Klart","completion":"2026","priceFrom":"SEK 5.5M"}],"titleRisks":[{"level":"ok|warn|danger","title":"title","detail":"Sweden-specific legal detail"}],"kpis":{"avgPrice":"SEK 6M","yield":"2.8%","appreciation":"4%","liquidity":"High"}}`
+  }
+};
+
+const PIQ_STEPS=['Fetching live signals','Analysing market data','Generating investment thesis','Scoring legal risks'];
+
+function piq_getAnthropicKey(){ return state.aiKeys?.claude||''; }
+function piq_getPerplexityKey(){ return state.aiKeys?.perplexity||''; }
+
+// ── RENDER PANEL ──────────────────────────────────────────────────────────────
+function renderPropIQ(){
+  const cfg=PIQ_MC[piq_market];
+  const histHtml = piq_history.length === 0
+    ? `<div class="piq-hist-empty">No searches yet.<br>Results saved here automatically.</div>`
+    : piq_history.map((h,i)=>{
+        const vCls=h.verdict==='BUY'?'piq-hv-buy':h.verdict==='AVOID'?'piq-hv-avoid':'piq-hv-hold';
+        const time=new Date(h.timestamp).toLocaleDateString('en-GB',{day:'numeric',month:'short'});
+        return `<div class="piq-hist-item${i===0&&piq_currentResult?' active':''}" onclick="piq_loadHistory(${i})">
+          <div class="piq-hi-q">${h.query}</div>
+          <div class="piq-hi-m"><span>${PIQ_MC[h.market]?.flag||''}</span><span>${time}</span>${h.verdict?`<span class="piq-hi-verdict ${vCls}">${h.verdict}</span>`:''}</div>
+        </div>`;
+      }).join('');
+
+  const clearBtn = piq_history.length > 0
+    ? `<button class="piq-hist-clear" onclick="piq_clearHistory()">Clear history</button>` : '';
+
+  const qtags = cfg.tags.map(t=>`<span class="piq-qtag" onclick="piq_quickSearch('${t}')">${t}</span>`).join('');
+
+  document.getElementById('panel-propiq').innerHTML = `
+    <div class="piq">
+      <div class="ph"><div class="ph-tag">REAL ESTATE INTELLIGENCE</div>
+        <div class="ph-title">Property IQ <span style="font-size:13px;font-weight:400;color:var(--text2)">Kenya & Sweden</span></div>
+        <div class="ph-sub">AI-powered analysis · Live signals · Mortgage calculator · Legal risk scoring</div>
+      </div>
+
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;flex-wrap:wrap">
+        <div class="piq-mtog-wrap">
+          <button class="piq-mtog ke${piq_market==='ke'?' on':''}" id="piq-tog-ke" onclick="piq_setMarket('ke')">🇰🇪 Kenya</button>
+          <button class="piq-mtog se${piq_market==='se'?' on':''}" id="piq-tog-se" onclick="piq_setMarket('se')">🇸🇪 Sweden</button>
+        </div>
+        <div class="piq-banner ${piq_market}" id="piq-banner">${cfg.banner}</div>
+      </div>
+
+      <div class="piq-disclaimer">⚠ AI-generated analysis only. Not financial or legal advice. Always verify with a licensed professional before any property purchase decision.</div>
+
+      <div class="piq-body">
+        <!-- History sidebar -->
+        <div class="piq-hist">
+          <div class="piq-hist-hd">Search History</div>
+          <div id="piq-hist-list">${histHtml}</div>
+          ${clearBtn}
+        </div>
+
+        <!-- Main area -->
+        <div class="piq-main">
+          <div class="piq-search-row">
+            <input class="piq-search-input" id="piq-search-input" placeholder="${cfg.placeholder}" onkeydown="if(event.key==='Enter')piq_runSearch()">
+            <button class="piq-search-btn" id="piq-search-btn" onclick="piq_runSearch()">Analyse</button>
+          </div>
+          <div class="piq-qtags">${qtags}</div>
+
+          <div class="piq-progress" id="piq-progress">
+            <div class="piq-prog-label" id="piq-prog-label">Fetching live signals...</div>
+            <div class="piq-prog-track"><div class="piq-prog-fill" id="piq-prog-fill"></div></div>
+            <div class="piq-prog-steps" id="piq-prog-steps"></div>
+          </div>
+
+          <div id="piq-results">
+            <div class="piq-empty"><div class="piq-empty-t">Search a location to begin</div>
+              <div class="piq-empty-s">PropIQ fetches live signals, generates an investment thesis,<br>calculates mortgage payments, and flags legal risks.</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      ${!piq_getAnthropicKey()?`<div class="callout callout-warn" style="margin-top:12px">⚠ <div>No Claude API key found. <a href="#" onclick="nav('settings');return false" style="color:var(--green)">Go to Settings → AI Keys</a> to add your Anthropic key and unlock Property IQ analysis.</div></div>`:''}
+    </div>`;
+}
+
+// ── MARKET TOGGLE ─────────────────────────────────────────────────────────────
+function piq_setMarket(m){
+  piq_market=m;
+  const cfg=PIQ_MC[m];
+  document.getElementById('piq-tog-ke')?.classList.toggle('on',m==='ke');
+  document.getElementById('piq-tog-se')?.classList.toggle('on',m==='se');
+  const banner=document.getElementById('piq-banner');
+  if(banner){ banner.className='piq-banner '+m; banner.textContent=cfg.banner; }
+  const inp=document.getElementById('piq-search-input');
+  if(inp) inp.placeholder=cfg.placeholder;
+  // re-render qtags
+  const qt=document.querySelector('.piq-qtags');
+  if(qt) qt.innerHTML=cfg.tags.map(t=>`<span class="piq-qtag" onclick="piq_quickSearch('${t}')">${t}</span>`).join('');
+  document.getElementById('piq-results').innerHTML=`<div class="piq-empty"><div class="piq-empty-t">Search a ${cfg.name} location to begin</div><div class="piq-empty-s">Live signals · Investment analysis · Mortgage calculator · Legal risk</div></div>`;
+}
+
+// ── HISTORY ───────────────────────────────────────────────────────────────────
+function piq_loadHistLS(){ try{ const s=localStorage.getItem('horizon_propiq_hist'); piq_history=s?JSON.parse(s):[]; }catch(e){ piq_history=[]; } }
+function piq_saveHistLS(){ try{ localStorage.setItem('horizon_propiq_hist',JSON.stringify(piq_history.slice(0,20))); }catch(e){} }
+
+function piq_saveToHistory(query,market,result){
+  piq_history.unshift({id:Date.now(),query,market,verdict:result.verdict,summary:result.summary,priceRange:result.priceRange,result,timestamp:new Date().toISOString()});
+  if(piq_history.length>20) piq_history=piq_history.slice(0,20);
+  piq_saveHistLS();
+}
+
+function piq_loadHistory(i){
+  const h=piq_history[i]; if(!h) return;
+  piq_market=h.market;
+  piq_currentResult=h.result;
+  piq_lastQuery=h.query;
+  document.getElementById('piq-tog-ke')?.classList.toggle('on',h.market==='ke');
+  document.getElementById('piq-tog-se')?.classList.toggle('on',h.market==='se');
+  const banner=document.getElementById('piq-banner');
+  if(banner){ banner.className='piq-banner '+h.market; banner.textContent=PIQ_MC[h.market].banner; }
+  document.getElementById('piq-search-input').value=h.query;
+  piq_renderResults(h.query,h.result,PIQ_MC[h.market]);
+}
+
+function piq_clearHistory(){
+  if(!confirm('Clear all Property IQ search history?')) return;
+  piq_history=[];piq_currentResult=null;piq_saveHistLS();
+  renderPropIQ();
+}
+
+// ── PROGRESS ──────────────────────────────────────────────────────────────────
+function piq_startProgress(){
+  const wrap=document.getElementById('piq-progress');
+  const fill=document.getElementById('piq-prog-fill');
+  const label=document.getElementById('piq-prog-label');
+  const steps=document.getElementById('piq-prog-steps');
+  if(!wrap) return;
+  wrap.classList.add('on'); fill.style.width='0%';
+  steps.innerHTML=PIQ_STEPS.map((s,i)=>`<div class="piq-pstep${i===0?' active':''}" id="piq-pstep-${i}"><div class="piq-pstep-dot"></div>${s}</div>`).join('');
+  let pct=0,step=0; label.textContent=PIQ_STEPS[0]+'...';
+  piq_progressTimer=setInterval(()=>{
+    pct+=Math.random()*8+2; if(pct>92)pct=92;
+    fill.style.width=pct+'%';
+    const ns=pct<30?0:pct<55?1:pct<78?2:3;
+    if(ns!==step){ document.getElementById('piq-pstep-'+step)?.classList.replace('active','done'); step=ns;
+      const el=document.getElementById('piq-pstep-'+step);
+      if(el){el.classList.add('active');label.textContent=PIQ_STEPS[step]+'...'} }
+  },400);
+}
+
+function piq_finishProgress(){
+  clearInterval(piq_progressTimer);
+  const fill=document.getElementById('piq-prog-fill');
+  const label=document.getElementById('piq-prog-label');
+  if(fill) fill.style.width='100%';
+  if(label) label.textContent='Analysis complete';
+  PIQ_STEPS.forEach((_,i)=>document.getElementById('piq-pstep-'+i)?.classList.replace('active','done'));
+  setTimeout(()=>document.getElementById('piq-progress')?.classList.remove('on'),800);
+}
+
+// ── SEARCH ────────────────────────────────────────────────────────────────────
+function piq_quickSearch(q){ document.getElementById('piq-search-input').value=q; piq_runSearch(); }
+
+async function piq_runSearch(){
+  const q=document.getElementById('piq-search-input')?.value.trim(); if(!q) return;
+  const key=piq_getAnthropicKey();
+  if(!key){ alert('Add your Anthropic API key in Settings → AI Keys to use Property IQ.'); nav('settings'); return; }
+  piq_lastQuery=q;
+  const btn=document.getElementById('piq-search-btn');
+  btn.disabled=true; btn.textContent='Analysing...';
+  const cfg=PIQ_MC[piq_market];
+  document.getElementById('piq-results').innerHTML='';
+  piq_startProgress();
+  try {
+    const signals=await piq_fetchSignals(q,cfg);
+    const analysis=await piq_fetchAnalysis(q,signals,cfg);
+    piq_finishProgress();
+    piq_currentResult=analysis;
+    piq_saveToHistory(q,piq_market,analysis);
+    piq_renderResults(q,analysis,cfg);
+  } catch(e){
+    piq_finishProgress();
+    document.getElementById('piq-results').innerHTML=`<div class="piq-error"><div class="piq-error-t">Analysis failed</div><div class="piq-error-m">${e.message}</div><button class="piq-retry" onclick="piq_runSearch()">Retry</button></div>`;
+  }
+  btn.disabled=false; btn.textContent='Analyse';
+}
+
+async function piq_fetchSignals(query,cfg){
+  const prompt=cfg.contextPrompt.replace('{q}',query);
+  const pk=piq_getPerplexityKey();
+  if(pk){
+    try{
+      const res=await fetch('https://api.perplexity.ai/chat/completions',{method:'POST',headers:{'Authorization':'Bearer '+pk,'Content-Type':'application/json'},body:JSON.stringify({model:'llama-3.1-sonar-large-128k-online',messages:[{role:'user',content:prompt}],max_tokens:1500})});
+      if(res.ok){const d=await res.json();return d.choices[0].message.content;}
+    }catch(e){}
+  }
+  const key=piq_getAnthropicKey();
+  const res=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'x-api-key':key,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true','Content-Type':'application/json'},body:JSON.stringify({model:'claude-sonnet-4-6',max_tokens:1500,tools:[{type:'web_search_20250305',name:'web_search'}],messages:[{role:'user',content:prompt}]})});
+  if(!res.ok){const e=await res.json();throw new Error(e.error?.message||'API error '+res.status);}
+  const d=await res.json();
+  return d.content.filter(b=>b.type==='text').map(b=>b.text).join('\n');
+}
+
+async function piq_fetchAnalysis(query,signals,cfg){
+  const key=piq_getAnthropicKey();
+  const prompt=cfg.analysisPrompt.replace('{q}',query).replace('{signals}',signals);
+  const res=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'x-api-key':key,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true','Content-Type':'application/json'},body:JSON.stringify({model:'claude-sonnet-4-6',max_tokens:2500,messages:[{role:'user',content:prompt}]})});
+  if(!res.ok){const e=await res.json();throw new Error(e.error?.message||'Claude error '+res.status);}
+  const d=await res.json();
+  const text=d.content[0].text.trim().replace(/^```json\n?/,'').replace(/\n?```$/,'');
+  return JSON.parse(text);
+}
+
+// ── MORTGAGE CALCULATOR ───────────────────────────────────────────────────────
+function piq_calcMortgage(){
+  const cfg=PIQ_MC[piq_market];
+  const price=parseFloat(document.getElementById('piq-mc-price')?.value.replace(/[^0-9.]/g,'')||0);
+  const deposit=parseFloat(document.getElementById('piq-mc-deposit')?.value||cfg.mortgageDeposit);
+  const rate=parseFloat(document.getElementById('piq-mc-rate')?.value||cfg.mortgageRates[0].v);
+  const months=parseInt(document.getElementById('piq-mc-term')?.value||cfg.mortgageTerm[0].v);
+  const res=document.getElementById('piq-mc-result'); if(!res) return;
+  if(!price){res.innerHTML='<div style="color:var(--text3);font-size:11px;font-family:var(--fm)">Enter a property price above</div>';return;}
+  const loan=price*(1-deposit/100), mr=rate/100/12;
+  const monthly=mr?loan*mr*Math.pow(1+mr,months)/(Math.pow(1+mr,months)-1):loan/months;
+  const total=monthly*months, interest=total-loan;
+  const fmt=n=>Math.round(n).toLocaleString(cfg.locale);
+  res.innerHTML=`<div class="piq-calc-result">
+    <div><div class="piq-cr-lbl">Monthly payment</div><div class="piq-cr-val">${cfg.currency} ${fmt(monthly)}</div><div class="piq-cr-sub">Per month</div></div>
+    <div><div class="piq-cr-lbl">Loan amount</div><div class="piq-cr-val" style="color:var(--blue)">${cfg.currency} ${fmt(loan)}</div><div class="piq-cr-sub">${100-deposit}% LTV</div></div>
+    <div><div class="piq-cr-lbl">Total interest</div><div class="piq-cr-val" style="color:var(--amber)">${cfg.currency} ${fmt(interest)}</div><div class="piq-cr-sub">Over ${Math.round(months/12)} years</div></div>
+  </div>`;
+}
+
+// ── FX CONVERTER ──────────────────────────────────────────────────────────────
+const PIQ_FX={KESKES:1,SEKSEK:1,KESUSD:0.0077,USDKES:129.5,SEKUSD:0.093,USDSEK:10.75,KESSEK:0.12,SEKKES:8.33,KESEUR:0.0071,SEKEUR:0.086,EURKES:140.5,EURSEK:11.6,USDEUR:0.925,EURUSD:1.081};
+function piq_convertFX(){
+  const amt=parseFloat(document.getElementById('piq-fx-amount')?.value||0);
+  const from=document.getElementById('piq-fx-from')?.value;
+  const to=document.getElementById('piq-fx-to')?.value;
+  const rate=PIQ_FX[from+to]||(PIQ_FX[to+from]?1/PIQ_FX[to+from]:1);
+  const result=amt*rate;
+  const el=document.getElementById('piq-fx-result');
+  if(el) el.value=result?result.toLocaleString(undefined,{maximumFractionDigits:2}):'';
+  const lbl=document.getElementById('piq-fx-rate-label');
+  if(lbl) lbl.textContent=`1 ${from} = ${rate.toFixed(4)} ${to} · Indicative rates`;
+}
+
+// ── SHARE ─────────────────────────────────────────────────────────────────────
+function piq_copyReport(){
+  if(!piq_currentResult) return;
+  const a=piq_currentResult, cfg=PIQ_MC[piq_market];
+  const text=`PropIQ Analysis: ${piq_lastQuery}\nMarket: ${cfg.name}\nVerdict: ${a.verdict}\nPrice: ${a.priceRange}\nYield: ${a.rentalYield}\nAppreciation: ${a.capitalAppreciation}\n\n${a.summary}\n\n${a.investmentThesis}\n\nAI-generated analysis only — not financial advice.`;
+  navigator.clipboard.writeText(text).then(()=>piq_showToast('Copied to clipboard'));
+}
+function piq_shareWhatsApp(){
+  if(!piq_currentResult) return;
+  const a=piq_currentResult, cfg=PIQ_MC[piq_market];
+  window.open('https://wa.me/?text='+encodeURIComponent(`PropIQ: ${piq_lastQuery} — Verdict: ${a.verdict}. ${a.summary} Price: ${a.priceRange}. Yield: ${a.rentalYield}.`));
+}
+function piq_showToast(msg){ const t=document.getElementById('piq-toast'); if(!t) return; t.textContent=msg; t.style.display='block'; setTimeout(()=>t.style.display='none',2500); }
+
+// ── COMPARE ───────────────────────────────────────────────────────────────────
+function piq_compareSearches(){
+  if(piq_history.length<2){alert('Run at least 2 searches to compare.');return;}
+  const items=piq_history.slice(0,4);
+  let html=`<div class="piq-card"><div class="piq-card-hd"><div class="piq-card-icon" style="background:var(--blue-dim)">⚖</div><div><div class="piq-card-title">Property Comparison</div><div class="piq-card-sub">Last ${items.length} searches</div></div></div><div class="piq-card-body"><div style="display:grid;grid-template-columns:repeat(${Math.min(items.length,2)},1fr);gap:10px">`;
+  items.forEach(h=>{
+    const r=h.result, vCls=h.verdict==='BUY'?'piq-v-buy':h.verdict==='AVOID'?'piq-v-avoid':'piq-v-hold';
+    html+=`<div style="background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:12px"><div style="font-weight:700;font-size:12px;margin-bottom:8px;color:var(--text)">${h.query} <span class="${vCls}" style="font-size:11px">${h.verdict}</span></div>
+      <div style="display:flex;justify-content:space-between;font-size:11px;padding:4px 0;border-bottom:1px solid var(--border)"><span style="color:var(--text2)">Price</span><span style="font-family:var(--fm)">${r.priceRange||'—'}</span></div>
+      <div style="display:flex;justify-content:space-between;font-size:11px;padding:4px 0;border-bottom:1px solid var(--border)"><span style="color:var(--text2)">Per m²</span><span style="font-family:var(--fm)">${r.pricePerSqm||'—'}</span></div>
+      <div style="display:flex;justify-content:space-between;font-size:11px;padding:4px 0;border-bottom:1px solid var(--border)"><span style="color:var(--text2)">Yield</span><span style="font-family:var(--fm);color:var(--green)">${r.rentalYield||'—'}</span></div>
+      <div style="display:flex;justify-content:space-between;font-size:11px;padding:4px 0"><span style="color:var(--text2)">Liquidity</span><span style="font-family:var(--fm)">${r.kpis?.liquidity||'—'}</span></div>
+    </div>`;
+  });
+  html+='</div></div></div>';
+  document.getElementById('piq-results').innerHTML=html;
+}
+
+// ── RENDER RESULTS ────────────────────────────────────────────────────────────
+function piq_sbClass(s){ const m={'planning':'piq-b-plan','approved':'piq-b-appr','under construction':'piq-b-cons','complete':'piq-b-done','bygglov ansökt':'piq-b-plan','bygglov beviljat':'piq-b-appr','byggnation pågår':'piq-b-cons','klart':'piq-b-done'}; return m[s.toLowerCase()]||'piq-b-plan'; }
+
+function piq_renderResults(query,a,cfg){
+  const pipeRows=(a.pipeline||[]).map(p=>`<tr><td style="font-weight:600;color:var(--text)">${p.name}</td><td style="color:var(--text2)">${p.developer}</td><td style="color:var(--text2)">${p.units}</td><td><span class="piq-badge ${piq_sbClass(p.status)}">${p.status}</span></td><td style="color:var(--text2);font-family:var(--fm);font-size:10px">${p.completion}</td><td style="color:var(--green);font-family:var(--fm);font-size:10px">${p.priceFrom}</td></tr>`).join('');
+  const flagsHtml=(a.titleRisks||[]).map(f=>`<div class="piq-flag ${f.level}"><div class="piq-flag-dot"></div><div><div class="piq-flag-t">${f.title}</div><div class="piq-flag-txt">${f.detail}</div></div></div>`).join('');
+  const signalsHtml=(a.signals||[]).map(s=>`<div class="piq-signal"><div class="piq-signal-dot" style="background:${s.sentiment==='positive'?'var(--green)':s.sentiment==='negative'?'var(--red)':'var(--amber)'}"></div><div><div class="piq-signal-txt">${s.text}</div><div class="piq-signal-src">${s.source||'Market data'}</div></div></div>`).join('');
+  const vCls=a.verdict==='BUY'?'piq-v-buy':a.verdict==='AVOID'?'piq-v-avoid':'piq-v-hold';
+  const vIcon=a.verdict==='BUY'?'▲':a.verdict==='AVOID'?'▼':'►';
+  const rateOpts=cfg.mortgageRates.map(r=>`<option value="${r.v}">${r.l}</option>`).join('');
+  const termOpts=cfg.mortgageTerm.map(t=>`<option value="${t.v}">${t.l}</option>`).join('');
+  const compareBtn=piq_history.length>=2?`<button class="piq-compare-btn" onclick="piq_compareSearches()">Compare (${Math.min(piq_history.length,4)})</button>`:'';
+
+  document.getElementById('piq-results').innerHTML=`
+    <div class="piq-compare-bar">
+      <span>${cfg.flag} ${query} · ${new Date().toLocaleDateString(cfg.locale,{day:'numeric',month:'short',year:'numeric'})}</span>
+      ${compareBtn}
+    </div>
+
+    <div class="piq-kpi-row">
+      <div class="piq-kpi"><div class="piq-kpi-lbl">Avg Price</div><div class="piq-kpi-val" style="font-size:13px;color:var(--text)">${a.kpis?.avgPrice||a.priceRange||'—'}</div><div class="piq-kpi-sub">${query}</div></div>
+      <div class="piq-kpi"><div class="piq-kpi-lbl">Price/m²</div><div class="piq-kpi-val" style="font-size:12px;color:var(--text2)">${a.pricePerSqm||'—'}</div><div class="piq-kpi-sub">${cfg.currency}/sqm</div></div>
+      <div class="piq-kpi"><div class="piq-kpi-lbl">Rental Yield</div><div class="piq-kpi-val" style="color:var(--green)">${a.kpis?.yield||a.rentalYield||'—'}</div><div class="piq-kpi-sub">Gross annual</div></div>
+      <div class="piq-kpi"><div class="piq-kpi-lbl">Appreciation</div><div class="piq-kpi-val" style="color:var(--blue);font-size:14px">${a.kpis?.appreciation||'—'}</div><div class="piq-kpi-sub">Annual est.</div></div>
+      <div class="piq-kpi"><div class="piq-kpi-lbl">Liquidity</div><div class="piq-kpi-val" style="font-size:13px">${a.kpis?.liquidity||'—'}</div><div class="piq-kpi-sub">Market depth</div></div>
+    </div>
+
+    <div class="piq-tabs">
+      <button class="piq-tab on" onclick="piq_switchTab('inv',this)">Investment</button>
+      <button class="piq-tab" onclick="piq_switchTab('mortgage',this)">Mortgage</button>
+      <button class="piq-tab" onclick="piq_switchTab('pipe',this)">Pipeline</button>
+      <button class="piq-tab" onclick="piq_switchTab('sig',this)">Signals</button>
+      <button class="piq-tab" onclick="piq_switchTab('title',this)">Legal Risk</button>
+      <button class="piq-tab" onclick="piq_switchTab('fx',this)">Currency</button>
+      <button class="piq-tab" onclick="piq_switchTab('share',this)">Share</button>
+    </div>
+
+    <div id="piq-pane-inv" class="piq-pane on">
+      <div class="piq-card">
+        <div class="piq-card-hd"><div class="piq-card-icon" style="background:var(--green-dim)">📈</div><div><div class="piq-card-title">AI Investment Analysis</div><div class="piq-card-sub">Claude · Live signals · ${cfg.flag} ${cfg.name}</div></div></div>
+        <div class="piq-card-body">
+          <div class="piq-ai-box"><div class="piq-ai-lbl">Executive Summary</div><div class="piq-ai-text">${a.summary}</div></div>
+          <div class="piq-ai-box"><div class="piq-ai-lbl">Investment Thesis</div><div class="piq-ai-text">${a.investmentThesis}</div></div>
+          <div class="piq-verdict-row">
+            <div class="piq-verdict-card"><div class="piq-verdict-lbl">Price Range</div><div class="piq-verdict-val" style="color:var(--text);font-size:11px">${a.priceRange}</div></div>
+            <div class="piq-verdict-card"><div class="piq-verdict-lbl">Verdict</div><div class="piq-verdict-val ${vCls}" style="font-size:20px">${vIcon} ${a.verdict}</div></div>
+            <div class="piq-verdict-card"><div class="piq-verdict-lbl">Rationale</div><div class="piq-verdict-val" style="color:var(--text2);font-size:11px;font-weight:400;line-height:1.4">${a.verdictReason}</div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div id="piq-pane-mortgage" class="piq-pane">
+      <div class="piq-card">
+        <div class="piq-card-hd"><div class="piq-card-icon" style="background:var(--green-dim)">💳</div><div><div class="piq-card-title">Mortgage Calculator</div><div class="piq-card-sub">${cfg.currency} · ${cfg.flag} ${cfg.name} market rates</div></div></div>
+        <div class="piq-card-body">
+          <div class="piq-calc-grid">
+            <div class="field"><label>Property price (${cfg.currency})</label><input id="piq-mc-price" type="number" placeholder="${cfg.currency==='KES'?'12000000':'6000000'}" oninput="piq_calcMortgage()"></div>
+            <div class="field"><label>Deposit (%)</label><input id="piq-mc-deposit" type="number" value="${cfg.mortgageDeposit}" oninput="piq_calcMortgage()"></div>
+            <div class="field"><label>Interest rate</label><select id="piq-mc-rate" onchange="piq_calcMortgage()">${rateOpts}</select></div>
+            <div class="field"><label>Loan term</label><select id="piq-mc-term" onchange="piq_calcMortgage()">${termOpts}</select></div>
+          </div>
+          <div id="piq-mc-result"><div style="color:var(--text3);font-size:11px;font-family:var(--fm)">Enter a property price above to calculate payments</div></div>
+        </div>
+      </div>
+    </div>
+
+    <div id="piq-pane-pipe" class="piq-pane">
+      <div class="piq-card">
+        <div class="piq-card-hd"><div class="piq-card-icon" style="background:var(--blue-dim)">🏗</div><div><div class="piq-card-title">Development Pipeline</div><div class="piq-card-sub">${cfg.currency==='SEK'?'Nyproduktion & byggprojekt':'Active and planned developments'} · ${query}</div></div></div>
+        <div class="piq-card-body" style="padding:0">${pipeRows?`<div style="overflow-x:auto"><table class="piq-table"><thead><tr><th>Project</th><th>Developer</th><th>Units</th><th>Status</th><th>Completion</th><th>Price from</th></tr></thead><tbody>${pipeRows}</tbody></table></div>`:'<div class="piq-empty" style="padding:20px"><div class="piq-empty-s">No pipeline data returned</div></div>'}</div>
+      </div>
+    </div>
+
+    <div id="piq-pane-sig" class="piq-pane">
+      <div class="piq-card">
+        <div class="piq-card-hd"><div class="piq-card-icon" style="background:var(--amber-dim)">📡</div><div><div class="piq-card-title">Market Signals</div><div class="piq-card-sub">Live intelligence · ${cfg.flag} ${cfg.name}</div></div></div>
+        <div class="piq-card-body">${signalsHtml||'<div style="color:var(--text3);font-size:11px">No signals returned</div>'}</div>
+      </div>
+    </div>
+
+    <div id="piq-pane-title" class="piq-pane">
+      <div class="piq-card">
+        <div class="piq-card-hd"><div class="piq-card-icon" style="background:var(--red-dim)">⚖</div><div><div class="piq-card-title">${cfg.currency==='SEK'?'Legal & Title Risk':'Title Risk Assessment'}</div><div class="piq-card-sub">${cfg.flag} ${cfg.name} · ${query}</div></div></div>
+        <div class="piq-card-body"><div class="piq-flags">${flagsHtml}</div><div class="piq-legal">${cfg.legalNote}</div></div>
+      </div>
+    </div>
+
+    <div id="piq-pane-fx" class="piq-pane">
+      <div class="piq-card">
+        <div class="piq-card-hd"><div class="piq-card-icon" style="background:var(--blue-dim)">💱</div><div><div class="piq-card-title">Currency Converter</div><div class="piq-card-sub">KES · SEK · USD · EUR · Indicative rates</div></div></div>
+        <div class="piq-card-body">
+          <div class="piq-fx-row">
+            <div class="piq-fx-f"><label>Amount</label><input id="piq-fx-amount" type="number" placeholder="Enter amount" oninput="piq_convertFX()"></div>
+            <select class="piq-fx-sel" id="piq-fx-from" onchange="piq_convertFX()"><option value="KES">KES</option><option value="SEK">SEK</option><option value="USD">USD</option><option value="EUR">EUR</option></select>
+            <div class="piq-fx-arrow">→</div>
+            <div class="piq-fx-f"><label>Converted</label><input id="piq-fx-result" type="text" readonly placeholder="Result" style="color:var(--green)"></div>
+            <select class="piq-fx-sel" id="piq-fx-to" onchange="piq_convertFX()"><option value="USD">USD</option><option value="SEK">SEK</option><option value="KES">KES</option><option value="EUR">EUR</option></select>
+          </div>
+          <div class="piq-fx-rate" id="piq-fx-rate-label">Select currencies and enter an amount</div>
+          <div style="margin-top:10px;padding:8px 10px;background:var(--bg3);border-radius:6px;font-size:10px;color:var(--text3);font-family:var(--fm)">Quick reference: KES 1M ≈ USD 7,700 ≈ SEK 120,000 · KES 10M ≈ USD 77,000 ≈ SEK 1.2M · Rates indicative only</div>
+        </div>
+      </div>
+    </div>
+
+    <div id="piq-pane-share" class="piq-pane">
+      <div class="piq-card">
+        <div class="piq-card-hd"><div class="piq-card-icon" style="background:var(--green-dim)">📤</div><div><div class="piq-card-title">Share & Export</div><div class="piq-card-sub">Share this analysis with your agent, lawyer, or family</div></div></div>
+        <div class="piq-card-body">
+          <div class="piq-share-grid">
+            <div class="piq-share-btn" onclick="piq_copyReport()"><div class="piq-share-icon">📋</div><div class="piq-share-lbl">Copy report</div><div class="piq-share-sub">Full text</div></div>
+            <div class="piq-share-btn" onclick="piq_shareWhatsApp()"><div class="piq-share-icon">💬</div><div class="piq-share-lbl">WhatsApp</div><div class="piq-share-sub">Share summary</div></div>
+            <div class="piq-share-btn" onclick="window.print()"><div class="piq-share-icon">🖨️</div><div class="piq-share-lbl">Print / PDF</div><div class="piq-share-sub">Save as PDF</div></div>
+          </div>
+          <div class="piq-toast" id="piq-toast"></div>
+          <div style="background:var(--bg3);border-radius:6px;padding:10px 12px;font-size:11px;color:var(--text2);line-height:1.6;margin-top:4px">
+            ${cfg.flag} <strong>${query}</strong> · Verdict: <strong class="${vCls}">${a.verdict}</strong><br>
+            Price: ${a.priceRange} · Yield: ${a.rentalYield} · Appreciation: ${a.capitalAppreciation}<br>
+            <span style="color:var(--text3);font-size:10px">${a.summary}</span>
+          </div>
+        </div>
+      </div>
+    </div>`;
+
+  // re-render history sidebar with active state
+  const histEl=document.getElementById('piq-hist-list');
+  if(histEl && piq_history.length>0){
+    histEl.innerHTML=piq_history.map((h,i)=>{
+      const vCls2=h.verdict==='BUY'?'piq-hv-buy':h.verdict==='AVOID'?'piq-hv-avoid':'piq-hv-hold';
+      const time=new Date(h.timestamp).toLocaleDateString('en-GB',{day:'numeric',month:'short'});
+      return `<div class="piq-hist-item${i===0?' active':''}" onclick="piq_loadHistory(${i})">
+        <div class="piq-hi-q">${h.query}</div>
+        <div class="piq-hi-m"><span>${PIQ_MC[h.market]?.flag||''}</span><span>${time}</span>${h.verdict?`<span class="piq-hi-verdict ${vCls2}">${h.verdict}</span>`:''}</div>
+      </div>`;
+    }).join('');
+  }
+}
+
+function piq_switchTab(name,el){
+  document.querySelectorAll('.piq-tab').forEach(t=>t.classList.remove('on'));
+  document.querySelectorAll('.piq-pane').forEach(p=>p.classList.remove('on'));
+  el.classList.add('on');
+  document.getElementById('piq-pane-'+name)?.classList.add('on');
+}
+
+// ── SETTINGS INTEGRATION — add Perplexity key field ──────────────────────────
+// Called after renderSettings() to inject the Perplexity key field
+function piq_injectSettingsKey(){
+  const aiSection=document.getElementById('set-ai-keys-section');
+  if(!aiSection || document.getElementById('piq-perp-field')) return;
+  const div=document.createElement('div');
+  div.id='piq-perp-field';
+  div.innerHTML=`<div class="field">
+    <label>Perplexity API Key <span style="font-size:10px;color:var(--text3)">(optional — enhances Property IQ live data)</span></label>
+    <input type="password" placeholder="pplx-…" value="${state.aiKeys?.perplexity||''}"
+      oninput="state.aiKeys=state.aiKeys||{};state.aiKeys.perplexity=this.value;save()">
+  </div>`;
+  aiSection.appendChild(div);
+}
+
+// Load propiq history on app init
+piq_loadHistLS();
+
+// Hook into nav so renderPropIQ runs when tab is opened
+const _origNav = typeof nav === 'function' ? nav : null;
+if(_origNav){
+  window.nav = function(panel){
+    _origNav(panel);
+    if(panel==='propiq') renderPropIQ();
+    if(panel==='settings') setTimeout(piq_injectSettingsKey, 50);
+  };
+}
 </script>
 </body>
 </html>
