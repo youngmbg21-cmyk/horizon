@@ -3735,5 +3735,129 @@ function toggleTheme() {
 })();
 </script>
 
+<script>
+// ═══════════════════════════════════════════════════════════════════
+// API KEY MODAL (Part 5E-3)
+// ═══════════════════════════════════════════════════════════════════
+
+function openKeyModal() {
+  const modal = document.getElementById('key-modal');
+  if (!modal) return;
+
+  // Prefill inputs from localStorage (under both the spec keys and
+  // the legacy propiq_* keys used by the search engine)
+  const ak = localStorage.getItem('anthropic-key')  || localStorage.getItem('propiq_ak') || '';
+  const pk = localStorage.getItem('perplexity-key') || localStorage.getItem('propiq_pk') || '';
+
+  const akInput = document.getElementById('key-anthropic');
+  const pkInput = document.getElementById('key-perplexity');
+  if (akInput) akInput.value = ak;
+  if (pkInput) pkInput.value = pk;
+
+  // Clear any previous error state
+  const err = document.getElementById('key-modal-error');
+  if (err) err.textContent = '';
+
+  modal.classList.add('open');
+  modal.style.display = 'flex';
+
+  // Focus first empty field
+  setTimeout(() => {
+    if (akInput && !akInput.value) akInput.focus();
+    else if (pkInput && !pkInput.value) pkInput.focus();
+    else if (akInput) akInput.focus();
+  }, 50);
+}
+
+function closeKeyModal() {
+  const modal = document.getElementById('key-modal');
+  if (!modal) return;
+  modal.classList.remove('open');
+  modal.style.display = 'none';
+}
+
+function saveKeys() {
+  const akInput = document.getElementById('key-anthropic');
+  const pkInput = document.getElementById('key-perplexity');
+  const err = document.getElementById('key-modal-error');
+
+  const ak = (akInput && akInput.value || '').trim();
+  const pk = (pkInput && pkInput.value || '').trim();
+
+  // Validate: Anthropic key is required (non-empty)
+  if (!ak) {
+    if (err) err.textContent = 'Anthropic API key is required.';
+    if (akInput) akInput.focus();
+    updateKeyBadge();
+    return;
+  }
+
+  // Persist under the spec key names …
+  localStorage.setItem('anthropic-key', ak);
+  if (pk) localStorage.setItem('perplexity-key', pk);
+  else localStorage.removeItem('perplexity-key');
+
+  // … and mirror to the legacy keys used by piqSearch() so the
+  // PropIQ engine picks them up without a reload.
+  localStorage.setItem('propiq_ak', ak);
+  if (pk) localStorage.setItem('propiq_pk', pk);
+  else localStorage.removeItem('propiq_pk');
+
+  if (err) err.textContent = '';
+  updateKeyBadge();
+  closeKeyModal();
+}
+
+function updateKeyBadge() {
+  const ak = localStorage.getItem('anthropic-key') || localStorage.getItem('propiq_ak') || '';
+  const pk = localStorage.getItem('perplexity-key') || localStorage.getItem('propiq_pk') || '';
+  const hasAnthropic = !!ak;
+  const hasPerplexity = !!pk;
+
+  // Overall badge — green only when the required key is set
+  const badge = document.getElementById('key-badge');
+  if (badge) {
+    badge.classList.remove('set', 'missing', 'partial');
+    if (hasAnthropic && hasPerplexity) {
+      badge.classList.add('set');
+      badge.style.color = 'var(--green)';
+      badge.style.borderColor = 'var(--green)';
+      badge.textContent = '\u25cf KEYS SET';
+    } else if (hasAnthropic) {
+      badge.classList.add('partial');
+      badge.style.color = 'var(--green)';
+      badge.style.borderColor = 'var(--green)';
+      badge.textContent = '\u25cf ANTHROPIC SET';
+    } else {
+      badge.classList.add('missing');
+      badge.style.color = 'var(--amber)';
+      badge.style.borderColor = 'var(--amber)';
+      badge.textContent = '\u25cf KEY MISSING';
+    }
+  }
+
+  // Per-key pill indicators (optional elements)
+  const akPill = document.getElementById('key-badge-anthropic');
+  if (akPill) {
+    akPill.classList.toggle('set', hasAnthropic);
+    akPill.classList.toggle('missing', !hasAnthropic);
+    akPill.style.color = hasAnthropic ? 'var(--green)' : 'var(--amber)';
+  }
+  const pkPill = document.getElementById('key-badge-perplexity');
+  if (pkPill) {
+    pkPill.classList.toggle('set', hasPerplexity);
+    pkPill.classList.toggle('missing', !hasPerplexity);
+    pkPill.style.color = hasPerplexity ? 'var(--green)' : 'var(--amber)';
+  }
+}
+
+// Initial badge sync on load
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', updateKeyBadge);
+} else {
+  updateKeyBadge();
+}
+</script>
+
 </body>
 </html>
