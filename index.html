@@ -2652,6 +2652,156 @@ Return:
     piqBusy = false;
   }
 }
+
+// ───────────────────────────────────────────────────────────────────
+// piqRenderResults — full results view (KPI row + tabs + active body)
+// ───────────────────────────────────────────────────────────────────
+let piqCurrentResult = null;
+let piqActiveTab = 'investment';
+
+const PIQ_TABS = [
+  { id: 'investment', label: 'Investment',  icon: '\ud83d\udcc8' },
+  { id: 'mortgage',   label: 'Mortgage',    icon: '\ud83c\udfe6' },
+  { id: 'pipeline',   label: 'Pipeline',    icon: '\ud83d\udee0' },
+  { id: 'signals',    label: 'Signals',     icon: '\ud83d\udce1' },
+  { id: 'legal',      label: 'Legal',       icon: '\u2696\ufe0f' },
+  { id: 'currency',   label: 'Currency',    icon: '\ud83d\udcb1' },
+  { id: 'share',      label: 'Share',       icon: '\ud83d\udd17' }
+];
+
+function piqRenderResults(result) {
+  if (!result) return;
+  piqCurrentResult = result;
+  piqActiveTab = 'investment';
+
+  const area = document.getElementById('piq-results-area');
+  if (!area) return;
+
+  const cfg = MARKETS[result.market] || {};
+  const a = result.analysis || {};
+  const k = a.kpis || {};
+
+  // Verdict color
+  const verdictCls = result.verdict === 'BUY' ? 'buy'
+    : result.verdict === 'HOLD' ? 'hold' : 'avoid';
+
+  // KPI row
+  const kpiRow = `
+    <div class="piq-kpi-row">
+      <div class="piq-kpi">
+        <div class="piq-kpi-lbl">Verdict</div>
+        <div class="piq-kpi-val verdict ${verdictCls}">${result.verdict || '\u2014'}</div>
+        <div class="piq-kpi-sub">Score ${result.score || 0}/100</div>
+      </div>
+      <div class="piq-kpi">
+        <div class="piq-kpi-lbl">Price Range</div>
+        <div class="piq-kpi-val">${a.priceRange || '\u2014'}</div>
+        <div class="piq-kpi-sub">${a.pricePerSqm || ''}</div>
+      </div>
+      <div class="piq-kpi">
+        <div class="piq-kpi-lbl">Rental Yield</div>
+        <div class="piq-kpi-val">${k.yield || a.rentalYield || '\u2014'}</div>
+        <div class="piq-kpi-sub">Gross annual</div>
+      </div>
+      <div class="piq-kpi">
+        <div class="piq-kpi-lbl">Appreciation</div>
+        <div class="piq-kpi-val">${k.appreciation || a.capitalAppreciation || '\u2014'}</div>
+        <div class="piq-kpi-sub">Annual capital growth</div>
+      </div>
+      <div class="piq-kpi">
+        <div class="piq-kpi-lbl">Liquidity</div>
+        <div class="piq-kpi-val">${k.liquidity || '\u2014'}</div>
+        <div class="piq-kpi-sub">${cfg.flag || ''} ${cfg.name || ''}</div>
+      </div>
+      <div class="piq-kpi">
+        <div class="piq-kpi-lbl">Avg Price</div>
+        <div class="piq-kpi-val">${k.avgPrice || '\u2014'}</div>
+        <div class="piq-kpi-sub">Market median</div>
+      </div>
+    </div>
+  `;
+
+  // Header — query + timestamp
+  const header = `
+    <div class="piq-result-header">
+      <div class="piq-result-title">
+        <span class="piq-result-flag">${cfg.flag || ''}</span>
+        <div>
+          <div class="piq-result-query">${result.query}</div>
+          <div class="piq-result-meta">${cfg.name || ''} \u00b7 ${new Date(result.timestamp).toLocaleString()}</div>
+        </div>
+      </div>
+    </div>
+  `;
+
+  // Tab strip
+  const tabs = `
+    <div class="piq-tabs" id="piq-tabs">
+      ${PIQ_TABS.map(t => `
+        <div class="piq-tab ${t.id === piqActiveTab ? 'active' : ''}"
+             data-tab="${t.id}"
+             onclick="piqSwitchTab('${t.id}')">
+          <span class="piq-tab-icon">${t.icon}</span>
+          <span class="piq-tab-lbl">${t.label}</span>
+        </div>
+      `).join('')}
+    </div>
+  `;
+
+  // Tab body mount point — filled by piqRenderTab
+  const body = `<div class="piq-tab-body" id="piq-tab-body"></div>`;
+
+  area.innerHTML = header + kpiRow + tabs + body;
+
+  // Render the default active tab
+  piqRenderTab(piqActiveTab);
+}
+
+function piqSwitchTab(tabId) {
+  if (!piqCurrentResult) return;
+  piqActiveTab = tabId;
+  document.querySelectorAll('#piq-tabs .piq-tab').forEach(el => {
+    el.classList.toggle('active', el.dataset.tab === tabId);
+  });
+  piqRenderTab(tabId);
+}
+
+function piqRenderTab(tabId) {
+  const body = document.getElementById('piq-tab-body');
+  if (!body || !piqCurrentResult) return;
+  const r = piqCurrentResult;
+
+  switch (tabId) {
+    case 'investment':
+      if (typeof piqRenderInvestment === 'function') body.innerHTML = piqRenderInvestment(r);
+      else body.innerHTML = '<div class="piq-placeholder">Investment view pending</div>';
+      break;
+    case 'mortgage':
+      if (typeof piqRenderMortgage === 'function') body.innerHTML = piqRenderMortgage(r);
+      else body.innerHTML = '<div class="piq-placeholder">Mortgage view pending</div>';
+      break;
+    case 'pipeline':
+      if (typeof piqRenderPipeline === 'function') body.innerHTML = piqRenderPipeline(r);
+      else body.innerHTML = '<div class="piq-placeholder">Pipeline view pending</div>';
+      break;
+    case 'signals':
+      if (typeof piqRenderSignals === 'function') body.innerHTML = piqRenderSignals(r);
+      else body.innerHTML = '<div class="piq-placeholder">Signals view pending</div>';
+      break;
+    case 'legal':
+      if (typeof piqRenderLegal === 'function') body.innerHTML = piqRenderLegal(r);
+      else body.innerHTML = '<div class="piq-placeholder">Legal view pending</div>';
+      break;
+    case 'currency':
+      if (typeof piqRenderCurrency === 'function') body.innerHTML = piqRenderCurrency(r);
+      else body.innerHTML = '<div class="piq-placeholder">Currency view pending</div>';
+      break;
+    case 'share':
+      if (typeof piqRenderShare === 'function') body.innerHTML = piqRenderShare(r);
+      else body.innerHTML = '<div class="piq-placeholder">Share view pending</div>';
+      break;
+  }
+}
 </script>
 
 </body>
