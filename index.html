@@ -3590,5 +3590,80 @@ function piqBackToResults() {
 }
 </script>
 
+<script>
+// ═══════════════════════════════════════════════════════════════════
+// TICKER BAR (Part 5E-1)
+// ═══════════════════════════════════════════════════════════════════
+
+function updateTicker() {
+  const contentEl = document.getElementById('ticker-content');
+  if (!contentEl) return;
+
+  // Pull live values from the calc engine
+  const sav = calcSavings();
+  const ff  = calcFunFund();
+  const nw  = calcNetWorth();
+  const egg = calcNestEgg();
+
+  const surplus    = sav.surplus;
+  const funFund    = ff.balance;
+  const nestEgg    = egg.finalNominal;
+  const netWorth   = nw.netWorth;
+  const savingsPct = sav.savingsRate;
+
+  // Each field has icon, label, value, and directional tone (pos/neg/neu)
+  const items = [
+    {
+      icon: '\ud83d\udcb0',
+      label: 'MONTHLY SURPLUS',
+      val: fmtCur(surplus),
+      tone: surplus > 0 ? 'pos' : surplus < 0 ? 'neg' : 'neu'
+    },
+    {
+      icon: '\ud83c\udf89',
+      label: 'FUN FUND',
+      val: fmtCur(funFund),
+      tone: funFund > 0 ? 'pos' : 'neu'
+    },
+    {
+      icon: '\ud83e\udd5a',
+      label: 'NEST EGG',
+      val: fmtCur(nestEgg),
+      tone: 'pos'
+    },
+    {
+      icon: '\ud83c\udfe6',
+      label: 'NET WORTH',
+      val: fmtCur(netWorth),
+      tone: netWorth >= 0 ? 'pos' : 'neg'
+    },
+    {
+      icon: '\ud83d\udcca',
+      label: 'SAVINGS RATE',
+      val: (savingsPct || 0).toFixed(1) + '%',
+      tone: savingsPct >= 20 ? 'pos' : savingsPct >= 10 ? 'neu' : 'neg'
+    }
+  ];
+
+  // Build marquee HTML — duplicate the set so the CSS scroll loop is seamless
+  const segment = items.map(it => `
+    <span class="ticker-item ${it.tone}">
+      <span class="ticker-icon">${it.icon}</span>
+      <span class="ticker-label">${it.label}</span>
+      <span class="ticker-value">${it.val}</span>
+    </span>
+    <span class="ticker-sep">\u2022</span>
+  `).join('');
+
+  contentEl.innerHTML = segment + segment;
+
+  // Optional quote element
+  const quoteEl = document.getElementById('ticker-quote');
+  if (quoteEl && state.tickerQuote) {
+    quoteEl.textContent = state.tickerQuote;
+  }
+}
+</script>
+
 </body>
 </html>
