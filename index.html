@@ -4337,5 +4337,209 @@ if (document.readyState === 'loading') {
 }
 </script>
 
+<script>
+// ═══════════════════════════════════════════════════════════════════
+// GLOBAL EVENT LISTENERS (Part 5E-8)
+// ═══════════════════════════════════════════════════════════════════
+
+function initGlobalListeners() {
+  // Helper — bind once, guarded by a flag so re-calling initGlobalListeners
+  // from a hot reload or second DOMContentLoaded won't double-wire.
+  function on(el, evt, fn) {
+    if (!el) return;
+    const key = '__h_' + evt;
+    if (el[key]) return;
+    el[key] = true;
+    el.addEventListener(evt, fn);
+  }
+
+  // ── App switcher tabs ──────────────────────────────────────────
+  // Any element with .app-tab[data-app] or #app-tabs [data-app]
+  document.querySelectorAll('.app-tab[data-app], #app-tabs [data-app]').forEach(tab => {
+    on(tab, 'click', (e) => {
+      e.preventDefault();
+      const app = tab.dataset.app;
+      if (app && typeof showApp === 'function') showApp(app);
+    });
+  });
+
+  // ── Sidebar nav items (Money OS) ───────────────────────────────
+  // .nav-item[data-panel] — desktop sidebar
+  document.querySelectorAll('.nav-item[data-panel]').forEach(item => {
+    on(item, 'click', (e) => {
+      e.preventDefault();
+      const panel = item.dataset.panel;
+      if (panel && typeof showPanel === 'function') showPanel(panel);
+    });
+  });
+  // Legacy #nav-<panel> IDs from horizon-os-v2 reference
+  ['dashboard', 'cashflow', 'networth', 'assets', 'vacation', 'retirement', 'settings']
+    .forEach(p => {
+      const el = document.getElementById('nav-' + p);
+      on(el, 'click', (e) => {
+        e.preventDefault();
+        if (typeof showPanel === 'function') showPanel(p);
+      });
+    });
+
+  // ── Theme toggle ───────────────────────────────────────────────
+  document.querySelectorAll('.theme-toggle, #theme-toggle, #theme-toggle-btn').forEach(btn => {
+    on(btn, 'click', (e) => {
+      e.preventDefault();
+      if (typeof toggleTheme === 'function') toggleTheme();
+    });
+  });
+
+  // ── Key badge (opens the key modal) ────────────────────────────
+  document.querySelectorAll('#key-badge, .key-badge-btn, #key-badge-btn').forEach(el => {
+    on(el, 'click', (e) => {
+      e.preventDefault();
+      if (typeof openKeyModal === 'function') openKeyModal();
+    });
+  });
+
+  // ── Export / import buttons ────────────────────────────────────
+  const expBtn = document.getElementById('export-btn') || document.getElementById('set-export-btn');
+  on(expBtn, 'click', (e) => {
+    e.preventDefault();
+    if (typeof exportState === 'function') exportState();
+  });
+
+  const impBtn = document.getElementById('import-btn') || document.getElementById('set-import-btn');
+  on(impBtn, 'click', (e) => {
+    e.preventDefault();
+    const file = document.getElementById('import-file') || document.getElementById('set-import-file');
+    if (file) file.click();
+  });
+  const impFile = document.getElementById('import-file') || document.getElementById('set-import-file');
+  on(impFile, 'change', (e) => {
+    if (typeof importState === 'function') importState(e.target);
+  });
+
+  // ── Modal close buttons ────────────────────────────────────────
+  // Any element with .modal-close or data-modal-close inside a modal
+  // closes the modal it belongs to. Special-case the key modal.
+  document.querySelectorAll('#key-modal .modal-close, #key-modal [data-modal-close], #key-modal-close').forEach(btn => {
+    on(btn, 'click', (e) => {
+      e.preventDefault();
+      if (typeof closeKeyModal === 'function') closeKeyModal();
+    });
+  });
+  // Click-outside-to-close for the key modal backdrop
+  const keyModal = document.getElementById('key-modal');
+  on(keyModal, 'click', (e) => {
+    if (e.target === keyModal && typeof closeKeyModal === 'function') closeKeyModal();
+  });
+  // Save button inside the key modal
+  const keySaveBtn = document.getElementById('key-save-btn') || document.getElementById('save-keys-btn');
+  on(keySaveBtn, 'click', (e) => {
+    e.preventDefault();
+    if (typeof saveKeys === 'function') saveKeys();
+  });
+
+  // ── AI FAB button ──────────────────────────────────────────────
+  document.querySelectorAll('#chat-fab, .chat-fab, #ai-fab').forEach(fab => {
+    on(fab, 'click', (e) => {
+      e.preventDefault();
+      if (typeof toggleChat === 'function') toggleChat();
+      else if (typeof openChat === 'function') openChat();
+    });
+  });
+  // Chat panel close button
+  document.querySelectorAll('#chat-close, .chat-close, #chat-panel .modal-close').forEach(btn => {
+    on(btn, 'click', (e) => {
+      e.preventDefault();
+      if (typeof closeChat === 'function') closeChat();
+    });
+  });
+
+  // ── Chat send (click + Enter) ──────────────────────────────────
+  const chatSendBtn = document.getElementById('chat-send') || document.getElementById('chat-send-btn');
+  on(chatSendBtn, 'click', (e) => {
+    e.preventDefault();
+    if (typeof sendChat === 'function') sendChat();
+  });
+  // Enter-to-send is already wired by Part 5 via a global keydown
+  // listener on #chat-input; no duplicate binding here.
+
+  // ── Market toggle buttons (PropIQ) ─────────────────────────────
+  document.querySelectorAll('[data-market], .market-toggle-btn, #tog-ke, #tog-se').forEach(btn => {
+    on(btn, 'click', (e) => {
+      e.preventDefault();
+      let m = btn.dataset.market;
+      if (!m) {
+        if (btn.id === 'tog-ke') m = 'ke';
+        else if (btn.id === 'tog-se') m = 'se';
+      }
+      if (m && typeof setMarket === 'function') setMarket(m);
+    });
+  });
+
+  // ── Quick tag chips ────────────────────────────────────────────
+  // Static chips outside the dynamic #piq-quick-tags strip — support
+  // data-tag="Westlands" attribute. (Dynamic tags already have inline
+  // onclick wired by setMarket().)
+  document.querySelectorAll('.qtag[data-tag]').forEach(chip => {
+    on(chip, 'click', (e) => {
+      e.preventDefault();
+      const term = chip.dataset.tag;
+      if (term && typeof piqQuickSearch === 'function') piqQuickSearch(term);
+    });
+  });
+
+  // ── Search input (Enter key) + search button ──────────────────
+  const searchInput = document.getElementById('piq-search-input') || document.getElementById('search-input');
+  on(searchInput, 'keydown', (e) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      if (typeof piqSearch === 'function') piqSearch();
+    }
+  });
+  const searchBtn = document.getElementById('piq-search-btn') || document.getElementById('search-btn');
+  on(searchBtn, 'click', (e) => {
+    e.preventDefault();
+    if (typeof piqSearch === 'function') piqSearch();
+  });
+
+  // ── Compare button ─────────────────────────────────────────────
+  const cmpBtn = document.getElementById('piq-compare-btn') || document.getElementById('compare-btn');
+  on(cmpBtn, 'click', (e) => {
+    e.preventDefault();
+    if (typeof piqCompare === 'function') piqCompare(4);
+  });
+
+  // ── Clear history button ───────────────────────────────────────
+  const clrBtn = document.getElementById('piq-clear-history') || document.getElementById('clear-history-btn');
+  on(clrBtn, 'click', (e) => {
+    e.preventDefault();
+    if (typeof piqClearHistory === 'function') piqClearHistory();
+  });
+
+  // ── Escape key closes modals / panels ──────────────────────────
+  if (!document.__h_escListener) {
+    document.__h_escListener = true;
+    document.addEventListener('keydown', (e) => {
+      if (e.key !== 'Escape') return;
+      const km = document.getElementById('key-modal');
+      if (km && km.classList.contains('open')) {
+        if (typeof closeKeyModal === 'function') closeKeyModal();
+        return;
+      }
+      const cp = document.getElementById('chat-panel');
+      if (cp && cp.classList.contains('open')) {
+        if (typeof closeChat === 'function') closeChat();
+      }
+    });
+  }
+}
+
+// Auto-initialize on load
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', initGlobalListeners);
+} else {
+  initGlobalListeners();
+}
+</script>
+
 </body>
 </html>
