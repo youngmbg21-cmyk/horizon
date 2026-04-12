@@ -2098,6 +2098,152 @@ function updateRetField(field, val) {
   saveState();
   renderRetire();
 }
+
+// ───────────────────────────────────────────────────────────────────
+// SETTINGS
+// ───────────────────────────────────────────────────────────────────
+function renderSettings() {
+  // Profile fields
+  setVal('set-current-age', state.currentAge);
+  setVal('set-retire-age', state.retirementAge);
+  setVal('set-life-exp', state.lifeExp);
+  setVal('set-growth-rate', state.growthRate);
+  setVal('set-inflation', state.inflationRate);
+  setVal('set-post-growth', state.postRetGrowth);
+  setVal('set-tax-rate', state.withdrawTaxRate);
+  setVal('set-ticker', state.tickerQuote || '');
+
+  // Display toggles — currency selector + dark mode
+  const curSel = document.getElementById('set-currency');
+  if (curSel) {
+    curSel.innerHTML = Object.keys(CSYM).map(c =>
+      `<option value="${c}" ${c === state.currency ? 'selected' : ''}>${c} (${CSYM[c]})</option>`
+    ).join('');
+  }
+
+  const darkEl = document.getElementById('set-dark-mode');
+  if (darkEl) darkEl.checked = !!state.darkMode;
+
+  const realEl = document.getElementById('set-nestegg-real');
+  if (realEl) realEl.checked = !!state.nestEggReal;
+
+  // Exchange rate inputs
+  const fxEl = document.getElementById('set-exchange-rates');
+  if (fxEl) {
+    fxEl.innerHTML = Object.entries(state.exchangeRates).map(([cur, rate]) => `
+      <div class="fx-row">
+        <label>${cur} (${CSYM[cur] || ''})</label>
+        <input type="number" step="0.0001" value="${rate}"
+          onchange="updateExchangeRate('${cur}', Number(this.value))"
+          ${cur === 'SEK' ? 'disabled' : ''}>
+      </div>
+    `).join('');
+  }
+
+  // Firebase status
+  const fbStatus = document.getElementById('fbStatus');
+  if (fbStatus && !fbStatus.innerHTML.trim()) {
+    fbStatus.innerHTML = fbReady
+      ? '<span style="color:var(--green)">\u2713 Connected</span>'
+      : '<span style="color:var(--text2)">Not connected</span>';
+  }
+  const fbUrlEl = document.getElementById('fbUrl');
+  const fbKeyEl = document.getElementById('fbKey');
+  const fbUserEl = document.getElementById('fbUser');
+  if (fbUrlEl && !fbUrlEl.value) fbUrlEl.value = localStorage.getItem('horizon-fb-url') || '';
+  if (fbKeyEl && !fbKeyEl.value) fbKeyEl.value = localStorage.getItem('horizon-fb-key') || '';
+  if (fbUserEl && !fbUserEl.value) fbUserEl.value = localStorage.getItem('horizon-fb-user') || 'default';
+
+  // Perplexity key field
+  const pkEl = document.getElementById('set-perplexity-key');
+  if (pkEl && !pkEl.value) {
+    pkEl.value = localStorage.getItem('propiq_pk') || '';
+  }
+
+  // Anthropic key field
+  const akEl = document.getElementById('set-anthropic-key');
+  if (akEl && !akEl.value) {
+    akEl.value = localStorage.getItem('propiq_ak') || '';
+  }
+
+  // Export / import buttons — wire up onclick if present
+  const expBtn = document.getElementById('set-export-btn');
+  if (expBtn && !expBtn.onclick) expBtn.onclick = exportState;
+  const impBtn = document.getElementById('set-import-btn');
+  if (impBtn && !impBtn.onclick) impBtn.onclick = () => document.getElementById('set-import-file').click();
+  const impFile = document.getElementById('set-import-file');
+  if (impFile && !impFile.onchange) impFile.onchange = (e) => importState(e.target);
+  const resetBtn = document.getElementById('set-reset-btn');
+  if (resetBtn && !resetBtn.onclick) {
+    resetBtn.onclick = () => {
+      if (confirm('Reset all data? This cannot be undone.')) {
+        localStorage.removeItem(STORAGE_KEY);
+        location.reload();
+      }
+    };
+  }
+}
+
+function updateSettingField(field, val) {
+  state[field] = val;
+  saveState();
+  renderAll();
+}
+
+function updateExchangeRate(cur, val) {
+  state.exchangeRates[cur] = val;
+  saveState();
+  renderAll();
+}
+
+function exportState() {
+  const a = document.createElement('a');
+  a.href = 'data:application/json,' + encodeURIComponent(JSON.stringify(state, null, 2));
+  a.download = 'horizon-backup-' + new Date().toISOString().slice(0, 10) + '.json';
+  a.click();
+}
+
+function importState(input) {
+  const f = input.files && input.files[0];
+  if (!f) return;
+  const r = new FileReader();
+  r.onload = e => {
+    try {
+      Object.assign(state, JSON.parse(e.target.result));
+      saveState();
+      renderAll();
+      alert('Import successful');
+    } catch (ex) {
+      alert('Invalid file: ' + ex.message);
+    }
+  };
+  r.readAsText(f);
+}
+
+// ───────────────────────────────────────────────────────────────────
+// MASTER RENDER DISPATCH
+// ───────────────────────────────────────────────────────────────────
+function renderAll() {
+  renderDashboard();
+  renderCashFlow();
+  renderNetWorth();
+  renderAssets();
+  renderFunFund();
+  renderRetire();
+  renderSettings();
+}
+
+function renderActivePanel() {
+  switch (currentPanel) {
+    case 'dashboard':   renderDashboard(); break;
+    case 'cashflow':    renderCashFlow();  break;
+    case 'networth':    renderNetWorth();  break;
+    case 'assets':      renderAssets();    break;
+    case 'vacation':    renderFunFund();   break;
+    case 'retirement':  renderRetire();    break;
+    case 'settings':    renderSettings();  break;
+  }
+}
 </script>
 
 </body>
