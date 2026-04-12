@@ -3665,5 +3665,75 @@ function updateTicker() {
 }
 </script>
 
+<script>
+// ═══════════════════════════════════════════════════════════════════
+// THEME TOGGLE (Part 5E-2)
+// ═══════════════════════════════════════════════════════════════════
+
+function ensureDisplayState() {
+  if (!state.display || typeof state.display !== 'object') {
+    state.display = {
+      theme: state.darkMode === false ? 'light' : 'dark'
+    };
+  }
+  if (state.display.theme !== 'light' && state.display.theme !== 'dark') {
+    state.display.theme = 'dark';
+  }
+}
+
+function setTheme(theme) {
+  // Normalize
+  if (theme !== 'light' && theme !== 'dark') theme = 'dark';
+
+  ensureDisplayState();
+  state.display.theme = theme;
+  // Keep legacy darkMode flag in sync so existing panels/settings read right
+  state.darkMode = theme === 'dark';
+
+  // Apply to <html>
+  document.documentElement.setAttribute('data-theme', theme);
+
+  // Update toggle button icon(s)
+  // Convention: any element with .theme-toggle gets its innerHTML updated,
+  // and elements with id="theme-toggle-icon" get refreshed too.
+  const icon = theme === 'dark' ? '\u263e' : '\u2600\ufe0f';   // ☾ moon / ☀ sun
+  const nextLbl = theme === 'dark' ? 'Light mode' : 'Dark mode';
+
+  document.querySelectorAll('.theme-toggle').forEach(btn => {
+    btn.setAttribute('aria-label', nextLbl);
+    btn.setAttribute('title', nextLbl);
+    const iconEl = btn.querySelector('.theme-toggle-icon');
+    if (iconEl) {
+      iconEl.textContent = icon;
+    } else {
+      btn.textContent = icon;
+    }
+  });
+
+  const topIcon = document.getElementById('theme-toggle-icon');
+  if (topIcon) topIcon.textContent = icon;
+
+  saveState();
+}
+
+function toggleTheme() {
+  ensureDisplayState();
+  setTheme(state.display.theme === 'dark' ? 'light' : 'dark');
+}
+
+// Apply saved theme on load
+(function applySavedTheme() {
+  function apply() {
+    ensureDisplayState();
+    setTheme(state.display.theme);
+  }
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', apply);
+  } else {
+    apply();
+  }
+})();
+</script>
+
 </body>
 </html>
