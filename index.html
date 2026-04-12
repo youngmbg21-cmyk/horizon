@@ -3859,5 +3859,80 @@ if (document.readyState === 'loading') {
 }
 </script>
 
+<script>
+// ═══════════════════════════════════════════════════════════════════
+// CLAUDE API CLIENT (Part 5E-4)
+// ═══════════════════════════════════════════════════════════════════
+
+async function claudeFetch(systemPrompt, userMessage) {
+  // Pull the stored Anthropic key — try the spec key name first,
+  // then fall back to the legacy name used by the PropIQ engine.
+  const key = localStorage.getItem('anthropic-key')
+    || localStorage.getItem('propiq_ak')
+    || '';
+
+  if (!key) {
+    return 'Anthropic API key missing. Open the key modal and paste a key starting with sk-ant- to continue.';
+  }
+  if (!key.startsWith('sk-ant-')) {
+    return 'Anthropic API key looks invalid (should start with sk-ant-). Please re-enter it via the key modal.';
+  }
+
+  const body = {
+    model: 'claude-sonnet-4-5',
+    max_tokens: 2000,
+    messages: [
+      { role: 'user', content: String(userMessage == null ? '' : userMessage) }
+    ]
+  };
+  if (systemPrompt) {
+    body.system = String(systemPrompt);
+  }
+
+  try {
+    const res = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'x-api-key': key,
+        'anthropic-version': '2023-06-01',
+        'anthropic-dangerous-direct-browser-access': 'true',
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(body)
+    });
+
+    if (!res.ok) {
+      let detail = '';
+      try {
+        const err = await res.json();
+        detail = (err && err.error && err.error.message) || '';
+      } catch (e) {
+        try { detail = await res.text(); } catch (_) {}
+      }
+      return 'Claude request failed (' + res.status + ')'
+        + (detail ? ': ' + detail : '') + '.';
+    }
+
+    const data = await res.json();
+    // Expected shape: { content: [{ type: 'text', text: '...' }, ...], ... }
+    if (data && Array.isArray(data.content)) {
+      const text = data.content
+        .filter(b => b && b.type === 'text' && typeof b.text === 'string')
+        .map(b => b.text)
+        .join('\n')
+        .trim();
+      if (text) return text;
+    }
+    return 'Claude returned an empty response. Please try again.';
+  } catch (e) {
+    const msg = (e && e.message) ? e.message : String(e);
+    if (/NetworkError|Failed to fetch|CORS/i.test(msg)) {
+      return 'Network or CORS error reaching api.anthropic.com. If you are running from a local file, host the page on Netlify or a local server so the browser can call the API.';
+    }
+    return 'Claude request error: ' + msg;
+  }
+}
+</script>
+
 </body>
 </html>
