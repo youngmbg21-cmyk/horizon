@@ -12,7 +12,40 @@
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-database-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
 </head>
-<body>
+<body class="dark" id="body">
+
+<!-- ══ TICKER BAR ══ -->
+<div class="ticker-bar">
+  <div class="ticker-track" id="ticker-content"></div>
+  <div class="ticker-sync" id="ticker-quote">●LIVE</div>
+</div>
+
+<!-- ══ TOPBAR ══ -->
+<div class="topbar">
+  <div class="logo">
+    <div class="logo-mark">H</div>
+    <span style="color:var(--text)">HORIZON</span>&nbsp;<span style="color:var(--green)">OS</span>
+  </div>
+
+  <!-- App switcher -->
+  <div class="app-tabs" id="app-tabs">
+    <button class="app-tab active" data-app="money">Money OS</button>
+    <button class="app-tab" data-app="property">Property IQ</button>
+  </div>
+
+  <div class="topbar-right">
+    <span class="sync-badge" id="syncBadge">LOCAL</span>
+    <span class="key-badge" id="key-badge" onclick="openKeyModal()">⚡ API KEYS</span>
+    <span id="key-badge-anthropic"></span>
+    <span id="key-badge-perplexity"></span>
+    <button class="iBtn" id="export-btn" title="Export backup">⬇</button>
+    <input type="file" id="import-file" style="display:none" accept=".json">
+    <button class="iBtn" id="import-btn" title="Import backup">⬆</button>
+    <button class="iBtn theme-toggle" id="theme-toggle" onclick="toggleTheme()">
+      <span class="theme-toggle-icon" id="theme-toggle-icon">🌙</span>
+    </button>
+  </div>
+</div>
 
 <script>
 // ═══════════════════════════════════════════════════════════════════
