@@ -336,5 +336,286 @@ window.addEventListener('DOMContentLoaded', () => {
 });
 </script>
 
+<script>
+// ═══════════════════════════════════════════════════════════════════
+// MONEY OS — CALCULATION ENGINE (pure math, no DOM access)
+// ═══════════════════════════════════════════════════════════════════
+
+function calcIncome(monthKey) {
+  const key = monthKey || state.selectedMonth;
+  const ov = state.monthlyOverrides[key];
+  const items = ov && ov.income ? ov.income : state.income;
+  const total = items.reduce((s, i) => s + i.amount, 0);
+  return { items, total, month: key, hasOverride: !!(ov && ov.income) };
+}
+
+function calcExpenses(monthKey) {
+  const key = monthKey || state.selectedMonth;
+  const ov = state.monthlyOverrides[key];
+  const items = ov && ov.expenses ? ov.expenses : state.expenses;
+  const total = items.reduce((s, i) => s + i.amount, 0);
+  const paid = items.filter(i => i.paid);
+  const unpaid = items.filter(i => !i.paid);
+  const paidTotal = paid.reduce((s, i) => s + i.amount, 0);
+  const unpaidTotal = unpaid.reduce((s, i) => s + i.amount, 0);
+  return { items, total, paid, unpaid, paidTotal, unpaidTotal, month: key, hasOverride: !!(ov && ov.expenses) };
+}
+
+function calcSavings(monthKey) {
+  const key = monthKey || state.selectedMonth;
+  const ov = state.monthlyOverrides[key];
+  const inc = calcIncome(key);
+  const exp = calcExpenses(key);
+  const baseSav = ov && ov.savings !== undefined ? ov.savings : state.baseSavings;
+  const surplus = inc.total - exp.total;
+  const savingsRate = inc.total > 0 ? (baseSav / inc.total) * 100 : 0;
+  const funFund = Math.max(0, surplus - baseSav);
+
+  // Split: 50% emergency, 30% nest egg, 20% fun fund (of base savings)
+  const emergency = baseSav * 0.5;
+  const nestEggAlloc = baseSav * 0.3;
+  const funAlloc = baseSav * 0.2;
+
+  return {
+    baseSavings: baseSav,
+    surplus,
+    savingsRate: Math.round(savingsRate * 10) / 10,
+    funFund,
+    allocation: { emergency, nestEgg: nestEggAlloc, funFund: funAlloc },
+    month: key
+  };
+}
+
+function calcCashFlow() {
+  const now = new Date();
+  const months = [];
+  let cumSavings = 0;
+
+  for (let i = 0; i < 12; i++) {
+    const d = new Date(now.getFullYear(), now.getMonth() - 11 + i, 1);
+    const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+    const inc = calcIncome(key);
+    const exp = calcExpenses(key);
+    const surplus = inc.total - exp.total;
+    cumSavings += surplus;
+    months.push({
+      month: key,
+      label: MN[d.getMonth()] + ' ' + d.getFullYear(),
+      income: inc.total,
+      expenses: exp.total,
+      surplus,
+      cumSavings
+    });
+  }
+
+  const avgIncome = months.reduce((s, m) => s + m.income, 0) / 12;
+  const avgExpenses = months.reduce((s, m) => s + m.expenses, 0) / 12;
+  const avgSurplus = months.reduce((s, m) => s + m.surplus, 0) / 12;
+
+  return { months, avgIncome, avgExpenses, avgSurplus, cumSavings };
+}
+
+function calcNetWorth() {
+  // Assets: external investment accounts
+  const assetItems = (state.externalAssets || []).map(a => ({
+    id: a.id,
+    name: a.name,
+    value: a.balance
+  }));
+  const totalAssets = assetItems.reduce((s, a) => s + a.value, 0);
+
+  // Property asset
+  const propertyValue = state.netWorth.property || 0;
+
+  // Liabilities
+  const mortgage = state.netWorth.mortgage || 0;
+  const otherDebt = state.netWorth.otherDebt || 0;
+  const totalLiabilities = mortgage + otherDebt;
+
+  // Net worth
+  const netWorth = totalAssets + propertyValue - totalLiabilities;
+
+  return {
+    assets: {
+      investments: { items: assetItems, total: totalAssets },
+      property: propertyValue,
+      total: totalAssets + propertyValue
+    },
+    liabilities: {
+      mortgage,
+      otherDebt,
+      total: totalLiabilities
+    },
+    netWorth
+  };
+}
+
+function calcNestEgg(yearsOverride) {
+  const years = yearsOverride !== undefined ? yearsOverride : (state.retirementAge - state.currentAge);
+  const inflRate = state.inflationRate / 100;
+  const projections = [];
+
+  // Per-asset projections
+  const assetProjections = (state.externalAssets || []).map(a => {
+    const r = (a.growthRate || state.growthRate) / 100;
+    const rn = r / 12;
+    const timeline = [];
+    let bal = a.balance;
+    for (let y = 0; y <= years; y++) {
+      const realBal = bal / Math.pow(1 + inflRate, y);
+      timeline.push({ year: y, nominal: Math.round(bal), real: Math.round(realBal) });
+      if (y < years) {
+        for (let m = 0; m < 12; m++) {
+          bal = bal * (1 + rn) + a.monthlyContribution;
+        }
+      }
+    }
+    return { id: a.id, name: a.name, timeline };
+  });
+
+  // Aggregate totals per year
+  for (let y = 0; y <= years; y++) {
+    let nominal = 0;
+    let real = 0;
+    assetProjections.forEach(ap => {
+      nominal += ap.timeline[y].nominal;
+      real += ap.timeline[y].real;
+    });
+    projections.push({ year: y, nominal, real });
+  }
+
+  // Also add monthly savings contribution as a separate growth line
+  const savRate = state.growthRate / 100;
+  const savRn = savRate / 12;
+  let savBal = 0;
+  const savingsTimeline = [];
+  for (let y = 0; y <= years; y++) {
+    const realBal = savBal / Math.pow(1 + inflRate, y);
+    savingsTimeline.push({ year: y, nominal: Math.round(savBal), real: Math.round(realBal) });
+    if (y < years) {
+      for (let m = 0; m < 12; m++) {
+        savBal = savBal * (1 + savRn) + state.baseSavings;
+      }
+    }
+  }
+
+  // Grand total = assets + savings contributions
+  const grandTotal = projections.map((p, i) => ({
+    year: p.year,
+    nominal: p.nominal + savingsTimeline[i].nominal,
+    real: p.real + savingsTimeline[i].real
+  }));
+
+  return {
+    years,
+    assetProjections,
+    savingsTimeline,
+    projections,
+    grandTotal,
+    finalNominal: grandTotal.length ? grandTotal[grandTotal.length - 1].nominal : 0,
+    finalReal: grandTotal.length ? grandTotal[grandTotal.length - 1].real : 0
+  };
+}
+
+function calcRetirement() {
+  const yearsToRet = state.retirementAge - state.currentAge;
+  const retYears = state.lifeExp - state.retirementAge;
+
+  // Swedish pension components (monthly)
+  const penAllman = state.penAllman || 0;
+  const penITP = state.penITP || 0;
+  const penOther = state.penOther || 0;
+  const monthlyPension = penAllman + penITP + penOther;
+
+  // Nest egg at retirement
+  const egg = calcNestEgg(yearsToRet);
+  const nestEggAtRet = state.nestEggReal ? egg.finalReal : egg.finalNominal;
+
+  // Monthly drawdown from nest egg over retirement years
+  const drawdownMonths = retYears * 12;
+  const postRetR = state.postRetGrowth / 100 / 12;
+  let monthlyDrawdown = 0;
+  if (drawdownMonths > 0) {
+    if (postRetR > 0) {
+      // PMT formula: PMT = PV * r / (1 - (1+r)^-n)
+      monthlyDrawdown = nestEggAtRet * postRetR / (1 - Math.pow(1 + postRetR, -drawdownMonths));
+    } else {
+      monthlyDrawdown = nestEggAtRet / drawdownMonths;
+    }
+  }
+
+  // After-tax drawdown
+  const taxRate = state.withdrawTaxRate / 100;
+  const monthlyDrawdownAfterTax = monthlyDrawdown * (1 - taxRate);
+
+  // Total monthly retirement income
+  const monthlyRetIncome = monthlyPension + monthlyDrawdownAfterTax;
+
+  // Current monthly expenses as baseline target
+  const currentExp = calcExpenses();
+  const monthlyTarget = currentExp.total;
+
+  // FIRE number: 25x annual expenses (4% rule)
+  const fireNumber = monthlyTarget * 12 * 25;
+
+  // Gap analysis
+  const gap = monthlyTarget - monthlyRetIncome;
+  const onTrack = gap <= 0;
+
+  return {
+    yearsToRetirement: yearsToRet,
+    retirementYears: retYears,
+    pension: {
+      allman: penAllman,
+      itp: penITP,
+      other: penOther,
+      monthlyTotal: monthlyPension
+    },
+    nestEggAtRetirement: Math.round(nestEggAtRet),
+    drawdownMonths,
+    monthlyDrawdownGross: Math.round(monthlyDrawdown),
+    monthlyDrawdownAfterTax: Math.round(monthlyDrawdownAfterTax),
+    monthlyRetirementIncome: Math.round(monthlyRetIncome),
+    monthlyTarget,
+    fireNumber: Math.round(fireNumber),
+    gap: Math.round(gap),
+    onTrack
+  };
+}
+
+function calcFunFund(monthKey) {
+  const sav = calcSavings(monthKey);
+  const balance = sav.funFund;
+
+  // Affordability tiers
+  const tiers = [
+    { name: 'Coffee date', amount: 500 },
+    { name: 'Nice dinner', amount: 2000 },
+    { name: 'Weekend trip', amount: 8000 },
+    { name: 'Short holiday', amount: 25000 },
+    { name: 'Big vacation', amount: 50000 }
+  ];
+
+  const tiersWithStatus = tiers.map(t => {
+    const affordable = balance >= t.amount;
+    const monthsToReach = !affordable && balance < t.amount && sav.funFund > 0
+      ? Math.ceil((t.amount - balance) / sav.funFund)
+      : affordable ? 0 : Infinity;
+    return { ...t, affordable, monthsToReach };
+  });
+
+  // Find the next unreached tier
+  const nextTier = tiersWithStatus.find(t => !t.affordable) || null;
+
+  return {
+    balance,
+    monthlySurplus: sav.funFund,
+    tiers: tiersWithStatus,
+    nextTier,
+    month: sav.month
+  };
+}
+</script>
+
 </body>
 </html>
