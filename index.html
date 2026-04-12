@@ -1767,6 +1767,337 @@ function removeAsset(id) {
   saveState();
   renderAssets();
 }
+
+// ───────────────────────────────────────────────────────────────────
+// FUN FUND / VACATION PLANNER
+// ───────────────────────────────────────────────────────────────────
+let vacMap = null;
+let vacFilter = 'all';
+
+function renderFunFund() {
+  const ff = calcFunFund();
+
+  // Headline
+  setEl('ff-balance', fmtCur(ff.balance));
+  setEl('ff-monthly', fmtCur(ff.monthlySurplus));
+
+  // Tier grid with affordability highlights
+  const tierEl = document.getElementById('ff-tier-grid');
+  if (tierEl) {
+    tierEl.innerHTML = ff.tiers.map(t => {
+      const pct = t.affordable ? 100 : Math.min(100, (ff.balance / t.amount) * 100);
+      const reachTxt = t.affordable
+        ? 'Affordable now'
+        : (t.monthsToReach === Infinity ? 'Out of reach' : t.monthsToReach + ' months');
+      return `
+        <div class="ff-tier ${t.affordable ? 'ok' : ''}">
+          <div class="ff-tier-name">${t.name}</div>
+          <div class="ff-tier-amt">${fmtCur(t.amount)}</div>
+          <div class="ff-tier-bar"><div class="ff-tier-fill" style="width:${pct}%"></div></div>
+          <div class="ff-tier-reach">${reachTxt}</div>
+        </div>
+      `;
+    }).join('');
+  }
+
+  // Next-tier focus card
+  const nextEl = document.getElementById('ff-next-tier');
+  if (nextEl) {
+    if (ff.nextTier) {
+      const need = ff.nextTier.amount - ff.balance;
+      nextEl.innerHTML = `
+        <div class="ff-next-name">Next: ${ff.nextTier.name}</div>
+        <div class="ff-next-need">${fmtCur(Math.max(0, need))} to go</div>
+        <div class="ff-next-months">${ff.nextTier.monthsToReach === Infinity ? '\u2014' : ff.nextTier.monthsToReach + ' months'}</div>
+      `;
+    } else {
+      nextEl.innerHTML = `<div class="ff-next-name">All tiers unlocked \ud83c\udf89</div>`;
+    }
+  }
+
+  // Fund timeline bars — projected fun fund accrual over 12 months
+  const tlEl = document.getElementById('ff-timeline');
+  if (tlEl) {
+    const bars = [];
+    const now = new Date();
+    let running = ff.balance;
+    const maxBar = ff.balance + ff.monthlySurplus * 12;
+    for (let i = 0; i < 12; i++) {
+      running += ff.monthlySurplus;
+      const d = new Date(now.getFullYear(), now.getMonth() + i + 1, 1);
+      const pct = maxBar > 0 ? (running / maxBar) * 100 : 0;
+      bars.push(`
+        <div class="ff-tl-bar">
+          <div class="ff-tl-fill" style="height:${pct}%"></div>
+          <div class="ff-tl-lbl">${MN[d.getMonth()]}</div>
+          <div class="ff-tl-val">${fmtCur(running)}</div>
+        </div>
+      `);
+    }
+    tlEl.innerHTML = bars.join('');
+  }
+
+  // Saved trips list
+  const tripsEl = document.getElementById('ff-saved-trips');
+  if (tripsEl) {
+    const trips = state.savedTrips || [];
+    if (trips.length === 0) {
+      tripsEl.innerHTML = '<div class="empty">No saved trips yet. Pick a destination below.</div>';
+    } else {
+      tripsEl.innerHTML = trips.map((t, i) => `
+        <div class="trip-card">
+          <div class="trip-flag">${t.flag || '\u2708'}</div>
+          <div class="trip-body">
+            <div class="trip-name">${t.dest}</div>
+            <div class="trip-cost">${t.cost}</div>
+          </div>
+          <button class="btn-remove" onclick="removeTrip(${i})">\u2715</button>
+        </div>
+      `).join('');
+    }
+  }
+
+  // Destination pulse grid with filters
+  const pulseEl = document.getElementById('ff-pulse-grid');
+  if (pulseEl) {
+    const filtered = vacFilter === 'all'
+      ? PULSE_DESTS
+      : PULSE_DESTS.filter(d => d.vibe === vacFilter);
+    pulseEl.innerHTML = filtered.map((d, idx) => `
+      <div class="pulse-card" style="border-left:3px solid ${d.col}" onclick="saveTrip(${PULSE_DESTS.indexOf(d)})">
+        <div class="pulse-flag">${d.flag}</div>
+        <div class="pulse-name">${d.dest}</div>
+        <div class="pulse-vibe">${d.vibe}</div>
+        <div class="pulse-why">${d.why}</div>
+        <div class="pulse-cost">${d.cost}</div>
+      </div>
+    `).join('');
+  }
+
+  // Filter chips active state
+  document.querySelectorAll('.ff-filter').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.filter === vacFilter);
+  });
+
+  // Leaflet map markers
+  if (typeof L !== 'undefined') {
+    const mapEl = document.getElementById('ff-map');
+    if (mapEl) {
+      if (!vacMap) {
+        vacMap = L.map('ff-map', { zoomControl: false }).setView([20, 15], 2);
+        L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png', {
+          attribution: '\u00a9 CARTO', maxZoom: 18
+        }).addTo(vacMap);
+      } else {
+        vacMap.eachLayer(l => { if (l instanceof L.CircleMarker) vacMap.removeLayer(l); });
+      }
+      PULSE_DESTS.forEach((d, idx) => {
+        L.circleMarker([d.lat, d.lng], {
+          radius: 8, color: d.col, fillColor: d.col, fillOpacity: 0.6, weight: 2
+        }).bindPopup(`<b>${d.flag} ${d.dest}</b><br>${d.cost}<br><em>${d.why}</em>`)
+          .on('click', () => saveTrip(idx))
+          .addTo(vacMap);
+      });
+      setTimeout(() => vacMap.invalidateSize(), 100);
+    }
+  }
+}
+
+function setVacFilter(vibe) {
+  vacFilter = vibe;
+  renderFunFund();
+}
+
+function saveTrip(idx) {
+  const dest = PULSE_DESTS[idx];
+  if (!dest) return;
+  if (!state.savedTrips) state.savedTrips = [];
+  state.savedTrips.push({ ...dest });
+  saveState();
+  renderFunFund();
+}
+
+function removeTrip(idx) {
+  (state.savedTrips || []).splice(idx, 1);
+  saveState();
+  renderFunFund();
+}
+
+// ───────────────────────────────────────────────────────────────────
+// RETIRE ANYWHERE
+// ───────────────────────────────────────────────────────────────────
+let retMap = null;
+let retExpModel = 'mid';
+
+function renderRetire() {
+  const ret = calcRetirement();
+  const egg = calcNestEgg();
+
+  // Scenario cards
+  setEl('ret-years-to', String(ret.yearsToRetirement));
+  setEl('ret-years-in', String(ret.retirementYears));
+  setEl('ret-nest-egg', fmtCur(ret.nestEggAtRetirement));
+  setEl('ret-monthly-income', fmtCur(ret.monthlyRetirementIncome));
+  setEl('ret-monthly-target', fmtCur(ret.monthlyTarget));
+  setEl('ret-fire', fmtCur(ret.fireNumber));
+  setEl('ret-gap', fmtCur(Math.abs(ret.gap)));
+  const gapEl = document.getElementById('ret-gap-status');
+  if (gapEl) {
+    gapEl.textContent = ret.onTrack ? 'ON TRACK' : 'GAP';
+    gapEl.className = 'gap-badge ' + (ret.onTrack ? 'ok' : 'bad');
+  }
+
+  // Swedish pension input fields
+  setVal('ret-pen-allman', state.penAllman || 0);
+  setVal('ret-pen-itp', state.penITP || 0);
+  setVal('ret-pen-other', state.penOther || 0);
+  setEl('ret-pen-total', fmtCur(ret.pension.monthlyTotal));
+
+  // Profile inputs
+  setVal('ret-current-age', state.currentAge);
+  setVal('ret-retire-age', state.retirementAge);
+  setVal('ret-life-exp', state.lifeExp);
+  setVal('ret-post-growth', state.postRetGrowth);
+  setVal('ret-tax-rate', state.withdrawTaxRate);
+
+  // Dream chip selector
+  const chipsEl = document.getElementById('ret-dream-chips');
+  if (chipsEl) {
+    const sel = state.selectedDreams || [];
+    chipsEl.innerHTML = DREAM_TYPES.map(d => `
+      <div class="dream-chip ${sel.includes(d.id) ? 'on' : ''}"
+        onclick="toggleDream('${d.id}')">
+        <span class="dream-icon">${d.icon}</span>
+        <span>${d.name}</span>
+      </div>
+    `).join('');
+  }
+
+  // Expense model rows
+  const model = RET_EXP_MODELS[retExpModel];
+  const modelEl = document.getElementById('ret-exp-model');
+  if (modelEl) {
+    const rows = Object.entries(model).map(([k, v]) => `
+      <div class="exp-row">
+        <div class="exp-k">${k.charAt(0).toUpperCase() + k.slice(1)}</div>
+        <div class="exp-v">${fmtCur(v)}</div>
+      </div>
+    `).join('');
+    const total = Object.values(model).reduce((s, v) => s + v, 0);
+    modelEl.innerHTML = rows + `
+      <div class="exp-row total">
+        <div class="exp-k">Total / month</div>
+        <div class="exp-v"><b>${fmtCur(total)}</b></div>
+      </div>
+    `;
+  }
+
+  // Expense model tier buttons
+  document.querySelectorAll('.ret-exp-tier').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.model === retExpModel);
+  });
+
+  // Destination cards
+  const destEl = document.getElementById('ret-dest-cards');
+  if (destEl) {
+    destEl.innerHTML = RET_DESTS.map((d, idx) => {
+      const selected = state.selectedRetDest === idx;
+      const tags = d.tl.map(t => `<span class="dt-tag">${t}</span>`).join('');
+      return `
+        <div class="ret-card ${selected ? 'selected' : ''}" onclick="selectRetDest(${idx})">
+          <div class="ret-card-hd">
+            <span class="ret-flag">${d.flag}</span>
+            <div>
+              <div class="ret-name">${d.name}</div>
+              <div class="ret-country">${d.country}</div>
+            </div>
+            <div class="ret-cost">${fmtCur(d.costK * 1000)}/mo</div>
+          </div>
+          <div class="ret-tags">${tags}</div>
+        </div>
+      `;
+    }).join('');
+  }
+
+  // Leaflet world map
+  if (typeof L !== 'undefined') {
+    const mapEl = document.getElementById('ret-map');
+    if (mapEl) {
+      if (!retMap) {
+        retMap = L.map('ret-map', { zoomControl: false }).setView([25, 10], 2);
+        L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png', {
+          attribution: '\u00a9 CARTO', maxZoom: 18
+        }).addTo(retMap);
+      } else {
+        retMap.eachLayer(l => { if (l instanceof L.CircleMarker) retMap.removeLayer(l); });
+      }
+      RET_DESTS.forEach((d, idx) => {
+        const sel = state.selectedRetDest === idx;
+        L.circleMarker([d.lat, d.lng], {
+          radius: sel ? 11 : 7,
+          color: sel ? '#00e8a0' : '#4d8fff',
+          fillColor: sel ? '#00e8a0' : '#4d8fff',
+          fillOpacity: 0.6, weight: 2
+        }).bindPopup(`<b>${d.flag} ${d.name}</b><br>${d.country}<br>${fmtCur(d.costK * 1000)}/mo`)
+          .on('click', () => selectRetDest(idx))
+          .addTo(retMap);
+      });
+      setTimeout(() => retMap.invalidateSize(), 100);
+    }
+  }
+
+  // APEX terminal output area — scenario summary
+  const apexEl = document.getElementById('ret-apex-output');
+  if (apexEl) {
+    const dest = state.selectedRetDest !== null && state.selectedRetDest !== undefined
+      ? RET_DESTS[state.selectedRetDest] : null;
+    const lines = [
+      '> APEX RETIREMENT SCENARIO ANALYSIS',
+      '> ---------------------------------',
+      `> CURRENT AGE ........... ${state.currentAge}`,
+      `> RETIRE AGE ............ ${state.retirementAge}`,
+      `> HORIZON ............... ${ret.yearsToRetirement}y accumulation / ${ret.retirementYears}y drawdown`,
+      `> NEST EGG @ RETIRE ..... ${fmtCur(ret.nestEggAtRetirement)}`,
+      `> PENSION / MONTH ....... ${fmtCur(ret.pension.monthlyTotal)}`,
+      `> DRAWDOWN / MONTH ...... ${fmtCur(ret.monthlyDrawdownAfterTax)} (after ${state.withdrawTaxRate}% tax)`,
+      `> TOTAL INCOME / MONTH .. ${fmtCur(ret.monthlyRetirementIncome)}`,
+      `> CURRENT EXPENSES ...... ${fmtCur(ret.monthlyTarget)}`,
+      `> GAP ................... ${ret.onTrack ? 'NONE \u2014 ON TRACK' : fmtCur(Math.abs(ret.gap)) + ' SHORTFALL'}`,
+      `> FIRE NUMBER ........... ${fmtCur(ret.fireNumber)}`,
+      '> ---------------------------------',
+      dest ? `> TARGET DESTINATION ... ${dest.flag} ${dest.name}, ${dest.country}` : '> TARGET DESTINATION ... (none selected)',
+      dest ? `> LOCAL COST ESTIMATE .. ${fmtCur(dest.costK * 1000)}/mo` : '',
+      '> END REPORT'
+    ].filter(Boolean);
+    apexEl.textContent = lines.join('\n');
+  }
+}
+
+function toggleDream(id) {
+  if (!state.selectedDreams) state.selectedDreams = [];
+  const i = state.selectedDreams.indexOf(id);
+  if (i >= 0) state.selectedDreams.splice(i, 1);
+  else state.selectedDreams.push(id);
+  saveState();
+  renderRetire();
+}
+
+function setExpModel(model) {
+  retExpModel = model;
+  renderRetire();
+}
+
+function selectRetDest(idx) {
+  state.selectedRetDest = idx;
+  saveState();
+  renderRetire();
+}
+
+function updateRetField(field, val) {
+  state[field] = val;
+  saveState();
+  renderRetire();
+}
 </script>
 
 </body>
