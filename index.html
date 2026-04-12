@@ -788,6 +788,29 @@ body.light .md tbody tr:nth-child(even) { background:rgba(0,0,0,0.015); }
 .loc-add-title { font-family:var(--ff); font-size:18px; font-weight:800; color:var(--text); margin-bottom:4px; }
 .loc-add-sub { font-size:12px; color:var(--text2); line-height:1.5; }
 .loc-add-search-wrap { position:relative; margin-bottom:12px; }
+
+/* ── Geocode autocomplete dropdown (shared by Retire Anywhere + PIQ) ─ */
+.geo-dropdown {
+  position:absolute; z-index:9999;
+  background:var(--bg2); border:1px solid var(--border2); border-radius:10px;
+  box-shadow:0 16px 40px -12px rgba(0,0,0,0.55);
+  max-height:320px; overflow-y:auto; padding:4px;
+  font-family:var(--fb);
+}
+body.light .geo-dropdown { box-shadow:0 10px 30px -10px rgba(60,40,10,0.22); }
+.geo-item {
+  display:flex; align-items:center; gap:10px;
+  padding:9px 12px; border-radius:7px; cursor:pointer;
+  transition:background .1s;
+}
+.geo-item:hover, .geo-item.active { background:var(--bg3); }
+.geo-item.active { box-shadow:inset 3px 0 0 var(--accent-positive); }
+.geo-flag { font-size:18px; flex-shrink:0; width:22px; text-align:center; }
+.geo-main { flex:1; min-width:0; }
+.geo-name { font-size:13px; font-weight:700; color:var(--text); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.geo-sub  { font-size:10px; color:var(--text2); margin-top:1px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.geo-type { font-family:var(--fm); font-size:9px; color:var(--text3); text-transform:uppercase; letter-spacing:.06em; flex-shrink:0; padding:2px 6px; background:var(--bg3); border-radius:3px; }
+.geo-loading, .geo-empty { padding:16px 14px; text-align:center; color:var(--text3); font-size:12px; font-family:var(--fm); }
 .loc-add-search-icon { position:absolute; left:12px; top:50%; transform:translateY(-50%); font-size:14px; color:var(--text3); pointer-events:none; }
 .loc-add-search { width:100%; padding:11px 14px 11px 38px; background:var(--bg3); border:1px solid var(--border); border-radius:8px; color:var(--text); font-size:14px; font-family:var(--fb); outline:none; transition:border-color .18s; }
 .loc-add-search:focus { border-color:var(--accent-positive); box-shadow:var(--focus-ring); }
@@ -803,6 +826,8 @@ body.light .md tbody tr:nth-child(even) { background:rgba(0,0,0,0.015); }
 .loc-add-cost { font-family:var(--fm); font-size:10px; color:var(--text3); text-align:right; }
 .loc-add-cost-val { color:var(--text2); font-weight:600; }
 .loc-add-empty { padding:28px 14px; text-align:center; color:var(--text3); font-size:12px; }
+.loc-add-seed-hd { padding:10px 14px 6px; font-family:var(--fm); font-size:9px; font-weight:700; letter-spacing:.12em; text-transform:uppercase; color:var(--text3); border-bottom:1px solid var(--border); margin-bottom:4px; }
+.loc-add-seed-hint { padding:10px 14px; font-size:11px; color:var(--text3); text-align:center; border-top:1px solid var(--border); margin-top:4px; line-height:1.5; }
 .loc-add-foot { display:flex; align-items:center; gap:10px; margin-top:12px; padding-top:10px; border-top:1px solid var(--border); }
 .loc-add-hint { font-family:var(--fm); font-size:10px; color:var(--text3); letter-spacing:.04em; }
 
@@ -1267,7 +1292,7 @@ body.light .md tbody tr:nth-child(even) { background:rgba(0,0,0,0.015); }
     </div>
     <div class="loc-add-search-wrap">
       <span class="loc-add-search-icon">🔍</span>
-      <input id="loc-add-search" class="loc-add-search" placeholder="e.g. Lisbon, Portugal, Thailand…" autocomplete="off" oninput="locAddFilter(this.value)" onkeydown="locAddKeydown(event)">
+      <input id="loc-add-search" class="loc-add-search" placeholder="Type any city or country — e.g. Lisbon, Kyoto, Buenos Aires…" autocomplete="off">
     </div>
     <div class="loc-add-results" id="loc-add-results"></div>
     <div class="loc-add-foot">
@@ -3997,6 +4022,214 @@ window.updateLocCost=function(id,val){ const l=state.places.find(l=>l.id===id); 
 window.updateLocTax=function(id,val){ const l=state.places.find(l=>l.id===id); if(l){l.taxRate=+val;save();} };
 window.updateLocNotes=function(id,val){ const l=state.places.find(l=>l.id===id); if(l){l.notes=val;save();} };
 window.removeLoc=function(id){ state.places=state.places.filter(l=>l.id!==id);save();closeModal('loc-modal');renderRetireAnywhere(); };
+// ─── GLOBAL GEOCODE AUTOCOMPLETE (Photon / OSM) ─────────────────────────────
+// Powered by https://photon.komoot.io — a keyless OSM-backed prefix-search
+// geocoder that covers every city, town, neighbourhood, and country in the
+// world. Replaces the old curated CITY_DB (still kept as a fallback below
+// for offline scenarios and the cost-of-living defaults).
+//
+// Results are deduped by (name + country), cached per-query, and fetched
+// via a single AbortController so rapid keystrokes cancel stale requests.
+const _geoCache = new Map();         // query(lowercase) → array of suggestions
+let _geoAbortCtl = null;              // most-recent in-flight AbortController
+let _geoDebTimer = null;              // shared debounce timer
+
+// ISO 3166-1 alpha-2 → 🇦🇦 regional-indicator emoji pair
+function _ccFlag(cc){
+  if(!cc || cc.length !== 2) return '🌍';
+  const base = 127397;
+  return String.fromCodePoint(...[...cc.toUpperCase()].map(ch => base + ch.charCodeAt(0)));
+}
+
+// Normalize a Photon feature into the app's place shape.
+// We care mostly about populated places + administrative divisions, not
+// random POIs. Photon's `osm_value` typically carries: city, town, village,
+// hamlet, suburb, neighbourhood, quarter, municipality, county, state,
+// country, locality, island, region.
+const _PHOTON_KEEP = new Set(['city','town','village','hamlet','suburb','neighbourhood','quarter','municipality','locality','county','state','region','country','island']);
+function _photonToSuggestion(f){
+  const p = f.properties || {};
+  const g = f.geometry || {};
+  const [lng, lat] = g.coordinates || [0, 0];
+  const type = p.osm_value || p.type || '';
+  if(type && !_PHOTON_KEEP.has(type)) return null;
+  // Prefer explicit place name; fall back through common property keys.
+  const name = p.name || p.city || p.locality || p.state || p.country;
+  if(!name) return null;
+  const country = p.country || '';
+  const countryCode = (p.countrycode || '').toUpperCase();
+  // Secondary context line: state/region if distinct from name
+  let sub = '';
+  if(p.state && p.state !== name) sub = p.state;
+  else if(p.county && p.county !== name) sub = p.county;
+  return {
+    id: `${p.osm_type || 'X'}-${p.osm_id || Math.random()}`,
+    name,
+    sub,                // e.g. "Stockholm County"
+    country,
+    countryCode,
+    flag: _ccFlag(countryCode),
+    lat: +lat,
+    lng: +lng,
+    type,
+    // Nice human label for display + PIQ search box
+    label: country ? `${name}, ${country}` : name,
+  };
+}
+
+async function geocodeSuggest(query, opts){
+  const q = (query || '').trim();
+  if(q.length < 2) return [];
+  const key = q.toLowerCase();
+  if(_geoCache.has(key)) return _geoCache.get(key);
+  // Cancel previous in-flight request
+  if(_geoAbortCtl) { try { _geoAbortCtl.abort(); } catch(e) {} }
+  _geoAbortCtl = new AbortController();
+  const limit = (opts && opts.limit) || 10;
+  const url = `https://photon.komoot.io/api/?q=${encodeURIComponent(q)}&limit=${limit * 2}&lang=en`;
+  try {
+    const res = await fetch(url, { signal: _geoAbortCtl.signal });
+    if(!res.ok) throw new Error('Photon API error ' + res.status);
+    const data = await res.json();
+    const seen = new Set();
+    const suggestions = [];
+    for(const f of (data.features || [])){
+      const s = _photonToSuggestion(f);
+      if(!s) continue;
+      const dedupKey = s.label.toLowerCase();
+      if(seen.has(dedupKey)) continue;
+      seen.add(dedupKey);
+      suggestions.push(s);
+      if(suggestions.length >= limit) break;
+    }
+    _geoCache.set(key, suggestions);
+    return suggestions;
+  } catch(e) {
+    if(e.name === 'AbortError') return null; // silent — newer request in flight
+    console.warn('geocodeSuggest failed:', e);
+    return [];
+  }
+}
+
+// ─── AUTOCOMPLETE UI COMPONENT ──────────────────────────────────────────────
+// Attaches a keyboard-navigable dropdown to an input element, backed by
+// geocodeSuggest(). `onPick(suggestion)` is called when the user selects a
+// result (click or Enter). `onEnterNoPick` is optional: if the user presses
+// Enter with no highlighted suggestion, it's called with the raw input
+// text — Property IQ uses this to run a free-text search.
+function attachGeocodeAutocomplete(input, { onPick, onEnterNoPick, placement } = {}){
+  if(!input || input._geoAttached) return;
+  input._geoAttached = true;
+  // Create dropdown DOM
+  const dd = document.createElement('div');
+  dd.className = 'geo-dropdown';
+  dd.style.display = 'none';
+  // Absolutely positioned relative to the document body so it can float
+  // above modals without being clipped by overflow:hidden containers.
+  document.body.appendChild(dd);
+  let items = [];
+  let activeIdx = -1;
+  let currentToken = 0;
+
+  function positionDropdown(){
+    const r = input.getBoundingClientRect();
+    dd.style.left = r.left + 'px';
+    dd.style.top  = (r.bottom + window.scrollY + 4) + 'px';
+    dd.style.width = r.width + 'px';
+  }
+  function render(){
+    if(!items.length){ dd.style.display = 'none'; return; }
+    dd.innerHTML = items.map((s, i) => `
+      <div class="geo-item ${i===activeIdx?'active':''}" data-idx="${i}">
+        <div class="geo-flag">${s.flag}</div>
+        <div class="geo-main">
+          <div class="geo-name">${esc2(s.name)}</div>
+          <div class="geo-sub">${esc2([s.sub, s.country].filter(Boolean).join(' · '))}</div>
+        </div>
+        <div class="geo-type">${esc2(s.type || '')}</div>
+      </div>
+    `).join('');
+    positionDropdown();
+    dd.style.display = 'block';
+    // Wire click handlers
+    dd.querySelectorAll('.geo-item').forEach(el => {
+      el.addEventListener('mousedown', e => e.preventDefault()); // don't blur input
+      el.addEventListener('click', () => {
+        const i = +el.getAttribute('data-idx');
+        pick(i);
+      });
+      el.addEventListener('mouseenter', () => {
+        activeIdx = +el.getAttribute('data-idx');
+        dd.querySelectorAll('.geo-item').forEach((e, j) => e.classList.toggle('active', j === activeIdx));
+      });
+    });
+  }
+  function hide(){
+    dd.style.display = 'none';
+    items = [];
+    activeIdx = -1;
+  }
+  function pick(i){
+    const s = items[i];
+    if(!s) return;
+    input.value = s.label;
+    hide();
+    if(typeof onPick === 'function') onPick(s);
+  }
+  async function fetchAndRender(q){
+    const token = ++currentToken;
+    // Loading hint (only if the network call takes > 150ms)
+    const loadingTimer = setTimeout(() => {
+      if(token !== currentToken) return;
+      dd.innerHTML = '<div class="geo-loading">Searching…</div>';
+      positionDropdown();
+      dd.style.display = 'block';
+    }, 150);
+    const res = await geocodeSuggest(q);
+    clearTimeout(loadingTimer);
+    if(token !== currentToken) return; // a newer keystroke has arrived
+    if(res === null) return;            // aborted
+    items = res || [];
+    activeIdx = items.length ? 0 : -1;
+    if(!items.length){
+      dd.innerHTML = '<div class="geo-empty">No matches. Try a different spelling.</div>';
+      positionDropdown();
+      dd.style.display = 'block';
+      return;
+    }
+    render();
+  }
+  input.addEventListener('input', () => {
+    const q = input.value.trim();
+    clearTimeout(_geoDebTimer);
+    if(q.length < 2){ hide(); return; }
+    _geoDebTimer = setTimeout(() => fetchAndRender(q), 200);
+  });
+  input.addEventListener('keydown', (e) => {
+    if(dd.style.display !== 'block' || !items.length){
+      if(e.key === 'Enter' && typeof onEnterNoPick === 'function'){
+        onEnterNoPick(input.value.trim());
+      }
+      return;
+    }
+    if(e.key === 'ArrowDown'){ e.preventDefault(); activeIdx = (activeIdx + 1) % items.length; render(); }
+    else if(e.key === 'ArrowUp'){ e.preventDefault(); activeIdx = (activeIdx - 1 + items.length) % items.length; render(); }
+    else if(e.key === 'Enter'){ e.preventDefault(); pick(activeIdx >= 0 ? activeIdx : 0); }
+    else if(e.key === 'Escape'){ hide(); }
+  });
+  input.addEventListener('blur', () => {
+    // Small delay so click events on dropdown items can fire first
+    setTimeout(hide, 150);
+  });
+  input.addEventListener('focus', () => {
+    if(items.length) { positionDropdown(); dd.style.display = 'block'; }
+  });
+  window.addEventListener('resize', () => { if(dd.style.display === 'block') positionDropdown(); });
+  window.addEventListener('scroll', () => { if(dd.style.display === 'block') positionDropdown(); }, true);
+  // Clean up if the input is detached from the DOM
+  input._geoDestroy = () => { dd.remove(); input._geoAttached = false; };
+}
+
 // Curated city database for the search-driven "Add Location" flow.
 // Numbers are rough per-month cost-of-living estimates in SEK for a
 // comfortable single-person lifestyle; they're starting points the user
@@ -4048,87 +4281,95 @@ const CITY_DB = [
   {name:'Auckland',    country:'New Zealand',   flag:'🇳🇿', costOfLiving:48000, taxRate:30, climate:'Temperate',     healthcare:'Excellent', infrastructure:'Excellent', lat:-36.848, lng:174.763},
   {name:'Sydney',      country:'Australia',     flag:'🇦🇺', costOfLiving:54000, taxRate:32, climate:'Temperate',     healthcare:'Excellent', infrastructure:'Excellent', lat:-33.867, lng:151.207},
 ];
-let _locAddFiltered = [];
-let _locAddIdx = 0;
+// ── Retire Anywhere "Add Location" modal — live geocode autocomplete ──
+// The modal's search input is wired to attachGeocodeAutocomplete() so the
+// user can type ANY city/country in the world and pick it from a live
+// dropdown. The old CITY_DB is still consulted ONLY for cost-of-living /
+// tax / climate defaults when the picked destination happens to match one
+// (so users get sensible initial numbers for popular destinations instead
+// of the generic fallback).
+function _cityDbDefaults(name, country){
+  const key = (name + '|' + country).toLowerCase();
+  for(const c of CITY_DB){
+    if(((c.name + '|' + c.country).toLowerCase()) === key) return c;
+  }
+  // Name-only fallback (some Photon results may use slightly different country spellings)
+  for(const c of CITY_DB){
+    if(c.name.toLowerCase() === name.toLowerCase()) return c;
+  }
+  return null;
+}
 window.addLocation = function(){
-  _locAddFiltered = CITY_DB.slice();
-  _locAddIdx = 0;
   openModal('loc-add-modal');
   setTimeout(() => {
     const inp = document.getElementById('loc-add-search');
-    if(inp){ inp.value = ''; inp.focus(); }
-    renderLocAddResults();
+    if(!inp) return;
+    inp.value = '';
+    inp.focus();
+    // Seed the results area with a curated "popular destinations" list so
+    // the modal doesn't look empty before the user starts typing.
+    renderLocAddSeed();
+    // Attach the live autocomplete — clicking a suggestion calls
+    // locAddAcceptSuggestion to persist the pick.
+    attachGeocodeAutocomplete(inp, {
+      onPick: (s) => locAddAcceptSuggestion(s),
+    });
   }, 20);
 };
-window.locAddFilter = function(q){
-  const query = (q||'').toLowerCase().trim();
-  if(!query) {
-    _locAddFiltered = CITY_DB.slice();
-  } else {
-    const tokens = query.split(/\s+/).filter(Boolean);
-    _locAddFiltered = CITY_DB.map(c => {
-      const hay = (c.name + ' ' + c.country).toLowerCase();
-      let score = 0;
-      tokens.forEach(t => {
-        if(c.name.toLowerCase().startsWith(t)) score += 20;
-        else if(c.country.toLowerCase().startsWith(t)) score += 15;
-        else if(hay.includes(t)) score += 5;
-        else score -= 100;
-      });
-      return { c, score };
-    }).filter(x => x.score > 0)
-      .sort((a,b) => b.score - a.score)
-      .map(x => x.c);
-  }
-  _locAddIdx = 0;
-  renderLocAddResults();
-};
-window.locAddKeydown = function(e){
-  if(e.key === 'Escape') { e.preventDefault(); closeModal('loc-add-modal'); return; }
-  if(e.key === 'ArrowDown') { e.preventDefault(); _locAddIdx = Math.min(_locAddFiltered.length-1, _locAddIdx+1); renderLocAddResults(); scrollLocAddIntoView(); return; }
-  if(e.key === 'ArrowUp')   { e.preventDefault(); _locAddIdx = Math.max(0, _locAddIdx-1); renderLocAddResults(); scrollLocAddIntoView(); return; }
-  if(e.key === 'Enter')     { e.preventDefault(); if(_locAddFiltered[_locAddIdx]) locAddPick(_locAddIdx); return; }
-};
-function scrollLocAddIntoView(){
-  const el = document.querySelector('.loc-add-result.active');
-  if(el) el.scrollIntoView({block:'nearest'});
-}
-function renderLocAddResults(){
+// Seed grid shown in the modal body before the user types — helpful
+// zero-state showing the curated cities that have good default numbers.
+function renderLocAddSeed(){
   const el = document.getElementById('loc-add-results'); if(!el) return;
-  if(!_locAddFiltered.length){
-    el.innerHTML = `<div class="loc-add-empty">No matches. Try a different city or country, or add a blank entry below.</div>`;
-    return;
-  }
-  el.innerHTML = _locAddFiltered.slice(0, 50).map((c, i) => `
-    <div class="loc-add-result ${i===_locAddIdx?'active':''}" onclick="locAddPick(${i})" onmouseenter="_locAddIdx=${i};document.querySelectorAll('.loc-add-result').forEach((e,j)=>e.classList.toggle('active',j===${i}))">
-      <div class="loc-add-flag">${c.flag}</div>
-      <div class="loc-add-meta">
-        <div class="loc-add-name">${esc2(c.name)}</div>
-        <div class="loc-add-country">${esc2(c.country)} · ${esc2(c.climate)}</div>
+  el.innerHTML = `
+    <div class="loc-add-seed-hd">Popular destinations</div>
+    ${CITY_DB.slice(0, 24).map(c => `
+      <div class="loc-add-result" onclick="locAddAcceptSuggestion({name:'${esc2(c.name)}',country:'${esc2(c.country)}',flag:'${c.flag}',lat:${c.lat},lng:${c.lng}})">
+        <div class="loc-add-flag">${c.flag}</div>
+        <div class="loc-add-meta">
+          <div class="loc-add-name">${esc2(c.name)}</div>
+          <div class="loc-add-country">${esc2(c.country)} · ${esc2(c.climate)}</div>
+        </div>
+        <div class="loc-add-cost">
+          <div><span class="loc-add-cost-val">${fmt(c.costOfLiving)}</span>/mo</div>
+          <div>Tax ${c.taxRate}%</div>
+        </div>
       </div>
-      <div class="loc-add-cost">
-        <div><span class="loc-add-cost-val">${fmt(c.costOfLiving)}</span>/mo</div>
-        <div>Tax ${c.taxRate}%</div>
-      </div>
-    </div>
-  `).join('');
+    `).join('')}
+    <div class="loc-add-seed-hint">Or type any city, town, or country in the world — results come from OpenStreetMap.</div>
+  `;
 }
-window.locAddPick = function(i){
-  const c = _locAddFiltered[i]; if(!c) return;
-  // Avoid duplicates — if a place with the same name+country is already
-  // in state, just navigate to it and close the modal.
-  const existing = state.places.find(p => (p.kind||'retirement')==='retirement' && p.name===c.name && p.country===c.country);
-  if(existing) {
+// Accept a suggestion — either from the geocode dropdown or from a seed
+// tile — and persist it as a retirement place.
+window.locAddAcceptSuggestion = function(s){
+  if(!s || !s.name) return;
+  // Dedupe — if this place already exists (name + country), jump to it.
+  const existing = state.places.find(p =>
+    (p.kind||'retirement')==='retirement' &&
+    p.name.toLowerCase() === (s.name||'').toLowerCase() &&
+    (p.country||'').toLowerCase() === (s.country||'').toLowerCase()
+  );
+  if(existing){
     closeModal('loc-add-modal');
     showLocDetail(existing.id);
     return;
   }
+  // Pull default cost/tax/climate from CITY_DB if we have them for this
+  // destination; otherwise start with sensible fallbacks and let the user
+  // tune them after the place is added.
+  const defaults = _cityDbDefaults(s.name, s.country) || {};
   state.places.push({
     id: genId(), kind: 'retirement',
-    name: c.name, country: c.country, flag: c.flag,
-    costOfLiving: c.costOfLiving, taxRate: c.taxRate,
-    climate: c.climate, healthcare: c.healthcare, infrastructure: c.infrastructure,
-    notes: '', lat: c.lat, lng: c.lng,
+    name: s.name,
+    country: s.country || defaults.country || '',
+    flag: s.flag || defaults.flag || '🌍',
+    costOfLiving: defaults.costOfLiving ?? 40000,
+    taxRate:       defaults.taxRate       ?? 15,
+    climate:       defaults.climate       || 'Temperate',
+    healthcare:    defaults.healthcare    || 'Good',
+    infrastructure:defaults.infrastructure|| 'Good',
+    notes: '',
+    lat: typeof s.lat === 'number' ? s.lat : (defaults.lat || 0),
+    lng: typeof s.lng === 'number' ? s.lng : (defaults.lng || 0),
   });
   save();
   closeModal('loc-add-modal');
@@ -4747,8 +4988,31 @@ function renderPropIQ(){
       ${!piq_getAnthropicKey()?`<div class="callout callout-warn" style="margin-top:12px">⚠ <div>No Claude API key found. <a href="#" onclick="nav('settings');return false" style="color:var(--green)">Go to Settings → AI Keys</a> to add your Anthropic key and unlock Property IQ analysis.</div></div>`:''}
     </div>`;
   // After the panel is in the DOM, rehydrate any background-task state
-  // (running spinner or cached result) for this market.
+  // (running spinner or cached result) for this market, and attach the
+  // global geocode autocomplete to the search input. The autocomplete
+  // lets the user type any city/country in the world; pressing Enter
+  // without picking a suggestion still runs a free-text piq search.
   if(typeof piq_renderBgSearchUI === 'function') setTimeout(piq_renderBgSearchUI, 20);
+  setTimeout(piq_attachSearchAutocomplete, 30);
+}
+
+function piq_attachSearchAutocomplete(){
+  const inp = document.getElementById('piq-search-input');
+  if(!inp || typeof attachGeocodeAutocomplete !== 'function') return;
+  attachGeocodeAutocomplete(inp, {
+    // Picking a suggestion fills the input with "City, Country" and
+    // immediately runs a Property IQ search against that location.
+    onPick: (s) => {
+      inp.value = s.label;
+      piq_runSearch();
+    },
+    // If the user types something and presses Enter without picking a
+    // suggestion (e.g. a neighbourhood or custom query), honor it as a
+    // free-text search.
+    onEnterNoPick: (raw) => {
+      if(raw) piq_runSearch();
+    },
+  });
 }
 
 // ── MARKET TOGGLE ─────────────────────────────────────────────────────────────
