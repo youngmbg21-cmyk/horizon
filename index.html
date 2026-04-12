@@ -238,6 +238,108 @@
       </div>
     </div>
 
+    <!-- ════════════════ NET WORTH ════════════════ -->
+    <div class="panel" id="panel-networth">
+      <div class="ph">
+        <div class="ph-tag">WEALTH POSITION</div>
+        <div class="ph-title">Net Worth</div>
+        <div class="ph-sub">Total assets minus all liabilities — your true wealth number.</div>
+      </div>
+
+      <!-- KPI ROW -->
+      <div class="kpi-row">
+        <div class="kpi">
+          <div class="kpi-lbl">TOTAL ASSETS</div>
+          <div class="kpi-val pos" id="nw-total-assets">—</div>
+        </div>
+        <div class="kpi">
+          <div class="kpi-lbl">TOTAL LIABILITIES</div>
+          <div class="kpi-val neg" id="nw-total-liabilities">—</div>
+        </div>
+        <div class="kpi">
+          <div class="kpi-lbl">NET WORTH</div>
+          <div class="kpi-val" id="nw-net-worth">—</div>
+        </div>
+      </div>
+
+      <div class="two-col">
+        <!-- ASSETS LIST -->
+        <div class="card">
+          <div class="card-title">◆ Assets
+            <div class="card-actions">
+              <button class="btn btn-o btn-xs" onclick="updateNwField('addAsset')">+ Add</button>
+            </div>
+          </div>
+          <div id="nw-assets-list"></div>
+        </div>
+
+        <!-- LIABILITIES LIST -->
+        <div class="card">
+          <div class="card-title">📉 Liabilities
+            <div class="card-actions">
+              <button class="btn btn-o btn-xs" onclick="updateNwField('addLiability')">+ Add</button>
+            </div>
+          </div>
+          <div id="nw-liabilities-list"></div>
+        </div>
+      </div>
+
+      <!-- PROJECTION CHART -->
+      <div class="card">
+        <div class="card-title">📈 Net Worth Projection</div>
+        <canvas id="nw-projection-chart" height="200"></canvas>
+      </div>
+    </div>
+
+    <!-- ════════════════ ASSETS & NEST EGG ════════════════ -->
+    <div class="panel" id="panel-assets">
+      <div class="ph">
+        <div class="ph-tag">INVESTMENT PORTFOLIO</div>
+        <div class="ph-title">Assets &amp; Nest Egg</div>
+        <div class="ph-sub">All investment vehicles projected to retirement.</div>
+      </div>
+
+      <!-- KPI ROW -->
+      <div class="kpi-row">
+        <div class="kpi">
+          <div class="kpi-lbl">PORTFOLIO TOTAL</div>
+          <div class="kpi-val" id="assets-total">—</div>
+        </div>
+        <div class="kpi">
+          <div class="kpi-lbl">REAL VALUE (TODAY)</div>
+          <div class="kpi-val" id="assets-total-real">—</div>
+        </div>
+        <div class="kpi">
+          <div class="kpi-lbl">YEARS TO RETIRE</div>
+          <div class="kpi-val" id="assets-years">—</div>
+        </div>
+      </div>
+
+      <!-- PORTFOLIO VEHICLES LIST -->
+      <div class="card">
+        <div class="card-title">◆ Investment Vehicles
+          <div class="card-actions">
+            <button class="btn btn-g btn-xs" onclick="addAsset()">+ Add Asset</button>
+          </div>
+        </div>
+        <div id="assets-list"></div>
+      </div>
+
+      <!-- NEST EGG GROWTH CHART -->
+      <div class="card">
+        <div class="card-title">📈 Nest Egg Growth to Retirement
+          <div class="card-actions">
+            <label class="toggle" title="Inflation-adjusted">
+              <input type="checkbox" class="assets-toggle" id="assets-real-toggle" onchange="setAssetsView(this.checked ? 'real' : 'nominal')">
+              <div class="toggle-track"></div>
+            </label>
+            <span style="font-size:11px;color:var(--text3);margin-left:4px">Real</span>
+          </div>
+        </div>
+        <canvas id="assets-growth-chart" height="200"></canvas>
+      </div>
+    </div>
+
 <script>
 // ═══════════════════════════════════════════════════════════════════
 // CONSTANTS & DEFAULTS
