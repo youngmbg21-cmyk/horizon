@@ -3378,6 +3378,216 @@ function piqFeedback(val) {
     setTimeout(() => el.textContent = '', 2500);
   }
 }
+
+// ───────────────────────────────────────────────────────────────────
+// piqRenderHistory — sidebar history list
+// ───────────────────────────────────────────────────────────────────
+function piqRenderHistory() {
+  ensurePropiqState();
+  const list = state.propiq.history || [];
+  const listEl = document.getElementById('piq-history-list');
+  const clearBtn = document.getElementById('piq-clear-history');
+
+  if (!listEl) return;
+
+  if (list.length === 0) {
+    listEl.innerHTML = `
+      <div class="sidebar-empty">
+        No searches yet.<br>Results saved automatically.
+      </div>
+    `;
+    if (clearBtn) clearBtn.style.display = 'none';
+    return;
+  }
+
+  if (clearBtn) clearBtn.style.display = '';
+
+  listEl.innerHTML = list.map(h => {
+    const cfg = MARKETS[h.market] || {};
+    const verdict = (h.verdict || '').toUpperCase();
+    const verdictCls = verdict === 'BUY' ? 'buy'
+      : verdict === 'HOLD' ? 'hold'
+      : verdict === 'AVOID' ? 'avoid' : 'neutral';
+    const active = piqCurrentResult && piqCurrentResult.id === h.id ? 'active' : '';
+    const date = new Date(h.timestamp);
+    const dateStr = date.toLocaleDateString() + ' ' +
+      date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+    return `
+      <div class="history-item ${active}" onclick="piqLoadFromHistory('${h.id}')">
+        <div class="hist-row">
+          <span class="hist-flag">${cfg.flag || ''}</span>
+          <span class="hist-query">${piqEscape(h.query)}</span>
+          <span class="hist-verdict-badge ${verdictCls}">${verdict || '\u2014'}</span>
+        </div>
+        <div class="hist-meta">
+          <span class="hist-market">${piqEscape(cfg.name || h.market)}</span>
+          <span class="hist-date">${dateStr}</span>
+          ${h.score != null ? `<span class="hist-score">${h.score}/100</span>` : ''}
+        </div>
+        <button class="hist-del" onclick="event.stopPropagation();piqDeleteFromHistory('${h.id}')" title="Delete">\u2715</button>
+      </div>
+    `;
+  }).join('');
+}
+
+function piqLoadFromHistory(id) {
+  ensurePropiqState();
+  const entry = (state.propiq.history || []).find(h => h.id === id);
+  if (!entry) return;
+  piqRenderResults(entry);
+  piqRenderHistory(); // refresh active state
+}
+
+function piqDeleteFromHistory(id) {
+  ensurePropiqState();
+  state.propiq.history = (state.propiq.history || []).filter(h => h.id !== id);
+  // If we deleted the currently-shown result, clear the view
+  if (piqCurrentResult && piqCurrentResult.id === id) {
+    piqCurrentResult = null;
+    const area = document.getElementById('piq-results-area');
+    if (area) {
+      area.innerHTML = `
+        <div class="empty">
+          <div class="empty-title">Search a location to begin</div>
+          <div class="empty-sub">Live signals \u00b7 Investment analysis \u00b7 Mortgage calculator \u00b7 Legal risk</div>
+        </div>
+      `;
+    }
+  }
+  saveState();
+  piqRenderHistory();
+}
+
+function piqClearHistory() {
+  if (!confirm('Clear all search history? This cannot be undone.')) return;
+  ensurePropiqState();
+  state.propiq.history = [];
+  piqCurrentResult = null;
+  saveState();
+  piqRenderHistory();
+  const area = document.getElementById('piq-results-area');
+  if (area) {
+    area.innerHTML = `
+      <div class="empty">
+        <div class="empty-title">Search a location to begin</div>
+        <div class="empty-sub">Live signals \u00b7 Investment analysis \u00b7 Mortgage calculator \u00b7 Legal risk</div>
+      </div>
+    `;
+  }
+}
+
+// ───────────────────────────────────────────────────────────────────
+// piqCompare — side-by-side grid of recent searches
+// ───────────────────────────────────────────────────────────────────
+function piqCompare(n) {
+  ensurePropiqState();
+  const count = Math.min(n || 4, 6);
+  const list = (state.propiq.history || []).slice(0, count);
+  const area = document.getElementById('piq-results-area');
+  if (!area) return;
+
+  if (list.length < 2) {
+    area.innerHTML = `
+      <div class="empty">
+        <div class="empty-title">Not enough searches to compare</div>
+        <div class="empty-sub">Run at least 2 searches to see a side-by-side view.</div>
+      </div>
+    `;
+    return;
+  }
+
+  const cfgFirst = MARKETS[list[0].market] || {};
+
+  // Build columns
+  const cols = list.map(r => {
+    const cfg = MARKETS[r.market] || {};
+    const a = r.analysis || {};
+    const k = a.kpis || {};
+    const verdict = (r.verdict || '').toUpperCase();
+    const verdictCls = verdict === 'BUY' ? 'buy'
+      : verdict === 'HOLD' ? 'hold'
+      : verdict === 'AVOID' ? 'avoid' : 'neutral';
+    return {
+      r, cfg, a, k, verdict, verdictCls
+    };
+  });
+
+  // Rows of compared attributes
+  const rows = [
+    { label: 'Market',        pick: c => `${c.cfg.flag || ''} ${c.cfg.name || ''}` },
+    { label: 'Verdict',       pick: c => `<span class="cmp-verdict ${c.verdictCls}">${c.verdict || '\u2014'}</span>` },
+    { label: 'Score',         pick: c => `${c.r.score || 0}/100` },
+    { label: 'Price Range',   pick: c => piqEscape(c.a.priceRange || '\u2014') },
+    { label: 'Price per m\u00b2',pick: c => piqEscape(c.a.pricePerSqm || '\u2014') },
+    { label: 'Rental Yield',  pick: c => piqEscape(c.k.yield || c.a.rentalYield || '\u2014') },
+    { label: 'Appreciation',  pick: c => piqEscape(c.k.appreciation || c.a.capitalAppreciation || '\u2014') },
+    { label: 'Avg Price',     pick: c => piqEscape(c.k.avgPrice || '\u2014') },
+    { label: 'Liquidity',     pick: c => piqEscape(c.k.liquidity || '\u2014') },
+    { label: 'Summary',       pick: c => piqEscape((c.a.summary || '').slice(0, 160) + ((c.a.summary || '').length > 160 ? '\u2026' : '')) }
+  ];
+
+  const headerCells = cols.map(c => `
+    <th class="cmp-col-head">
+      <div class="cmp-col-flag">${c.cfg.flag || ''}</div>
+      <div class="cmp-col-query">${piqEscape(c.r.query)}</div>
+      <div class="cmp-col-date">${new Date(c.r.timestamp).toLocaleDateString()}</div>
+      <button class="cmp-open" onclick="piqLoadFromHistory('${c.r.id}')">Open \u2192</button>
+    </th>
+  `).join('');
+
+  const bodyRows = rows.map(row => `
+    <tr>
+      <th class="cmp-row-label">${row.label}</th>
+      ${cols.map(c => `<td>${row.pick(c)}</td>`).join('')}
+    </tr>
+  `).join('');
+
+  area.innerHTML = `
+    <div class="piq-compare">
+      <div class="piq-compare-hd">
+        <div>
+          <div class="piq-section-hd">Property Comparison</div>
+          <div class="piq-muted">Your last ${list.length} searches \u00b7 ${cfgFirst.flag || ''} ${cfgFirst.name || ''} focus</div>
+        </div>
+        <button class="btn-secondary" onclick="piqBackToResults()">\u2190 Back</button>
+      </div>
+      <div class="piq-compare-wrap">
+        <table class="dt cmp-table">
+          <thead>
+            <tr>
+              <th class="cmp-row-label"></th>
+              ${headerCells}
+            </tr>
+          </thead>
+          <tbody>${bodyRows}</tbody>
+        </table>
+      </div>
+    </div>
+  `;
+}
+
+function piqBackToResults() {
+  if (piqCurrentResult) {
+    piqRenderResults(piqCurrentResult);
+  } else {
+    ensurePropiqState();
+    const last = (state.propiq.history || [])[0];
+    if (last) {
+      piqRenderResults(last);
+    } else {
+      const area = document.getElementById('piq-results-area');
+      if (area) {
+        area.innerHTML = `
+          <div class="empty">
+            <div class="empty-title">Search a location to begin</div>
+            <div class="empty-sub">Live signals \u00b7 Investment analysis \u00b7 Mortgage calculator \u00b7 Legal risk</div>
+          </div>
+        `;
+      }
+    }
+  }
+}
 </script>
 
 </body>
