@@ -2420,6 +2420,238 @@ function setMarket(market) {
   if (togKe) togKe.classList.toggle('on', market === 'ke');
   if (togSe) togSe.classList.toggle('on', market === 'se');
 }
+
+function piqQuickSearch(term) {
+  const input = document.getElementById('piq-search-input');
+  if (input) input.value = term;
+  piqSearch();
+}
+
+// ───────────────────────────────────────────────────────────────────
+// piqSearch — 4-step search pipeline
+// ───────────────────────────────────────────────────────────────────
+let piqBusy = false;
+
+function piqSetStep(step, status, msg) {
+  // status: 'pending' | 'active' | 'done' | 'skip' | 'error'
+  const el = document.getElementById('piq-step-' + step);
+  if (el) {
+    el.className = 'piq-step ' + status;
+    const m = el.querySelector('.piq-step-msg');
+    if (m && msg !== undefined) m.textContent = msg;
+  }
+  const bar = document.getElementById('piq-progress-bar');
+  if (bar) {
+    const doneCount = document.querySelectorAll('.piq-step.done, .piq-step.skip').length;
+    bar.style.width = Math.round((doneCount / 4) * 100) + '%';
+  }
+}
+
+function piqShowProgress(show) {
+  const wrap = document.getElementById('piq-progress');
+  if (wrap) wrap.style.display = show ? '' : 'none';
+  if (show) {
+    ['1', '2', '3', '4'].forEach(n => piqSetStep(n, 'pending', ''));
+    const bar = document.getElementById('piq-progress-bar');
+    if (bar) bar.style.width = '0%';
+  }
+}
+
+async function piqSearch() {
+  if (piqBusy) return;
+  ensurePropiqState();
+
+  const input = document.getElementById('piq-search-input');
+  const query = (input && input.value || '').trim();
+  if (!query) {
+    alert('Enter a location or property type to search.');
+    return;
+  }
+
+  const market = state.propiq.market || 'ke';
+  const cfg = MARKETS[market];
+  if (!cfg) { alert('Unknown market: ' + market); return; }
+
+  const anthropicKey = localStorage.getItem('propiq_ak') || '';
+  const perplexityKey = localStorage.getItem('propiq_pk') || '';
+  if (!anthropicKey) {
+    alert('Anthropic API key required. Add it in Settings.');
+    return;
+  }
+  if (!anthropicKey.startsWith('sk-ant-')) {
+    alert('Anthropic key should start with sk-ant-');
+    return;
+  }
+
+  piqBusy = true;
+  state.propiq.lastQuery = query;
+  piqShowProgress(true);
+
+  const result = {
+    id: 'r' + Date.now(),
+    query,
+    market,
+    marketName: cfg.name,
+    marketFlag: cfg.flag,
+    currency: cfg.currency,
+    timestamp: new Date().toISOString(),
+    signals: [],
+    analysis: null,
+    legal: null,
+    verdict: null
+  };
+
+  try {
+    // ── STEP 1: Perplexity signals fetch ────────────────────────
+    let signalsText = '';
+    if (perplexityKey) {
+      piqSetStep('1', 'active', 'Fetching live market signals\u2026');
+      try {
+        const prompt = cfg.perplexityContext.replace('{q}', query);
+        const res = await fetch('https://api.perplexity.ai/chat/completions', {
+          method: 'POST',
+          headers: {
+            'Authorization': 'Bearer ' + perplexityKey,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            model: 'llama-3.1-sonar-small-128k-online',
+            messages: [{ role: 'user', content: prompt }],
+            max_tokens: 1500
+          })
+        });
+        if (res.ok) {
+          const data = await res.json();
+          signalsText = data.choices && data.choices[0]
+            && data.choices[0].message && data.choices[0].message.content || '';
+          result.rawSignals = signalsText;
+          piqSetStep('1', 'done', 'Live signals retrieved');
+        } else {
+          piqSetStep('1', 'error', 'Perplexity error \u2014 continuing');
+        }
+      } catch (e) {
+        piqSetStep('1', 'error', 'Perplexity unavailable \u2014 continuing');
+      }
+    } else {
+      piqSetStep('1', 'skip', 'No Perplexity key \u2014 skipped');
+    }
+
+    // ── STEP 2: Anthropic analysis ──────────────────────────────
+    piqSetStep('2', 'active', 'Running AI investment analysis\u2026');
+    const analysisPrompt = cfg.analysisContext
+      .replace('{q}', query)
+      .replace('{signals}', signalsText || '(no external signals \u2014 use general market knowledge)');
+    const aRes = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'x-api-key': anthropicKey,
+        'anthropic-version': '2023-06-01',
+        'anthropic-dangerous-direct-browser-access': 'true',
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        model: 'claude-haiku-4-5-20251001',
+        max_tokens: 2000,
+        messages: [{ role: 'user', content: analysisPrompt }]
+      })
+    });
+    if (!aRes.ok) {
+      const err = await aRes.json().catch(() => ({}));
+      throw new Error((err.error && err.error.message) || 'Anthropic call failed');
+    }
+    const aData = await aRes.json();
+    const aText = aData.content && aData.content[0] && aData.content[0].text || '';
+    piqSetStep('2', 'done', 'Analysis complete');
+
+    // ── STEP 3: Parse thesis JSON + determine verdict ───────────
+    piqSetStep('3', 'active', 'Parsing thesis\u2026');
+    let parsed = null;
+    try {
+      const match = aText.match(/\{[\s\S]*\}/);
+      parsed = JSON.parse(match ? match[0] : aText);
+    } catch (e) {
+      throw new Error('Thesis parse failed: ' + e.message);
+    }
+    result.analysis = parsed;
+    result.signals = parsed.signals || [];
+
+    // Verdict determination — normalize to BUY / HOLD / AVOID
+    let verdict = (parsed.verdict || '').toString().toUpperCase();
+    if (!['BUY', 'HOLD', 'AVOID'].includes(verdict)) {
+      const yieldNum = parseFloat((parsed.rentalYield || '').toString()) || 0;
+      if (yieldNum >= 5) verdict = 'BUY';
+      else if (yieldNum >= 3) verdict = 'HOLD';
+      else verdict = 'AVOID';
+    }
+    result.verdict = verdict;
+    result.verdictReason = parsed.verdictReason || '';
+
+    // Simple score: 0-100 derived from verdict + yield
+    const yieldNum = parseFloat((parsed.rentalYield || '').toString()) || 0;
+    const base = verdict === 'BUY' ? 75 : verdict === 'HOLD' ? 55 : 30;
+    result.score = Math.min(100, Math.max(0, Math.round(base + yieldNum * 2)));
+    piqSetStep('3', 'done', 'Verdict: ' + verdict);
+
+    // ── STEP 4: Legal risk assessment ───────────────────────────
+    piqSetStep('4', 'active', 'Running legal risk check\u2026');
+    const legalPrompt = `You are a ${cfg.name} real estate legal analyst. For the query "${query}" in ${cfg.name}, return ONLY valid JSON assessing legal/title risks.
+Consider these flag areas: ${cfg.legalFlags.map(f => f.label).join(', ')}.
+Return:
+{"overall":"ok|warn|danger","flags":[{"key":"...","label":"...","level":"ok|warn|danger","detail":"one sentence"}],"summary":"2 sentences"}`;
+    try {
+      const lRes = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: {
+          'x-api-key': anthropicKey,
+          'anthropic-version': '2023-06-01',
+          'anthropic-dangerous-direct-browser-access': 'true',
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          model: 'claude-haiku-4-5-20251001',
+          max_tokens: 1000,
+          messages: [{ role: 'user', content: legalPrompt }]
+        })
+      });
+      if (lRes.ok) {
+        const lData = await lRes.json();
+        const lText = lData.content && lData.content[0] && lData.content[0].text || '';
+        const lMatch = lText.match(/\{[\s\S]*\}/);
+        result.legal = JSON.parse(lMatch ? lMatch[0] : lText);
+        piqSetStep('4', 'done', 'Legal check complete');
+      } else {
+        result.legal = { overall: 'warn', flags: [], summary: 'Legal check unavailable.' };
+        piqSetStep('4', 'error', 'Legal check failed \u2014 using defaults');
+      }
+    } catch (e) {
+      result.legal = { overall: 'warn', flags: [], summary: 'Legal check unavailable.' };
+      piqSetStep('4', 'error', 'Legal check unavailable');
+    }
+
+    // ── SAVE TO HISTORY ────────────────────────────────────────
+    if (!Array.isArray(state.propiq.history)) state.propiq.history = [];
+    state.propiq.history.unshift(result);
+    if (state.propiq.history.length > 50) {
+      state.propiq.history = state.propiq.history.slice(0, 50);
+    }
+    saveState();
+
+    // Render results
+    if (typeof piqRenderResults === 'function') {
+      piqRenderResults(result);
+    }
+    if (typeof piqRenderHistory === 'function') {
+      piqRenderHistory();
+    }
+
+    setTimeout(() => piqShowProgress(false), 800);
+  } catch (e) {
+    piqSetStep('4', 'error', e.message || 'Search failed');
+    alert('Search failed: ' + (e.message || e));
+  } finally {
+    piqBusy = false;
+  }
+}
 </script>
 
 </body>
