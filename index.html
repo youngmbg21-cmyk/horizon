@@ -5691,5 +5691,61 @@ if (document.readyState === 'loading') {
   </div>
 </div>
 
+<!-- ══ MOBILE NAV ══ -->
+<div class="mob-nav" id="mob-nav">
+
+  <!-- App switch strip (Money OS / Property IQ) -->
+  <div class="mob-app-switch" id="mob-app-switch">
+    <button class="mob-app-btn app-tab active" data-app="money">
+      <span class="mn-icon">◈</span>
+      <span class="mn-label">Money OS</span>
+    </button>
+    <button class="mob-app-btn app-tab" data-app="property">
+      <span class="mn-icon">🏠</span>
+      <span class="mn-label">Property IQ</span>
+    </button>
+  </div>
+
+  <!-- Money OS section nav strip -->
+  <div class="mob-nav-inner" id="mob-nav-money">
+    <div class="mob-nav-item active" id="mn-dashboard" data-panel="dashboard">
+      <div class="mn-icon">◈</div>
+      <div class="mn-label">HOME</div>
+    </div>
+    <div class="mob-nav-item" id="mn-cashflow" data-panel="cashflow">
+      <div class="mn-icon">⇄</div>
+      <div class="mn-label">FLOW</div>
+    </div>
+    <div class="mob-nav-item" id="mn-networth" data-panel="networth">
+      <div class="mn-icon">◆</div>
+      <div class="mn-label">WORTH</div>
+    </div>
+    <div class="mob-nav-item" id="mn-assets" data-panel="assets">
+      <div class="mn-icon">📈</div>
+      <div class="mn-label">ASSETS</div>
+    </div>
+    <div class="mob-nav-item" id="mn-vacation" data-panel="vacation">
+      <div class="mn-icon">✈</div>
+      <div class="mn-label">FUN</div>
+    </div>
+    <div class="mob-nav-item" id="mn-retirement" data-panel="retirement">
+      <div class="mn-icon">🌅</div>
+      <div class="mn-label">RETIRE</div>
+    </div>
+    <div class="mob-nav-item" id="mn-settings" data-panel="settings">
+      <div class="mn-icon">⚙</div>
+      <div class="mn-label">SET</div>
+    </div>
+  </div>
+
+  <!-- Property IQ section nav strip -->
+  <div class="mob-nav-inner" id="mob-nav-property" style="display:none">
+    <div class="mob-nav-item active" id="mn-piq-search" data-piq="search">
+      <div class="mn-icon">🔍</div>
+      <div class="mn-label">SEARCH</div>
+    </div>
+  </div>
+</div>
+
 </body>
 </html>
