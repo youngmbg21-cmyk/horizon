@@ -334,6 +334,30 @@ input[type="number"] { -moz-appearance:textfield; }
 .ui-stat:last-child { border-bottom:none; }
 .ui-stat-lbl { color:var(--text2); }
 .ui-stat-val { font-family:var(--fm); font-weight:600; color:var(--text); }
+
+/* ── Data management grid (Settings → split export/import) ────────── */
+.data-mgmt-grid { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+@media (max-width:760px) { .data-mgmt-grid { grid-template-columns:1fr; } }
+.data-mgmt-row { display:flex; align-items:center; justify-content:space-between; gap:10px; padding:10px 12px; background:var(--bg3); border:1px solid var(--border); border-radius:8px; transition:border-color .18s; }
+.data-mgmt-row:hover { border-color:var(--border2); }
+.data-mgmt-meta { display:flex; align-items:center; gap:10px; min-width:0; }
+.data-mgmt-icon { font-size:18px; flex-shrink:0; width:24px; text-align:center; }
+.data-mgmt-title { font-size:12px; font-weight:700; color:var(--text); }
+.data-mgmt-sub { font-size:10px; color:var(--text3); margin-top:1px; line-height:1.4; }
+.data-mgmt-btns { display:flex; gap:4px; flex-shrink:0; }
+
+/* ── Shared state surfaces (ui.empty / ui.loading / ui.error) ──────── */
+.state { background:var(--bg3); border:2px dashed var(--border2); border-radius:var(--rl); padding:28px 24px; text-align:center; display:flex; flex-direction:column; align-items:center; gap:6px; }
+.state-empty .state-icon { font-size:32px; opacity:.5; margin-bottom:2px; }
+.state-loading { border-style:solid; }
+.state-error { border-color:var(--accent-critical); background:var(--accent-critical-dim); }
+.state-error .state-icon { font-size:24px; color:var(--accent-critical); }
+.state-title { font-size:15px; font-weight:700; color:var(--text); }
+.state-sub { font-size:12px; color:var(--text2); line-height:1.6; max-width:540px; }
+.state-cta { margin-top:10px; display:flex; gap:8px; flex-wrap:wrap; justify-content:center; }
+.state-spinner { width:26px; height:26px; border-radius:50%; border:2px solid var(--border); border-top-color:var(--accent-positive); animation:stateSpin .9s linear infinite; }
+@keyframes stateSpin { to { transform:rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .state-spinner { animation:none; } }
 .muted { color:var(--text2); }
 
 /* ── SUSTAINABILITY CARD ─────────────────────────────── */
@@ -501,6 +525,10 @@ input[type="number"] { -moz-appearance:textfield; }
   font-family:var(--fm); transition:all .15s; text-align:left;
 }
 .aip-chip:hover { color:var(--amber); border-color:var(--amber); background:rgba(255,184,0,.1); }
+.aip-chip-divider { flex-basis:100%; height:1px; background:var(--border); margin:6px 0 0; }
+.aip-chip-group-lbl { flex-basis:100%; font-family:var(--fm); font-size:9px; letter-spacing:.12em; text-transform:uppercase; color:var(--text3); margin-top:2px; }
+.aip-chip.aip-chip-recent { background:var(--bg3); color:var(--text3); border-style:dashed; max-width:100%; overflow:hidden; text-overflow:ellipsis; }
+.aip-chip.aip-chip-recent:hover { color:var(--accent-positive); border-color:var(--accent-positive); background:var(--accent-positive-dim); }
 .aip-input-row { display:flex; gap:8px; align-items:flex-end; }
 .aip-textarea {
   flex:1; background:var(--bg4); border:1px solid var(--border); border-radius:8px;
@@ -1076,6 +1104,8 @@ function defaultState() {
     aiKeys:{ claude:'', openai:'' },
     aiProvider:'claude',
     aiMessages:[],
+    // Per-panel AI conversation memory (recent user queries, newest first).
+    aiHistoryByPanel:{},
   };
 }
 
@@ -1112,7 +1142,7 @@ function invalidateSelectors(){ _selGen++; }
 // ─── PERSISTENCE ────────────────────────────────────────────────────────────
 // State schema version. Bump this and add a branch to migrate() whenever the
 // shape of `state` changes in a backwards-incompatible way.
-const STATE_VERSION = 4;
+const STATE_VERSION = 5;
 function migrate(s) {
   const from = s.version || 1;
   if(from >= STATE_VERSION) { s.version = STATE_VERSION; return s; }
@@ -1148,6 +1178,10 @@ function migrate(s) {
     }
     // Leave s.retireLocations in place as a frozen snapshot for rollback.
     if(!s.categoryMap) s.categoryMap = {}; // Transactions → Budget mapping
+  }
+  // v4 → v5: per-panel AI conversation memory
+  if(from < 5) {
+    if(!s.aiHistoryByPanel || typeof s.aiHistoryByPanel !== 'object') s.aiHistoryByPanel = {};
   }
   s.version = STATE_VERSION;
   return s;
@@ -1585,11 +1619,12 @@ const _lastKpiValues = {};
 // of hand-rolling card/KPI/stat markup so the whole app shares one visual
 // vocabulary. Every helper tolerates missing fields and escapes user text.
 const ui = {
-  // Page header: <tag>, <title>, optional subtitle
-  ph({tag, title, sub}){
+  // Page header: <tag>, <title>, optional subtitle. Pass `titleHtml` to
+  // embed raw HTML in the title (e.g. a subtitle span).
+  ph({tag, title, titleHtml, sub}){
     return `<div class="ph">
       ${tag?`<div class="ph-tag">${esc2(tag)}</div>`:''}
-      <div class="ph-title">${esc2(title||'')}</div>
+      <div class="ph-title">${titleHtml || esc2(title||'')}</div>
       ${sub?`<div class="ph-sub">${sub}</div>`:''}
     </div>`;
   },
@@ -1631,6 +1666,31 @@ const ui = {
   },
   // KPI row wrapper — convenience for a grid of kpi() items.
   kpiRow(items){ return `<div class="kpi-row">${items.map(i=>ui.kpi(i)).join('')}</div>`; },
+  // Empty state — for panels/cards that have no content yet.
+  empty({icon, title, sub, cta}){
+    return `<div class="state state-empty">
+      ${icon?`<div class="state-icon">${icon}</div>`:''}
+      <div class="state-title">${esc2(title||'Nothing here yet')}</div>
+      ${sub?`<div class="state-sub">${sub}</div>`:''}
+      ${cta?`<div class="state-cta">${cta}</div>`:''}
+    </div>`;
+  },
+  // Inline loading spinner + optional label.
+  loading(label){
+    return `<div class="state state-loading">
+      <div class="state-spinner" aria-hidden="true"></div>
+      <div class="state-sub">${esc2(label||'Loading…')}</div>
+    </div>`;
+  },
+  // Error state with optional retry button (string onclick).
+  error({title, msg, retry}){
+    return `<div class="state state-error">
+      <div class="state-icon">⚠</div>
+      <div class="state-title">${esc2(title||'Something went wrong')}</div>
+      ${msg?`<div class="state-sub">${msg}</div>`:''}
+      ${retry?`<div class="state-cta"><button class="btn btn-danger" onclick="${retry}">Try again</button></div>`:''}
+    </div>`;
+  },
 };
 // Matching CSS for ui.stat lives alongside the existing utilities (.pos/.neg
 // already exist on kpi-val). Add the generic stat-row look.
@@ -2230,20 +2290,20 @@ function renderTransactions() {
   if(!el) return;
 
   if(!state.bankConnected) {
-    el.innerHTML=`
-      <div class="ph"><div class="ph-tag">PERSONAL FINANCES</div><div class="ph-title">Bank & Transactions</div><div class="ph-sub">Connect your bank account to view real transaction data and spending patterns</div></div>
-      <div class="bank-empty">
-        <div class="bank-empty-icon">🏦</div>
-        <div class="bank-empty-title">No Bank Connected</div>
-        <div class="bank-empty-sub">Connect via Open Banking (PSD2) to automatically import transactions from your bank. Supported banks:</div>
-        <div style="margin-bottom:18px">
-          <span class="bank-badge">🇸🇪 SEB</span><span class="bank-badge">🇸🇪 Swedbank</span><span class="bank-badge">🇸🇪 Handelsbanken</span>
-          <span class="bank-badge">🇸🇪 Nordea</span><span class="bank-badge">🇩🇰 Danske Bank</span><span class="bank-badge">🇪🇺 All PSD2</span>
-        </div>
-        <button class="btn btn-g" onclick="openModal('bank-modal')">🏦 Connect Bank Account</button>
-        <p style="font-size:11px;color:var(--text3);margin-top:12px">Or load demo data to explore the features</p>
-        <button class="btn btn-o btn-sm" style="margin-top:6px" onclick="connectBankDemo()">📊 Load Demo Data</button>
-      </div>`;
+    el.innerHTML = `
+      ${ui.ph({tag:'PERSONAL FINANCES', title:'Bank & Transactions', sub:'Connect your bank account to view real transaction data and spending patterns'})}
+      ${ui.empty({
+        icon:'🏦',
+        title:'No Bank Connected',
+        sub:`Connect via Open Banking (PSD2) to automatically import transactions from your bank. Supported banks:
+          <div style="margin-top:14px;display:flex;gap:6px;flex-wrap:wrap;justify-content:center">
+            <span class="bank-badge">🇸🇪 SEB</span><span class="bank-badge">🇸🇪 Swedbank</span><span class="bank-badge">🇸🇪 Handelsbanken</span>
+            <span class="bank-badge">🇸🇪 Nordea</span><span class="bank-badge">🇩🇰 Danske Bank</span><span class="bank-badge">🇪🇺 All PSD2</span>
+          </div>`,
+        cta:`<button class="btn btn-g" onclick="openModal('bank-modal')">🏦 Connect Bank Account</button>
+             <button class="btn btn-o btn-sm" onclick="connectBankDemo()">📊 Load Demo Data</button>`
+      })}
+    `;
     return;
   }
 
@@ -3225,14 +3285,29 @@ function renderSettings() {
         </div>
       </div>
       <!-- Data management -->
-      <div class="card">
+      <div class="card" style="grid-column:1/-1">
         <div class="card-title">💾 Data Management</div>
-        <p style="font-size:12px;color:var(--text2);margin-bottom:12px;line-height:1.5">All data is saved locally in your browser. Export a backup JSON to move between devices.</p>
-        <div style="display:flex;gap:8px;flex-wrap:wrap">
-          <button class="btn btn-o btn-sm" onclick="exportData()">⬇ Export JSON</button>
-          <button class="btn btn-o btn-sm" onclick="document.getElementById('import-input').click()">⬆ Import JSON</button>
-          <input id="import-input" type="file" accept=".json" style="display:none" onchange="importData(this)">
-          <button class="btn btn-danger" onclick="if(confirm('Reset all data?')){localStorage.removeItem('${STORAGE_KEY}');location.reload()}">⚠ Reset All</button>
+        <p style="font-size:12px;color:var(--text2);margin-bottom:12px;line-height:1.5">All data is saved locally in your browser. Export a slice or the full backup to move between devices. Imports merge into your current state (they don't replace the whole thing unless you pick "Everything").</p>
+        <div class="data-mgmt-grid">
+          ${EXPORT_SLICES.map(slice => `
+            <div class="data-mgmt-row">
+              <div class="data-mgmt-meta">
+                <div class="data-mgmt-icon">${slice.icon}</div>
+                <div>
+                  <div class="data-mgmt-title">${esc2(slice.label)}</div>
+                  <div class="data-mgmt-sub">${esc2(slice.sub)}</div>
+                </div>
+              </div>
+              <div class="data-mgmt-btns">
+                <button class="btn btn-o btn-xs" onclick="exportSlice('${slice.key}')">⬇ Export</button>
+                <button class="btn btn-o btn-xs" onclick="document.getElementById('import-input-${slice.key}').click()">⬆ Import</button>
+                <input id="import-input-${slice.key}" type="file" accept=".json" style="display:none" onchange="importSlice(this, '${slice.key}')">
+              </div>
+            </div>
+          `).join('')}
+        </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:14px;padding-top:12px;border-top:1px solid var(--border)">
+          <button class="btn btn-danger" onclick="if(confirm('Reset all data? This cannot be undone.')){localStorage.removeItem('${STORAGE_KEY}');location.reload()}">⚠ Reset All</button>
         </div>
       </div>
     </div>`;
@@ -3241,19 +3316,78 @@ function renderSettings() {
 }
 
 // ══ EXPORT / IMPORT ══════════════════════════════════════════════════════════
-window.exportData=function(){
-  const blob=new Blob([JSON.stringify(state,null,2)],{type:'application/json'});
+// Each slice knows how to extract + restore its own subset of state so
+// Settings can offer one button per section (A17). The `all` slice is
+// the traditional full-state roundtrip.
+const EXPORT_SLICES = [
+  { key:'baseline',   icon:'💰', label:'Baseline',        sub:'Income, expenses, savings target', fields:['baseIncome','baseExpenses','baseSavings'] },
+  { key:'retirement', icon:'🎯', label:'Retirement',      sub:'Portfolio assets, scenarios, ages, tax', fields:['externalAssets','retirementExpenses','retirementScenario','currentAge','retirementAge','lifeExp','withdrawTaxRate','growthRate','inflationRate','retirementPostGrowth'] },
+  { key:'places',     icon:'🌍', label:'Places',          sub:'Retire Anywhere destinations', fields:['places'] },
+  { key:'trips',      icon:'✈️', label:'Trips & Fun Fund', sub:'Planned travel and lifestyle budget', fields:['trips'] },
+  { key:'overrides',  icon:'📆', label:'Overrides',       sub:'Monthly overrides + yearly bases', fields:['monthlyOverrides','yearlyBases','cascadeEnabled'] },
+  { key:'settings',   icon:'⚙', label:'Preferences',     sub:'Theme, currency, exchange rates, AI keys', fields:['currency','exchangeRates','darkMode','tickerQuote','aiKeys','aiProvider','categoryMap'] },
+  { key:'all',        icon:'📦', label:'Everything',      sub:'Full state backup (overwrites on import)', fields:null },
+];
+function downloadJSON(filename, data){
+  const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});
   const url=URL.createObjectURL(blob);
-  const a=document.createElement('a');a.href=url;a.download='horizon-finance-backup.json';a.click();
+  const a=document.createElement('a');a.href=url;a.download=filename;a.click();
   URL.revokeObjectURL(url);
+}
+window.exportSlice=function(sliceKey){
+  const slice = EXPORT_SLICES.find(s=>s.key===sliceKey);
+  if(!slice) return;
+  let payload;
+  if(slice.fields === null) {
+    payload = state; // full export
+  } else {
+    payload = {version: STATE_VERSION, _slice: slice.key};
+    slice.fields.forEach(f => { if(state[f] !== undefined) payload[f] = state[f]; });
+  }
+  downloadJSON(`horizon-${slice.key}.json`, payload);
 };
+window.importSlice=function(input, sliceKey){
+  const file=input.files[0]; if(!file) return;
+  const slice = EXPORT_SLICES.find(s=>s.key===sliceKey);
+  if(!slice) return;
+  const reader=new FileReader();
+  reader.onload=e=>{
+    try{
+      const d=JSON.parse(e.target.result);
+      if(slice.fields === null) {
+        // Full import — replace wholesale, then migrate.
+        Object.assign(state, d);
+        migrate(state);
+      } else {
+        // Slice import: merge only the fields this slice owns.
+        // Refuse if the file was exported as a different slice (unless it's "all").
+        if(d._slice && d._slice !== slice.key) {
+          if(!confirm(`This file was exported as "${d._slice}" but you're importing it into "${slice.key}". Continue anyway?`)) {
+            input.value = ''; return;
+          }
+        }
+        slice.fields.forEach(f => { if(d[f] !== undefined) state[f] = d[f]; });
+      }
+      invalidateSelectors();
+      save();
+      renderAll();
+      alert(`Imported ${slice.label.toLowerCase()}.`);
+    }catch(err){
+      alert('Invalid backup file: '+err.message);
+    }
+    input.value = '';
+  };
+  reader.readAsText(file);
+};
+// Legacy full-state exporters (kept for any external callers).
+window.exportData=function(){ exportSlice('all'); };
 window.importData=function(input){
   const file=input.files[0]; if(!file) return;
   const reader=new FileReader();
   reader.onload=e=>{
     try{
       const d=JSON.parse(e.target.result);
-      Object.assign(state,d);save();renderAll();
+      Object.assign(state,d); migrate(state); invalidateSelectors(); save(); renderAll();
     }catch(e){alert('Invalid backup file: '+e.message);}
   };
   reader.readAsText(file);
@@ -3338,8 +3472,36 @@ function renderAIPChips(){
   const el=document.getElementById('aip-chips');
   if(!el) return;
   el.style.display=aiChatHistory.length>0?'none':'flex';
-  const chips=aipChipsFor(state.activePanel||'dashboard');
-  el.innerHTML=chips.map(c=>`<button class="aip-chip" onclick="aipChip('${c.replace(/'/g,"\\'")}')">${c}</button>`).join('');
+  const panel = state.activePanel||'dashboard';
+  const chips = aipChipsFor(panel);
+  const recent = getAIHistoryFor(panel).slice(0, 4); // up to 4 recent queries
+  // Suggestions group + (optional) recent group, separated visually.
+  let html = chips.map(c=>`<button class="aip-chip" onclick="aipChip('${c.replace(/'/g,"\\'")}')">${c}</button>`).join('');
+  if(recent.length){
+    html += `<div class="aip-chip-divider"></div>
+      <div class="aip-chip-group-lbl">Recent on ${esc2((PANEL_META[panel]&&PANEL_META[panel].label)||panel)}</div>
+      ${recent.map(q=>`<button class="aip-chip aip-chip-recent" onclick="aipChip('${q.replace(/'/g,"\\'").replace(/"/g,'&quot;')}')" title="${esc2(q)}">↺ ${esc2(q.length>42?q.slice(0,40)+'…':q)}</button>`).join('')}`;
+  }
+  el.innerHTML = html;
+}
+
+// Per-panel conversation memory — stores the last few user queries made
+// while each panel was active so renderAIPChips can surface them as a
+// "Recent" row under the suggestion chips. Lives inside state so it
+// persists across reloads.
+function getAIHistoryFor(panel){
+  if(!state.aiHistoryByPanel) state.aiHistoryByPanel = {};
+  return state.aiHistoryByPanel[panel] || [];
+}
+function pushAIHistory(panel, query){
+  if(!query || !query.trim()) return;
+  if(!state.aiHistoryByPanel) state.aiHistoryByPanel = {};
+  const list = state.aiHistoryByPanel[panel] || [];
+  // Dedupe: if this query is already recent, move it to the front.
+  const filtered = list.filter(q => q !== query);
+  filtered.unshift(query);
+  state.aiHistoryByPanel[panel] = filtered.slice(0, 8);
+  save();
 }
 
 function clearAIChat(){
@@ -3398,6 +3560,9 @@ async function aipSend() {
   ta.value=''; ta.style.height='38px';
   aipAddMsg('user',msg);
   aiChatHistory.push({role:'user',content:msg});
+  // Remember this query against the panel the user was looking at so the
+  // "Recent on <Panel>" row in renderAIPChips can surface it next time.
+  pushAIHistory(state.activePanel||'dashboard', msg);
   aipTyping=true;
   document.getElementById('aip-chips').style.display='none';
   const typWrap=document.createElement('div');
@@ -3524,10 +3689,11 @@ function renderPropIQ(){
 
   document.getElementById('panel-propiq').innerHTML = `
     <div class="piq">
-      <div class="ph"><div class="ph-tag">REAL ESTATE INTELLIGENCE</div>
-        <div class="ph-title">Property IQ <span style="font-size:13px;font-weight:400;color:var(--text2)">Kenya & Sweden</span></div>
-        <div class="ph-sub">AI-powered analysis · Live signals · Mortgage calculator · Legal risk scoring</div>
-      </div>
+      ${(typeof ui!=='undefined'&&ui.ph)?ui.ph({
+        tag:'REAL ESTATE INTELLIGENCE',
+        titleHtml:'Property IQ <span style="font-size:13px;font-weight:400;color:var(--text2)">Kenya & Sweden</span>',
+        sub:'AI-powered analysis · Live signals · Mortgage calculator · Legal risk scoring'
+      }):`<div class="ph"><div class="ph-tag">REAL ESTATE INTELLIGENCE</div><div class="ph-title">Property IQ</div><div class="ph-sub">AI-powered analysis</div></div>`}
 
       <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;flex-wrap:wrap">
         <div class="piq-mtog-wrap">
@@ -3562,9 +3728,11 @@ function renderPropIQ(){
           </div>
 
           <div id="piq-results">
-            <div class="piq-empty"><div class="piq-empty-t">Search a location to begin</div>
-              <div class="piq-empty-s">PropIQ fetches live signals, generates an investment thesis,<br>calculates mortgage payments, and flags legal risks.</div>
-            </div>
+            ${(typeof ui!=='undefined'&&ui.empty)?ui.empty({
+              icon:'🏠',
+              title:'Search a location to begin',
+              sub:'PropIQ fetches live signals, generates an investment thesis, calculates mortgage payments, and flags legal risks.'
+            }):`<div class="piq-empty"><div class="piq-empty-t">Search a location to begin</div><div class="piq-empty-s">PropIQ fetches live signals and analyses mortgages.</div></div>`}
           </div>
         </div>
       </div>
@@ -3586,7 +3754,9 @@ function piq_setMarket(m){
   // re-render qtags
   const qt=document.querySelector('.piq-qtags');
   if(qt) qt.innerHTML=cfg.tags.map(t=>`<span class="piq-qtag" onclick="piq_quickSearch('${t}')">${t}</span>`).join('');
-  document.getElementById('piq-results').innerHTML=`<div class="piq-empty"><div class="piq-empty-t">Search a ${cfg.name} location to begin</div><div class="piq-empty-s">Live signals · Investment analysis · Mortgage calculator · Legal risk</div></div>`;
+  document.getElementById('piq-results').innerHTML = (typeof ui!=='undefined'&&ui.empty)
+    ? ui.empty({icon:'🏠', title:`Search a ${cfg.name} location to begin`, sub:'Live signals · Investment analysis · Mortgage calculator · Legal risk'})
+    : `<div class="piq-empty"><div class="piq-empty-t">Search a ${cfg.name} location to begin</div><div class="piq-empty-s">Live signals · Investment analysis · Mortgage calculator · Legal risk</div></div>`;
 }
 
 // ── HISTORY ───────────────────────────────────────────────────────────────────
