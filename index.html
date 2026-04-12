@@ -1,0 +1,340 @@
+<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"><title>Horizon</title></head>
+<body>
+
+<script>
+// ═══════════════════════════════════════════════════════════════════
+// CONSTANTS & DEFAULTS
+// ═══════════════════════════════════════════════════════════════════
+
+const STORAGE_KEY = 'horizon-unified-v1';
+
+const MN = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+
+const CSYM = { SEK:'kr', USD:'$', EUR:'\u20ac', KES:'KSh' };
+
+const PULSE_DESTS = [
+  {dest:'Nairobi + Safari',flag:'\ud83c\uddf0\ud83c\uddea',why:'East Africa peak season',cost:'SEK 25\u201345K',lat:-1.29,lng:36.82,vibe:'Safari & Wildlife',col:'#00e8a0'},
+  {dest:'Cape Town',flag:'\ud83c\uddff\ud83c\udde6',why:'World-class and affordable',cost:'SEK 20\u201340K',lat:-33.93,lng:18.42,vibe:'City & Culture',col:'#4d8fff'},
+  {dest:'Lisbon',flag:'\ud83c\uddf5\ud83c\uddf9',why:'Best value in Western Europe',cost:'SEK 15\u201328K',lat:38.72,lng:-9.14,vibe:'City & Culture',col:'#00d4ff'},
+  {dest:'Bali',flag:'\ud83c\uddee\ud83c\udde9',why:'Luxury on a budget',cost:'SEK 18\u201335K',lat:-8.34,lng:115.09,vibe:'Beach & Relaxation',col:'#f5a623'},
+  {dest:'Istanbul',flag:'\ud83c\uddf9\ud83c\uddf7',why:'Culture, food, incredible value',cost:'SEK 12\u201322K',lat:41.01,lng:28.98,vibe:'Food & Wine',col:'#8b5cf6'},
+  {dest:'Maldives',flag:'\ud83c\uddf2\ud83c\uddfb',why:'Ultimate couples luxury',cost:'SEK 60\u2013120K',lat:3.2,lng:73.22,vibe:'Luxury Escape',col:'#ec4899'},
+  {dest:'Paris',flag:'\ud83c\uddeb\ud83c\uddf7',why:'Romance & culture',cost:'SEK 25\u201350K',lat:48.85,lng:2.35,vibe:'City & Culture',col:'#ff4d6d'},
+  {dest:'Chicago',flag:'\ud83c\uddfa\ud83c\uddf8',why:'City break, great food scene',cost:'SEK 30\u201355K',lat:41.88,lng:-87.63,vibe:'City & Culture',col:'#00e8a0'},
+];
+
+const RET_DESTS = [
+  {flag:'\ud83c\uddf5\ud83c\uddf9',name:'Lisbon',country:'Portugal',costK:18,lat:38.72,lng:-9.14,tags:['dt-warm','dt-safe','dt-visa','dt-ret'],tl:['Warm','Safe','EU Visa','NHR Tax']},
+  {flag:'\ud83c\uddf2\ud83c\uddf9',name:'Malta',country:'Malta',costK:20,lat:35.9,lng:14.5,tags:['dt-warm','dt-safe','dt-visa'],tl:['Warm','Safe','EU Visa']},
+  {flag:'\ud83c\uddf2\ud83c\uddfd',name:'Mexico City',country:'Mexico',costK:14,lat:19.43,lng:-99.13,tags:['dt-warm','dt-ret'],tl:['Warm','Retire Visa']},
+  {flag:'\ud83c\uddf9\ud83c\udded',name:'Chiang Mai',country:'Thailand',costK:10,lat:18.79,lng:98.99,tags:['dt-warm','dt-ret'],tl:['Warm','LTR Visa']},
+  {flag:'\ud83c\uddf0\ud83c\uddea',name:'Nairobi',country:'Kenya',costK:12,lat:-1.29,lng:36.82,tags:['dt-warm','dt-ret'],tl:['Warm','Expat Hub']},
+  {flag:'\ud83c\uddea\ud83c\uddf8',name:'Valencia',country:'Spain',costK:16,lat:39.47,lng:-0.38,tags:['dt-warm','dt-safe','dt-visa'],tl:['Warm','Safe','EU Visa']},
+  {flag:'\ud83c\uddfa\ud83c\uddfe',name:'Montevideo',country:'Uruguay',costK:15,lat:-34.9,lng:-56.19,tags:['dt-safe','dt-ret'],tl:['Safe','Retire Visa']},
+  {flag:'\ud83c\uddec\ud83c\uddf7',name:'Athens',country:'Greece',costK:15,lat:37.98,lng:23.73,tags:['dt-warm','dt-safe','dt-visa'],tl:['Warm','Safe','EU Visa']},
+  {flag:'\ud83c\uddf2\ud83c\udde6',name:'Marrakech',country:'Morocco',costK:9,lat:31.63,lng:-8.0,tags:['dt-warm','dt-ret'],tl:['Warm','Affordable']},
+];
+
+const DREAM_TYPES = [
+  {id:'coastal',icon:'\ud83c\udfd6',name:'Coastal'},
+  {id:'city',icon:'\ud83c\udfd9',name:'City Life'},
+  {id:'nature',icon:'\ud83c\udf3f',name:'Nature'},
+  {id:'warm',icon:'\u2600\ufe0f',name:'Warm Climate'},
+  {id:'culture',icon:'\ud83c\udfad',name:'Arts & Culture'},
+  {id:'family',icon:'\ud83d\udc68\u200d\ud83d\udc69\u200d\ud83d\udc67',name:'Family Hub'},
+  {id:'luxury',icon:'\ud83e\udd42',name:'Luxury'},
+  {id:'adventure',icon:'\ud83e\uddd7',name:'Adventure'},
+  {id:'peaceful',icon:'\ud83d\udd4a',name:'Peaceful'},
+];
+
+const RET_EXP_MODELS = {
+  low:    {housing:5000,food:2500,health:1500,transport:800,leisure:1200,misc:1000},
+  mid:    {housing:9000,food:4000,health:2500,transport:1500,leisure:2500,misc:1500},
+  high:   {housing:16000,food:6000,health:4000,transport:2500,leisure:5000,misc:2500},
+  luxury: {housing:25000,food:9000,health:6000,transport:4000,leisure:10000,misc:5000},
+};
+
+const MC = {
+  ke:{name:'Kenya',flag:'\ud83c\uddf0\ud83c\uddea',currency:'KES',locale:'en-KE',
+    banner:'\ud83c\uddf0\ud83c\uddea &nbsp; Kenya market \u00b7 Prices in KES \u00b7 Nairobi focus',
+    searchLabel:'Search any Nairobi location or property type',
+    placeholder:'e.g. Westlands 2BR, Karen villa, Kilimani off-plan...',
+    tags:['Westlands','Kilimani','Karen','Kileleshwa','Lavington','Runda','Parklands','Nairobi CBD'],
+    mortgageRates:[{label:'KCB (13.5%)',val:13.5},{label:'Equity Bank (14%)',val:14},{label:'Stanbic (13%)',val:13},{label:'NCBA (14.5%)',val:14.5}],
+    mortgageTerm:[{label:'20 years',val:240},{label:'25 years',val:300},{label:'15 years',val:180}],
+    mortgageDeposit:20,
+    legalNote:'Always conduct an official title search at Ardhi House (Lands Registry, Upper Hill, Nairobi) before paying any deposit. Official search costs KES 500 and takes 3\u20135 working days. Instruct a Kenya-registered advocate to conduct the search on your behalf.'
+  },
+  se:{name:'Sweden',flag:'\ud83c\uddf8\ud83c\uddea',currency:'SEK',locale:'sv-SE',
+    banner:'\ud83c\uddf8\ud83c\uddea &nbsp; Swedish market \u00b7 Prices in SEK \u00b7 Stockholm & major cities',
+    searchLabel:'Search any Swedish location or property type',
+    placeholder:'e.g. \u00d6stermalm l\u00e4genhet, Liding\u00f6 villa, Nacka bostadsr\u00e4tt...',
+    tags:['\u00d6stermalm','Liding\u00f6','Nacka','Bromma','Djursholm','Solna','Gothenburg','Malm\u00f6'],
+    mortgageRates:[{label:'Riksbank rate + 1% (4.5%)',val:4.5},{label:'Swedbank (4.2%)',val:4.2},{label:'SEB (4.4%)',val:4.4},{label:'Handelsbanken (4.3%)',val:4.3}],
+    mortgageTerm:[{label:'30 years',val:360},{label:'25 years',val:300},{label:'15 years',val:180}],
+    mortgageDeposit:15,
+    legalNote:'Engage a licensed Swedish fastighetsm\u00e4klare and conduct a full Lantm\u00e4teriregistret search before signing. Confirm pantbrev status and inteckningar with the seller.'
+  }
+};
+
+const DEFAULT_STATE = {
+  // Money OS — profile
+  currency: 'SEK',
+  darkMode: true,
+  currentAge: 44,
+  retirementAge: 69,
+  lifeExp: 90,
+  growthRate: 7,
+  inflationRate: 2,
+  postRetGrowth: 4,
+  withdrawTaxRate: 20,
+  nestEggReal: false,
+  tickerQuote: 'Come rain or shine, I will retire under the sun.',
+  exchangeRates: { SEK:1, USD:0.11, EUR:0.09, KES:14.27 },
+
+  // Money OS — pension inputs
+  penAllman: 0,
+  penITP: 0,
+  penOther: 0,
+
+  // Money OS — income line items
+  income: [
+    {id:'i1',name:'Young',amount:98000,paid:false},
+    {id:'i2',name:'Guliz',amount:31000,paid:false}
+  ],
+
+  // Money OS — expense line items
+  expenses: [
+    {id:'e1',name:'Mortgage',amount:27000,paid:false},
+    {id:'e2',name:'Groceries',amount:7000,paid:false},
+    {id:'e3',name:'Avgift',amount:7250,paid:false},
+    {id:'e4',name:'Cleaning',amount:2000,paid:false},
+    {id:'e5',name:'Insurance',amount:1380,paid:false},
+    {id:'e6',name:'AKASSA',amount:900,paid:false},
+    {id:'e7',name:'Madre',amount:9500,paid:false},
+    {id:'e8',name:'Guliz Bills',amount:4415,paid:false},
+    {id:'e9',name:'Guliz Allowance',amount:10000,paid:false},
+    {id:'e10',name:'Young Bills',amount:2000,paid:false},
+    {id:'e11',name:'Young Allowance',amount:10000,paid:false},
+    {id:'e12',name:'Chase',amount:55000,paid:false}
+  ],
+
+  // Money OS — savings
+  baseSavings: 27000,
+  monthlyOverrides: {},
+
+  // Money OS — assets (external)
+  externalAssets: [
+    {id:'a1',name:'ITP1',balance:1400000,growthRate:4,monthlyContribution:32000},
+    {id:'a2',name:'Vanguard',balance:1400000,growthRate:7,monthlyContribution:0},
+    {id:'a3',name:'Royal London',balance:700000,growthRate:7,monthlyContribution:0}
+  ],
+
+  // Money OS — liabilities / net worth
+  netWorth: { property:0, mortgage:0, otherDebt:0 },
+
+  // Money OS — vacation trips
+  savedTrips: [],
+
+  // Money OS — retirement scenarios
+  selectedDreams: [],
+  selectedRetDest: null,
+
+  // Money OS — selected month
+  selectedMonth: `${new Date().getFullYear()}-${String(new Date().getMonth()+1).padStart(2,'0')}`,
+
+  // PropIQ
+  ppiMarket: 'ke',
+  ppiHistory: [],
+  ppiLastQuery: ''
+};
+
+// ═══════════════════════════════════════════════════════════════════
+// UNIFIED STATE OBJECT
+// ═══════════════════════════════════════════════════════════════════
+
+let state = {};
+let saveTimeout = null;
+
+function loadState() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    state = raw ? Object.assign({}, DEFAULT_STATE, JSON.parse(raw)) : { ...DEFAULT_STATE };
+  } catch (e) {
+    state = { ...DEFAULT_STATE };
+  }
+}
+
+function saveState() {
+  clearTimeout(saveTimeout);
+  saveTimeout = setTimeout(() => {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    if (fbRef) syncToFirebase();
+  }, 600);
+  setSyncBadge('saving', '\u25cf SAVING');
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// FIREBASE MODULE
+// ═══════════════════════════════════════════════════════════════════
+
+let fbDb = null, fbRef = null, fbReady = false;
+
+function initFirebase() {
+  const url = document.getElementById('fbUrl').value.trim();
+  const key = document.getElementById('fbKey').value.trim();
+  const user = document.getElementById('fbUser').value.trim();
+  if (!url || !key) {
+    document.getElementById('fbStatus').textContent = '\u26a0 Enter DB URL and API key';
+    return;
+  }
+  try {
+    const app = firebase.apps.length
+      ? firebase.app()
+      : firebase.initializeApp({ apiKey: key, databaseURL: url, projectId: 'horizon-os' });
+    fbDb = firebase.database(app);
+    fbRef = fbDb.ref('users/' + (user || 'default') + '/state');
+    fbRef.once('value', snap => {
+      if (snap.val()) { Object.assign(state, snap.val()); }
+      fbRef.on('value', s => { if (s.val()) Object.assign(state, s.val()); });
+      document.getElementById('fbStatus').innerHTML = '<span style="color:var(--green)">\u2713 Connected</span>';
+      setSyncBadge('synced', '\u2601 SYNCED');
+      fbReady = true;
+    }).catch(e => {
+      document.getElementById('fbStatus').innerHTML = '<span style="color:var(--red)">\u2715 ' + e.message + '</span>';
+    });
+  } catch (e) {
+    document.getElementById('fbStatus').innerHTML = '<span style="color:var(--red)">\u2715 ' + e.message + '</span>';
+  }
+}
+
+function syncToFirebase() {
+  if (!fbRef) return;
+  fbRef.set(state).then(() => {
+    setSyncBadge('synced', '\u2601 SYNCED');
+    const el = document.getElementById('sbSyncTime');
+    if (el) el.textContent = 'Synced ' + new Date().toLocaleTimeString();
+  }).catch(() => setSyncBadge('', 'LOCAL'));
+}
+
+function syncFromFirebase() {
+  if (!fbRef) return;
+  fbRef.once('value', snap => {
+    if (snap.val()) {
+      Object.assign(state, snap.val());
+      saveState();
+      setSyncBadge('synced', '\u2601 SYNCED');
+    }
+  });
+}
+
+function setSyncBadge(cls, txt) {
+  const b = document.getElementById('syncBadge');
+  if (!b) return;
+  b.className = 'sync-badge' + (cls ? ' ' + cls : '');
+  b.textContent = txt;
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// APP ROUTER
+// ═══════════════════════════════════════════════════════════════════
+
+let currentApp = 'money';
+let currentPanel = 'dashboard';
+let currentPiqView = 'search';
+
+function showApp(app) {
+  currentApp = app;
+  const moneyEl = document.getElementById('app-money');
+  const propEl = document.getElementById('app-property');
+  if (moneyEl) moneyEl.style.display = app === 'money' ? '' : 'none';
+  if (propEl) propEl.style.display = app === 'property' ? '' : 'none';
+  document.querySelectorAll('.app-tab').forEach(t => {
+    t.classList.toggle('active', t.dataset.app === app);
+  });
+  if (app === 'money') {
+    location.hash = '#/money/' + currentPanel;
+  } else {
+    location.hash = '#/property' + (currentPiqView !== 'search' ? '/' + currentPiqView : '');
+  }
+}
+
+function showPanel(panel) {
+  currentPanel = panel;
+  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-item,.mob-nav-item').forEach(n => n.classList.remove('active'));
+  const pe = document.getElementById('panel-' + panel);
+  if (pe) pe.classList.add('active');
+  const ni = document.getElementById('nav-' + panel);
+  if (ni) ni.classList.add('active');
+  const mi = document.getElementById('mn-' + panel);
+  if (mi) mi.classList.add('active');
+  if (currentApp !== 'money') showApp('money');
+  location.hash = '#/money/' + panel;
+}
+
+function showPiqPanel(view) {
+  currentPiqView = view;
+  document.querySelectorAll('.piq-view').forEach(v => v.classList.remove('active'));
+  const ve = document.getElementById('piq-' + view);
+  if (ve) ve.classList.add('active');
+  if (currentApp !== 'property') showApp('property');
+  location.hash = '#/property' + (view !== 'search' ? '/' + view : '');
+}
+
+function handleRoute() {
+  const hash = location.hash || '#/money/dashboard';
+  const parts = hash.replace('#/', '').split('/');
+  const app = parts[0] || 'money';
+  const sub = parts[1] || (app === 'money' ? 'dashboard' : 'search');
+
+  if (app === 'money') {
+    currentApp = 'money';
+    currentPanel = sub;
+    const moneyEl = document.getElementById('app-money');
+    const propEl = document.getElementById('app-property');
+    if (moneyEl) moneyEl.style.display = '';
+    if (propEl) propEl.style.display = 'none';
+    document.querySelectorAll('.app-tab').forEach(t => {
+      t.classList.toggle('active', t.dataset.app === 'money');
+    });
+    document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+    document.querySelectorAll('.nav-item,.mob-nav-item').forEach(n => n.classList.remove('active'));
+    const pe = document.getElementById('panel-' + sub);
+    if (pe) pe.classList.add('active');
+    const ni = document.getElementById('nav-' + sub);
+    if (ni) ni.classList.add('active');
+    const mi = document.getElementById('mn-' + sub);
+    if (mi) mi.classList.add('active');
+  } else if (app === 'property') {
+    currentApp = 'property';
+    currentPiqView = sub;
+    const moneyEl = document.getElementById('app-money');
+    const propEl = document.getElementById('app-property');
+    if (moneyEl) moneyEl.style.display = 'none';
+    if (propEl) propEl.style.display = '';
+    document.querySelectorAll('.app-tab').forEach(t => {
+      t.classList.toggle('active', t.dataset.app === 'property');
+    });
+    document.querySelectorAll('.piq-view').forEach(v => v.classList.remove('active'));
+    const ve = document.getElementById('piq-' + sub);
+    if (ve) ve.classList.add('active');
+  }
+}
+
+window.onhashchange = handleRoute;
+
+window.addEventListener('DOMContentLoaded', () => {
+  loadState();
+  if (location.hash) {
+    handleRoute();
+  } else {
+    location.hash = '#/money/dashboard';
+  }
+});
+</script>
+
+</body>
+</html>
