@@ -553,11 +553,17 @@ body.light .chart-tooltip { box-shadow:0 6px 18px -6px rgba(60,40,10,0.2); }
 
 /* ── LOCATION CARDS ──────────────────────────────────── */
 .loc-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(240px,1fr)); gap:10px; margin-bottom:10px; }
-.loc-card { background:var(--bg2); border:1px solid var(--border); border-radius:10px; padding:12px; transition:all .2s; cursor:pointer; }
-.loc-card:hover { border-color:var(--border2); transform:translateY(-1px); }
+.loc-card { background:var(--bg2); border:1px solid var(--border); border-radius:10px; padding:12px; transition:all .2s; display:flex; flex-direction:column; }
+.loc-card:hover { border-color:var(--border2); transform:translateY(-1px); box-shadow:0 6px 16px -8px rgba(0,0,0,0.3); }
+body.light .loc-card:hover { box-shadow:0 5px 14px -8px rgba(60,40,10,0.18); }
 .loc-card.feasible { border-color:var(--green); }
 .loc-card.conditional { border-color:var(--amber); }
 .loc-card.infeasible { border-color:var(--red); }
+/* Explicit call-to-action row on every card (discoverability fix) */
+.loc-card-actions { display:flex; align-items:center; gap:6px; margin-top:12px; padding-top:10px; border-top:1px dashed var(--border); }
+.loc-card-cta { flex:1; justify-content:center; width:100%; font-size:12px; font-weight:700; padding:8px 12px; }
+.loc-card-rerun { flex-shrink:0; width:32px; height:32px; display:flex; align-items:center; justify-content:center; background:var(--bg3); border:1px solid var(--border); color:var(--text2); border-radius:7px; cursor:pointer; font-size:13px; transition:all .15s; }
+.loc-card-rerun:hover { border-color:var(--accent-positive); color:var(--accent-positive); background:var(--accent-positive-dim); }
 .loc-name { font-size:15px; font-weight:700; margin-bottom:1px; }
 .loc-country { font-size:10px; color:var(--text2); margin-bottom:8px; }
 .loc-verdict { display:inline-block; font-size:9px; font-weight:700; letter-spacing:.08em; padding:2px 7px; border-radius:3px; font-family:var(--fm); }
@@ -826,6 +832,140 @@ body.light .md tbody tr:nth-child(even) { background:rgba(0,0,0,0.015); }
 .piq-report-body .md h3 { font-size:13px; }
 .piq-report-body .md .md-table-wrap { margin:12px 0 18px; }
 .piq-report-body .md blockquote { margin-top:14px; }
+
+/* ── RETIRE ANYWHERE — Location Analysis slide-over ─────────────────
+   A non-blocking right-side panel that covers ~65% of the viewport.
+   The backdrop is pointer-events:none so the user can still interact
+   with the sidebar and other tabs while the panel is open — the panel
+   only closes via the explicit ✕ button. */
+.retire-slideover-backdrop {
+  position:fixed; inset:0;
+  background:rgba(5,8,15,0.45);
+  backdrop-filter:blur(2px);
+  z-index:560;
+  opacity:0; pointer-events:none;
+  transition:opacity .26s cubic-bezier(.4,0,.2,1);
+}
+body.light .retire-slideover-backdrop { background:rgba(60,40,10,0.22); }
+.retire-slideover-backdrop.open { opacity:1; }
+.retire-slideover {
+  position:fixed; top:0; right:0; bottom:0;
+  width:min(68vw, 960px);
+  z-index:570;
+  background:var(--bg2);
+  border-left:1px solid var(--border2);
+  box-shadow:-12px 0 40px -8px rgba(0,0,0,0.55);
+  display:flex; flex-direction:column;
+  transform:translateX(100%);
+  transition:transform .34s cubic-bezier(.2,.7,.2,1);
+}
+body.light .retire-slideover { box-shadow:-10px 0 32px -10px rgba(60,40,10,0.25); }
+.retire-slideover.open { transform:translateX(0); }
+@media (max-width:900px){ .retire-slideover { width:100vw; } }
+/* Fixed header bar */
+.retire-so-head {
+  display:flex; align-items:center; gap:14px;
+  padding:18px 22px;
+  border-bottom:1px solid var(--border);
+  background:var(--bg2);
+  flex-shrink:0;
+}
+.retire-so-head-main { display:flex; align-items:center; gap:14px; flex:1; min-width:0; }
+.retire-so-flag { font-size:32px; line-height:1; flex-shrink:0; }
+.retire-so-head-text { flex:1; min-width:0; }
+.retire-so-title {
+  font-family:var(--ff); font-size:19px; font-weight:800; color:var(--text);
+  letter-spacing:-.01em; line-height:1.2;
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+}
+.retire-so-sub {
+  font-family:var(--fm); font-size:10px; letter-spacing:.04em;
+  color:var(--text3); margin-top:3px;
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+}
+.retire-so-close {
+  width:36px; height:36px; border-radius:8px;
+  background:var(--bg3); border:1px solid var(--border);
+  color:var(--text2); font-size:15px; cursor:pointer;
+  display:flex; align-items:center; justify-content:center;
+  flex-shrink:0; transition:all .15s;
+}
+.retire-so-close:hover { border-color:var(--accent-critical); color:var(--accent-critical); background:var(--accent-critical-dim); }
+/* Scrollable body */
+.retire-so-body {
+  flex:1 1 auto;
+  min-height:0;
+  overflow-y:auto;
+  padding:22px 26px 30px;
+  scrollbar-gutter:stable;
+}
+.retire-so-body::-webkit-scrollbar { width:8px; }
+.retire-so-body::-webkit-scrollbar-track { background:transparent; }
+.retire-so-body::-webkit-scrollbar-thumb { background:var(--border2); border-radius:4px; }
+/* Fixed footer action bar */
+.retire-so-footer {
+  display:flex; align-items:center; gap:14px;
+  padding:14px 22px;
+  border-top:1px solid var(--border);
+  background:var(--bg2);
+  flex-shrink:0;
+}
+.retire-so-footer-hint { flex:1; font-family:var(--fm); font-size:10px; letter-spacing:.02em; color:var(--text3); }
+.retire-so-footer-actions { display:flex; gap:8px; flex-shrink:0; }
+.retire-so-footer .btn:disabled { opacity:.45; cursor:not-allowed; }
+
+/* Slide-over body section headings */
+.retire-so-section { margin-bottom:22px; }
+.retire-so-section-hd {
+  font-family:var(--fm); font-size:9px; font-weight:700;
+  letter-spacing:.14em; text-transform:uppercase;
+  color:var(--text3);
+  margin-bottom:10px; padding-bottom:6px;
+  border-bottom:1px solid var(--border);
+}
+.retire-so-fact-grid {
+  display:grid; grid-template-columns:repeat(3, 1fr);
+  gap:10px;
+}
+@media (max-width:720px){ .retire-so-fact-grid { grid-template-columns:repeat(2, 1fr); } }
+.retire-so-fact {
+  background:var(--bg3); border:1px solid var(--border);
+  border-radius:8px; padding:12px 14px;
+}
+.retire-so-fact-lbl {
+  font-family:var(--fm); font-size:9px; letter-spacing:.06em;
+  text-transform:uppercase; color:var(--text3); margin-bottom:4px;
+}
+.retire-so-fact-val {
+  font-family:var(--fm); font-size:15px; font-weight:700; color:var(--text);
+  font-variant-numeric:tabular-nums;
+}
+.retire-so-fact-val.pos { color:var(--accent-positive); }
+.retire-so-fact-val.neg { color:var(--accent-critical); }
+.retire-so-fact-val.amb { color:var(--accent-warning); }
+/* Inline cost-of-living / tax / notes editors */
+.retire-so-edit-row { display:grid; grid-template-columns:repeat(3, 1fr); gap:10px; }
+@media (max-width:720px){ .retire-so-edit-row { grid-template-columns:1fr; } }
+.retire-so-edit-row .field { margin-bottom:0; }
+.retire-so-notes { grid-column:1/-1; }
+/* Analysis empty state + loading */
+.retire-so-empty-cta {
+  display:flex; flex-direction:column; align-items:center; gap:14px;
+  padding:36px 20px;
+  background:var(--bg3); border:2px dashed var(--border2);
+  border-radius:var(--rl);
+  text-align:center;
+}
+.retire-so-empty-icon { font-size:40px; opacity:.6; }
+.retire-so-empty-t { font-family:var(--ff); font-size:16px; font-weight:800; color:var(--text); }
+.retire-so-empty-s { font-size:12px; color:var(--text2); line-height:1.55; max-width:520px; }
+.retire-so-loading {
+  display:flex; align-items:center; gap:12px;
+  padding:22px;
+  background:var(--bg3); border:1px solid var(--border);
+  border-radius:10px;
+  font-family:var(--fm); font-size:12px; color:var(--accent-positive);
+}
 
 /* ── VAULT ──────────────────────────────────────────────────────────── */
 .vault-grid { display:grid; grid-template-columns:340px 1fr; gap:14px; align-items:start; }
@@ -1420,6 +1560,29 @@ body.light .piq-country-menu { box-shadow:0 12px 28px -10px rgba(60,40,10,0.22);
       <button class="btn btn-g" onclick="nav('settings'); hideOnboardingBlock();">Go to Settings</button>
     </div>
     <div class="onboarding-note">This message will reappear on every tab until both fields are completed.</div>
+  </div>
+</div>
+
+<!-- Retire Anywhere — Location Analysis slide-over panel -->
+<div class="retire-slideover-backdrop" id="retire-slideover-backdrop"></div>
+<div class="retire-slideover" id="retire-slideover" aria-hidden="true" role="dialog" aria-label="Location analysis">
+  <div class="retire-so-head" id="retire-so-head">
+    <div class="retire-so-head-main">
+      <div class="retire-so-flag" id="retire-so-flag">🌍</div>
+      <div class="retire-so-head-text">
+        <div class="retire-so-title" id="retire-so-title">—</div>
+        <div class="retire-so-sub" id="retire-so-sub">—</div>
+      </div>
+    </div>
+    <button class="retire-so-close" onclick="closeLocAnalysis()" title="Close" aria-label="Close panel">✕</button>
+  </div>
+  <div class="retire-so-body" id="retire-so-body"></div>
+  <div class="retire-so-footer">
+    <div class="retire-so-footer-hint" id="retire-so-footer-hint">This panel stays open while you browse — close it with ✕ when you're done.</div>
+    <div class="retire-so-footer-actions">
+      <button class="btn btn-o btn-sm" id="retire-so-save-btn" onclick="slideoverSaveToVault()" disabled>🗄 Save to Vault</button>
+      <button class="btn btn-g btn-sm" id="retire-so-pdf-btn" onclick="slideoverExportPdf()" disabled>📄 Download PDF</button>
+    </div>
   </div>
 </div>
 
@@ -4287,8 +4450,17 @@ function renderRetireAnywhere() {
   const nums=getRetirementNumbers();
   const monthlyIncome=nums.sustainableAfterTax+nums.pension;
 
-  const locCards=scored.map(loc=>`
-    <div class="loc-card ${loc.verdict}" onclick="showLocDetail('${loc.id}')">
+  const locCards=scored.map(loc=>{
+    // Is there a cached Deep Dive report for this location in the Vault?
+    // If so the primary CTA flips to "View Report" + shows a small "Re-run"
+    // icon button so the user can refresh without losing the cached one.
+    const cached = (state.vault||[]).find(v => v.type==='deepdive' && v.locationId===loc.id);
+    const primaryLabel = cached ? '📄 View Report' : '🔬 Run AI Analysis';
+    const primaryClass = cached ? 'btn btn-o' : 'btn btn-g';
+    const rerunBtn = cached
+      ? `<button class="loc-card-rerun" onclick="event.stopPropagation();openLocAnalysis('${loc.id}',{rerun:true})" title="Re-run analysis">↻</button>`
+      : '';
+    return `<div class="loc-card ${loc.verdict}">
       <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:6px">
         <div>
           <div class="loc-name">${loc.flag} ${esc(loc.name)}</div>
@@ -4303,7 +4475,12 @@ function renderRetireAnywhere() {
       <div class="loc-stat"><span class="loc-stat-lbl">Monthly surplus</span><span class="loc-stat-val ${loc.surplus>=0?'pos':'neg'}">${fmt(loc.surplus)}</span></div>
       <div class="loc-stat"><span class="loc-stat-lbl">Local tax rate</span><span class="loc-stat-val">${loc.taxRate}%</span></div>
       <div class="loc-stat"><span class="loc-stat-lbl">Climate</span><span class="loc-stat-val muted">${loc.climate}</span></div>
-    </div>`).join('');
+      <div class="loc-card-actions">
+        <button class="${primaryClass} loc-card-cta" onclick="openLocAnalysis('${loc.id}')">${primaryLabel}</button>
+        ${rerunBtn}
+      </div>
+    </div>`;
+  }).join('');
 
   document.getElementById('panel-retireanywhere').innerHTML=`
     <div class="ph"><div class="ph-tag">RETIRE ANYWHERE</div><div class="ph-title">Where Can You Retire?</div><div class="ph-sub">AI-powered analysis — your ${fmt(monthlyIncome)}/mo retirement income vs. global cost of living</div></div>
@@ -4383,6 +4560,266 @@ window.showLocDetail=function(id){
     <div id="loc-ai-out" style="margin-top:12px"></div>`;
   openModal('loc-modal');
 };
+// ── LOCATION ANALYSIS SLIDE-OVER ────────────────────────────────────────────
+// Full-screen right-side panel that replaces the old narrow modal. Fixed
+// header + fixed footer + scrollable body. Non-blocking: the backdrop
+// dimmer is pointer-events:none so the user can keep navigating the app
+// while the panel is open.
+let _slideoverLocId = null;
+function openLocAnalysis(id, opts){
+  const loc = retirePlaces().find(l => l.id === id);
+  if(!loc) return;
+  _slideoverLocId = id;
+  // Hint the AI run to auto-start if called with {rerun:true} or if no
+  // cached report exists yet for this location.
+  const cached = (state.vault||[]).find(v => v.type==='deepdive' && v.locationId===id);
+  const autoStart = !!(opts && opts.rerun) || !cached;
+  renderLocAnalysisSlideover({ autoStart: false, rerunIfCached: !!(opts && opts.rerun) });
+  // Show the panel
+  const so = document.getElementById('retire-slideover');
+  const bd = document.getElementById('retire-slideover-backdrop');
+  if(so) so.classList.add('open');
+  if(bd) bd.classList.add('open');
+  if(so) so.setAttribute('aria-hidden', 'false');
+  // If forced rerun or first-time analysis, kick it off after a short
+  // delay so the panel animation completes first.
+  if(autoStart){
+    setTimeout(() => runLocAnalysis(id, { force: !!(opts && opts.rerun) }), 420);
+  }
+}
+window.openLocAnalysis = openLocAnalysis;
+window.closeLocAnalysis = function(){
+  const so = document.getElementById('retire-slideover');
+  const bd = document.getElementById('retire-slideover-backdrop');
+  if(so) so.classList.remove('open');
+  if(bd) bd.classList.remove('open');
+  if(so) so.setAttribute('aria-hidden', 'true');
+  _slideoverLocId = null;
+};
+
+// Render the slide-over's header + body + footer for the currently-open
+// location. Pulls any cached Deep Dive report out of the vault so
+// returning to a previously-analysed location shows the report
+// immediately. Also re-renders after analysis completion.
+function renderLocAnalysisSlideover(opts){
+  const id = _slideoverLocId;
+  if(!id) return;
+  const loc = scoreLocation(retirePlaces().find(l => l.id === id));
+  if(!loc) return;
+  const r = rate(); const s = sym();
+  const nums = getRetirementNumbers();
+  const monthlyIncome = nums.sustainableAfterTax + nums.pension;
+  const cached = (state.vault||[]).find(v => v.type==='deepdive' && v.locationId===id);
+
+  // Header
+  document.getElementById('retire-so-flag').textContent  = loc.flag || '🌍';
+  document.getElementById('retire-so-title').textContent = `${loc.name}${loc.country?', '+loc.country:''}`;
+  const subParts = [`${loc.label}`, `${Math.round(loc.affordabilityScore*100)}% affordable`];
+  if(cached) subParts.push(`Report generated ${new Date(cached.date).toLocaleString(undefined,{day:'numeric',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'})}`);
+  document.getElementById('retire-so-sub').textContent = subParts.join(' · ');
+
+  // Body
+  const body = document.getElementById('retire-so-body');
+  const factsHtml = `
+    <div class="retire-so-section">
+      <div class="retire-so-section-hd">Quick Facts</div>
+      <div class="retire-so-fact-grid">
+        <div class="retire-so-fact"><div class="retire-so-fact-lbl">Monthly cost of living</div><div class="retire-so-fact-val">${fmt(loc.costOfLiving)}</div></div>
+        <div class="retire-so-fact"><div class="retire-so-fact-lbl">Your income at retirement</div><div class="retire-so-fact-val pos">${fmt(monthlyIncome)}</div></div>
+        <div class="retire-so-fact"><div class="retire-so-fact-lbl">Monthly surplus</div><div class="retire-so-fact-val ${loc.surplus>=0?'pos':'neg'}">${fmt(loc.surplus)}</div></div>
+        <div class="retire-so-fact"><div class="retire-so-fact-lbl">Local income tax</div><div class="retire-so-fact-val">${loc.taxRate}%</div></div>
+        <div class="retire-so-fact"><div class="retire-so-fact-lbl">Climate</div><div class="retire-so-fact-val" style="font-size:12px">${esc(loc.climate||'—')}</div></div>
+        <div class="retire-so-fact"><div class="retire-so-fact-lbl">Healthcare</div><div class="retire-so-fact-val" style="font-size:12px">${esc(loc.healthcare||'—')}</div></div>
+      </div>
+    </div>`;
+  const editHtml = `
+    <div class="retire-so-section">
+      <div class="retire-so-section-hd">Editable Details</div>
+      <div class="retire-so-edit-row">
+        <div class="field"><label>Monthly Cost of Living (${s})</label><input type="number" value="${Math.round(loc.costOfLiving*r)}" oninput="updateLocCost('${loc.id}',this.value/${r});renderLocAnalysisSlideover()"></div>
+        <div class="field"><label>Local Tax Rate (%)</label><input type="number" value="${loc.taxRate}" oninput="updateLocTax('${loc.id}',+this.value);renderLocAnalysisSlideover()"></div>
+        <div class="field retire-so-notes"><label>Notes</label><input value="${esc(loc.notes||'')}" oninput="updateLocNotes('${loc.id}',this.value)"></div>
+      </div>
+      <div style="margin-top:10px;display:flex;gap:8px">
+        <button class="btn btn-danger btn-sm" onclick="if(confirm('Remove this location?')){removeLoc('${loc.id}');closeLocAnalysis();}">🗑 Remove location</button>
+      </div>
+    </div>`;
+
+  // Analysis section — three possible states: empty (show CTA), running
+  // (show spinner), or complete (show full report from vault cache).
+  let analysisHtml;
+  if(cached && !(opts && opts.rerunIfCached)){
+    analysisHtml = `
+      <div class="retire-so-section">
+        <div class="retire-so-section-hd">AI Deep Dive Report</div>
+        <div class="card" style="padding:18px 20px">
+          ${mdParse(cached.markdown||'')}
+        </div>
+      </div>`;
+  } else {
+    analysisHtml = `
+      <div class="retire-so-section">
+        <div class="retire-so-section-hd">AI Deep Dive Report</div>
+        <div class="retire-so-empty-cta" id="retire-so-analysis-cta">
+          <div class="retire-so-empty-icon">🔬</div>
+          <div class="retire-so-empty-t">No analysis yet</div>
+          <div class="retire-so-empty-s">Run an AI Deep Dive to generate a structured report covering cost of living, healthcare, visa &amp; residency, tax implications, climate, real estate, and pros &amp; cons — tailored to your citizenship and home base.</div>
+          <button class="btn btn-g" onclick="runLocAnalysis('${loc.id}')">🔬 Run AI Analysis</button>
+        </div>
+      </div>`;
+  }
+
+  body.innerHTML = factsHtml + editHtml + analysisHtml;
+
+  // Footer buttons — enabled only when we have a cached report
+  const saveBtn = document.getElementById('retire-so-save-btn');
+  const pdfBtn  = document.getElementById('retire-so-pdf-btn');
+  const hint    = document.getElementById('retire-so-footer-hint');
+  if(cached && !(opts && opts.rerunIfCached)){
+    if(saveBtn) { saveBtn.disabled = false; saveBtn.textContent = '🗄 Saved to Vault ✓'; saveBtn.classList.add('btn-g'); saveBtn.classList.remove('btn-o'); }
+    if(pdfBtn)  pdfBtn.disabled = false;
+    if(hint)    hint.textContent = `Report tailored for ${(countryInfo(cached.citizenship)||{}).name||'—'} citizen from ${(countryInfo(cached.homeBase)||{}).name||'—'}`;
+  } else {
+    if(saveBtn) { saveBtn.disabled = true; saveBtn.textContent = '🗄 Save to Vault'; saveBtn.classList.remove('btn-g'); saveBtn.classList.add('btn-o'); }
+    if(pdfBtn)  pdfBtn.disabled = true;
+    if(hint)    hint.textContent = 'Run an analysis to enable Save to Vault and PDF export.';
+  }
+}
+window.renderLocAnalysisSlideover = renderLocAnalysisSlideover;
+
+// Kick off the Deep Dive analysis for the currently-open slide-over and
+// render the result inline. Reuses aiDeepDive's prompt shape but writes
+// to the slide-over body instead of the old loc-ai-out target.
+window.runLocAnalysis = function(id, opts){
+  const loc = state.places.find(l => l.id === id);
+  if(!loc) return;
+  const key = state.aiKeys?.claude;
+  if(!key){ alert('Add your Claude API key in Settings → AI Keys to run the analysis.'); return; }
+  if(!state.citizenship || !state.homeBase){
+    alert('Please complete Citizenship and Home Base in Settings first — analyses are tailored to your personal context.');
+    nav('settings');
+    return;
+  }
+  const cz = countryInfo(state.citizenship);
+  const hb = countryInfo(state.homeBase);
+  const nums = getRetirementNumbers();
+  const income = nums.sustainableAfterTax + nums.pension;
+  // If rerun, strip the previous cached entry so the new one replaces it
+  if(opts && opts.force){
+    state.vault = (state.vault||[]).filter(v => !(v.type==='deepdive' && v.locationId===id));
+  }
+  // Show the loading state in the analysis section of the slide-over
+  const body = document.getElementById('retire-so-body');
+  const cta = document.getElementById('retire-so-analysis-cta');
+  if(cta) cta.outerHTML = `
+    <div class="retire-so-loading" id="retire-so-analysis-cta">
+      <span class="state-spinner" style="width:18px;height:18px;border-width:2px"></span>
+      <span>Generating Deep Dive report for <strong style="color:var(--text)">${esc(loc.name)}</strong>… this takes 20–40 seconds. You can close the panel and come back — the result is cached.</span>
+    </div>`;
+  const ctx = buildPersonalContext();
+  const prompt = `${ctx}
+
+Generate a comprehensive, professional DEEP DIVE retirement relocation report for **${loc.name}, ${loc.country}**.
+
+CONTEXT
+- Prospective retiree holds ${cz.name} (${cz.code}) citizenship, currently based in ${hb.name} (${hb.code}).
+- Projected monthly retirement income: ${fmt(income)} (in today's money), sourced from portfolio draw-down and any pensions.
+- Target monthly cost of living at destination: ${fmt(loc.costOfLiving)}.
+- Destination headline income tax rate: ${loc.taxRate}%.
+
+REQUIREMENTS
+Return a single markdown document (no JSON, no preamble, no wrapping). Use H2 headings for each section and markdown tables where numbers help. Every section must be grounded in 2024–2025 reality and the user's specific personal context (citizenship, home base). Be honest — flag red flags, visa traps, and tax gotchas.
+
+Structure EXACTLY as follows:
+
+## Executive Summary
+One punchy paragraph: is this destination viable for this specific person? Headline numbers, surplus/shortfall, one-sentence verdict.
+
+## Cost of Living
+A markdown table with rows for Housing, Groceries, Utilities, Transport, Healthcare, Dining, Leisure — with typical monthly ranges in local currency + the user's home-base currency equivalent. One paragraph of commentary on how realistic the assumed ${fmt(loc.costOfLiving)} is.
+
+## Healthcare
+Quality of public vs private system, costs for over-65s, expat insurance expectations, any bilateral agreements with ${cz.name} or ${hb.name}, and a specific hospital/clinic recommendation if the city has one.
+
+## Visa & Residency
+Specifically for ${cz.name} citizens. What visa route applies (retirement visa, D-visa, golden visa, passive income visa)? Minimum income thresholds. Path to permanent residency. Timeline. Red flags. Cost.
+
+## Tax Implications
+Tailored to a ${cz.name} citizen currently tax-resident in ${hb.name} who is moving to ${loc.country}. Cover:
+- Whether a double-tax treaty exists between ${hb.name} and ${loc.country}
+- Treatment of pension income, portfolio withdrawals, and capital gains
+- Effective local tax rate at this income level
+- Exit-tax considerations from ${hb.name}
+- Any special regimes (NHR, Beckham, foreign-sourced income exemptions)
+
+## Climate & Lifestyle
+Month-by-month climate summary, air quality, walkability, expat community size, language requirements, major cultural notes.
+
+## Real Estate
+Buy vs rent economics at this income level. Typical purchase prices in the main expat districts. Foreigner ownership restrictions (if any). Expected rental yield and property tax. Mortgage availability for non-residents.
+
+## Pros & Cons
+Two short markdown bullet lists. Be specific and concrete — no generic filler.
+
+## Final Verdict
+One paragraph. Recommendation: "proceed", "proceed with caveats", or "reconsider". State the single biggest risk and the single biggest opportunity.`;
+  (async () => {
+    try {
+      const reply = await callClaude(prompt, 3000, key);
+      // Save to Vault automatically so the slide-over, the Vault tab,
+      // and the card CTA all update in lockstep.
+      const entry = {
+        id: 'dd-' + Date.now(),
+        type: 'deepdive',
+        locationId: id,
+        location: loc.name,
+        country: loc.country,
+        flag: loc.flag || '🌍',
+        date: new Date().toISOString(),
+        citizenship: state.citizenship,
+        homeBase: state.homeBase,
+        markdown: reply,
+      };
+      if(!Array.isArray(state.vault)) state.vault = [];
+      state.vault.unshift(entry);
+      if(state.vault.length > 50) state.vault = state.vault.slice(0, 50);
+      save();
+      // Re-render the slide-over so the cached report appears in the
+      // analysis section and the footer buttons enable.
+      renderLocAnalysisSlideover();
+      // Also re-render the card grid so the CTA flips to "View Report".
+      if(state.activePanel === 'retireanywhere') renderRetireAnywhere();
+    } catch(e) {
+      const cta2 = document.getElementById('retire-so-analysis-cta');
+      if(cta2) cta2.outerHTML = `
+        <div class="state state-error" id="retire-so-analysis-cta">
+          <div class="state-icon">⚠</div>
+          <div class="state-title">Analysis failed</div>
+          <div class="state-sub">${esc(e.message||String(e))}</div>
+          <div class="state-cta"><button class="btn btn-o btn-sm" onclick="runLocAnalysis('${id}')">Retry</button></div>
+        </div>`;
+    }
+  })();
+};
+
+window.slideoverSaveToVault = function(){
+  // Already saved automatically when the analysis completes. This button
+  // is a visual "saved" confirmation — if somehow the report exists in
+  // memory but isn't persisted, this is a safety net. Jump to Vault.
+  if(state.activePanel !== 'vault') nav('vault');
+};
+window.slideoverExportPdf = function(){
+  const id = _slideoverLocId; if(!id) return;
+  const cached = (state.vault||[]).find(v => v.type==='deepdive' && v.locationId===id);
+  if(!cached){ alert('No report available yet — run the analysis first.'); return; }
+  exportVaultEntryPdf(cached.id);
+};
+
+// Legacy preserved so any old code path that still calls showLocDetail
+// still opens the user's chosen location — just now through the new
+// slide-over instead of the old narrow modal.
+window.showLocDetail = function(id){ openLocAnalysis(id); };
+
 window.updateLocCost=function(id,val){ const l=state.places.find(l=>l.id===id); if(l){l.costOfLiving=+val;save();} };
 window.updateLocTax=function(id,val){ const l=state.places.find(l=>l.id===id); if(l){l.taxRate=+val;save();} };
 window.updateLocNotes=function(id,val){ const l=state.places.find(l=>l.id===id); if(l){l.notes=val;save();} };
