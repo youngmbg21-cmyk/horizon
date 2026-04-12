@@ -428,7 +428,31 @@ input[type="number"] { -moz-appearance:textfield; }
 .runway-chip.amb { background:var(--accent-warning-dim); color:var(--accent-warning); border-color:var(--accent-warning-dim); }
 .runway-chip.neg { background:var(--accent-critical-dim); color:var(--accent-critical); border-color:var(--accent-critical-dim); }
 .runway-chip.muted { color:var(--text3); }
-.runway-legend { display:flex; gap:16px; margin-top:10px; padding:10px 12px; background:var(--bg3); border:1px solid var(--border); border-radius:8px; font-family:var(--fm); font-size:10px; color:var(--text2); letter-spacing:.02em; flex-wrap:wrap; }
+.runway-legend { display:flex; gap:16px; margin-top:10px; padding:10px 12px; background:var(--bg3); border:1px solid var(--border); border-radius:8px; font-family:var(--fm); font-size:10px; color:var(--text2); letter-spacing:.02em; flex-wrap:wrap; align-items:center; }
+.runway-legend-item { display:inline-flex; align-items:center; gap:6px; }
+.runway-legend-line { display:inline-block; width:18px; height:3px; border-radius:2px; }
+.runway-legend-sq   { display:inline-block; width:10px; height:10px; border-radius:2px; }
+.runway-legend-gap  { display:inline-flex; align-items:center; gap:4px; color:var(--accent-premium); font-weight:600; margin-left:auto; padding:3px 8px; background:var(--accent-premium-dim); border-radius:4px; }
+
+/* ── SVG CHART (pure SVG, replaces Chart.js runway) ───────────────── */
+.runway-svg-host { width:100%; background:var(--bg2); border:1px solid var(--border); border-radius:10px; padding:10px 12px 8px; }
+body.light .runway-svg-host { background:var(--bg3); }
+.runway-svg { display:block; width:100%; height:auto; max-height:320px; }
+.runway-empty { min-height:220px; display:flex; align-items:center; justify-content:center; color:var(--text3); font-size:13px; font-family:var(--fm); }
+/* SVG text + strokes — use variables so theme switching works */
+.runway-svg .runway-grid { stroke:var(--border); stroke-width:1; }
+.runway-svg .runway-axis-label { fill:var(--text3); font-size:10px; font-family:'JetBrains Mono', monospace; }
+.runway-svg .runway-axis-label.dim { fill:var(--text3); font-size:9px; }
+.runway-svg .runway-axis-title { fill:var(--text3); font-size:9px; font-family:'JetBrains Mono', monospace; font-weight:600; letter-spacing:.06em; text-transform:uppercase; }
+.runway-svg .runway-bar-port { fill:#f5a623; }
+.runway-svg .runway-bar-pen  { fill:#4d9fff; }
+.runway-svg .runway-annot-line.life   { stroke:#f5a623; stroke-width:1.5; stroke-dasharray:5,4; opacity:.85; }
+.runway-svg .runway-annot-line.runout { stroke:#ff4d6d; stroke-width:1.5; stroke-dasharray:5,4; opacity:.9; }
+.runway-svg .runway-annot-label { font-family:'JetBrains Mono', monospace; font-size:10px; font-weight:700; }
+.runway-svg .runway-annot-label.life    { fill:#f5a623; }
+.runway-svg .runway-annot-label.runout  { fill:#ff4d6d; }
+.runway-svg .runway-annot-label.surplus { fill:#00e8a0; }
+.runway-svg .runway-start-label { fill:#4d9fff; font-family:'DM Sans', sans-serif; font-size:10px; font-weight:600; }
 .runway-milestones-wrap { margin-top:14px; padding-top:12px; border-top:1px dashed var(--border); }
 .runway-ms-hd { font-family:var(--fm); font-size:9px; letter-spacing:.14em; text-transform:uppercase; color:var(--text3); margin-bottom:8px; }
 .runway-milestones { display:grid; grid-template-columns:repeat(auto-fill, minmax(108px, 1fr)); gap:8px; }
@@ -3201,7 +3225,7 @@ function renderRetirement() {
             <span class="runway-chip muted">Life exp. ${state.lifeExp||90}</span>
           </div>
         </div>
-        <div class="chart-wrap xl"><canvas id="runway-chart"></canvas></div>
+        <div class="runway-svg-host" id="runway-svg-host"></div>
         <div class="runway-legend" id="runway-legend"></div>
         <div class="runway-milestones-wrap">
           <div class="runway-ms-hd">Age snapshots</div>
@@ -3322,267 +3346,243 @@ function renderRetirement() {
 // Debounce helper so typing doesn't re-render every keystroke
 let _retDebTimer=null;
 function debouncedRenderRetirement(){
+  // Short debounce per runway spec — chart updates smoothly after the
+  // user stops typing rather than flickering on every keystroke.
   clearTimeout(_retDebTimer);
-  _retDebTimer=setTimeout(renderRetirement,600);
+  _retDebTimer=setTimeout(renderRetirement,400);
 }
 
+// ─── LONGEVITY RUNWAY — pure SVG renderer ───────────────────────────────────
+// Rebuilt from scratch per spec (no Chart.js). Recomputes from state on
+// every call, no animation, no stale state. See the chart spec in the
+// commit history for the design principles being honored here.
 function renderRunwayChart(){
-  destroyChart('runway');
-  const ctx=document.getElementById('runway-chart');
-  if(!ctx) return;
+  // Clean up any leftover Chart.js instance from the previous version.
+  if(typeof destroyChart==='function') destroyChart('runway');
+  const host = document.getElementById('runway-svg-host');
+  if(!host) return;
 
-  const nums=getRetirementNumbers();
-  const cd=chartDefaults();
-  const cdata=buildRunwayChartData(nums);
-  const lifeExp=state.lifeExp||90;
+  const nums = getRetirementNumbers();
+  const cdata = buildRunwayChartData(nums);
+  const lifeExp = state.lifeExp || 90;
+  const retAge = state.retirementAge;
 
-  // subtitle
-  const pensions=getPensionAssets();
-  const sub=document.getElementById('runway-subtitle');
-  if(sub){
-    const hasPen=pensions.length>0&&cdata.earliestPension!==null;
-    const realRate=Math.max(0,(state.retirementPostGrowth||4)-state.inflationRate);
-    if(hasPen&&cdata.earliestPension>state.retirementAge){
-      sub.textContent=`How long your real nest egg lasts — Phase 1: ${fmt(nums.grossNeeded)}/mo (age ${state.retirementAge}–${cdata.earliestPension-1}), Phase 2: reduced withdrawal + pension (age ${cdata.earliestPension}+) at ${realRate.toFixed(1)}% real growth`;
-    } else {
-      sub.textContent=`How long your real nest egg lasts — withdrawing ${fmt(nums.grossNeeded)}/mo gross at ${realRate.toFixed(1)}% real growth`;
+  // ── EMPTY STATE ──────────────────────────────────────────────────────────
+  if(!cdata.labels || cdata.labels.length === 0){
+    host.innerHTML = '<div class="runway-empty">Set your retirement age and portfolio to see the runway.</div>';
+    // Still update the surrounding chrome so the panel doesn't look broken.
+    _runwayUpdateChrome(cdata, nums, lifeExp);
+    return;
+  }
+
+  // ── DIMENSIONS ───────────────────────────────────────────────────────────
+  const W = 680, H = 240;
+  const pad = { t: 28, r: 56, b: 30, l: 62 };
+  const pw = W - pad.l - pad.r;       // plot width
+  const ph = H - pad.t - pad.b;       // plot height
+  const n  = cdata.labels.length;
+
+  // ── SCALES ───────────────────────────────────────────────────────────────
+  // Left axis: portfolio balance. +10% headroom.
+  const maxBal = Math.max(...cdata.balData, 1) * 1.1;
+  // Right axis: combined annual income (portfolio withdrawal + pension).
+  // +20% headroom.
+  const maxInc = Math.max(
+    ...cdata.labels.map((_, i) => (cdata.portWithdrawal[i]||0) + (cdata.pensionData[i]||0)),
+    1
+  ) * 1.2;
+  const xScale = i => pad.l + (n <= 1 ? pw / 2 : (i / (n - 1)) * pw);
+  const yBal   = v => pad.t + ph - (Math.max(0, v) / maxBal) * ph;
+  const yInc   = v => pad.t + ph - (Math.max(0, v) / maxInc) * ph;
+
+  // Bar width scales inversely with year count, clamped [3, 12].
+  const barW = Math.max(3, Math.min(12, Math.floor(pw / (n * 1.4))));
+
+  // Runout detection — the first index where balance hits zero.
+  const runoutIdx = cdata.balData.findIndex((b, i) => i > 0 && b <= 0);
+  const hasRunout = runoutIdx > 0;
+  const survives = !hasRunout;
+  const lineColor   = survives ? '#00e8a0' : '#ff4d6d';
+  const lineColorLt = survives ? '#00c889' : '#e53b55';
+
+  // ── BUILD SVG — back-to-front layering ───────────────────────────────────
+  const parts = [];
+  parts.push(`<svg class="runway-svg" viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid meet" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Longevity runway chart">`);
+
+  // Gradient defs
+  parts.push(`<defs>
+    <linearGradient id="runwayFill" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%"  stop-color="${lineColor}" stop-opacity="0.32"/>
+      <stop offset="100%" stop-color="${lineColor}" stop-opacity="0.02"/>
+    </linearGradient>
+  </defs>`);
+
+  // Layer 1: horizontal grid lines + left balance axis labels (0/25/50/75/100%)
+  const gridLevels = [0, 0.25, 0.5, 0.75, 1];
+  gridLevels.forEach(pct => {
+    const y = pad.t + ph - pct * ph;
+    const val = maxBal * pct;
+    const dash = pct === 0 ? '' : ' stroke-dasharray="2,4"';
+    parts.push(`<line x1="${pad.l}" y1="${y}" x2="${pad.l + pw}" y2="${y}" class="runway-grid"${dash}/>`);
+    parts.push(`<text x="${pad.l - 8}" y="${y + 3}" text-anchor="end" class="runway-axis-label">${_svgEsc(fmtC(val))}</text>`);
+  });
+
+  // Layer 2: stacked income bars — SKIP INDEX 0 (starting state, not a
+  // year of drawdown). Amber (portfolio withdrawal) on the bottom, blue
+  // (pension) stacked on top. After depletion, amber disappears and
+  // remaining pension bars fade to 1/3 opacity.
+  for(let i = 1; i < n; i++){
+    const cx      = xScale(i);
+    const x       = cx - barW / 2;
+    const portVal = cdata.portWithdrawal[i] || 0;
+    const penVal  = cdata.pensionData[i]     || 0;
+    const baseY   = pad.t + ph;
+    const depleted = hasRunout && i >= runoutIdx;
+    const op = depleted ? 0.33 : 1;
+    // Portfolio withdrawal (amber) — nothing once the portfolio is gone.
+    if(!depleted && portVal > 0){
+      const h = (portVal / maxInc) * ph;
+      parts.push(`<rect x="${x}" y="${baseY - h}" width="${barW}" height="${h}" class="runway-bar-port" opacity="${op}"/>`);
+    }
+    // Pension income (blue) — continues after depletion.
+    if(penVal > 0){
+      const h = (penVal / maxInc) * ph;
+      const portH = depleted ? 0 : ((portVal || 0) / maxInc) * ph;
+      const py = baseY - portH - h;
+      parts.push(`<rect x="${x}" y="${py}" width="${barW}" height="${h}" class="runway-bar-pen" opacity="${op}"/>`);
     }
   }
 
-  // Age-based snapshots (65, 70, 75, 80, 85, 90). We include any 5-year
-  // tick that falls within the simulation window; if the runout age is
-  // not a multiple of 5 we inject that as its own pill so the user can
-  // see exactly where depletion happens.
-  const msEl=document.getElementById('runway-milestones');
+  // Layer 3: gradient area under balance line
+  let area = `M ${xScale(0)} ${pad.t + ph}`;
+  for(let i = 0; i < n; i++) area += ` L ${xScale(i)} ${yBal(cdata.balData[i])}`;
+  area += ` L ${xScale(n - 1)} ${pad.t + ph} Z`;
+  parts.push(`<path d="${area}" fill="url(#runwayFill)"/>`);
+
+  // Layer 4: balance line — the primary visual story
+  let line = '';
+  for(let i = 0; i < n; i++) line += (i === 0 ? 'M ' : ' L ') + xScale(i).toFixed(2) + ' ' + yBal(cdata.balData[i]).toFixed(2);
+  parts.push(`<path d="${line}" fill="none" stroke="${lineColor}" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>`);
+
+  // Layer 5: right-side income axis labels (0%, 50%, 100%) + header
+  [0, 0.5, 1].forEach(pct => {
+    const y = pad.t + ph - pct * ph;
+    const val = maxInc * pct;
+    parts.push(`<text x="${pad.l + pw + 8}" y="${y + 3}" text-anchor="start" class="runway-axis-label dim">${_svgEsc(fmtC(val))}</text>`);
+  });
+  parts.push(`<text x="${pad.l + pw + 8}" y="${pad.t - 10}" class="runway-axis-title">Income/yr</text>`);
+
+  // Layer 6: annotations — life exp, runout OR surplus
+  const leIdx = cdata.labels.indexOf(lifeExp);
+  if(leIdx >= 0){
+    const x = xScale(leIdx);
+    parts.push(`<line x1="${x}" y1="${pad.t}" x2="${x}" y2="${pad.t + ph}" class="runway-annot-line life"/>`);
+    // Flip label to the left if it would overflow the right edge.
+    const atEnd = leIdx >= n - 2;
+    const lx = atEnd ? x - 6 : x + 6;
+    const anchor = atEnd ? 'end' : 'start';
+    parts.push(`<text x="${lx}" y="${pad.t + 10}" text-anchor="${anchor}" class="runway-annot-label life">Life exp. ${lifeExp}</text>`);
+  }
+  if(hasRunout){
+    const x = xScale(runoutIdx);
+    const runoutAge = cdata.labels[runoutIdx];
+    parts.push(`<line x1="${x}" y1="${pad.t}" x2="${x}" y2="${pad.t + ph}" class="runway-annot-line runout"/>`);
+    const atEnd = runoutIdx >= n - 2;
+    const lx = atEnd ? x - 6 : x + 6;
+    const anchor = atEnd ? 'end' : 'start';
+    parts.push(`<text x="${lx}" y="${pad.t + 24}" text-anchor="${anchor}" class="runway-annot-label runout">Runs out ~age ${runoutAge}</text>`);
+  } else {
+    parts.push(`<text x="${pad.l + pw - 4}" y="${pad.t + 12}" text-anchor="end" class="runway-annot-label surplus">Surplus at age ${lifeExp}+</text>`);
+  }
+
+  // Layer 7: x-axis age labels — multiples of 5 only
+  cdata.labels.forEach((age, i) => {
+    if(age % 5 === 0){
+      parts.push(`<text x="${xScale(i)}" y="${pad.t + ph + 18}" text-anchor="middle" class="runway-axis-label">${age}</text>`);
+    }
+  });
+
+  // Layer 8: retire-start dot + label
+  const sx = xScale(0);
+  const sy = yBal(cdata.balData[0]);
+  parts.push(`<circle cx="${sx}" cy="${sy}" r="5" fill="#4d9fff" stroke="var(--bg2)" stroke-width="1.5"/>`);
+  parts.push(`<text x="${sx + 10}" y="${sy + 4}" class="runway-start-label">Retire age ${retAge}</text>`);
+
+  parts.push('</svg>');
+  host.innerHTML = parts.join('');
+
+  // ── CHROME: subtitle, legend, milestones, verdict chip ──────────────────
+  _runwayUpdateChrome(cdata, nums, lifeExp, lineColor);
+}
+
+// Escape minimal set of chars that matter inside SVG text content.
+function _svgEsc(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+function _runwayUpdateChrome(cdata, nums, lifeExp, lineColor){
+  // Subtitle — adapts to whether there's a pension gap period
+  const pensions = getPensionAssets();
+  const sub = document.getElementById('runway-subtitle');
+  if(sub){
+    const realRate = Math.max(0, (state.retirementPostGrowth || 4) - state.inflationRate);
+    const hasPenGap = pensions.length > 0 && cdata.earliestPension !== null && cdata.earliestPension > state.retirementAge;
+    if(hasPenGap){
+      sub.textContent = `How long your real nest egg lasts — Phase 1: ${fmt(nums.grossNeeded)}/mo (age ${state.retirementAge}–${cdata.earliestPension - 1}), Phase 2: reduced withdrawal + pension (age ${cdata.earliestPension}+) at ${realRate.toFixed(1)}% real growth`;
+    } else {
+      sub.textContent = `How long your real nest egg lasts — withdrawing ${fmt(nums.grossNeeded)}/mo gross at ${realRate.toFixed(1)}% real growth`;
+    }
+  }
+
+  // Age snapshots — 5-year milestones + runout injection
+  const msEl = document.getElementById('runway-milestones');
   if(msEl){
-    const lifeExp = state.lifeExp||90;
     const snapshotAges = [];
-    for(let a = Math.max(65, state.retirementAge); a <= Math.max(lifeExp, state.retirementAge+25); a += 5) {
-      if(a > state.retirementAge) snapshotAges.push(a);
+    for(let a = Math.max(65, state.retirementAge); a <= Math.max(lifeExp, state.retirementAge + 25); a += 5){
+      if(a > state.retirementAge && a <= lifeExp) snapshotAges.push(a);
     }
-    if(nums.runoutAge && !snapshotAges.includes(nums.runoutAge)) {
+    if(nums.runoutAge && !snapshotAges.includes(nums.runoutAge) && nums.runoutAge <= lifeExp){
       snapshotAges.push(nums.runoutAge);
-      snapshotAges.sort((a,b)=>a-b);
+      snapshotAges.sort((a, b) => a - b);
     }
-    const msPills = snapshotAges.slice(0, 10).map(a => {
+    msEl.innerHTML = snapshotAges.slice(0, 10).map(a => {
       const idx = cdata.labels.indexOf(a);
-      const bal = idx>=0 ? cdata.balData[idx] : 0;
-      const pen = idx>=0 ? (cdata.pensionData[idx]||0) : 0;
+      const bal = idx >= 0 ? cdata.balData[idx] : 0;
+      const pen = idx >= 0 ? (cdata.pensionData[idx] || 0) : 0;
       const isLifeExp = a === lifeExp;
-      const isRunout = nums.runoutAge && a === nums.runoutAge;
-      const tone = bal>0 ? 'pos' : 'neg';
+      const isRunout  = nums.runoutAge && a === nums.runoutAge;
+      const tone = bal > 0 ? 'pos' : 'neg';
       const badge = isRunout ? '<span class="runway-ms-badge neg">Runout</span>'
                   : isLifeExp ? '<span class="runway-ms-badge info">Life exp.</span>'
-                  : pen>0 ? '<span class="runway-ms-badge muted">+pension</span>'
+                  : pen > 0 ? '<span class="runway-ms-badge muted">+pension</span>'
                   : '';
       return `<div class="runway-ms ${tone}${isLifeExp?' is-lifeexp':''}${isRunout?' is-runout':''}">
         <div class="runway-ms-age">Age ${a}</div>
-        <div class="runway-ms-val">${bal>0 ? fmt(bal) : 'Depleted'}</div>
+        <div class="runway-ms-val">${bal > 0 ? fmt(bal) : 'Depleted'}</div>
         ${badge}
       </div>`;
     }).join('');
-    msEl.innerHTML = msPills;
   }
-  // Update the verdict chip in the header
+
+  // Verdict chip
   const chip = document.getElementById('runway-verdict-chip');
-  if(chip) {
+  if(chip){
     chip.textContent = nums.verdict;
-    chip.className = 'runway-chip ' + (nums.verdictClass==='overfunded'?'pos':nums.verdictClass==='ontarget'?'amb':'neg');
+    chip.className = 'runway-chip ' + (nums.verdictClass === 'overfunded' ? 'pos' : nums.verdictClass === 'ontarget' ? 'amb' : 'neg');
   }
 
-  // legend
-  const legEl=document.getElementById('runway-legend');
-  const hasPen=pensions.length>0;
+  // Legend — line swatch + two bar swatches, plus pension-gap callout
+  const legEl = document.getElementById('runway-legend');
   if(legEl){
-    legEl.innerHTML=`<span>— <span style="color:var(--green)">Portfolio balance</span> (left axis)</span>
-      <span><span style="color:var(--amber)">█</span> Portfolio withdrawal/yr (right axis)</span>
-      ${hasPen?`<span><span style="color:var(--blue)">█</span> Pension income/yr</span>`:''}
-      ${cdata.earliestPension&&cdata.earliestPension>state.retirementAge?`<span style="color:var(--violet)">⚡ Pension starts age ${cdata.earliestPension} (${cdata.earliestPension-state.retirementAge}yr gap)</span>`:''}`;
+    const color = lineColor || (nums.runoutAge ? '#ff4d6d' : '#00e8a0');
+    const gap = cdata.earliestPension && cdata.earliestPension > state.retirementAge
+      ? `<span class="runway-legend-gap">⚡ Pension starts at age ${cdata.earliestPension} (${cdata.earliestPension - state.retirementAge}yr gap)</span>`
+      : '';
+    legEl.innerHTML = `
+      <span class="runway-legend-item"><span class="runway-legend-line" style="background:${color}"></span>Portfolio balance (left axis)</span>
+      <span class="runway-legend-item"><span class="runway-legend-sq" style="background:#f5a623"></span>Portfolio withdrawal</span>
+      <span class="runway-legend-item"><span class="runway-legend-sq" style="background:#4d9fff"></span>Pension income</span>
+      ${gap}
+    `;
   }
-
-  // stacked bar max for right axis
-  const maxIncome=Math.max(...cdata.labels.map((_,i)=>cdata.portWithdrawal[i]+(cdata.pensionData[i]||0)),1)*1.25;
-  const maxBal=Math.max(...cdata.balData,1)*1.12;
-
-  const datasets=[
-    // Stacked portfolio withdrawal bars
-    {
-      type:'bar', label:'Portfolio Withdrawal/yr',
-      data:cdata.portWithdrawal,
-      backgroundColor:'rgba(245,166,35,0.35)', borderColor:'rgba(245,166,35,0.7)', borderWidth:0.5,
-      yAxisID:'y2', stack:'income', borderRadius:1,
-    },
-  ];
-  if(hasPen){
-    datasets.push({
-      type:'bar', label:'Pension Income/yr',
-      data:cdata.pensionData,
-      backgroundColor:'rgba(77,159,255,0.35)', borderColor:'rgba(77,159,255,0.7)', borderWidth:0.5,
-      yAxisID:'y2', stack:'income', borderRadius:1,
-    });
-  }
-  // Portfolio balance line on top
-  datasets.push({
-    type:'line', label:'Portfolio Balance',
-    data:cdata.balData,
-    borderColor:'#00e8a0', backgroundColor:'rgba(0,232,160,0.08)',
-    fill:true, tension:0.35, pointRadius:0, borderWidth:2.5, yAxisID:'y1', order:0,
-  });
-
-  // Annotation plugin via chartjs-plugin-annotation is not loaded, so we draw
-  // life expectancy, runout, and the "surplus zone" shading as custom paint.
-  const verticalLinesPlugin = {
-    id:'vertLines',
-    beforeDatasetsDraw(chart){
-      // The x-axis now ends at life expectancy, so we surface the
-      // "surplus" annotation as a top-right badge inside the plot area
-      // whenever the portfolio is still positive at life-exp. The old
-      // behavior shaded the strip from life-exp → right edge, which is
-      // zero width once the chart is trimmed.
-      const xAxis=chart.scales.x;
-      const yAxis=chart.scales.y1;
-      if(!xAxis||!yAxis) return;
-      const leIdx = cdata.labels.indexOf(lifeExp);
-      if(leIdx < 0) return;
-      const balAtLifeExp = cdata.balData[leIdx] || 0;
-      if(balAtLifeExp <= 0) return;
-      const ctx2 = chart.ctx;
-      ctx2.save();
-      // Soft full-area tint to communicate "plan is funded".
-      ctx2.fillStyle = 'rgba(0,232,160,0.04)';
-      ctx2.fillRect(xAxis.left, yAxis.top, xAxis.right - xAxis.left, yAxis.bottom - yAxis.top);
-      // Top-right pill badge
-      const label = 'SURPLUS AT LIFE EXP';
-      ctx2.font = 'bold 10px JetBrains Mono';
-      const tw = ctx2.measureText(label).width;
-      const padX = 8, padY = 5;
-      const bx = xAxis.right - tw - padX*2 - 4;
-      const by = yAxis.top + 6;
-      ctx2.fillStyle = 'rgba(0,232,160,0.18)';
-      ctx2.strokeStyle = 'rgba(0,232,160,0.55)';
-      ctx2.lineWidth = 1;
-      ctx2.beginPath();
-      const r = 4;
-      ctx2.moveTo(bx+r, by);
-      ctx2.lineTo(bx+tw+padX*2-r, by);
-      ctx2.quadraticCurveTo(bx+tw+padX*2, by, bx+tw+padX*2, by+r);
-      ctx2.lineTo(bx+tw+padX*2, by+padY*2+10-r);
-      ctx2.quadraticCurveTo(bx+tw+padX*2, by+padY*2+10, bx+tw+padX*2-r, by+padY*2+10);
-      ctx2.lineTo(bx+r, by+padY*2+10);
-      ctx2.quadraticCurveTo(bx, by+padY*2+10, bx, by+padY*2+10-r);
-      ctx2.lineTo(bx, by+r);
-      ctx2.quadraticCurveTo(bx, by, bx+r, by);
-      ctx2.closePath();
-      ctx2.fill();
-      ctx2.stroke();
-      ctx2.fillStyle = 'rgba(0,232,160,0.95)';
-      ctx2.fillText(label, bx+padX, by+padY+9);
-      ctx2.restore();
-    },
-    afterDraw(chart){
-      const ctx2=chart.ctx;
-      const xAxis=chart.scales.x;
-      const yAxis=chart.scales.y1;
-      if(!xAxis||!yAxis) return;
-      ctx2.save();
-      // Helper: choose left or right side for a marker label so it never
-      // clips off the chart edge. Returns the {bx, tx} for label box.
-      const labelSide = (x, w) => {
-        if(x + 4 + w + 4 <= xAxis.right) return { bx: x + 4, tx: x + 9 };
-        return { bx: x - 4 - w, tx: x - 4 - w + 5 };
-      };
-      // Life expectancy line (amber dashed, consistent with reference design)
-      const leIdx=cdata.labels.indexOf(lifeExp);
-      if(leIdx>=0){
-        const x=xAxis.getPixelForValue(leIdx);
-        ctx2.beginPath(); ctx2.setLineDash([5,4]);
-        ctx2.strokeStyle='rgba(245,166,35,0.75)'; ctx2.lineWidth=1.5;
-        ctx2.moveTo(x,yAxis.top); ctx2.lineTo(x,yAxis.bottom);
-        ctx2.stroke();
-        // Label with a soft background so it reads against any bar.
-        ctx2.setLineDash([]);
-        ctx2.font='bold 10px JetBrains Mono';
-        const label = 'Life exp. '+lifeExp;
-        const w = ctx2.measureText(label).width + 10;
-        const { bx, tx } = labelSide(x, w);
-        ctx2.fillStyle='rgba(245,166,35,0.18)';
-        ctx2.fillRect(bx, yAxis.top+4, w, 16);
-        ctx2.fillStyle='rgba(245,166,35,0.95)';
-        ctx2.fillText(label, tx, yAxis.top+16);
-      }
-      // Runout line (red solid) — only drawn if depletion happens at or
-      // before life expectancy (the chart no longer extends past it).
-      if(nums.runoutAge && nums.runoutAge <= lifeExp && cdata.runoutIdx>=0){
-        const x=xAxis.getPixelForValue(cdata.runoutIdx);
-        ctx2.beginPath(); ctx2.setLineDash([]);
-        ctx2.strokeStyle='rgba(255,77,109,0.85)'; ctx2.lineWidth=2;
-        ctx2.moveTo(x,yAxis.top); ctx2.lineTo(x,yAxis.bottom);
-        ctx2.stroke();
-        ctx2.font='bold 10px JetBrains Mono';
-        const lbl='Depletes ~'+Math.round(nums.runoutAge);
-        const w = ctx2.measureText(lbl).width + 10;
-        const side = labelSide(x, w);
-        ctx2.fillStyle='rgba(255,77,109,0.2)';
-        ctx2.fillRect(side.bx, yAxis.top+24, w, 16);
-        ctx2.fillStyle='rgba(255,77,109,0.95)';
-        ctx2.fillText(lbl, side.tx, yAxis.top+36);
-      }
-      // Retire start dot
-      const x0=xAxis.getPixelForValue(0);
-      const y0=yAxis.getPixelForValue(cdata.balData[0]);
-      ctx2.beginPath(); ctx2.setLineDash([]);
-      ctx2.arc(x0,y0,5,0,2*Math.PI);
-      ctx2.fillStyle='#4d9fff'; ctx2.fill();
-      ctx2.font='10px DM Sans'; ctx2.fillStyle='#4d9fff'; ctx2.textAlign='left';
-      ctx2.fillText('Retire age '+state.retirementAge, x0+8, y0+12);
-      ctx2.restore();
-    }
-  };
-
-  charts['runway']=new Chart(ctx,{
-    data:{ labels:cdata.labels.map(a=>String(a)), datasets },
-    options:{
-      responsive:true, maintainAspectRatio:false,
-      interaction:{ mode:'index', intersect:false },
-      plugins:{
-        legend:{ display:false },
-        tooltip:{
-          backgroundColor:cd.tooltipBg, borderColor:cd.tooltipBorder, borderWidth:1,
-          titleColor:cd.tooltipTitle, bodyColor:cd.tooltipBody,
-          bodyFont:{family:'JetBrains Mono',size:11}, padding:11,
-          callbacks:{
-            title:items=>'Age '+items[0].label,
-            label:c=>{
-              if(c.dataset.label==='Portfolio Balance') return '  Balance: '+fmt(c.raw);
-              if(c.dataset.label==='Portfolio Withdrawal/yr') return '  Portfolio withdrawal: '+fmt(c.raw)+'/yr';
-              if(c.dataset.label==='Pension Income/yr') return '  Pension income: '+fmt(c.raw)+'/yr';
-              return '  '+c.dataset.label+': '+fmt(c.raw);
-            }
-          }
-        }
-      },
-      scales:{
-        x:{
-          ticks:{ color:cd.textColor, font:{family:'JetBrains Mono',size:10}, maxTicksLimit:12, callback:(v,i)=>cdata.labels[i]%5===0?String(cdata.labels[i]):'' },
-          grid:{ color:cd.gridColor }
-        },
-        y1:{
-          type:'linear', position:'left',
-          max:maxBal,
-          ticks:{ color:cd.textColor, font:{family:'JetBrains Mono',size:10}, callback:v=>fmtC(v) },
-          grid:{ color:cd.gridColor }
-        },
-        y2:{
-          type:'linear', position:'right',
-          max:maxIncome,
-          ticks:{ color:isLight()?'#7080a0':'#3d506e', font:{family:'JetBrains Mono',size:9}, callback:v=>fmtC(v) },
-          grid:{ drawOnChartArea:false },
-          title:{ display:true, text:'Income/yr', color:isLight()?'#7080a0':'#3d506e', font:{size:9,family:'JetBrains Mono'} }
-        }
-      }
-    },
-    plugins:[verticalLinesPlugin]
-  });
 }
 
 // ══ FUN FUND ═════════════════════════════════════════════════════════════════
