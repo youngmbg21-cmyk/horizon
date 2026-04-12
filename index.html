@@ -214,6 +214,29 @@ input[type="number"] { -moz-appearance:textfield; }
 .two-col > .card,
 .three-col > .card { margin-bottom:0; }
 
+/* Compact card — fixed max-height with a pinned header and an
+   internally scrollable body. Used for list-heavy cards (Recent
+   Transactions, 12-Month Spending by Category) so they don't dominate
+   the page vertically. */
+.card.card-compact { display:flex; flex-direction:column; max-height:340px; }
+.card.card-compact .card-title { flex-shrink:0; margin-bottom:10px; }
+.card.card-compact .card-body {
+  flex:1 1 auto;
+  min-height:0;           /* required so the flex child can actually scroll */
+  overflow-y:auto;
+  /* Visual bleed into the card padding so the scrollbar sits cleanly
+     against the right edge and the content retains normal spacing. */
+  margin-right:-8px;
+  padding-right:8px;
+  /* Soft fade at the bottom hints there's more content below. */
+  mask-image:linear-gradient(to bottom, #000 0, #000 calc(100% - 16px), transparent 100%);
+  -webkit-mask-image:linear-gradient(to bottom, #000 0, #000 calc(100% - 16px), transparent 100%);
+}
+.card.card-compact .card-body::-webkit-scrollbar { width:6px; }
+.card.card-compact .card-body::-webkit-scrollbar-thumb { background:var(--border2); border-radius:3px; }
+.card.card-compact .card-body::-webkit-scrollbar-track { background:transparent; }
+@media (max-width:900px){ .card.card-compact { max-height:300px; } }
+
 /* ── KPI GRID ────────────────────────────────────────── */
 .kpi-row { display:grid; grid-template-columns:repeat(auto-fit,minmax(190px,1fr)); gap:10px; margin-bottom:14px; }
 .kpi { background:var(--bg2); border:1px solid var(--border); border-radius:10px; padding:14px 16px; transition:border-color .2s, transform .2s, box-shadow .2s; cursor:default; min-height:86px; display:flex; flex-direction:column; justify-content:center; position:relative; }
@@ -303,11 +326,15 @@ input[type="number"] { -moz-appearance:textfield; }
 .chart-wrap.md { height:200px; }
 .chart-wrap.lg { height:240px; }
 .chart-wrap.xl { height:280px; }
+/* Focal — designated "hero" chart for a section. Taller canvas, more
+   breathing room, proportionally bigger axes + labels. */
+.chart-wrap.focal { height:400px; }
 .chart-wrap > canvas { width:100% !important; height:100% !important; display:block; }
 @media (max-width:900px){
   .chart-wrap,.chart-wrap.md { height:180px; }
   .chart-wrap.lg { height:210px; }
   .chart-wrap.xl { height:240px; }
+  .chart-wrap.focal { height:300px; }
 }
 
 /* ── CASHFLOW BAR ────────────────────────────────────── */
@@ -2763,36 +2790,38 @@ function renderTransactions() {
     </div>
 
     <div class="two-col">
-      <!-- Recent transactions -->
-      <div class="card">
+      <!-- Recent transactions — compact card with pinned title + scrollable body -->
+      <div class="card card-compact">
         <div class="card-title">Recent Transactions</div>
-        <div class="tx-list">
-          ${state.transactions.slice(0,10).map(tx=>`
-            <div class="tx-item">
-              <div class="tx-icon" style="background:${tx.type==='credit'?'var(--green-dim)':'var(--bg3)'}">${tx.icon||'💳'}</div>
-              <div class="tx-info">
-                <div class="tx-name">${esc(tx.name)}</div>
-                <div class="tx-cat">${tx.category}</div>
-              </div>
-              <div class="tx-date">${tx.date}</div>
-              <div class="tx-amount ${tx.type==='credit'?'inp':'out'}">${tx.type==='credit'?'+':''}${fmt(Math.abs(tx.amount))}</div>
-            </div>`).join('')}
+        <div class="card-body">
+          <div class="tx-list">
+            ${state.transactions.slice(0,10).map(tx=>`
+              <div class="tx-item">
+                <div class="tx-icon" style="background:${tx.type==='credit'?'var(--green-dim)':'var(--bg3)'}">${tx.icon||'💳'}</div>
+                <div class="tx-info">
+                  <div class="tx-name">${esc(tx.name)}</div>
+                  <div class="tx-cat">${tx.category}</div>
+                </div>
+                <div class="tx-date">${tx.date}</div>
+                <div class="tx-amount ${tx.type==='credit'?'inp':'out'}">${tx.type==='credit'?'+':''}${fmt(Math.abs(tx.amount))}</div>
+              </div>`).join('')}
+          </div>
         </div>
       </div>
 
-      <!-- Spending categories -->
-      <div class="card">
+      <!-- Spending categories — compact card with pinned title + scrollable body -->
+      <div class="card card-compact">
         <div class="card-title">12-Month Spending by Category
           <div class="ct-actions"><span class="conn-badge demo">DEMO DATA</span></div>
         </div>
-        ${catRows}
+        <div class="card-body">${catRows}</div>
       </div>
     </div>
 
-    <!-- Spending chart -->
+    <!-- Spending chart — focal (hero) chart, takes the newly freed vertical space -->
     <div class="card">
       <div class="card-title">📊 12-Month Spending vs Income Trend</div>
-      <div class="chart-wrap md"><canvas id="tx-chart"></canvas></div>
+      <div class="chart-wrap focal"><canvas id="tx-chart"></canvas></div>
     </div>
 
     <!-- AI Patterns -->
@@ -2809,16 +2838,50 @@ function renderTransactions() {
     destroyChart('tx');
     const ctx=document.getElementById('tx-chart');
     if(ctx){
+      const cd=chartDefaults();
       const months=MONTH_NAMES.slice(4).concat(MONTH_NAMES.slice(0,4));
       const income=[127000,127000,206000,131800,127000,127000,127000,127000,127000,127000,127000,127000];
       const expenses=[132500,178264,88545,91500,103500,91500,108636,63945,81636,91500,56590,107090];
+      const net=income.map((v,i)=>v-expenses[i]);
+      // Focal chart — proportions scale up with the canvas. Bigger axis
+      // fonts, more y-ticks, slightly heavier borders, added net-flow
+      // overlay line for a second read on the trend.
       charts['tx']=new Chart(ctx.getContext('2d'),{
         type:'bar',
-        data:{labels:months,datasets:[
-          {label:'Income',data:income,backgroundColor:'#00e8a030',borderColor:'#00e8a0',borderWidth:1.5,borderRadius:3},
-          {label:'Expenses',data:expenses,backgroundColor:'#ff4d6d20',borderColor:'#ff4d6d',borderWidth:1.5,borderRadius:3},
-        ]},
-        options:chartPreset()
+        data:{
+          labels:months,
+          datasets:[
+            {label:'Income',   data:income,   backgroundColor:'#00e8a028', borderColor:'#00e8a0', borderWidth:2,   borderRadius:5, categoryPercentage:0.7, barPercentage:0.85, order:2},
+            {label:'Expenses', data:expenses, backgroundColor:'#ff4d6d22', borderColor:'#ff4d6d', borderWidth:2,   borderRadius:5, categoryPercentage:0.7, barPercentage:0.85, order:2},
+            {label:'Net Flow', data:net,      type:'line', borderColor:'#4d9fff', backgroundColor:'#4d9fff18', fill:false, tension:0.35, pointRadius:4, pointHoverRadius:6, pointBackgroundColor:'#4d9fff', borderWidth:2.5, order:1},
+          ]
+        },
+        options:chartPreset({
+          layout:{ padding:{ top:10, right:10, bottom:4, left:4 } },
+          plugins:{
+            legend:{ labels:{ color:cd.legendColor, font:{family:'JetBrains Mono',size:12,weight:'600'}, boxWidth:14, padding:16, usePointStyle:true } },
+            tooltip:{
+              backgroundColor:cd.tooltipBg, borderColor:cd.tooltipBorder, borderWidth:1,
+              titleColor:cd.tooltipTitle, bodyColor:cd.tooltipBody,
+              titleFont:{family:'JetBrains Mono',size:12,weight:'700'},
+              bodyFont:{family:'JetBrains Mono',size:12},
+              padding:12, cornerRadius:6, boxPadding:4,
+              callbacks:{ label:c=>'  '+c.dataset.label+': '+fmt(c.raw) }
+            }
+          },
+          scales:{
+            x:{
+              ticks:{ color:cd.textColor, font:{family:'JetBrains Mono',size:11}, padding:6 },
+              grid:{ color:cd.gridColor, drawOnChartArea:false },
+              border:{ color:cd.gridColor }
+            },
+            y:{
+              ticks:{ color:cd.textColor, callback:v=>fmtC(v), font:{family:'JetBrains Mono',size:11}, maxTicksLimit:8, padding:8 },
+              grid:{ color:cd.gridColor },
+              border:{ color:cd.gridColor, dash:[2,3] }
+            }
+          }
+        })
       });
     }
   },50);
