@@ -950,14 +950,33 @@ body.light .geo-dropdown { box-shadow:0 10px 30px -10px rgba(60,40,10,0.22); }
 .piq-title { font-size:22px; font-weight:800; }
 .piq-sub { font-size:12px; color:var(--text2); margin-top:2px; }
 /* Market toggle */
-.piq-mtog-wrap { display:flex; background:var(--bg3); border:1px solid var(--border); border-radius:20px; padding:3px; gap:2px; }
-.piq-mtog { display:flex; align-items:center; gap:5px; padding:4px 12px; border-radius:16px; font-size:12px; font-weight:600; cursor:pointer; border:none; background:transparent; color:var(--text2); transition:all .2s; }
-.piq-mtog.ke.on { background:var(--green-dim); color:var(--green); }
-.piq-mtog.se.on { background:var(--blue-dim); color:var(--blue); }
-/* Market banner */
-.piq-banner { padding:8px 12px; font-family:var(--fm); font-size:10px; letter-spacing:.1em; text-transform:uppercase; border-radius:6px; margin-bottom:12px; display:flex; align-items:center; gap:8px; }
-.piq-banner.ke { background:var(--green-dim); color:var(--green); border:1px solid #00e8a022; }
-.piq-banner.se { background:var(--blue-dim); color:var(--blue); border:1px solid #4d9fff22; }
+/* Country picker — replaces the old ke/se toggle with a searchable dropdown */
+.piq-country-row { display:flex; align-items:center; gap:10px; margin-bottom:12px; flex-wrap:wrap; }
+.piq-country-picker { position:relative; }
+.piq-country-trigger { display:inline-flex; align-items:center; gap:8px; background:var(--bg3); border:1px solid var(--border2); border-radius:10px; padding:8px 14px; color:var(--text); font-family:var(--fb); font-size:13px; font-weight:600; cursor:pointer; transition:all .18s; min-width:200px; }
+.piq-country-trigger:hover { border-color:var(--accent-positive); }
+.piq-country-trigger .piq-ct-flag { font-size:18px; line-height:1; }
+.piq-country-trigger .piq-ct-name { flex:1; text-align:left; }
+.piq-country-trigger .piq-ct-caret { font-size:11px; color:var(--text3); margin-left:2px; transition:transform .18s; }
+.piq-country-picker.open .piq-country-trigger .piq-ct-caret { transform:rotate(180deg); color:var(--accent-positive); }
+.piq-country-picker.open .piq-country-trigger { border-color:var(--accent-positive); box-shadow:var(--focus-ring); }
+.piq-country-menu { position:absolute; z-index:500; top:calc(100% + 6px); left:0; width:min(340px, 95vw); background:var(--bg2); border:1px solid var(--border2); border-radius:12px; box-shadow:0 18px 40px -12px rgba(0,0,0,0.55); display:none; flex-direction:column; overflow:hidden; }
+body.light .piq-country-menu { box-shadow:0 12px 28px -10px rgba(60,40,10,0.22); }
+.piq-country-picker.open .piq-country-menu { display:flex; }
+.piq-country-search-wrap { position:relative; padding:12px; border-bottom:1px solid var(--border); }
+.piq-country-search-icon { position:absolute; left:22px; top:50%; transform:translateY(-50%); color:var(--text3); font-size:13px; pointer-events:none; }
+.piq-country-search { width:100%; background:var(--bg3); border:1px solid var(--border); border-radius:8px; padding:9px 12px 9px 34px; color:var(--text); font-family:var(--fb); font-size:13px; outline:none; transition:border-color .15s; }
+.piq-country-search:focus { border-color:var(--accent-positive); }
+.piq-country-results { max-height:320px; overflow-y:auto; padding:6px 4px; }
+.piq-country-item { display:flex; align-items:center; gap:10px; padding:8px 12px; border-radius:7px; cursor:pointer; transition:background .1s; }
+.piq-country-item:hover, .piq-country-item.active { background:var(--bg3); }
+.piq-country-item.active { box-shadow:inset 3px 0 0 var(--accent-positive); }
+.piq-country-item.selected { background:var(--accent-positive-dim); }
+.piq-country-item-flag { font-size:18px; width:22px; text-align:center; flex-shrink:0; }
+.piq-country-item-name { flex:1; font-size:13px; color:var(--text); font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.piq-country-item-code { font-family:var(--fm); font-size:10px; color:var(--text3); text-transform:uppercase; letter-spacing:.04em; }
+.piq-country-empty { padding:24px 14px; text-align:center; color:var(--text3); font-size:12px; }
+.piq-banner { padding:8px 12px; font-family:var(--fm); font-size:10px; letter-spacing:.1em; text-transform:uppercase; border-radius:6px; background:var(--accent-info-dim); color:var(--accent-info); border:1px solid var(--accent-info-dim); display:flex; align-items:center; gap:8px; flex:1; min-width:220px; }
 /* Disclaimer */
 .piq-disclaimer { background:var(--amber-dim); border:1px solid #f5a62330; border-radius:6px; padding:8px 12px; font-size:11px; color:var(--amber); margin-bottom:12px; font-family:var(--fm); }
 /* Search */
@@ -1452,6 +1471,8 @@ function defaultState() {
     paidFlags:{},
     // Persisted "last result" cache for search-driven features.
     searchCache:{},
+    // Property IQ last-selected country (ISO 3166-1 alpha-2).
+    piqCountry:'KE',
   };
 }
 
@@ -1546,7 +1567,7 @@ function invalidateSelectors(){ _selGen++; }
 // ─── PERSISTENCE ────────────────────────────────────────────────────────────
 // State schema version. Bump this and add a branch to migrate() whenever the
 // shape of `state` changes in a backwards-incompatible way.
-const STATE_VERSION = 6;
+const STATE_VERSION = 7;
 function migrate(s) {
   const from = s.version || 1;
   if(from >= STATE_VERSION) { s.version = STATE_VERSION; return s; }
@@ -1591,6 +1612,15 @@ function migrate(s) {
   if(from < 6) {
     if(!s.paidFlags || typeof s.paidFlags !== 'object') s.paidFlags = {};
     if(!s.searchCache || typeof s.searchCache !== 'object') s.searchCache = {};
+  }
+  // v6 → v7: Property IQ selected-country persistence (ISO 3166-1 alpha-2).
+  // Back-fill from legacy market values ('ke' / 'se') if present, otherwise
+  // default to KE to match the previous initial selection.
+  if(from < 7) {
+    if(!s.piqCountry) {
+      const legacy = s.piqMarket || 'ke';
+      s.piqCountry = String(legacy).toUpperCase();
+    }
   }
   s.version = STATE_VERSION;
   return s;
@@ -5065,75 +5095,260 @@ window.addEventListener('resize',()=>{
 // All globals prefixed piq_ to avoid collisions
 // ══════════════════════════════════════════════════════════════════════════════
 
-let piq_market = 'ke';
+// Current country — ISO 3166-1 alpha-2 code. Defaults to Kenya for
+// backwards compatibility with the legacy 'ke'/'se' toggle; restored from
+// state.piqCountry on init so the user's last selection persists across
+// sessions, tab switches, and refreshes.
+let piq_country = 'KE';
+// Legacy alias kept in lockstep with piq_country so any remaining
+// references (piq_bgKey, piq_fetchSignals, piq_fetchAnalysis, etc.)
+// keep working without a sweeping rename.
+let piq_market = 'KE';
 let piq_history = [];
 let piq_currentResult = null;
 let piq_lastQuery = '';
 let piq_progressTimer = null;
 
-const PIQ_MC = {
-  ke:{name:'Kenya',flag:'🇰🇪',currency:'KES',locale:'en-KE',
-    banner:'🇰🇪 Kenya market · Prices in KES · Nairobi focus',
-    placeholder:'e.g. Westlands 2BR, Karen villa, Kilimani off-plan…',
-    tags:['Westlands','Kilimani','Karen','Kileleshwa','Lavington','Runda','Parklands','Nairobi CBD'],
-    mortgageRates:[{l:'KCB (13.5%)',v:13.5},{l:'Equity Bank (14%)',v:14},{l:'Stanbic (13%)',v:13},{l:'NCBA (14.5%)',v:14.5}],
-    mortgageTerm:[{l:'20 years',v:240},{l:'25 years',v:300},{l:'15 years',v:180}],
-    mortgageDeposit:20,
-    legalNote:'Always conduct an official title search at Ardhi House (Lands Registry, Upper Hill, Nairobi) before paying any deposit. Official search costs KES 500 and takes 3–5 working days. Instruct a Kenya-registered advocate to conduct the search on your behalf.',
-    contextPrompt:`You are a Kenya real estate analyst. Research: "{q}" in Nairobi, Kenya. Provide: prices in KES, price per sqm, rental yields (%), recent transactions, comparable properties, infrastructure nearby, market risks/positives. Focus on 2024–2025 data.`,
-    analysisPrompt:`You are PropIQ Kenya — AI property investment analyst for Nairobi. Query: "{q}". Research: {signals}\nReturn ONLY valid JSON:\n{"summary":"2-3 sentence overview","priceRange":"e.g. KES 8M–15M","pricePerSqm":"e.g. KES 95,000/m²","rentalYield":"e.g. 5.8%","capitalAppreciation":"e.g. 8–12% annually","verdict":"BUY|HOLD|AVOID","verdictReason":"one sentence","investmentThesis":"3-4 sentences","signals":[{"sentiment":"positive|negative|neutral","text":"text","source":"source"}],"pipeline":[{"name":"name","developer":"dev","units":50,"status":"Planning|Approved|Under Construction|Complete","completion":"Q4 2025","priceFrom":"KES 9M"}],"titleRisks":[{"level":"ok|warn|danger","title":"title","detail":"detail"}],"kpis":{"avgPrice":"KES 12M","yield":"5.8%","appreciation":"9%","liquidity":"Medium"}}`
-  },
-  se:{name:'Sweden',flag:'🇸🇪',currency:'SEK',locale:'sv-SE',
-    banner:'🇸🇪 Swedish market · Prices in SEK · Stockholm & major cities',
-    placeholder:'e.g. Östermalm lägenhet, Lidingö villa, Nacka bostadsrätt…',
-    tags:['Östermalm','Lidingö','Nacka','Bromma','Djursholm','Solna','Gothenburg','Malmö'],
-    mortgageRates:[{l:'Riksbank rate + 1% (4.5%)',v:4.5},{l:'Swedbank (4.2%)',v:4.2},{l:'SEB (4.4%)',v:4.4},{l:'Handelsbanken (4.3%)',v:4.3}],
-    mortgageTerm:[{l:'30 years',v:360},{l:'25 years',v:300},{l:'15 years',v:180}],
-    mortgageDeposit:15,
-    legalNote:'Engage a licensed Swedish fastighetsmäklare and conduct a full Lantmäteriregistret search before signing. Confirm pantbrev status and inteckningar with the seller. For bostadsrätt, review the bostadsrättsföreningens årsredovisning and check the association debt (skuld per andel). An energideklaration is required by law.',
-    contextPrompt:`You are a Swedish real estate analyst. Research: "{q}" in Sweden. Provide: prices in SEK (including SEK/m²), HOX/Valueguard trends, rental yields, Riksbank rate impact, nyproduktion nearby, comparables with SEK prices, risks and positives. Focus on 2024–2025 Swedish housing data.`,
-    analysisPrompt:`You are PropIQ Sweden — AI property investment analyst for Swedish real estate. Query: "{q}". Research: {signals}\nReturn ONLY valid JSON:\n{"summary":"2-3 sentence overview","priceRange":"e.g. SEK 4M–8M","pricePerSqm":"e.g. SEK 85,000/m²","rentalYield":"e.g. 2.8%","capitalAppreciation":"e.g. 3–5% annually","verdict":"BUY|HOLD|AVOID","verdictReason":"one sentence","investmentThesis":"3-4 sentences including Riksbank context","signals":[{"sentiment":"positive|negative|neutral","text":"text","source":"Hemnet|Valueguard|Riksbank|etc"}],"pipeline":[{"name":"name","developer":"dev","units":60,"status":"Bygglov ansökt|Bygglov beviljat|Byggnation pågår|Klart","completion":"2026","priceFrom":"SEK 5.5M"}],"titleRisks":[{"level":"ok|warn|danger","title":"title","detail":"Sweden-specific legal detail"}],"kpis":{"avgPrice":"SEK 6M","yield":"2.8%","appreciation":"4%","liquidity":"High"}}`
-  }
+// ─── COUNTRY DATA ───────────────────────────────────────────────────────────
+// Full ISO 3166-1 alpha-2 list. Names come from Intl.DisplayNames at runtime
+// so we don't ship a 250-name string table. Currency codes are mapped here
+// because Intl doesn't expose them.
+const PIQ_COUNTRY_CODES = [
+  'AF','AL','DZ','AD','AO','AG','AR','AM','AU','AT','AZ','BS','BH','BD','BB',
+  'BY','BE','BZ','BJ','BT','BO','BA','BW','BR','BN','BG','BF','BI','CV','KH',
+  'CM','CA','KY','CF','TD','CL','CN','CO','KM','CG','CD','CR','CI','HR','CU',
+  'CY','CZ','DK','DJ','DM','DO','EC','EG','SV','GQ','ER','EE','SZ','ET','FJ',
+  'FI','FR','GA','GM','GE','DE','GH','GR','GD','GT','GN','GW','GY','HT','HN',
+  'HK','HU','IS','IN','ID','IR','IQ','IE','IL','IT','JM','JP','JO','KZ','KE',
+  'KI','KW','KG','LA','LV','LB','LS','LR','LY','LI','LT','LU','MO','MG','MW',
+  'MY','MV','ML','MT','MH','MR','MU','MX','FM','MD','MC','MN','ME','MA','MZ',
+  'MM','NA','NR','NP','NL','NZ','NI','NE','NG','KP','MK','NO','OM','PK','PW',
+  'PS','PA','PG','PY','PE','PH','PL','PT','PR','QA','RO','RU','RW','KN','LC',
+  'VC','WS','SM','ST','SA','SN','RS','SC','SL','SG','SK','SI','SB','SO','ZA',
+  'KR','SS','ES','LK','SD','SR','SE','CH','SY','TW','TJ','TZ','TH','TL','TG',
+  'TO','TT','TN','TR','TM','TV','UG','UA','AE','GB','US','UY','UZ','VU','VA',
+  'VE','VN','YE','ZM','ZW'
+];
+const PIQ_COUNTRY_CURRENCY = {
+  AF:'AFN',AL:'ALL',DZ:'DZD',AD:'EUR',AO:'AOA',AG:'XCD',AR:'ARS',AM:'AMD',AU:'AUD',AT:'EUR',
+  AZ:'AZN',BS:'BSD',BH:'BHD',BD:'BDT',BB:'BBD',BY:'BYN',BE:'EUR',BZ:'BZD',BJ:'XOF',BT:'BTN',
+  BO:'BOB',BA:'BAM',BW:'BWP',BR:'BRL',BN:'BND',BG:'BGN',BF:'XOF',BI:'BIF',CV:'CVE',KH:'KHR',
+  CM:'XAF',CA:'CAD',KY:'KYD',CF:'XAF',TD:'XAF',CL:'CLP',CN:'CNY',CO:'COP',KM:'KMF',CG:'XAF',
+  CD:'CDF',CR:'CRC',CI:'XOF',HR:'EUR',CU:'CUP',CY:'EUR',CZ:'CZK',DK:'DKK',DJ:'DJF',DM:'XCD',
+  DO:'DOP',EC:'USD',EG:'EGP',SV:'USD',GQ:'XAF',ER:'ERN',EE:'EUR',SZ:'SZL',ET:'ETB',FJ:'FJD',
+  FI:'EUR',FR:'EUR',GA:'XAF',GM:'GMD',GE:'GEL',DE:'EUR',GH:'GHS',GR:'EUR',GD:'XCD',GT:'GTQ',
+  GN:'GNF',GW:'XOF',GY:'GYD',HT:'HTG',HN:'HNL',HK:'HKD',HU:'HUF',IS:'ISK',IN:'INR',ID:'IDR',
+  IR:'IRR',IQ:'IQD',IE:'EUR',IL:'ILS',IT:'EUR',JM:'JMD',JP:'JPY',JO:'JOD',KZ:'KZT',KE:'KES',
+  KI:'AUD',KW:'KWD',KG:'KGS',LA:'LAK',LV:'EUR',LB:'LBP',LS:'LSL',LR:'LRD',LY:'LYD',LI:'CHF',
+  LT:'EUR',LU:'EUR',MO:'MOP',MG:'MGA',MW:'MWK',MY:'MYR',MV:'MVR',ML:'XOF',MT:'EUR',MH:'USD',
+  MR:'MRU',MU:'MUR',MX:'MXN',FM:'USD',MD:'MDL',MC:'EUR',MN:'MNT',ME:'EUR',MA:'MAD',MZ:'MZN',
+  MM:'MMK',NA:'NAD',NR:'AUD',NP:'NPR',NL:'EUR',NZ:'NZD',NI:'NIO',NE:'XOF',NG:'NGN',KP:'KPW',
+  MK:'MKD',NO:'NOK',OM:'OMR',PK:'PKR',PW:'USD',PS:'ILS',PA:'PAB',PG:'PGK',PY:'PYG',PE:'PEN',
+  PH:'PHP',PL:'PLN',PT:'EUR',PR:'USD',QA:'QAR',RO:'RON',RU:'RUB',RW:'RWF',KN:'XCD',LC:'XCD',
+  VC:'XCD',WS:'WST',SM:'EUR',ST:'STN',SA:'SAR',SN:'XOF',RS:'RSD',SC:'SCR',SL:'SLE',SG:'SGD',
+  SK:'EUR',SI:'EUR',SB:'SBD',SO:'SOS',ZA:'ZAR',KR:'KRW',SS:'SSP',ES:'EUR',LK:'LKR',SD:'SDG',
+  SR:'SRD',SE:'SEK',CH:'CHF',SY:'SYP',TW:'TWD',TJ:'TJS',TZ:'TZS',TH:'THB',TL:'USD',TG:'XOF',
+  TO:'TOP',TT:'TTD',TN:'TND',TR:'TRY',TM:'TMT',TV:'AUD',UG:'UGX',UA:'UAH',AE:'AED',GB:'GBP',
+  US:'USD',UY:'UYU',UZ:'UZS',VU:'VUV',VA:'EUR',VE:'VES',VN:'VND',YE:'YER',ZM:'ZMW',ZW:'ZWL'
 };
+// Curated major-cities / popular-districts per country for the quick-select
+// chip row. Countries not in this map get a generic "Capital · Downtown…"
+// fallback derived from the country name.
+const PIQ_COUNTRY_CITIES = {
+  KE:['Westlands','Kilimani','Karen','Kileleshwa','Lavington','Runda','Parklands','Nairobi CBD'],
+  SE:['Östermalm','Lidingö','Nacka','Bromma','Djursholm','Solna','Gothenburg','Malmö'],
+  US:['Manhattan','Brooklyn','Beverly Hills','Miami Beach','Austin','Seattle','Boston','Chicago'],
+  GB:['Chelsea','Mayfair','Notting Hill','Kensington','Shoreditch','Canary Wharf','Edinburgh','Manchester'],
+  FR:['8e arrondissement','Le Marais','Neuilly','Saint-Germain','Nice','Cannes','Lyon','Bordeaux'],
+  DE:['Mitte','Prenzlauer Berg','Charlottenburg','Schwabing','Hamburg','Frankfurt','Cologne','Stuttgart'],
+  ES:['Salamanca','Chamberí','Barceloneta','Eixample','Valencia','Málaga','Seville','Palma'],
+  IT:['Brera','Centro Storico','Trastevere','Porta Nuova','Florence','Venice','Naples','Turin'],
+  PT:['Chiado','Príncipe Real','Foz','Ribeira','Cascais','Madeira','Porto','Algarve'],
+  NL:['Jordaan','De Pijp','Zuidas','Oud-Zuid','Rotterdam','The Hague','Utrecht','Eindhoven'],
+  CH:['Zurich City','Zollikon','Kilchberg','Old Town Geneva','Lausanne','Zug','Basel','Lucerne'],
+  AT:['Innere Stadt','Döbling','Hietzing','Salzburg','Graz','Innsbruck','Linz','Klagenfurt'],
+  GR:['Kolonaki','Glyfada','Kifisia','Voula','Thessaloniki','Mykonos','Santorini','Rhodes'],
+  AE:['Dubai Marina','Downtown Dubai','Palm Jumeirah','Abu Dhabi','Sharjah','JBR','Business Bay','DIFC'],
+  SA:['Riyadh','Jeddah','Dammam','Al Khobar','Medina','Makkah','NEOM','Taif'],
+  SG:['Orchard','Marina Bay','Sentosa','Holland Village','Bukit Timah','Tanglin','Robertson','East Coast'],
+  JP:['Minato','Shibuya','Chiyoda','Shinjuku','Osaka','Kyoto','Yokohama','Fukuoka'],
+  KR:['Gangnam','Seocho','Yongsan','Jung-gu','Busan','Incheon','Daegu','Jeju'],
+  CN:['Pudong','Xuhui','Chaoyang','Luohu','Shenzhen','Hangzhou','Guangzhou','Chengdu'],
+  HK:['The Peak','Mid-Levels','Repulse Bay','Kowloon','Sai Kung','Causeway Bay','Central','Discovery Bay'],
+  IN:['South Delhi','Bandra','Koramangala','Juhu','Gurgaon','Noida','Pune','Hyderabad'],
+  TH:['Sukhumvit','Sathorn','Silom','Thonglor','Phuket','Chiang Mai','Pattaya','Hua Hin'],
+  VN:['District 1','District 2','Thao Dien','Tay Ho','Da Nang','Hoi An','Nha Trang','Hanoi Old Quarter'],
+  MY:['KLCC','Mont Kiara','Bangsar','Damansara Heights','Penang','Johor Bahru','Langkawi','Kota Kinabalu'],
+  ID:['Menteng','Kemang','Pondok Indah','Senopati','Seminyak','Canggu','Ubud','Surabaya'],
+  PH:['Makati','BGC','Rockwell','Ortigas','Cebu','Davao','Boracay','Tagaytay'],
+  AU:['Bondi','Double Bay','Mosman','Toorak','Paddington','Chapel Street','Gold Coast','Perth'],
+  NZ:['Parnell','Ponsonby','Remuera','Wellington CBD','Queenstown','Christchurch','Takapuna','Hamilton'],
+  CA:['Toronto Downtown','Yorkville','Vancouver Kitsilano','West Van','Montreal','Ottawa','Calgary','Whistler'],
+  BR:['Ipanema','Leblon','Jardins','Vila Madalena','Búzios','Florianópolis','Brasília','Salvador'],
+  AR:['Puerto Madero','Recoleta','Palermo','Belgrano','Mar del Plata','Bariloche','Mendoza','Córdoba'],
+  CL:['Las Condes','Vitacura','Providencia','Lo Barnechea','Viña del Mar','Valparaíso','La Serena','Pucón'],
+  MX:['Polanco','Condesa','Roma Norte','Santa Fe','Playa del Carmen','Tulum','Mérida','San Miguel de Allende'],
+  ZA:['Sandton','Camps Bay','Sea Point','Waterfront','Umhlanga','Stellenbosch','Durban','Pretoria'],
+  NG:['Ikoyi','Victoria Island','Lekki','Banana Island','Abuja','Port Harcourt','Maitama','Ikeja'],
+  EG:['Zamalek','Maadi','New Cairo','Giza','Alexandria','Hurghada','Sharm El Sheikh','El Gouna'],
+  MA:['Gueliz','Hivernage','Palmeraie','Agdal','Casablanca','Tangier','Essaouira','Rabat'],
+  TR:['Nisantasi','Bebek','Etiler','Levent','Bodrum','Antalya','Izmir','Cesme'],
+  IL:['Rothschild','Neve Tzedek','Herzliya Pituach','Jerusalem','Haifa','Eilat','Caesarea','Savyon'],
+  PL:['Mokotów','Wilanów','Śródmieście','Kraków Old Town','Gdańsk','Wrocław','Poznań','Sopot'],
+  CZ:['Vinohrady','Dejvice','Smíchov','Old Town Prague','Brno','Karlovy Vary','Ostrava','Pilsen'],
+  HU:['District V','Buda Hills','Rózsadomb','District VI','Debrecen','Szeged','Pécs','Balaton'],
+  IE:['Ballsbridge','Dublin 4','Ranelagh','Howth','Cork','Galway','Kinsale','Killarney'],
+  DK:['Østerbro','Frederiksberg','Hellerup','Christianshavn','Aarhus','Odense','Aalborg','Helsingør'],
+  NO:['Frogner','Majorstuen','Bygdøy','Holmenkollen','Bergen','Stavanger','Trondheim','Tromsø'],
+  FI:['Eira','Kaivopuisto','Kruununhaka','Espoo','Tampere','Turku','Rovaniemi','Oulu'],
+  BE:['Uccle','Ixelles','Woluwe','Ghent','Antwerp','Bruges','Leuven','Namur'],
+  LU:['Limpertsberg','Belair','Kirchberg','Merl','Esch-sur-Alzette','Differdange','Dudelange','Diekirch'],
+};
+// Generic fallback chips for any country not in the map above.
+const PIQ_CITIES_FALLBACK = ['Capital district','Downtown','Waterfront','Suburbs','Beachfront','Old town','Financial district','Luxury district'];
+
+// Country list with Intl.DisplayNames → used by the dropdown. Built lazily
+// because Intl.DisplayNames is a browser-only API.
+let _piqCountryList = null;
+function piqCountryList(){
+  if(_piqCountryList) return _piqCountryList;
+  let dn;
+  try { dn = new Intl.DisplayNames(['en'], {type:'region'}); } catch(e) {}
+  _piqCountryList = PIQ_COUNTRY_CODES.map(code => {
+    const name = dn ? (dn.of(code) || code) : code;
+    return {
+      code,
+      name,
+      flag: typeof _ccFlag === 'function' ? _ccFlag(code) : '🌍',
+      currency: PIQ_COUNTRY_CURRENCY[code] || 'USD',
+    };
+  }).sort((a, b) => a.name.localeCompare(b.name));
+  return _piqCountryList;
+}
+
+// Build a PIQ market config for an arbitrary ISO2 country code. This
+// replaces the old hardcoded PIQ_MC ke/se table so the feature works with
+// every country in the world. Memoized per code.
+const _piqCfgCache = {};
+function piq_getConfig(code){
+  code = (code || 'KE').toUpperCase();
+  if(_piqCfgCache[code]) return _piqCfgCache[code];
+  const list = piqCountryList();
+  let entry = list.find(c => c.code === code);
+  if(!entry) entry = list.find(c => c.code === 'KE') || list[0];
+  const { name, flag, currency } = entry;
+  const cities = (PIQ_COUNTRY_CITIES[code] || PIQ_CITIES_FALLBACK).slice();
+  const primary = cities[0];
+  // Locale: best-effort IETF tag. If the browser doesn't understand it,
+  // .toLocaleDateString falls back gracefully.
+  const locale = 'en-' + code;
+  const cfg = {
+    code, name, flag, currency, locale,
+    banner: `${flag} ${name} market · Prices in ${currency} · ${primary} & major cities`,
+    placeholder: `e.g. ${cities[0]} 2BR, ${cities[1] || 'city centre'} villa, ${cities[2] || 'downtown'} off-plan…`,
+    tags: cities,
+    mortgageRates: [
+      { l:`Local bank (avg 8%)`, v:8 },
+      { l:`Local bank (avg 9%)`, v:9 },
+      { l:`Local bank (avg 10%)`, v:10 },
+      { l:`Local bank (avg 11%)`, v:11 },
+    ],
+    mortgageTerm: [
+      { l:'25 years', v:300 },
+      { l:'30 years', v:360 },
+      { l:'20 years', v:240 },
+      { l:'15 years', v:180 },
+    ],
+    mortgageDeposit: 20,
+    legalNote: `Always engage a licensed local attorney and conduct an official title search at the ${name} land registry before paying any deposit. Verify zoning, encumbrances, and planning permissions through the relevant municipal authority.`,
+    contextPrompt: `You are a ${name} real estate analyst. Research: "{q}" in ${name}. Provide: prices in ${currency}, price per sqm, rental yields (%), recent transactions, comparable properties, infrastructure nearby, market risks/positives. Focus on 2024–2025 data.`,
+    analysisPrompt: `You are PropIQ ${name} — AI property investment analyst for ${name} real estate. Query: "{q}". Research: {signals}\nReturn ONLY valid JSON. Use plain short values in "kpis" — numbers and % only, no parenthetical notes, no source tags, no internal labels.\n{"summary":"2-3 sentence overview","priceRange":"e.g. ${currency} 5M–10M","pricePerSqm":"e.g. ${currency} 50,000/m²","rentalYield":"e.g. 5%","capitalAppreciation":"e.g. 5% annually","verdict":"BUY|HOLD|AVOID","verdictReason":"one sentence","investmentThesis":"3-4 sentences","signals":[{"sentiment":"positive|negative|neutral","text":"text","source":"source"}],"pipeline":[{"name":"name","developer":"dev","units":50,"status":"Planning|Approved|Under Construction|Complete","completion":"Q4 2025","priceFrom":"${currency} 5M"}],"titleRisks":[{"level":"ok|warn|danger","title":"title","detail":"detail"}],"kpis":{"avgPrice":"${currency} 8M","yield":"5%","appreciation":"5%","liquidity":"Medium"}}`
+  };
+  _piqCfgCache[code] = cfg;
+  return cfg;
+}
+// Back-compat alias for the legacy name. Some code paths (history items,
+// cache keys) still reference PIQ_MC[market] — route those through the
+// dynamic config so every ISO2 code resolves cleanly.
+const PIQ_MC = new Proxy({}, {
+  get(_target, key){ return (typeof key === 'string') ? piq_getConfig(key) : undefined; }
+});
 
 const PIQ_STEPS=['Fetching live signals','Analysing market data','Generating investment thesis','Scoring legal risks'];
 
 function piq_getAnthropicKey(){ return state.aiKeys?.claude||''; }
 function piq_getPerplexityKey(){ return state.aiKeys?.perplexity||''; }
 
+// Sanitize a raw KPI string returned by the LLM. Claude sometimes appends
+// parenthetical justifications, source tags, or internal node labels to
+// KPI values — e.g. "9% annually (master-planned MUD nodes)" or
+// "KES 12M · source: Hass Consult". Strip all of that so only the clean
+// numeric value + unit is surfaced.
+function piq_cleanKpi(v){
+  if(v == null) return '—';
+  let s = String(v).trim();
+  if(!s) return '—';
+  // Drop parentheticals (they're almost always internal notes or
+  // source tags, not user-facing content).
+  s = s.replace(/\s*\([^)]*\)\s*/g, ' ');
+  // Drop square-bracket annotations.
+  s = s.replace(/\s*\[[^\]]*\]\s*/g, ' ');
+  // Drop curly-brace annotations.
+  s = s.replace(/\s*\{[^}]*\}\s*/g, ' ');
+  // Drop "· source: …" / "— source: …" fragments and anything after them.
+  s = s.replace(/\s*[·|—]\s*source\s*:.*$/i, '');
+  // Drop trailing dash-led qualifiers ("— internal label", "- MUD nodes").
+  s = s.replace(/\s*[-—–]\s*[a-z][^$]*$/i, '');
+  // Collapse duplicate whitespace and trim.
+  s = s.replace(/\s{2,}/g, ' ').trim();
+  return s || '—';
+}
+
 // ── RENDER PANEL ──────────────────────────────────────────────────────────────
 function renderPropIQ(){
-  const cfg=PIQ_MC[piq_market];
+  const cfg = piq_getConfig(piq_country);
   const histHtml = piq_history.length === 0
     ? `<div class="piq-hist-empty">No searches yet.<br>Results saved here automatically.</div>`
     : piq_history.map((h,i)=>{
         const vCls=h.verdict==='BUY'?'piq-hv-buy':h.verdict==='AVOID'?'piq-hv-avoid':'piq-hv-hold';
         const time=new Date(h.timestamp).toLocaleDateString('en-GB',{day:'numeric',month:'short'});
+        const hCfg = piq_getConfig(h.market || h.country || 'KE');
         return `<div class="piq-hist-item${i===0&&piq_currentResult?' active':''}" onclick="piq_loadHistory(${i})">
           <div class="piq-hi-q">${h.query}</div>
-          <div class="piq-hi-m"><span>${PIQ_MC[h.market]?.flag||''}</span><span>${time}</span>${h.verdict?`<span class="piq-hi-verdict ${vCls}">${h.verdict}</span>`:''}</div>
+          <div class="piq-hi-m"><span>${hCfg.flag}</span><span>${time}</span>${h.verdict?`<span class="piq-hi-verdict ${vCls}">${h.verdict}</span>`:''}</div>
         </div>`;
       }).join('');
 
   const clearBtn = piq_history.length > 0
     ? `<button class="piq-hist-clear" onclick="piq_clearHistory()">Clear history</button>` : '';
 
-  const qtags = cfg.tags.map(t=>`<span class="piq-qtag" onclick="piq_quickSearch('${t}')">${t}</span>`).join('');
+  const qtags = cfg.tags.map(t=>`<span class="piq-qtag" onclick="piq_quickSearch('${t.replace(/'/g,"\\'")}')">${esc2(t)}</span>`).join('');
 
   document.getElementById('panel-propiq').innerHTML = `
     <div class="piq">
       ${(typeof ui!=='undefined'&&ui.ph)?ui.ph({
         tag:'REAL ESTATE INTELLIGENCE',
-        titleHtml:'Property IQ <span style="font-size:13px;font-weight:400;color:var(--text2)">Kenya & Sweden</span>',
+        titleHtml:`Property IQ <span id="piq-country-sub" style="font-size:13px;font-weight:400;color:var(--text2)">${esc2(cfg.name)}</span>`,
         sub:'AI-powered analysis · Live signals · Mortgage calculator · Legal risk scoring'
       }):`<div class="ph"><div class="ph-tag">REAL ESTATE INTELLIGENCE</div><div class="ph-title">Property IQ</div><div class="ph-sub">AI-powered analysis</div></div>`}
 
-      <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;flex-wrap:wrap">
-        <div class="piq-mtog-wrap">
-          <button class="piq-mtog ke${piq_market==='ke'?' on':''}" id="piq-tog-ke" onclick="piq_setMarket('ke')">🇰🇪 Kenya</button>
-          <button class="piq-mtog se${piq_market==='se'?' on':''}" id="piq-tog-se" onclick="piq_setMarket('se')">🇸🇪 Sweden</button>
+      <!-- Country selector (searchable dropdown) + market context pill -->
+      <div class="piq-country-row">
+        <div class="piq-country-picker" id="piq-country-picker">
+          <button type="button" class="piq-country-trigger" id="piq-country-trigger" onclick="piq_toggleCountryMenu()">
+            <span class="piq-ct-flag" id="piq-ct-flag">${cfg.flag}</span>
+            <span class="piq-ct-name" id="piq-ct-name">${esc2(cfg.name)}</span>
+            <span class="piq-ct-caret">▾</span>
+          </button>
+          <div class="piq-country-menu" id="piq-country-menu">
+            <div class="piq-country-search-wrap">
+              <span class="piq-country-search-icon">🔍</span>
+              <input type="text" class="piq-country-search" id="piq-country-search" placeholder="Type to search countries…" autocomplete="off" oninput="piq_filterCountryMenu(this.value)" onkeydown="piq_countryMenuKeydown(event)">
+            </div>
+            <div class="piq-country-results" id="piq-country-results"></div>
+          </div>
         </div>
-        <div class="piq-banner ${piq_market}" id="piq-banner">${cfg.banner}</div>
+        <div class="piq-banner" id="piq-banner">${esc2(cfg.banner)}</div>
       </div>
 
       <div class="piq-disclaimer">⚠ AI-generated analysis only. Not financial or legal advice. Always verify with a licensed professional before any property purchase decision.</div>
@@ -5200,31 +5415,130 @@ function piq_attachSearchAutocomplete(){
   });
 }
 
-// ── MARKET TOGGLE ─────────────────────────────────────────────────────────────
-function piq_setMarket(m){
-  piq_market=m;
-  const cfg=PIQ_MC[m];
-  document.getElementById('piq-tog-ke')?.classList.toggle('on',m==='ke');
-  document.getElementById('piq-tog-se')?.classList.toggle('on',m==='se');
-  const banner=document.getElementById('piq-banner');
-  if(banner){ banner.className='piq-banner '+m; banner.textContent=cfg.banner; }
-  const inp=document.getElementById('piq-search-input');
-  if(inp) inp.placeholder=cfg.placeholder;
-  // re-render qtags
-  const qt=document.querySelector('.piq-qtags');
-  if(qt) qt.innerHTML=cfg.tags.map(t=>`<span class="piq-qtag" onclick="piq_quickSearch('${t}')">${t}</span>`).join('');
-  // If a cached or in-flight result exists for this market, show it
-  // instead of a blank empty state.
-  const bgKey = 'piq:'+m;
+// ── COUNTRY PICKER ────────────────────────────────────────────────────────────
+// The user can switch Property IQ to any country in the world. Selection is
+// persisted in state.piqCountry + localStorage so it survives refreshes.
+
+// Keep the old piq_market variable in lockstep with piq_country for any
+// lingering call sites. Cache keys still bucket by the ISO2 code so one
+// market's result never stomps another's.
+let _piqCountryFiltered = [];
+let _piqCountryActiveIdx = 0;
+
+function piq_setCountry(code){
+  code = (code || 'KE').toUpperCase();
+  if(piq_country === code) { piq_closeCountryMenu(); return; }
+  piq_country = code;
+  piq_market = code; // back-compat alias
+  state.piqCountry = code;
+  if(typeof save === 'function') save();
+  const cfg = piq_getConfig(code);
+  // Update subtitle (Property IQ title's country name)
+  const sub = document.getElementById('piq-country-sub');
+  if(sub) sub.textContent = cfg.name;
+  // Update trigger button
+  const tf = document.getElementById('piq-ct-flag');
+  const tn = document.getElementById('piq-ct-name');
+  if(tf) tf.textContent = cfg.flag;
+  if(tn) tn.textContent = cfg.name;
+  // Update market context pill
+  const banner = document.getElementById('piq-banner');
+  if(banner) { banner.className = 'piq-banner'; banner.textContent = cfg.banner; }
+  // Update search input placeholder
+  const inp = document.getElementById('piq-search-input');
+  if(inp) inp.placeholder = cfg.placeholder;
+  // Re-render quick-select chip row
+  const qt = document.querySelector('.piq-qtags');
+  if(qt) qt.innerHTML = cfg.tags.map(t =>
+    `<span class="piq-qtag" onclick="piq_quickSearch('${t.replace(/'/g,"\\'")}')">${esc2(t)}</span>`
+  ).join('');
+  piq_closeCountryMenu();
+  // Show either the cached/in-flight result for this country or the
+  // empty state.
+  const bgKey = 'piq:' + code;
   const hasCache = (state.searchCache && state.searchCache[bgKey]) || bgTaskStatus(bgKey) === 'running';
   if(hasCache) {
     piq_renderBgSearchUI();
   } else {
-    document.getElementById('piq-results').innerHTML = (typeof ui!=='undefined'&&ui.empty)
-      ? ui.empty({icon:'🏠', title:`Search a ${cfg.name} location to begin`, sub:'Live signals · Investment analysis · Mortgage calculator · Legal risk'})
-      : `<div class="piq-empty"><div class="piq-empty-t">Search a ${cfg.name} location to begin</div><div class="piq-empty-s">Live signals · Investment analysis · Mortgage calculator · Legal risk</div></div>`;
+    const resultsEl = document.getElementById('piq-results');
+    if(resultsEl) {
+      resultsEl.innerHTML = (typeof ui!=='undefined' && ui.empty)
+        ? ui.empty({icon:'🏠', title:`Search a ${cfg.name} location to begin`, sub:'Live signals · Investment analysis · Mortgage calculator · Legal risk'})
+        : `<div class="piq-empty"><div class="piq-empty-t">Search a ${cfg.name} location to begin</div><div class="piq-empty-s">Live signals · Investment analysis · Mortgage calculator · Legal risk</div></div>`;
+    }
   }
 }
+window.piq_toggleCountryMenu = function(){
+  const picker = document.getElementById('piq-country-picker');
+  if(!picker) return;
+  const isOpen = picker.classList.toggle('open');
+  if(isOpen){
+    piq_renderCountryMenu('');
+    const input = document.getElementById('piq-country-search');
+    if(input){ input.value=''; setTimeout(() => input.focus(), 20); }
+  }
+};
+window.piq_closeCountryMenu = function(){
+  const picker = document.getElementById('piq-country-picker');
+  if(picker) picker.classList.remove('open');
+};
+window.piq_filterCountryMenu = function(q){
+  piq_renderCountryMenu(q);
+};
+window.piq_countryMenuKeydown = function(e){
+  if(e.key === 'Escape'){ e.preventDefault(); piq_closeCountryMenu(); return; }
+  if(!_piqCountryFiltered.length) return;
+  if(e.key === 'ArrowDown'){ e.preventDefault(); _piqCountryActiveIdx = Math.min(_piqCountryFiltered.length-1, _piqCountryActiveIdx+1); piq_renderCountryMenu(document.getElementById('piq-country-search').value, true); }
+  else if(e.key === 'ArrowUp'){ e.preventDefault(); _piqCountryActiveIdx = Math.max(0, _piqCountryActiveIdx-1); piq_renderCountryMenu(document.getElementById('piq-country-search').value, true); }
+  else if(e.key === 'Enter'){ e.preventDefault(); const pick = _piqCountryFiltered[_piqCountryActiveIdx]; if(pick) piq_setCountry(pick.code); }
+};
+function piq_renderCountryMenu(query, keepIdx){
+  const el = document.getElementById('piq-country-results'); if(!el) return;
+  const all = piqCountryList();
+  const q = (query || '').trim().toLowerCase();
+  let list;
+  if(!q){
+    list = all;
+  } else {
+    list = all.map(c => {
+      const name = c.name.toLowerCase();
+      const code = c.code.toLowerCase();
+      let score = 0;
+      if(name.startsWith(q)) score += 20;
+      else if(name.includes(q)) score += 8;
+      if(code === q) score += 30;
+      else if(code.startsWith(q)) score += 10;
+      return { c, score };
+    }).filter(x => x.score > 0)
+      .sort((a, b) => b.score - a.score)
+      .map(x => x.c);
+  }
+  _piqCountryFiltered = list;
+  if(!keepIdx) _piqCountryActiveIdx = list.findIndex(c => c.code === piq_country);
+  if(_piqCountryActiveIdx < 0 || _piqCountryActiveIdx >= list.length) _piqCountryActiveIdx = 0;
+  if(!list.length){
+    el.innerHTML = `<div class="piq-country-empty">No matches. Try a different spelling.</div>`;
+    return;
+  }
+  el.innerHTML = list.slice(0, 80).map((c, i) => `
+    <div class="piq-country-item ${i===_piqCountryActiveIdx?'active':''} ${c.code===piq_country?'selected':''}" onclick="piq_setCountry('${c.code}')">
+      <span class="piq-country-item-flag">${c.flag}</span>
+      <span class="piq-country-item-name">${esc2(c.name)}</span>
+      <span class="piq-country-item-code">${c.code}</span>
+    </div>
+  `).join('');
+  // Auto-scroll active into view
+  const activeEl = el.querySelector('.piq-country-item.active');
+  if(activeEl && keepIdx) activeEl.scrollIntoView({block:'nearest'});
+}
+// Close the dropdown when clicking outside of it
+document.addEventListener('click', (e) => {
+  const picker = document.getElementById('piq-country-picker');
+  if(!picker || !picker.classList.contains('open')) return;
+  if(!picker.contains(e.target)) piq_closeCountryMenu();
+});
+// Keep the old name as an alias so any lingering references don't break
+window.piq_setMarket = piq_setCountry;
 
 // ── HISTORY ───────────────────────────────────────────────────────────────────
 function piq_loadHistLS(){ try{ const s=localStorage.getItem('horizon_propiq_hist'); piq_history=s?JSON.parse(s):[]; }catch(e){ piq_history=[]; } }
@@ -5237,16 +5551,17 @@ function piq_saveToHistory(query,market,result){
 }
 
 function piq_loadHistory(i){
-  const h=piq_history[i]; if(!h) return;
-  piq_market=h.market;
-  piq_currentResult=h.result;
-  piq_lastQuery=h.query;
-  document.getElementById('piq-tog-ke')?.classList.toggle('on',h.market==='ke');
-  document.getElementById('piq-tog-se')?.classList.toggle('on',h.market==='se');
-  const banner=document.getElementById('piq-banner');
-  if(banner){ banner.className='piq-banner '+h.market; banner.textContent=PIQ_MC[h.market].banner; }
-  document.getElementById('piq-search-input').value=h.query;
-  piq_renderResults(h.query,h.result,PIQ_MC[h.market]);
+  const h = piq_history[i]; if(!h) return;
+  // History entries still use the legacy `market` field; normalize to
+  // an ISO2 code (uppercase) and route through piq_setCountry so the
+  // whole UI updates consistently.
+  const code = (h.market || h.country || 'KE').toUpperCase();
+  piq_currentResult = h.result;
+  piq_lastQuery = h.query;
+  piq_setCountry(code);
+  const input = document.getElementById('piq-search-input');
+  if(input) input.value = h.query;
+  piq_renderResults(h.query, h.result, piq_getConfig(code));
 }
 
 function piq_clearHistory(){
@@ -5482,11 +5797,11 @@ function piq_renderResults(query,a,cfg){
     </div>
 
     <div class="piq-kpi-row">
-      <div class="piq-kpi"><div class="piq-kpi-lbl">Avg Price</div><div class="piq-kpi-val" style="font-size:13px;color:var(--text)">${a.kpis?.avgPrice||a.priceRange||'—'}</div><div class="piq-kpi-sub">${query}</div></div>
-      <div class="piq-kpi"><div class="piq-kpi-lbl">Price/m²</div><div class="piq-kpi-val" style="font-size:12px;color:var(--text2)">${a.pricePerSqm||'—'}</div><div class="piq-kpi-sub">${cfg.currency}/sqm</div></div>
-      <div class="piq-kpi"><div class="piq-kpi-lbl">Rental Yield</div><div class="piq-kpi-val" style="color:var(--green)">${a.kpis?.yield||a.rentalYield||'—'}</div><div class="piq-kpi-sub">Gross annual</div></div>
-      <div class="piq-kpi"><div class="piq-kpi-lbl">Appreciation</div><div class="piq-kpi-val" style="color:var(--blue);font-size:14px">${a.kpis?.appreciation||'—'}</div><div class="piq-kpi-sub">Annual est.</div></div>
-      <div class="piq-kpi"><div class="piq-kpi-lbl">Liquidity</div><div class="piq-kpi-val" style="font-size:13px">${a.kpis?.liquidity||'—'}</div><div class="piq-kpi-sub">Market depth</div></div>
+      <div class="piq-kpi"><div class="piq-kpi-lbl">Avg Price</div><div class="piq-kpi-val" style="font-size:13px;color:var(--text)">${piq_cleanKpi(a.kpis?.avgPrice||a.priceRange)}</div><div class="piq-kpi-sub">${esc2(query)}</div></div>
+      <div class="piq-kpi"><div class="piq-kpi-lbl">Price/m²</div><div class="piq-kpi-val" style="font-size:12px;color:var(--text2)">${piq_cleanKpi(a.pricePerSqm)}</div><div class="piq-kpi-sub">${cfg.currency}/sqm</div></div>
+      <div class="piq-kpi"><div class="piq-kpi-lbl">Rental Yield</div><div class="piq-kpi-val" style="color:var(--green)">${piq_cleanKpi(a.kpis?.yield||a.rentalYield)}</div><div class="piq-kpi-sub">Gross annual</div></div>
+      <div class="piq-kpi"><div class="piq-kpi-lbl">Appreciation</div><div class="piq-kpi-val" style="color:var(--blue);font-size:14px">${piq_cleanKpi(a.kpis?.appreciation)}</div><div class="piq-kpi-sub">Annual est.</div></div>
+      <div class="piq-kpi"><div class="piq-kpi-lbl">Liquidity</div><div class="piq-kpi-val" style="font-size:13px">${piq_cleanKpi(a.kpis?.liquidity)}</div><div class="piq-kpi-sub">Market depth</div></div>
     </div>
 
     <div class="piq-tabs">
@@ -5624,6 +5939,13 @@ function piq_injectSettingsKey(){
 
 // Load propiq history on app init
 piq_loadHistLS();
+// Restore the user's last-selected PIQ country from state so the dropdown,
+// market context pill, quick-chips, and search prompts all reflect their
+// choice across sessions, tab switches, and page refreshes.
+if(typeof state !== 'undefined' && state.piqCountry){
+  piq_country = String(state.piqCountry).toUpperCase();
+  piq_market  = piq_country;
+}
 
 // propiq is now wired into renderPanel's fns map directly; we only need to
 // inject the Perplexity API key field when the user opens Settings.
