@@ -1098,6 +1098,76 @@ body.light .loc-card:hover { box-shadow:0 5px 14px -8px rgba(60,40,10,0.18); }
   color:var(--amber); font-weight:600; letter-spacing:.06em; text-transform:uppercase;
 }
 
+/* ── AI panel · thread rail ───────────────────────────
+   Horizontal pill rail above the message list. Switches
+   between the AI advisor and any friend threads seeded
+   from state.contacts. Pinned above .aip-msgs so the
+   messages view still scrolls independently. */
+.aip-thread-rail {
+  display:flex; flex-wrap:nowrap; overflow-x:auto; gap:6px;
+  padding:8px 12px;
+  background:var(--bg2);
+  border-bottom:1px solid var(--border);
+  scrollbar-width:thin;
+}
+.aip-thread-rail::-webkit-scrollbar { height:3px; }
+.aip-thread-rail::-webkit-scrollbar-thumb { background:var(--border2); border-radius:2px; }
+.aip-thread-pill {
+  position:relative;
+  display:inline-flex; align-items:center; gap:6px;
+  flex-shrink:0;
+  padding:5px 10px 5px 6px;
+  background:var(--bg3);
+  border:1px solid var(--border);
+  border-radius:18px;
+  color:var(--text2);
+  font-family:var(--ff);
+  font-size:11px;
+  font-weight:600;
+  cursor:pointer;
+  transition:background .15s, border-color .15s, color .15s;
+  white-space:nowrap;
+}
+.aip-thread-pill:hover {
+  border-color:var(--border2);
+  color:var(--text);
+}
+.aip-thread-pill.active {
+  background:var(--accent-positive-dim);
+  border-color:var(--green);
+  color:var(--green);
+}
+.aip-thread-pill .aip-thread-avatar {
+  display:inline-flex; align-items:center; justify-content:center;
+  width:20px; height:20px;
+  background:var(--bg2);
+  border-radius:50%;
+  font-size:13px;
+  line-height:1;
+  flex-shrink:0;
+}
+.aip-thread-pill.active .aip-thread-avatar {
+  background:var(--bg);
+}
+.aip-thread-pill .aip-thread-name {
+  max-width:120px;
+  overflow:hidden;
+  text-overflow:ellipsis;
+}
+.aip-thread-unread {
+  display:inline-flex; align-items:center; justify-content:center;
+  min-width:16px; height:16px;
+  padding:0 5px;
+  background:var(--violet);
+  color:#fff;
+  border-radius:10px;
+  font-family:var(--fm);
+  font-size:9px;
+  font-weight:700;
+  letter-spacing:.04em;
+  margin-left:2px;
+}
+
 /* Messages area */
 .aip-msgs { flex:1; overflow-y:auto; padding:14px; display:flex; flex-direction:column; gap:12px; }
 .ai-msg-wrap { display:flex; flex-direction:column; gap:3px; }
@@ -2274,6 +2344,9 @@ body.light .piq-country-menu { box-shadow:0 12px 28px -10px rgba(60,40,10,0.22);
     </div>
     <div class="aip-pills" id="aip-pills"></div>
   </div>
+  <!-- Thread rail — AI advisor + any friend threads live in the same
+       chat surface. Clicking a pill swaps .aip-msgs to that thread. -->
+  <div class="aip-thread-rail" id="aip-thread-rail"></div>
   <!-- Messages -->
   <div class="aip-msgs" id="aip-msgs">
     <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:200px;text-align:center;padding:20px;color:var(--text3);">
@@ -2519,6 +2592,19 @@ function defaultState() {
     aiMessages:[],
     // Per-panel AI conversation memory (recent user queries, newest first).
     aiHistoryByPanel:{},
+    // Chat threads — the shared surface for the AI advisor + friend
+    // chats. Each entry is { id, kind:'ai'|'friend', title, avatar,
+    // messages:[{role,content,at}], unread, pinned }. The AI thread
+    // always exists; friend threads are seeded from state.contacts
+    // on first load via _seedDemoChatThreads().
+    chatThreads:{},
+    activeChatThreadId:'ai:horizon',
+    // Contacts list powering friend threads. Seeded with one demo
+    // friend (Sara) so the feature is previewable out of the box.
+    contacts:[
+      { id:'demo-sara', name:'Sara', avatar:'👩🏻', status:'online',
+        bio:'Friend from Stockholm · co-planning the Paris trip', persona:'sara' },
+    ],
     // Chatbot: "simple" (plain language) or "expert" (technical depth).
     aiMode:'expert',
     // Whether the chat panel is widened leftwards.
@@ -2665,7 +2751,7 @@ window.dr = function(name){ return window.commitRender(name); };
 // ─── PERSISTENCE ────────────────────────────────────────────────────────────
 // State schema version. Bump this and add a branch to migrate() whenever the
 // shape of `state` changes in a backwards-incompatible way.
-const STATE_VERSION = 9;
+const STATE_VERSION = 10;
 function migrate(s) {
   const from = s.version || 1;
   if(from >= STATE_VERSION) { s.version = STATE_VERSION; return s; }
@@ -2742,6 +2828,19 @@ function migrate(s) {
       delete t.budget;
       delete t.date;
     });
+  }
+  // v9 → v10: introduce state.chatThreads + state.contacts. Any
+  // existing in-memory aiChatHistory is not persisted, so nothing
+  // to migrate — we just seed the defaults if they're missing.
+  if(from < 10) {
+    if(!s.chatThreads || typeof s.chatThreads !== 'object') s.chatThreads = {};
+    if(!Array.isArray(s.contacts)) {
+      s.contacts = [
+        { id:'demo-sara', name:'Sara', avatar:'👩🏻', status:'online',
+          bio:'Friend from Stockholm · co-planning the Paris trip', persona:'sara' },
+      ];
+    }
+    if(!s.activeChatThreadId) s.activeChatThreadId = 'ai:horizon';
   }
   s.version = STATE_VERSION;
   return s;
@@ -8714,8 +8813,102 @@ window.importData=function(input){
 };
 
 // ══ AI PANEL ═════════════════════════════════════════════════════════════════
-let aiChatHistory=[];
+// Backwards-compat alias. The panel used to own a single in-memory
+// aiChatHistory array; it's now a live getter that reads the
+// currently-active thread's messages out of state.chatThreads. Every
+// legacy code path that pushed to / read from aiChatHistory still
+// works — it just goes through the active thread.
+const aiChatHistory = {
+  get length(){ return (_activeThread()?.messages || []).length; },
+  slice(...args){ return (_activeThread()?.messages || []).slice(...args); },
+  push(msg){
+    const t = _activeThread();
+    if(!t) return;
+    if(!Array.isArray(t.messages)) t.messages = [];
+    t.messages.push(Object.assign({ at: Date.now() }, msg));
+  },
+  filter(fn){ return (_activeThread()?.messages || []).filter(fn); },
+};
 let aipTyping=false;
+
+// ── CHAT THREADS ─────────────────────────────────────────────────────────
+// One unified surface for both the AI advisor and friend chats. Every
+// thread persists on state.chatThreads; the UI simply renders the
+// currently-active one via state.activeChatThreadId. Friend threads are
+// seeded from state.contacts on first render so the demo experience is
+// available out of the box.
+const AI_THREAD_ID = 'ai:horizon';
+function _seedChatThreads(){
+  if(!state.chatThreads) state.chatThreads = {};
+  // Always ensure the Horizon AI thread exists.
+  if(!state.chatThreads[AI_THREAD_ID]){
+    state.chatThreads[AI_THREAD_ID] = {
+      id: AI_THREAD_ID,
+      kind: 'ai',
+      title: 'Horizon AI',
+      avatar: '✦',
+      messages: [],
+      unread: 0,
+      pinned: true,
+    };
+  }
+  // Seed a friend thread for every contact that doesn't have one yet.
+  // For the demo friend we also seed a short opening exchange so the
+  // thread isn't empty on first open.
+  (state.contacts || []).forEach(c => {
+    const key = `friend:${c.id}`;
+    if(state.chatThreads[key]) return;
+    const now = Date.now();
+    const seedMessages = c.id === 'demo-sara'
+      ? [
+          { role:'them', content:'Hey! Super excited about Paris 🗼', at: now - 86400000 },
+          { role:'me',   content:'Same — hotel\'s booked for August',  at: now - 82800000 },
+          { role:'them', content:'Shall we split the flights? I can book mine this week.', at: now - 3600000 },
+        ]
+      : [];
+    state.chatThreads[key] = {
+      id: key,
+      kind: 'friend',
+      title: c.name,
+      avatar: c.avatar || '👤',
+      contactId: c.id,
+      messages: seedMessages,
+      unread: seedMessages.filter(m => m.role === 'them').length > 0 && c.id === 'demo-sara' ? 1 : 0,
+    };
+  });
+  if(!state.activeChatThreadId || !state.chatThreads[state.activeChatThreadId]){
+    state.activeChatThreadId = AI_THREAD_ID;
+  }
+}
+function _activeThread(){
+  if(!state.chatThreads) _seedChatThreads();
+  return state.chatThreads[state.activeChatThreadId] || state.chatThreads[AI_THREAD_ID] || null;
+}
+function _threadsInOrder(){
+  if(!state.chatThreads) _seedChatThreads();
+  return Object.values(state.chatThreads).sort((a,b) => {
+    // AI pinned first, then friends alphabetical.
+    if(a.kind === 'ai' && b.kind !== 'ai') return -1;
+    if(b.kind === 'ai' && a.kind !== 'ai') return 1;
+    return String(a.title).localeCompare(String(b.title));
+  });
+}
+// Mirror the bot/user role vocabulary across thread kinds so a single
+// renderer can draw both. AI: user/assistant. Friend: me/them.
+function _roleSide(thread, role){
+  if(!thread) return 'bot';
+  if(thread.kind === 'friend'){
+    return role === 'me' ? 'user' : 'bot';
+  }
+  return role === 'user' ? 'user' : 'bot';
+}
+function _roleLabel(thread, role){
+  if(!thread) return 'HORIZON AI';
+  if(thread.kind === 'friend'){
+    return role === 'me' ? '' : (thread.title || 'FRIEND').toUpperCase();
+  }
+  return 'HORIZON AI';
+}
 const AIP_CHIPS=['📊 Analyse my spending','🎯 Am I on track for retirement?','💡 Grow my nest egg','🌍 Where should I retire?','✈️ Can I afford my trips?','⚠️ Biggest financial risks?'];
 // Per-panel suggestion prompts — AI chips reflect the user's current view so
 // the conversation feels contextual rather than generic.
@@ -8757,9 +8950,103 @@ function openAIPanel(){
   if(backdrop) backdrop.classList.add('open');
   if(fab) fab.style.display='none';
   if(minTab) minTab.style.display='none';
+  _seedChatThreads();
+  // Opening the panel clears the active thread's unread count and
+  // bumps its lastReadAt timestamp.
+  const t = _activeThread();
+  if(t){ t.unread = 0; t.lastReadAt = Date.now(); save(); }
+  renderAipThreads();
+  aipRenderActiveThread();
   updateAIPPills();
   renderAIPChips();
   syncAIModeUI();
+}
+// Render the thread rail above the message list. AI thread always
+// present and pinned to the left; friend threads follow.
+function renderAipThreads(){
+  const rail = document.getElementById('aip-thread-rail');
+  if(!rail) return;
+  _seedChatThreads();
+  const threads = _threadsInOrder();
+  const activeId = state.activeChatThreadId;
+  const pills = threads.map(t => {
+    const active = t.id === activeId ? ' active' : '';
+    const unread = (t.id !== activeId && t.unread > 0) ? `<span class="aip-thread-unread">${t.unread > 9 ? '9+' : t.unread}</span>` : '';
+    return `<button class="aip-thread-pill${active}" onclick="switchChatThread('${t.id}')" title="${esc2(t.title)}">
+      <span class="aip-thread-avatar">${t.avatar || (t.kind==='ai'?'✦':'👤')}</span>
+      <span class="aip-thread-name">${esc2(t.title)}</span>
+      ${unread}
+    </button>`;
+  }).join('');
+  rail.innerHTML = pills;
+}
+window.switchChatThread = function(id){
+  if(!state.chatThreads || !state.chatThreads[id]) return;
+  state.activeChatThreadId = id;
+  const t = state.chatThreads[id];
+  t.unread = 0;
+  t.lastReadAt = Date.now();
+  save();
+  renderAipThreads();
+  aipRenderActiveThread();
+  // Chips only make sense for the AI thread; hide them on friend threads
+  // where the suggestion rail doesn't apply.
+  const chipsEl = document.getElementById('aip-chips');
+  if(chipsEl) chipsEl.style.display = (t.kind === 'ai' && (t.messages||[]).length === 0) ? 'flex' : 'none';
+  // Update placeholder text on the input to match the context.
+  const ta = document.getElementById('aip-input');
+  if(ta) ta.placeholder = t.kind === 'friend' ? `Message ${t.title}…` : 'Ask about your finances…';
+  // Header sub-title flips to reflect the active thread.
+  const sub = document.getElementById('aip-sub');
+  if(sub) sub.textContent = t.kind === 'friend'
+    ? (`${(state.contacts||[]).find(c=>c.id===t.contactId)?.bio || ''}` || 'Direct message')
+    : 'Aware of your financial context';
+};
+// Re-paint the message list from the active thread's messages array.
+// Used when switching threads OR when opening the panel. Individual
+// sends still append bubbles incrementally via aipAddMsg() to avoid
+// a full re-render mid-keystroke.
+function aipRenderActiveThread(){
+  const msgs = document.getElementById('aip-msgs');
+  if(!msgs) return;
+  const t = _activeThread();
+  if(!t) return;
+  // Destroy any in-chat chart instances before replacing DOM.
+  if(typeof _destroyAIChartInstances === 'function') _destroyAIChartInstances();
+  const messages = t.messages || [];
+  if(messages.length === 0){
+    if(t.kind === 'ai'){
+      msgs.innerHTML = `<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:200px;text-align:center;padding:20px;color:var(--text3);">
+        <div style="font-size:36px;opacity:.4;margin-bottom:10px;">✦</div>
+        <div style="font-size:13px;font-weight:600;color:var(--text);margin-bottom:6px;">Your AI Financial Advisor</div>
+        <div style="font-size:11px;line-height:1.7">Ask me anything about your finances, retirement timeline, where to retire, or travel budget.</div>
+      </div>`;
+    } else {
+      msgs.innerHTML = `<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:200px;text-align:center;padding:20px;color:var(--text3);">
+        <div style="font-size:36px;opacity:.4;margin-bottom:10px;">${t.avatar||'👤'}</div>
+        <div style="font-size:13px;font-weight:600;color:var(--text);margin-bottom:6px;">Say hi to ${esc2(t.title)}</div>
+        <div style="font-size:11px;line-height:1.7">This conversation is private between you and ${esc2(t.title)}. Your financial snapshot is never shared with friends.</div>
+      </div>`;
+    }
+    return;
+  }
+  // Rebuild bubbles from the thread's messages. Friend rows use a
+  // friend-labelled .ai-msg-wrap.bot so the existing left/right
+  // bubble CSS carries every case for free.
+  msgs.innerHTML = '';
+  messages.forEach(m => {
+    const side = _roleSide(t, m.role);
+    const wrap = document.createElement('div');
+    wrap.className = `ai-msg-wrap ${side}`;
+    if(side === 'bot'){
+      const label = _roleLabel(t, m.role);
+      wrap.innerHTML = `${label ? `<div class="ai-msg-label">${esc2(label)}</div>` : ''}<div class="ai-msg bot">${mdParse(String(m.content || ''))}</div>`;
+    } else {
+      wrap.innerHTML = `<div class="ai-msg user">${esc(String(m.content || ''))}</div>`;
+    }
+    msgs.appendChild(wrap);
+  });
+  msgs.scrollTop = 99999;
 }
 function closePanel(){
   const {panel,backdrop,fab}=_ai();
@@ -8772,7 +9059,11 @@ function aiMinimize(){
   if(panel) panel.classList.remove('open');
   if(backdrop) backdrop.classList.remove('open');
   if(fab) fab.style.display='none';
-  const msgCount=aiChatHistory.filter(m=>m.role==='user').length;
+  // Count sent messages from the active thread, regardless of
+  // whether it's the AI (role 'user') or a friend (role 'me').
+  const t = _activeThread();
+  const msgs = (t && t.messages) || [];
+  const msgCount = msgs.filter(m => m.role === 'user' || m.role === 'me').length;
   if(minSub) minSub.textContent=msgCount>0?`${msgCount} message${msgCount!==1?'s':''} · click to expand`:'Click to expand';
   if(minTab) minTab.style.display='flex';
 }
@@ -8796,7 +9087,12 @@ function updateAIPPills(){
 function renderAIPChips(){
   const el=document.getElementById('aip-chips');
   if(!el) return;
-  el.style.display=aiChatHistory.length>0?'none':'flex';
+  // Chips only surface on the AI thread and only when it's empty.
+  // Friend threads never show them.
+  const t = _activeThread();
+  const hasMsgs = t && (t.messages||[]).length > 0;
+  const isFriend = t && t.kind === 'friend';
+  el.style.display = (!isFriend && !hasMsgs) ? 'flex' : 'none';
   const panel = state.activePanel||'dashboard';
   const chips = aipChipsFor(panel);
   const recent = getAIHistoryFor(panel).slice(0, 4); // up to 4 recent queries
@@ -8830,16 +9126,15 @@ function pushAIHistory(panel, query){
 }
 
 function clearAIChat(){
-  aiChatHistory=[];
-  // Destroy any Chart.js instances that in-chat charts registered so their
-  // canvas contexts don't leak when the bubble DOM is replaced below.
+  // Scope clears to the ACTIVE thread only — the other thread (AI or
+  // friend) keeps its history. Useful for wiping a single conversation
+  // without losing the other one. Friends' saved history lives in
+  // state.chatThreads so a clear only nukes the local view.
+  const t = _activeThread();
+  if(t) t.messages = [];
   if(typeof _destroyAIChartInstances === 'function') _destroyAIChartInstances();
-  const msgs=document.getElementById('aip-msgs');
-  msgs.innerHTML=`<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:200px;text-align:center;padding:20px;color:var(--text3);">
-    <div style="font-size:36px;opacity:.4;margin-bottom:10px;">✦</div>
-    <div style="font-size:13px;font-weight:600;color:var(--text);margin-bottom:6px;">Your AI Financial Advisor</div>
-    <div style="font-size:11px;line-height:1.7">Ask me anything about your finances, retirement timeline, where to retire, or travel budget.</div>
-  </div>`;
+  save();
+  aipRenderActiveThread();
   renderAIPChips();
 }
 
@@ -10065,8 +10360,19 @@ async function aipSend() {
   const ta=document.getElementById('aip-input'); if(!ta) return;
   const msg=ta.value.trim(); if(!msg||aipTyping) return;
   ta.value=''; ta.style.height='38px';
+  _seedChatThreads();
+  const thread = _activeThread();
+  if(!thread) return;
+  // Dispatch on thread kind. AI path is the original Claude call,
+  // friend path stays entirely client-side and routes through the
+  // scripted persona replier.
+  if(thread.kind === 'friend') return sendToFriend(thread, msg);
+  return sendToAI(thread, msg);
+}
+
+async function sendToAI(thread, msg){
   aipAddMsg('user',msg);
-  aiChatHistory.push({role:'user',content:msg});
+  thread.messages.push({ role:'user', content:msg, at: Date.now() });
   // Remember this query against the panel the user was looking at so the
   // "Recent on <Panel>" row in renderAIPChips can surface it next time.
   pushAIHistory(state.activePanel||'dashboard', msg);
@@ -10088,11 +10394,12 @@ async function aipSend() {
       headers:{'Content-Type':'application/json','x-api-key':key,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
       // Bumped from 600 → 900 to leave headroom for an optional fenced
       // `horizon-chart` block without squeezing the narrative response.
-      body:JSON.stringify({model:'claude-opus-4-6',max_tokens:900,system:buildAIContext(),messages:aiChatHistory.slice(-8)})
+      body:JSON.stringify({model:'claude-opus-4-6',max_tokens:900,system:buildAIContext(),messages:thread.messages.slice(-8).map(m=>({role:m.role,content:m.content}))})
     });
     const d=await res.json();
     const reply=d.content?.map(c=>c.text||'').join('')||'No response';
-    aiChatHistory.push({role:'assistant',content:reply});
+    thread.messages.push({ role:'assistant', content:reply, at: Date.now() });
+    save();
     // Pull any ```horizon-chart``` fenced blocks out of the reply, leaving
     // sentinels behind. Run mdParse() on the sentinel-embedded text (safe
     // because sentinels are alphanumeric and untouched by markdown), then
@@ -10109,6 +10416,74 @@ async function aipSend() {
   } catch(e){ typWrap.querySelector('.ai-msg').innerHTML=`<span style="color:var(--red);font-size:12px">Error: ${e.message}</span>`; }
   aipTyping=false;
   document.getElementById('aip-msgs').scrollTop=99999;
+}
+
+// ── FRIEND CHAT ─────────────────────────────────────────────────────────
+// Entirely client-side for the demo. We render the user's message
+// instantly, stash it on the thread, then enqueue a scripted reply from
+// the matching persona after a short typing delay. This deliberately
+// NEVER calls buildAIContext() or the LLM, so the user's financial
+// snapshot can never leak into a friend conversation.
+async function sendToFriend(thread, msg){
+  // Append the user's outgoing message.
+  aipAddMsg('user', msg);
+  thread.messages.push({ role:'me', content:msg, at: Date.now() });
+  save();
+  aipTyping = true;
+  // Show a typing indicator attributed to the friend.
+  const typWrap = document.createElement('div');
+  typWrap.className = 'ai-msg-wrap bot';
+  typWrap.innerHTML = `<div class="ai-msg-label">${esc2((thread.title||'FRIEND').toUpperCase())}</div><div class="ai-msg bot"><div class="ai-typing"><span></span><span></span><span></span></div></div>`;
+  const msgsEl = document.getElementById('aip-msgs');
+  msgsEl.appendChild(typWrap);
+  msgsEl.scrollTop = 99999;
+  // Delay gives the typing indicator time to feel alive.
+  const delay = 900 + Math.random() * 1200;
+  await new Promise(r => setTimeout(r, delay));
+  const persona = (state.contacts || []).find(c => c.id === thread.contactId)?.persona || 'sara';
+  const reply = _mockFriendReply(persona, msg, thread);
+  thread.messages.push({ role:'them', content:reply, at: Date.now() });
+  save();
+  const bubble = typWrap.querySelector('.ai-msg');
+  if(bubble) bubble.innerHTML = mdParse(reply);
+  aipTyping = false;
+  msgsEl.scrollTop = 99999;
+}
+
+// Tiny pattern-based persona replier. Picks a line based on keywords in
+// the user's last message. Keeps the demo light and scripted — no LLM
+// call, no financial data access. Swap this for a real transport when
+// the backend is ready.
+function _mockFriendReply(persona, msg, thread){
+  const m = String(msg||'').toLowerCase();
+  const match = (words) => words.some(w => m.includes(w));
+  if(persona === 'sara'){
+    if(match(['hi','hello','hey','yo','hej']))
+      return `Hey! 👋 What's up?`;
+    if(match(['trip','paris','flight','flights','fly']))
+      return `Oh nice — I was just looking at flights this morning. SAS has a **3 200 kr** return from Arlanda mid-August. Want me to book both?`;
+    if(match(['hotel','airbnb','stay','apartment']))
+      return `I'll forward you the Montmartre Airbnb I bookmarked last week. Two bedrooms, walking distance to everything. **Around 1 400 kr/night.**`;
+    if(match(['budget','cost','money','split','share','pay']))
+      return `Let's just split everything 50/50 and settle up at the end of the trip — easier than tracking line by line 🙌`;
+    if(match(['when','date','august','june','july','dates']))
+      return `I was thinking **Aug 8–15**? That's my open week. Does that still work for you?`;
+    if(match(['food','eat','dinner','restaurant']))
+      return `I've got a list from a friend who lives there — I'll drop it in here tonight. Bistro in the 11th is apparently a must.`;
+    if(match(['cancel','worried','not sure','maybe','hesit']))
+      return `Talk to me — what's on your mind? If the timing isn't right we can push to September, no stress.`;
+    if(match(['thanks','thank you','ta','cheers']))
+      return `Anytime ❤️`;
+    if(match(['?','when','what','how','where','why']))
+      return `Good question — let me check properly tonight and get back to you before bed.`;
+    // Default fallback: contextual-ish ack based on message length.
+    if(msg.length < 12) return `Got it 👍`;
+    if(msg.length < 40) return `Makes sense — I'm on the same page.`;
+    return `Got it — let me sit with that for a bit and come back with something concrete. Might ping you tomorrow morning.`;
+  }
+  // Generic persona fallback.
+  if(match(['hi','hello','hey'])) return `Hey! 👋`;
+  return `Got it — I'll think on that and reply properly in a bit.`;
 }
 window.aipChip=function(text){
   const ta=document.getElementById('aip-input'); if(ta){ta.value=text;} aipSend();
