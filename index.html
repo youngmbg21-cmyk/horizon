@@ -665,6 +665,55 @@ body.light .loc-card:hover { box-shadow:0 5px 14px -8px rgba(60,40,10,0.18); }
 @media (max-width:900px){ #retire-map { height:260px; } }
 
 /* ── FUN FUND ────────────────────────────────────────── */
+/* ── RETIREMENT · DERIVED SAVINGS PROJECTION ROW ───────
+   Pinned to the top of the portfolio list. Violet-lime
+   treatment matches the "linked/derived" vocabulary used
+   elsewhere (Monthly Review fromTrip rows) so the user
+   can tell at a glance this line is computed, not
+   editable. */
+.asset-row-derived {
+  background: linear-gradient(90deg, var(--violet-dim) 0%, rgba(163,230,53,.10) 100%);
+  border:1px dashed var(--violet);
+  border-left:3px solid #a3e635;
+  border-radius:8px;
+  padding:10px 12px;
+  margin-bottom:6px;
+}
+.asset-row-derived .ard-body {
+  display:flex; align-items:center; gap:10px; flex-wrap:wrap;
+  font-family:var(--fm); font-size:11px; color:var(--text2);
+}
+.asset-row-derived .ard-pill {
+  display:inline-flex; align-items:center;
+  font-family:var(--fm); font-size:9px; font-weight:700;
+  letter-spacing:.08em; text-transform:uppercase;
+  padding:2px 7px; border-radius:3px;
+  background:var(--violet); color:#fff;
+}
+.asset-row-derived .ard-name {
+  font-family:var(--ff); font-size:13px; font-weight:700;
+  color:var(--text);
+}
+.asset-row-derived .ard-meta strong {
+  color:var(--text); font-weight:700;
+}
+.asset-row-derived .ard-arrow { color:var(--text3); margin:0 2px; }
+.asset-row-derived .ard-final {
+  font-family:var(--fm); font-size:14px; font-weight:700;
+  color:#a3e635;
+}
+.asset-row-derived .ard-final-sub {
+  font-size:10px; color:var(--text3);
+}
+.asset-row-derived .ard-note {
+  margin-top:6px; padding-top:6px;
+  border-top:1px dashed rgba(163,230,53,.25);
+  font-family:var(--ff); font-size:10px; color:var(--text2); line-height:1.5;
+}
+.asset-row-derived .ard-note strong {
+  color:var(--text); font-weight:700;
+}
+
 /* ── DASHBOARD · WELCOMING AI CARD ─────────────────────
    Sits above the KPI rows. Horizontal layout: icon, body
    (headline + sub-line), and a CTA button that fires the
@@ -4605,7 +4654,13 @@ function renderDashboard() {
       </div>
       <!-- Nest Egg Projection -->
       <div class="card" data-section="nestegg">
-        <div class="card-title">🎯 Nest Egg Growth Curve</div>
+        <div class="card-title" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px">
+          <span>🎯 Nest Egg Growth Curve</span>
+          <div class="scen-tabs" style="margin:0">
+            <button class="scen-btn ${(state.dashNestEggMode||'real')==='real'?'active':''}" onclick="setDashNestEggMode('real')">Today&rsquo;s Money</button>
+            <button class="scen-btn ${(state.dashNestEggMode||'real')==='nominal'?'active':''}" onclick="setDashNestEggMode('nominal')">Nominal</button>
+          </div>
+        </div>
         <div class="chart-wrap lg"><canvas id="dash-nestegg-chart"></canvas></div>
       </div>
     </div>
@@ -4647,13 +4702,29 @@ function renderDashboard() {
     if(ne) {
       const cd=chartDefaults();
       const proj=getProjection();
+      const mode = state.dashNestEggMode || 'real';
+      // Nominal: use compounded raw values. Today's Money: divide by
+      // cumulative inflation so every series is expressed in the
+      // user's real purchasing power (same lens the rest of the app
+      // uses by default). Both datasets come straight from the
+      // single getProjection() source of truth so the Savings curve
+      // on this chart is identical to the projection used for the
+      // Savings line item in the Retirement Plan tab.
+      const inflF = y => Math.pow(1+state.inflationRate/100, y);
+      const savings = proj.map(p => mode === 'real' ? Math.round(p.appSavings / inflF(p.age - state.currentAge)) : p.appSavings);
+      const total   = proj.map(p => mode === 'real' ? p.realTotal : p.total);
       charts['dash-ne']=new Chart(ne.getContext('2d'),{
         type:'line',
         data:{
           labels:proj.map(p=>'Age '+p.age),
           datasets:[
-            {label:'Nominal',data:proj.map(p=>p.total),borderColor:'#00e8a0',fill:false,tension:.3,pointRadius:0,borderWidth:2},
-            {label:"Today's Money",data:proj.map(p=>p.realTotal),borderColor:'#4d9fff',fill:false,tension:.3,pointRadius:0,borderWidth:1.5,borderDash:[4,3]},
+            // Combined Nest Egg — in-app savings + every external
+            // investment account compounded. Solid green line.
+            {label:'Combined Nest Egg', data: total,   borderColor:'#00e8a0', backgroundColor:'#00e8a012', fill:true,  tension:.3, pointRadius:0, borderWidth:2.25, order:1},
+            // Savings Growth — ONLY the in-app monthly/yearly savings
+            // stream, compounded at state.growthRate. Same numbers
+            // that drive the Retirement Plan Savings line item.
+            {label:'Savings Growth',    data: savings, borderColor:'#f5a623', backgroundColor:'transparent',fill:false, tension:.3, pointRadius:0, borderWidth:2,    borderDash:[5,4], order:2},
           ]
         },
         options:chartPreset({scales:{
@@ -4664,6 +4735,20 @@ function renderDashboard() {
     }
   },50);
 }
+// Toggle between real (today's money) and nominal (future kr)
+// on the Dashboard Nest Egg Growth Curve. Persists the choice so
+// a user's preferred lens sticks across sessions. Defaults to
+// real — that's the lens every other retirement view ships with.
+window.setDashNestEggMode = function(mode){
+  if(mode !== 'real' && mode !== 'nominal') return;
+  state.dashNestEggMode = mode;
+  save();
+  // Re-render just the dashboard so the toggle button state + chart
+  // flip together. The live-reactivity pipeline would also catch
+  // this after 200 ms, but firing it synchronously here keeps the
+  // click feel snappy.
+  if(typeof renderDashboard === 'function') renderDashboard();
+};
 
 // ══ TRANSACTIONS ═════════════════════════════════════════════════════════════
 function renderTransactions() {
@@ -4966,23 +5051,26 @@ function renderMonthly() {
          re-render (which would tear down the focused Savings Target
          input mid-keystroke). The keys are stable: exp/sav/fun for the
          bar segments, income/expenses/savings/funFund for the numeric
-         readouts. -->
+         readouts. All four read from the *pure* per-month values so
+         they match the Fun Fund tab running balance, the 12-Month
+         chart's Fun Fund line, and the Dashboard — one consistent
+         Income − Expenses − Savings story everywhere. -->
     <div class="card" style="padding:14px 16px;margin-bottom:12px">
       <div style="display:flex;flex-wrap:wrap;gap:20px;align-items:center">
         <div style="flex:1;min-width:180px">
           <div style="font-size:10px;color:var(--text3);font-family:var(--fm);letter-spacing:.1em;margin-bottom:6px">MONTH SUMMARY — ${sel.label}</div>
           <div class="cf-bar">
-            <div class="cf-bar-exp" data-mo-bar="exp" style="width:${sel.income>0?Math.min(sel.expenses/sel.income*100,100):0}%"></div>
-            <div class="cf-bar-sav" data-mo-bar="sav" style="width:${sel.income>0?Math.min(sel.savings/sel.income*100,100):0}%"></div>
-            <div class="cf-bar-fun" data-mo-bar="fun" style="width:${sel.income>0?Math.max(sel.funFund/sel.income*100,0):0}%"></div>
+            <div class="cf-bar-exp" data-mo-bar="exp" style="width:${sel.pureIncome>0?Math.min(sel.pureExpenses/sel.pureIncome*100,100):0}%"></div>
+            <div class="cf-bar-sav" data-mo-bar="sav" style="width:${sel.pureIncome>0?Math.min(sel.savings/sel.pureIncome*100,100):0}%"></div>
+            <div class="cf-bar-fun" data-mo-bar="fun" style="width:${sel.pureIncome>0?Math.max(sel.pureFunFund/sel.pureIncome*100,0):0}%"></div>
           </div>
-          <div class="cf-bar-labels" data-mo-bar-labels><span>Exp ${sel.income>0?Math.round(sel.expenses/sel.income*100):0}%</span><span>Sav ${sel.income>0?Math.round(sel.savings/sel.income*100):0}%</span><span>Fun ${sel.income>0?Math.max(Math.round(sel.funFund/sel.income*100),0):0}%</span></div>
+          <div class="cf-bar-labels" data-mo-bar-labels><span>Exp ${sel.pureIncome>0?Math.round(sel.pureExpenses/sel.pureIncome*100):0}%</span><span>Sav ${sel.pureIncome>0?Math.round(sel.savings/sel.pureIncome*100):0}%</span><span>Fun ${sel.pureIncome>0?Math.max(Math.round(sel.pureFunFund/sel.pureIncome*100),0):0}%</span></div>
         </div>
         <div style="display:flex;gap:20px;flex-wrap:wrap">
-          <div style="text-align:center"><div style="font-size:9px;color:var(--text3);font-family:var(--fm);letter-spacing:.08em">INCOME</div><div data-mo-num="income" style="font-family:var(--fm);font-size:16px;font-weight:700;color:var(--green)">${fmt(sel.income)}</div></div>
-          <div style="text-align:center"><div style="font-size:9px;color:var(--text3);font-family:var(--fm);letter-spacing:.08em">EXPENSES</div><div data-mo-num="expenses" style="font-family:var(--fm);font-size:16px;font-weight:700;color:var(--red)">${fmt(sel.expenses)}</div></div>
+          <div style="text-align:center"><div style="font-size:9px;color:var(--text3);font-family:var(--fm);letter-spacing:.08em">INCOME</div><div data-mo-num="income" style="font-family:var(--fm);font-size:16px;font-weight:700;color:var(--green)">${fmt(sel.pureIncome)}</div></div>
+          <div style="text-align:center"><div style="font-size:9px;color:var(--text3);font-family:var(--fm);letter-spacing:.08em">EXPENSES</div><div data-mo-num="expenses" style="font-family:var(--fm);font-size:16px;font-weight:700;color:var(--red)">${fmt(sel.pureExpenses)}</div></div>
           <div style="text-align:center"><div style="font-size:9px;color:var(--text3);font-family:var(--fm);letter-spacing:.08em">SAVINGS</div><div data-mo-num="savings" style="font-family:var(--fm);font-size:16px;font-weight:700;color:var(--amber)">${fmt(sel.savings)}</div></div>
-          <div style="text-align:center"><div style="font-size:9px;color:var(--text3);font-family:var(--fm);letter-spacing:.08em">FUN FUND</div><div data-mo-num="funFund" style="font-family:var(--fm);font-size:16px;font-weight:700;color:var(--cyan)">${fmt(sel.funFund)}</div></div>
+          <div style="text-align:center"><div style="font-size:9px;color:var(--text3);font-family:var(--fm);letter-spacing:.08em">FUN FUND</div><div data-mo-num="funFund" style="font-family:var(--fm);font-size:16px;font-weight:700;color:var(--cyan)">${fmt(sel.pureFunFund)}</div></div>
         </div>
       </div>
     </div>
@@ -5070,10 +5158,12 @@ function liveSyncMonthlyReview(selKey){
   const key = selKey || state.selectedMonth || months[0]?.key;
   const sel = months.find(m => m.key === key);
   if(!sel) return;
-  // Summary bar segment widths (same math as the initial render).
-  const pctExp = sel.income > 0 ? Math.min(sel.expenses / sel.income * 100, 100) : 0;
-  const pctSav = sel.income > 0 ? Math.min(sel.savings  / sel.income * 100, 100) : 0;
-  const pctFun = sel.income > 0 ? Math.max(sel.funFund  / sel.income * 100, 0)   : 0;
+  // Summary bar segment widths + headline numbers — every field is
+  // the *pure* per-month value so this matches the Fun Fund tab
+  // running-balance table and the Fun Fund chart line one-for-one.
+  const pctExp = sel.pureIncome > 0 ? Math.min(sel.pureExpenses / sel.pureIncome * 100, 100) : 0;
+  const pctSav = sel.pureIncome > 0 ? Math.min(sel.savings      / sel.pureIncome * 100, 100) : 0;
+  const pctFun = sel.pureIncome > 0 ? Math.max(sel.pureFunFund  / sel.pureIncome * 100, 0)   : 0;
   const barExp = host.querySelector('[data-mo-bar="exp"]');
   const barSav = host.querySelector('[data-mo-bar="sav"]');
   const barFun = host.querySelector('[data-mo-bar="fun"]');
@@ -5089,10 +5179,10 @@ function liveSyncMonthlyReview(selKey){
   const numExp     = host.querySelector('[data-mo-num="expenses"]');
   const numSavings = host.querySelector('[data-mo-num="savings"]');
   const numFunFund = host.querySelector('[data-mo-num="funFund"]');
-  if(numIncome)  numIncome.textContent  = fmt(sel.income);
-  if(numExp)     numExp.textContent     = fmt(sel.expenses);
+  if(numIncome)  numIncome.textContent  = fmt(sel.pureIncome);
+  if(numExp)     numExp.textContent     = fmt(sel.pureExpenses);
   if(numSavings) numSavings.textContent = fmt(sel.savings);
-  if(numFunFund) numFunFund.textContent = fmt(sel.funFund);
+  if(numFunFund) numFunFund.textContent = fmt(sel.pureFunFund);
   // Chart datasets — mutate the existing Chart.js instance's data
   // arrays and call update('none') for a zero-animation live refresh.
   // No canvas teardown, no destroyChart, no focus loss.
@@ -5381,7 +5471,37 @@ function renderRetirement() {
     </div>`;
 
   // ── SECTION 2: PORTFOLIO ────────────────────────────────────────────────────
-  const assetRows = state.externalAssets.map((a,idx)=>{
+  // Derived Savings Projection — a read-only row pinned to the top of
+  // the portfolio list. It's computed directly from getProjection()
+  // (the same source that feeds the Dashboard → Nest Egg Growth
+  // Curve's Savings line), so the Retirement Plan and Dashboard
+  // always tell the same savings story. The user cannot edit this
+  // row — to change its value they edit their Monthly Review
+  // savings / Yearly Forecast savings targets upstream.
+  const savingsProj = getProjection();
+  const savingsFinal = savingsProj.length ? savingsProj[savingsProj.length-1].appSavings : 0;
+  const savingsFinalReal = Math.round(savingsFinal / inflF);
+  const savingsLastYearContrib = savingsProj.length ? savingsProj[savingsProj.length-1].yearlyContrib : 0;
+  // Average monthly savings across the projection window, used as
+  // the "Contrib/mo" readout on the row. We average instead of
+  // snapshotting the current month so a user who varies savings
+  // monthly sees a representative figure.
+  const savingsMonthlyAvg = savingsProj.length
+    ? Math.round(savingsProj.reduce((sum, p) => sum + (p.yearlyContrib || 0), 0) / (12 * savingsProj.length))
+    : 0;
+  const savingsProjRow = `<div class="asset-row-derived" title="Auto-generated from your Monthly Review + Yearly Forecast savings targets. Edit those upstream to change this projection.">
+    <div class="ard-body">
+      <span class="ard-pill">DERIVED</span>
+      <span class="ard-name">💾 Savings Projection</span>
+      <span class="ard-meta">Contrib avg: <strong>${fmt(savingsMonthlyAvg)}</strong>/mo</span>
+      <span class="ard-meta">Growth rate: <strong>${state.growthRate}%</strong></span>
+      <span class="ard-arrow">→</span>
+      <span class="ard-final">${fmt(savingsFinalReal)}</span>
+      <span class="ard-final-sub">today&rsquo;s kr at age ${state.retirementAge}</span>
+    </div>
+    <div class="ard-note">Sourced from your Monthly Review / Yearly Forecast savings targets — this row is read-only. Matches the <strong>Savings Growth</strong> line on the Dashboard Nest Egg chart.</div>
+  </div>`;
+  const assetRows = savingsProjRow + state.externalAssets.map((a,idx)=>{
     const isInv=(a.assetType||'investment')==='investment';
     const gr=a.growthRate??state.growthRate;
     const projV=isInv?futureValue(a.balance,a.monthlyContribution,gr,ytr):0;
