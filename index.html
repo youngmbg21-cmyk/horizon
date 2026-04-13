@@ -6493,6 +6493,22 @@ Portfolio split (x-axis = age, full lifetime):
 - portfolio.investments — Portfolio · investments (currency, age)
 - portfolio.pensions — Portfolio · pensions · annual income (currency, age)
 
+Fun Fund (x-axis = month, next 12 months):
+- funfund.balance — Fun Fund · cumulative balance (currency, month)
+- funfund.spend — Fun Fund · planned trip spend · monthly (currency, month)
+
+Travel (x-axis = trip name, one point per planned trip):
+- travel.budget — Trip budget (currency, trip)
+- travel.remaining — Trip remaining (currency, trip)
+
+Property IQ · search history (x-axis = property / query label):
+- property.rentalYield — Rental yield · % (percent, property)
+- property.pricePerSqm — Price per m² (currency, property)
+
+Property IQ · mortgage amortization (x-axis = loan year, current scenario):
+- property.mortgagePrincipal — Mortgage · principal paid per year (currency, year)
+- property.mortgageInterest — Mortgage · interest paid per year (currency, year)
+
 ${_catalogDynamicListing()}Worked examples:
 
 1) User: "Show the nominal nest egg as bars alongside the real value"
@@ -6536,6 +6552,21 @@ ${_catalogDynamicListing()}Worked examples:
 \`\`\`horizon-chart
 {"kind":"custom","title":"Vanguard projected balance","datasets":[
   {"series":"investment.<matching-slug>","display":"area"}
+]}
+\`\`\`
+
+7) User: "Split my mortgage repayments into principal and interest"
+\`\`\`horizon-chart
+{"kind":"custom","title":"Mortgage principal vs interest","stacked":true,"datasets":[
+  {"series":"property.mortgagePrincipal","display":"bar","label":"Principal"},
+  {"series":"property.mortgageInterest","display":"bar","label":"Interest"}
+]}
+\`\`\`
+
+8) User: "Compare the rental yields I've searched"
+\`\`\`horizon-chart
+{"kind":"custom","title":"Rental yields · past searches","datasets":[
+  {"series":"property.rentalYield","display":"bar"}
 ]}
 \`\`\`
 
@@ -7048,6 +7079,166 @@ function buildSeriesCatalog(){
       () => 0,
       (s, i) => (s && s.pensionData) ? (s.pensionData[i] || 0) : 0,
     ),
+  };
+
+  // ── FUN FUND (x = month, next 12 months) ──────────────────────────────
+  // funfund.balance  — running cumulative surplus of get12Months()[i].funFund
+  //                    so the user sees the trajectory of discretionary
+  //                    money piling up (or drawing down) month by month.
+  // funfund.spend    — per-month trip budget allocation. Uses the exact
+  //                    same bucket-by-month logic the Fun Fund tab chart
+  //                    uses (state.trips grouped by trip.date.slice(0,7))
+  //                    so the two views never diverge.
+  cat['funfund.balance'] = {
+    label: 'Fun Fund · cumulative balance', unit: 'currency', xAxis: 'month',
+    get(){
+      const months = get12Months();
+      let running = 0;
+      return {
+        xValues: months.map(m => m.short),
+        values:  months.map(m => { running += (m.funFund || 0); return running; }),
+      };
+    },
+  };
+  cat['funfund.spend'] = {
+    label: 'Fun Fund · planned trip spend · monthly', unit: 'currency', xAxis: 'month',
+    get(){
+      const months = get12Months();
+      const tripByMonth = {};
+      (state.trips || []).forEach(t => {
+        const key = (t.date || '').slice(0, 7);
+        if(!key) return;
+        tripByMonth[key] = (tripByMonth[key] || 0) + (t.budget || 0);
+      });
+      return {
+        xValues: months.map(m => m.short),
+        values:  months.map(m => tripByMonth[m.key] || 0),
+      };
+    },
+  };
+
+  // ── TRAVEL (x = trip name) ────────────────────────────────────────────
+  // One point per planned trip. travel.budget is what the user set; the
+  // travel.remaining series is budget - spent so over-budget trips show
+  // up as negative bars.
+  const addTripSeries = (key, label, pick) => {
+    cat[key] = {
+      label, unit:'currency', xAxis:'trip',
+      get(){
+        const trips = state.trips || [];
+        return {
+          xValues: trips.map(t => t.name || 'Trip'),
+          values:  trips.map(t => pick(t) || 0),
+        };
+      },
+    };
+  };
+  addTripSeries('travel.budget',    'Trip budget',    t => t.budget);
+  addTripSeries('travel.remaining', 'Trip remaining', t => (t.budget || 0) - (t.spent || 0));
+
+  // ── PROPERTY IQ HISTORY (x = property / query label) ─────────────────
+  // Reads from the existing piq_history array (the same store the
+  // Property IQ history sidebar shows). Each entry is a past search:
+  // { query, market, result: {rentalYield, pricePerSqm, kpis:{yield,
+  // avgPrice, appreciation, liquidity}, ... } }. We parse the numeric
+  // part out of the free-text value (e.g. "4.2%" or "kr 45,000") with a
+  // single tolerant extractor — no new data source, just a projection
+  // of already-stored strings into numbers so they can be charted.
+  const parsePiqNumber = (s) => {
+    if(s == null) return 0;
+    if(typeof s === 'number') return s;
+    const str = String(s);
+    // Strip commas (treated as US/English thousand separators). European
+    // decimal notation like "5,2%" is rare in this app's supported markets
+    // and would round to "5.2" either way — acceptable for chart visuals.
+    // Also strip spaces inside numbers ("1 200 000" → "1200000").
+    const cleaned = str.replace(/,/g, '').replace(/(\d)\s+(?=\d)/g, '$1');
+    const matches = cleaned.match(/[0-9]+(?:\.[0-9]+)?/g);
+    if(!matches || !matches.length) return 0;
+    const nums = matches.map(m => parseFloat(m));
+    // "3-5%" / "kr 4M–6M" → midpoint
+    if(nums.length >= 2 && /[–\-]/.test(cleaned)) return (nums[0] + nums[1]) / 2;
+    return nums[0];
+  };
+  // Convert a piq_history row into its best-effort numeric rental yield
+  // and price-per-sqm figures. Rental yield comes from kpis.yield (newer
+  // shape) or .rentalYield (legacy). Price per sqm comes from .pricePerSqm.
+  const piqRowYield = (h) => parsePiqNumber(h?.result?.kpis?.yield ?? h?.result?.rentalYield);
+  const piqRowSqm   = (h) => parsePiqNumber(h?.result?.pricePerSqm);
+  cat['property.rentalYield'] = {
+    label: 'Rental yield · %', unit: 'percent', xAxis: 'property',
+    get(){
+      const hist = (typeof piq_history !== 'undefined' && Array.isArray(piq_history)) ? piq_history : [];
+      const rows = hist.slice(0, 8); // newest first, cap for readability
+      return {
+        xValues: rows.map(h => h.query || '—'),
+        values:  rows.map(piqRowYield),
+      };
+    },
+  };
+  cat['property.pricePerSqm'] = {
+    label: 'Price per m²', unit: 'currency', xAxis: 'property',
+    get(){
+      const hist = (typeof piq_history !== 'undefined' && Array.isArray(piq_history)) ? piq_history : [];
+      const rows = hist.slice(0, 8);
+      return {
+        xValues: rows.map(h => h.query || '—'),
+        values:  rows.map(piqRowSqm),
+      };
+    },
+  };
+
+  // ── PROPERTY IQ MORTGAGE AMORTIZATION (x = loan year) ────────────────
+  // Derives a year-by-year principal / interest split from the CURRENT
+  // Property IQ mortgage scenario (price, deposit, rate, term). The
+  // monthly payment and loan total are already computed inside
+  // piq_getMortgageScenario() — we just replay the amortization using
+  // those same values so the series is guaranteed to match the
+  // Mortgage Calculator card. When Property IQ has no active analysis
+  // OR the scenario inputs are empty, the series reports {xValues:[],
+  // values:[]} and the validator/renderer shows a graceful empty state.
+  const buildMortgageSchedule = () => {
+    // piq_getMortgageScenario depends on piq_currentResult AND DOM inputs;
+    // guard both so catalog construction never throws.
+    if(typeof piq_getMortgageScenario !== 'function' ||
+       typeof piq_currentResult === 'undefined' || !piq_currentResult ||
+       typeof PIQ_MC === 'undefined' || typeof piq_market === 'undefined' ||
+       !PIQ_MC[piq_market]) return null;
+    let s;
+    try { s = piq_getMortgageScenario(piq_currentResult, PIQ_MC[piq_market]); }
+    catch(e){ return null; }
+    if(!s || !s.hasPrice || !s.loan || !s.monthly || !s.months) return null;
+    const mr = (s.rate || 0) / 100 / 12;
+    const years = Math.max(1, Math.round(s.months / 12));
+    const principalByYear = new Array(years).fill(0);
+    const interestByYear  = new Array(years).fill(0);
+    let bal = s.loan;
+    for(let m = 0; m < s.months; m++){
+      const interest  = mr > 0 ? bal * mr : 0;
+      const principal = Math.max(0, s.monthly - interest);
+      const yr = Math.min(years - 1, Math.floor(m / 12));
+      principalByYear[yr] += principal;
+      interestByYear[yr]  += interest;
+      bal = Math.max(0, bal - principal);
+    }
+    const xValues = Array.from({length: years}, (_, i) => `Yr ${i + 1}`);
+    return { xValues, principalByYear, interestByYear };
+  };
+  cat['property.mortgagePrincipal'] = {
+    label: 'Mortgage · principal paid per year', unit: 'currency', xAxis: 'year',
+    get(){
+      const sch = buildMortgageSchedule();
+      if(!sch) return { xValues:[], values:[] };
+      return { xValues: sch.xValues, values: sch.principalByYear };
+    },
+  };
+  cat['property.mortgageInterest'] = {
+    label: 'Mortgage · interest paid per year', unit: 'currency', xAxis: 'year',
+    get(){
+      const sch = buildMortgageSchedule();
+      if(!sch) return { xValues:[], values:[] };
+      return { xValues: sch.xValues, values: sch.interestByYear };
+    },
   };
 
   return cat;
