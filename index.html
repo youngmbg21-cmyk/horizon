@@ -3276,8 +3276,9 @@ bus.on('state:changed', () => {
   clearTimeout(_liveRenderTimer);
   _liveRenderTimer = setTimeout(() => {
     try {
-      if(typeof renderTicker  === 'function') renderTicker();
-      if(typeof updateSidebar === 'function') updateSidebar();
+      if(typeof renderTicker         === 'function') renderTicker();
+      if(typeof renderCurrencyToggle === 'function') renderCurrencyToggle();
+      if(typeof updateSidebar        === 'function') updateSidebar();
       if(typeof bus !== 'undefined') bus.emit('state:liveSync', { panel: state.activePanel });
     } catch(e){ console.warn('live sync failed', e); }
     _pendingFullRender = true;
@@ -3620,7 +3621,7 @@ function buildCmdpItems(){
     items.push({
       group:'Currency', icon:'💱', label:`Switch currency to ${c}`, hint:CURRENCY_SYMBOLS[c],
       keywords:`currency ${c} swap change`.toLowerCase(),
-      action:()=>{state.currency=c;save();renderAll();}
+      action:()=>{ applyCurrency(c); }
     });
   });
   // AI chip suggestions — execute the active panel's contextual chips
@@ -3818,12 +3819,72 @@ function renderTicker() {
 function renderCurrencyToggle() {
   const el = document.getElementById('cur-toggle');
   if(!el) return;
-  // Currency toggle: write state and fire save(). The live listener
-  // takes care of the follow-up render once the click handler returns
-  // — avoiding a double render (and the associated layout flash) that
-  // an explicit renderAll() here would cause.
-  el.innerHTML = Object.keys(CURRENCY_SYMBOLS).map(c=>`<button class="cur-btn ${c===state.currency?'active':''}" onclick="state.currency='${c}';save()">${c}</button>`).join('');
+  el.innerHTML = Object.keys(CURRENCY_SYMBOLS).map(c=>`<button class="cur-btn ${c===state.currency?'active':''}" onclick="applyCurrency('${c}')">${c}</button>`).join('');
 }
+// ─── CURRENCY APPLIER ───────────────────────────────────────────────────────
+// One atomic, single-frame path for every currency flip.
+//
+// Why not just save() + let the live-reactivity pipeline take care of it:
+//   1. The live listener debounces 200 ms, so the click feels laggy.
+//   2. It calls renderPanel(active) but NOT renderCurrencyToggle, so the
+//      toggle's `.active` button stays on the old currency while the
+//      panel body already shows the new one — that's the "desync" bug.
+//   3. It then triggers a deferred full rebuild after focusout, which
+//      means some clicks effectively render twice and the DOM shakes.
+//
+// applyCurrency() sidesteps all three:
+//   · toggles are patched in place immediately so the highlighted
+//     button is always the truth;
+//   · existing Chart.js instances update in place via _liveSyncCharts()
+//     (no destroy, no blank-canvas frame);
+//   · the active panel body and chrome (ticker + sidebar) re-render in
+//     a single requestAnimationFrame so the innerHTML swap and chart
+//     teardown/recreation land in one paint;
+//   · state is persisted straight to localStorage, bypassing the bus,
+//     so the live listener doesn't schedule a second redundant render.
+window.applyCurrency = function(c){
+  if(!c || !CURRENCY_SYMBOLS[c] || state.currency === c) return;
+  state.currency = c;
+  if(typeof invalidateSelectors === 'function') invalidateSelectors();
+  // 1) Instant toggle patch — source of truth for the button class
+  //    lives right here on the click event, never behind a debounce.
+  try {
+    document.querySelectorAll('#cur-toggle .cur-btn').forEach(b => {
+      b.classList.toggle('active', (b.textContent || '').trim() === c);
+    });
+  } catch(_e){}
+  // 2) In-place chart refresh — each chart's y-axis tick callback
+  //    reads fmtC()/state.currency dynamically, so chart.update('none')
+  //    redraws labels with the new symbol without destroying the
+  //    canvas. No empty frame, no shake.
+  try { if(typeof _liveSyncCharts === 'function') _liveSyncCharts(); } catch(_e){}
+  // 3) Single-frame body + chrome re-render.
+  requestAnimationFrame(() => {
+    try {
+      if(typeof renderTicker  === 'function') renderTicker();
+      if(typeof updateSidebar === 'function') updateSidebar();
+      const active = state.activePanel || 'dashboard';
+      if(typeof renderPanel   === 'function') renderPanel(active);
+      if(typeof decoratePanel === 'function') decoratePanel(active);
+      if(typeof updateScopeChip === 'function') updateScopeChip();
+      // Re-assert toggle active class — renderTicker() / renderPanel()
+      // don't touch the toggle, but we do it again here as a safety
+      // net in case anything downstream clobbered the DOM.
+      document.querySelectorAll('#cur-toggle .cur-btn').forEach(b => {
+        b.classList.toggle('active', (b.textContent || '').trim() === c);
+      });
+    } catch(e){ console.warn('applyCurrency render failed', e); }
+  });
+  // 4) Persist directly — no bus, no double render.
+  try {
+    state.version = STATE_VERSION;
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    if(typeof showSave === 'function'){
+      showSave('saved');
+      setTimeout(() => showSave(''), 1200);
+    }
+  } catch(_e){}
+};
 
 // ─── THEME ─────────────────────────────────────────────────────────────────
 function toggleTheme() {
@@ -5988,6 +6049,13 @@ function renderFunFund() {
   // Forecast & Review → Monthly tab shows).
   const months=allMonths.slice(0,12);
   const totalFF=months.reduce((s,m)=>s+m.pureFunFund,0);
+  // Normalise status: the dropdown now only offers "planning" and
+  // "booked". Any legacy state left over from the older four-option
+  // version (wishlist / completed / …) is coerced to "planning" so
+  // the pill, dropdown, and saved state stay in lockstep.
+  (state.trips || []).forEach(t => {
+    if(t.status !== 'planning' && t.status !== 'booked') t.status = 'planning';
+  });
   const tripBudget = (t) => (t.expenses || []).reduce((s,ex)=>s + (Number(ex.amount)||0), 0);
   const totalTrips=state.trips.reduce((s,t)=>s+tripBudget(t),0);
   const totalSpent=state.trips.reduce((s,t)=>s+(Number(t.spent)||0),0);
@@ -6007,7 +6075,7 @@ function renderFunFund() {
       const ym = (ex.date || '').slice(0,7);
       return `<div class="trip-exp-row">
         <input class="trip-exp-name" value="${esc(ex.name || '')}" placeholder="e.g. Flights, hotel, shopping…" oninput="updateTripExpense('${t.id}','${ex.id}','name',this.value)">
-        <input type="month" class="trip-exp-date" value="${ym}" onchange="updateTripExpense('${t.id}','${ex.id}','date',this.value)" title="Month this cost lands in the Monthly Review tab">
+        <input type="month" class="trip-exp-date" value="${ym}" onclick="try{this.showPicker&&this.showPicker()}catch(_){}" onfocus="try{this.showPicker&&this.showPicker()}catch(_){}" onchange="updateTripExpense('${t.id}','${ex.id}','date',this.value)" title="Month this cost lands in the Monthly Review tab · click to pick">
         <div class="trip-exp-amt-wrap"><span class="trip-exp-cur">${s}</span><input class="trip-exp-amt" type="number" value="${Math.round((Number(ex.amount)||0)*r)}" oninput="updateTripExpense('${t.id}','${ex.id}','amount',this.value/${r})"></div>
         <button class="line-rm" onclick="removeTripExpense('${t.id}','${ex.id}')" title="Remove this expense">×</button>
       </div>`;
@@ -6028,8 +6096,6 @@ function renderFunFund() {
           <select class="trip-meta-sel" onchange="updateTripField('${t.id}','status',this.value)">
             <option value="planning" ${t.status==='planning'?'selected':''}>Planning</option>
             <option value="booked" ${t.status==='booked'?'selected':''}>Booked</option>
-            <option value="wishlist" ${t.status==='wishlist'?'selected':''}>Wishlist</option>
-            <option value="completed" ${t.status==='completed'?'selected':''}>Completed</option>
           </select>
         </div>
         <div class="trip-meta-field">
