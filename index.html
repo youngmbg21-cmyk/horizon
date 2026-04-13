@@ -10429,7 +10429,11 @@ async function sendToAI(thread, msg){
     if(blocks.length) _renderAIChartBlocks(bubble, blocks);
   } catch(e){ typWrap.querySelector('.ai-msg').innerHTML=`<span style="color:var(--red);font-size:12px">Error: ${e.message}</span>`; }
   aipTyping=false;
-  document.getElementById('aip-msgs').scrollTop=99999;
+  // Land the user at the TOP of the new response so long replies can
+  // be read naturally from the first line. Defer to the next frame so
+  // any charts / layout changes inside the bubble have settled before
+  // we measure offsets.
+  _scrollToMessageTop(typWrap);
 }
 
 // ── FRIEND CHAT ─────────────────────────────────────────────────────────
@@ -10557,7 +10561,30 @@ async function sendToFriend(thread, msg){
     if(bubble) bubble.innerHTML = `<span style="color:var(--red);font-size:12px">Couldn't reach Sara right now — ${esc(e.message || String(e))}</span>`;
   }
   aipTyping = false;
-  msgsEl.scrollTop = 99999;
+  // Land at the top of Sara's reply so long messages read top-down.
+  _scrollToMessageTop(typWrap);
+}
+// Helper — scroll the chat panel so the top edge of the given
+// message wrap aligns with the top of the .aip-msgs scroll area.
+// Called after an AI / friend reply has been rendered so the user
+// starts at the first line of the new message instead of being
+// dumped at its bottom. Deferred to requestAnimationFrame so any
+// charts / markdown layout changes inside the bubble have been
+// measured before we compute the offset.
+function _scrollToMessageTop(wrap){
+  if(!wrap) return;
+  const msgs = document.getElementById('aip-msgs');
+  if(!msgs) return;
+  const go = () => {
+    // Target offset = element's position inside the scroll container.
+    // Subtract a tiny amount of breathing room so the label isn't
+    // flush against the top border.
+    const target = Math.max(0, wrap.offsetTop - 8);
+    msgs.scrollTo ? msgs.scrollTo({ top: target, behavior: 'smooth' }) : (msgs.scrollTop = target);
+  };
+  // Two RAFs: first lets the browser apply any pending layout after
+  // the innerHTML swap; second runs the scroll with fresh offsets.
+  requestAnimationFrame(() => requestAnimationFrame(go));
 }
 window.aipChip=function(text){
   const ta=document.getElementById('aip-input'); if(ta){ta.value=text;} aipSend();
