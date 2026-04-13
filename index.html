@@ -4322,8 +4322,27 @@ function removeLineItem(key,id) {
 function resolveKey(key) {
   if(key==='baseIncome') return state.baseIncome;
   if(key==='baseExpenses') return state.baseExpenses;
-  if(key.startsWith('mo-inc:')){ const k=key.split(':')[1]; return state.monthlyOverrides[k]?.income; }
-  if(key.startsWith('mo-exp:')){ const k=key.split(':')[1]; return state.monthlyOverrides[k]?.expenses; }
+  // Monthly Review edit keys ALWAYS resolve to a per-month override
+  // array. If the month has never been touched, we lazily clone the
+  // currently-effective items (whatever getEffective() would hand
+  // back — baseline, yearly base, or cascaded base) into
+  // state.monthlyOverrides[key] and return the clone. That way the
+  // very first keystroke on a "baseline month" materialises its
+  // own override layer instead of mutating the shared baseline —
+  // no more cascade between months, and months that are never
+  // edited keep inheriting from the baseline via getEffective().
+  const materialiseMonthlyOverride = (k, field) => {
+    if(!state.monthlyOverrides[k]) state.monthlyOverrides[k] = {};
+    if(!state.monthlyOverrides[k][field]){
+      const [yy, mm] = k.split('-').map(Number);
+      const eff = getEffective(yy, mm - 1);
+      const src = field === 'income' ? eff.incomeItems : eff.expenseItems;
+      state.monthlyOverrides[k][field] = JSON.parse(JSON.stringify(src || []));
+    }
+    return state.monthlyOverrides[k][field];
+  };
+  if(key.startsWith('mo-inc:')){ return materialiseMonthlyOverride(key.split(':')[1], 'income'); }
+  if(key.startsWith('mo-exp:')){ return materialiseMonthlyOverride(key.split(':')[1], 'expenses'); }
   if(key.startsWith('yr-inc:')){ const k=key.split(':')[1]; return state.yearlyBases[k]?.income; }
   if(key.startsWith('yr-exp:')){ const k=key.split(':')[1]; return state.yearlyBases[k]?.expenses; }
   return null;
@@ -5246,8 +5265,14 @@ function renderMonthly() {
       </div>
     </div>`;
 
-  const incKey=state.monthlyOverrides[selKey]?.income?`mo-inc:${selKey}`:'baseIncome';
-  const expKey=state.monthlyOverrides[selKey]?.expenses?`mo-exp:${selKey}`:'baseExpenses';
+  // Always use the per-month state key for line-item edits so the
+  // very first keystroke materialises a fresh override via
+  // resolveKey() — no more routing edits into the shared baseline.
+  // Months that are never touched still display baseline items
+  // because sel.incomeItems / sel.expenseItems come from
+  // getEffective(), which keeps its fallback chain untouched.
+  const incKey=`mo-inc:${selKey}`;
+  const expKey=`mo-exp:${selKey}`;
   renderLineItems('mo-inc',sel.incomeItems,incKey,false,false);
   // Paid checkboxes only appear on the current month's expense view so the
   // user can tick bills off as they're actually paid; the month key tells
