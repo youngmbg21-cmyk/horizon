@@ -845,9 +845,13 @@ body.light .md tbody tr:nth-child(even) { background:rgba(0,0,0,0.015); }
 #ai-min-tab .min-title { font-size:13px; font-weight:700; color:#fff; }
 #ai-min-tab .min-sub { font-size:11px; color:rgba(255,255,255,.75); }
 #ai-min-tab .min-arrow { font-size:11px; color:rgba(255,255,255,.8); }
+/* AI backdrop is intentionally invisible: clicking outside the AI panel
+   should still dismiss it (so we keep the click-target div in DOM and
+   z-indexed above the page) but the page itself should remain fully
+   visible and unobstructed when the advisor is open. No tint, no blur. */
 #ai-backdrop {
-  position:fixed; inset:0; background:rgba(0,0,0,.45);
-  z-index:599; display:none; backdrop-filter:blur(2px);
+  position:fixed; inset:0; background:transparent;
+  z-index:599; display:none;
 }
 #ai-backdrop.open { display:block; }
 .modal-backdrop { position:fixed; inset:0; background:rgba(0,0,0,.6); z-index:1100; display:flex; align-items:center; justify-content:center; padding:16px; opacity:0; pointer-events:none; transition:opacity .25s; }
@@ -1156,6 +1160,43 @@ body.light .geo-dropdown { box-shadow:0 10px 30px -10px rgba(60,40,10,0.22); }
 .scen-tabs { display:flex; gap:3px; background:var(--bg3); border-radius:7px; padding:3px; margin-bottom:14px; width:fit-content; }
 .scen-btn { background:transparent; border:none; color:var(--text2); padding:5px 14px; border-radius:5px; font-size:12px; cursor:pointer; transition:all .2s; font-weight:500; }
 .scen-btn.active { background:var(--violet); color:#fff; font-weight:700; }
+
+/* ── FORECAST & REVIEW SCOPE BAR ─────────────────────────────────────
+   Mirrors .ret-scen-bar so the two pages share one design vocabulary.
+   The Monthly / Yearly toggle sits at the top of the unified Forecast
+   & Review tab and switches between the two existing views without
+   leaving the page. */
+.review-scope-bar {
+  background:var(--bg2); border:1px solid var(--border); border-radius:12px;
+  padding:12px 16px; margin-bottom:14px;
+  display:flex; align-items:center; gap:14px; flex-wrap:wrap;
+}
+.review-scope-lbl {
+  display:flex; flex-direction:column; gap:2px; min-width:0;
+}
+.review-scope-eyebrow {
+  font-family:var(--fm); font-size:9px; font-weight:700;
+  letter-spacing:.12em; text-transform:uppercase; color:var(--text3);
+}
+.review-scope-title {
+  font-family:var(--ff); font-size:14px; font-weight:700;
+  color:var(--text); letter-spacing:-.01em; line-height:1.2;
+}
+.review-scope-bar .scen-tabs { margin-bottom:0; }
+.review-scope-hint {
+  font-family:var(--fm); font-size:10px; color:var(--text3);
+  margin-left:auto; line-height:1.4; max-width:280px; text-align:right;
+}
+@media (max-width:680px){
+  .review-scope-bar { flex-direction:column; align-items:stretch; }
+  .review-scope-hint { margin-left:0; text-align:left; max-width:none; }
+}
+/* When the unified review tab is rendering, exactly one child panel
+   shows at a time (Monthly or Yearly) — toggled by a class on the
+   wrapper. The hidden child is set to display:none so its line items,
+   inputs and chart instances stay in DOM when the user flips back. */
+#panel-review.scope-monthly #panel-yearly,
+#panel-review.scope-yearly  #panel-monthly { display:none; }
 
 /* ── GLOBAL PLANNING SCENARIO BAR ────────────────────────────────────
    The Lean / Baseline / Comfortable toggle sits at the very top of
@@ -1490,8 +1531,7 @@ body.light .piq-country-menu { box-shadow:0 12px 28px -10px rgba(60,40,10,0.22);
       <div class="sb-sep"></div>
       <div class="sb-section">PERSONAL FINANCES</div>
       <div class="nav-item" data-panel="transactions" onclick="nav('transactions')"><span class="nav-icon">🏦</span>Bank & Transactions</div>
-      <div class="nav-item" data-panel="monthly" onclick="nav('monthly')"><span class="nav-icon">☰</span>Monthly Review</div>
-      <div class="nav-item" data-panel="yearly" onclick="nav('yearly')"><span class="nav-icon">▦</span>Yearly Forecast</div>
+      <div class="nav-item" data-panel="review" onclick="nav('review')"><span class="nav-icon">▦</span>Forecast & Review</div>
       <div class="nav-item" data-panel="retirement" onclick="nav('retirement')"><span class="nav-icon">🌅</span>Retirement Plan</div>
 
       <div class="sb-sep"></div>
@@ -1521,8 +1561,15 @@ body.light .piq-country-menu { box-shadow:0 12px 28px -10px rgba(60,40,10,0.22);
     <div class="content">
       <div class="panel active" id="panel-dashboard"></div>
       <div class="panel" id="panel-transactions"></div>
-      <div class="panel" id="panel-monthly"></div>
-      <div class="panel" id="panel-yearly"></div>
+      <!-- Forecast & Review — unified tab. Header + scope toggle render
+           inside #panel-review-host; the existing #panel-monthly and
+           #panel-yearly containers live inside it and exactly one is
+           shown at a time based on state.reviewScope. -->
+      <div class="panel" id="panel-review">
+        <div id="panel-review-host"></div>
+        <div id="panel-monthly"></div>
+        <div id="panel-yearly"></div>
+      </div>
       <div class="panel" id="panel-retirement"></div>
       <div class="panel" id="panel-funfund"></div>
       <div class="panel" id="panel-retireanywhere"></div>
@@ -2492,7 +2539,12 @@ function scoreLocation(loc) {
 // ─── NAVIGATION ─────────────────────────────────────────────────────────────
 // Hash routing: #panel or #panel/section — panel drives nav(), section is
 // remembered so downstream renderers can scroll / pulse a target card.
-const VALID_PANELS = ['dashboard','transactions','monthly','yearly','retirement','funfund','retireanywhere','propiq','vault','settings'];
+// `monthly` and `yearly` are kept as VALID_PANELS so existing deep-links,
+// hash routes (#monthly / #yearly), command-palette searches, and dashboard
+// KPI cards continue to work — they redirect into `review` with the right
+// scope preset inside nav(). The Forecast & Review tab is the new unified
+// home for both views.
+const VALID_PANELS = ['dashboard','transactions','review','monthly','yearly','retirement','funfund','retireanywhere','propiq','vault','settings'];
 let _navFromHash = false;
 function parseHash() {
   const raw = (location.hash||'').replace(/^#/,'');
@@ -2525,6 +2577,16 @@ function nav(panel, opts) {
   if(!onboardingComplete() && panel !== 'settings') {
     showOnboardingBlock();
     panel = 'settings';
+  }
+  // Legacy redirect: monthly/yearly are now scopes inside the unified
+  // Forecast & Review tab. Any code path that still navigates to the old
+  // panel ids (dashboard KPI cards, hash routes, command palette,
+  // related-row links, deep-links) lands on `review` with the matching
+  // scope preset. The active scope is persisted on state so subsequent
+  // visits remember the last lens.
+  if(panel === 'monthly' || panel === 'yearly'){
+    state.reviewScope = panel;
+    panel = 'review';
   }
   state.activePanel=panel;
   state.activeSection = (opts&&opts.section)||null;
@@ -2605,8 +2667,9 @@ function renderPanel(panel) {
   const fns = {
     dashboard:renderDashboard,
     transactions:renderTransactions,
-    monthly:renderMonthly,
-    yearly:renderYearly,
+    review:renderReview,
+    monthly:renderReview,
+    yearly:renderReview,
     retirement:renderRetirement,
     funfund:renderFunFund,
     retireanywhere:renderRetireAnywhere,
@@ -2621,6 +2684,10 @@ function renderPanel(panel) {
 const PANEL_META = {
   dashboard:      {label:'Dashboard',        group:'Overview',          icon:'◉'},
   transactions:   {label:'Bank & Transactions', group:'Personal Finances', icon:'🏦'},
+  review:         {label:'Forecast & Review', group:'Personal Finances', icon:'▦'},
+  // Legacy aliases — preserved for back-compat with deep-links, the
+  // dashboard KPI cards, hash routes, and command palette. nav() resolves
+  // them into the unified `review` tab with the right scope preset.
   monthly:        {label:'Monthly Review',   group:'Personal Finances', icon:'☰'},
   yearly:         {label:'Yearly Forecast',  group:'Personal Finances', icon:'▦'},
   retirement:     {label:'Retirement Plan',  group:'Personal Finances', icon:'🌅'},
@@ -2632,12 +2699,13 @@ const PANEL_META = {
 };
 // Hand-curated cross-links: "if you're here, you might next want..."
 const RELATED_MAP = {
-  dashboard:      ['monthly','retirement','retireanywhere'],
-  transactions:   ['monthly','funfund','dashboard'],
-  monthly:        ['yearly','funfund','retirement'],
-  yearly:         ['retirement','monthly','funfund'],
-  retirement:     ['retireanywhere','yearly','funfund'],
-  funfund:        ['monthly','retireanywhere','dashboard'],
+  dashboard:      ['review','retirement','retireanywhere'],
+  transactions:   ['review','funfund','dashboard'],
+  review:         ['retirement','funfund','dashboard'],
+  monthly:        ['review','funfund','retirement'],
+  yearly:         ['review','retirement','funfund'],
+  retirement:     ['retireanywhere','review','funfund'],
+  funfund:        ['review','retireanywhere','dashboard'],
   retireanywhere: ['retirement','propiq','vault'],
   propiq:         ['retireanywhere','retirement','vault'],
   vault:          ['retireanywhere','retirement','propiq'],
@@ -2802,13 +2870,21 @@ function decoratePanel(panel){
 }
 
 // ─── SCOPE CHIP (persistent time indicator) ─────────────────────────────────
+// Resolve which time dimension the scope chip should show. The unified
+// `review` tab carries its own scope (Monthly / Yearly) on state.reviewScope;
+// every other panel defaults to month scope.
+function _scopeKind(){
+  const panel = state.activePanel||'dashboard';
+  if(panel === 'review') return state.reviewScope === 'yearly' ? 'year' : 'month';
+  return 'month';
+}
 function updateScopeChip(){
   const label = document.getElementById('sc-label');
   const chip = document.getElementById('scope-chip');
   if(!label||!chip) return;
-  const panel = state.activePanel||'dashboard';
-  chip.classList.toggle('is-year', panel==='yearly');
-  if(panel==='yearly'){
+  const kind = _scopeKind();
+  chip.classList.toggle('is-year', kind === 'year');
+  if(kind === 'year'){
     label.textContent = String(state.selectedYear||CY);
   } else {
     // default: show selectedMonth (Monthly) or current month otherwise
@@ -2820,7 +2896,8 @@ function updateScopeChip(){
 }
 function scopeShift(dir){
   const panel = state.activePanel||'dashboard';
-  if(panel==='yearly'){
+  const kind = _scopeKind();
+  if(kind === 'year'){
     state.selectedYear = Math.max(CY, (state.selectedYear||CY+1) + dir);
     save(); renderAll();
   } else {
@@ -2833,15 +2910,15 @@ function scopeShift(dir){
     state.selectedMonth = months[idx].key;
     save();
     // Re-render only if we're on a panel that cares about the month.
-    if(panel==='monthly'||panel==='dashboard'||panel==='funfund') renderAll();
+    if(panel==='review'||panel==='dashboard'||panel==='funfund') renderAll();
     else updateScopeChip();
   }
 }
 function scopeChipClick(){
-  const panel = state.activePanel||'dashboard';
-  // Yearly panel handles year scope; everything else delegates to Monthly
-  if(panel==='yearly') nav('yearly');
-  else nav('monthly');
+  // Both year and month scopes live inside the unified review tab now.
+  // Click flips into review with the appropriate scope preset.
+  if(_scopeKind() === 'year') nav('yearly'); // legacy alias → review/yearly
+  else nav('monthly');                       // legacy alias → review/monthly
 }
 
 // ─── COMMAND PALETTE (⌘K / Ctrl+K) ──────────────────────────────────────────
@@ -3697,6 +3774,63 @@ function renderTransactions() {
 }
 
 // ══ MONTHLY ══════════════════════════════════════════════════════════════════
+// ══ FORECAST & REVIEW — unified host for Monthly + Yearly ════════════════════
+// The two panels are kept fully intact; this orchestrator paints the shared
+// header and the Monthly / Yearly scope toggle, then delegates to the
+// underlying renderMonthly() / renderYearly() to populate the visible body.
+// state.reviewScope persists the user's last lens across reloads, and the
+// legacy redirect inside nav() converts old #monthly / #yearly entry points
+// into the right scope automatically.
+function renderReview(){
+  const host = document.getElementById('panel-review-host');
+  const wrap = document.getElementById('panel-review');
+  if(!host || !wrap) return;
+  if(state.reviewScope !== 'monthly' && state.reviewScope !== 'yearly') {
+    state.reviewScope = 'monthly';
+  }
+  const scope = state.reviewScope;
+  const SCOPE_META = {
+    monthly: {
+      title: 'Monthly Review',
+      sub:   'Each month inherits your baseline. Edit any field to create a monthly override.',
+      hint:  'Showing one month at a time. Switch to Yearly to set base values for a future year.',
+    },
+    yearly: {
+      title: 'Yearly Forecast',
+      sub:   'Set base values for a given year. Enable cascade to apply to all future years.',
+      hint:  'Showing one year at a time. Switch to Monthly to review or override individual months.',
+    },
+  };
+  const meta = SCOPE_META[scope];
+  // Toggle the host class so the CSS hides the inactive child panel.
+  wrap.classList.toggle('scope-monthly', scope === 'monthly');
+  wrap.classList.toggle('scope-yearly',  scope === 'yearly');
+  host.innerHTML = `
+    <div class="ph"><div class="ph-tag">PERSONAL FINANCES</div><div class="ph-title">Forecast & Review</div><div class="ph-sub">${esc(meta.sub)}</div></div>
+    <div class="review-scope-bar">
+      <div class="review-scope-lbl">
+        <div class="review-scope-eyebrow">Review Lens</div>
+        <div class="review-scope-title">${esc(meta.title)}</div>
+      </div>
+      <div class="scen-tabs">
+        <button class="scen-btn ${scope==='monthly'?'active':''}" onclick="setReviewScope('monthly')">Monthly ☰</button>
+        <button class="scen-btn ${scope==='yearly' ?'active':''}" onclick="setReviewScope('yearly')">Yearly ▦</button>
+      </div>
+      <div class="review-scope-hint">${esc(meta.hint)}</div>
+    </div>`;
+  // Always render BOTH bodies so a flip into the other scope is instant
+  // (no rebuild flicker). The hidden child is display:none via CSS.
+  renderMonthly();
+  renderYearly();
+}
+window.setReviewScope = function(scope){
+  if(scope !== 'monthly' && scope !== 'yearly') return;
+  state.reviewScope = scope;
+  save();
+  renderReview();
+  if(typeof updateScopeChip === 'function') updateScopeChip();
+};
+
 function renderMonthly() {
   const months=get12Months();
   let selKey=state.selectedMonth||months[0].key;
@@ -3710,9 +3844,11 @@ function renderMonthly() {
   if(!el) return;
   const r=rate(); const s=sym();
 
+  // The page header is rendered once by renderReview() above this
+  // panel, so the per-view ph block has been removed to avoid a
+  // duplicate title. Each scope (Monthly / Yearly) keeps the rest of
+  // its body fully intact.
   el.innerHTML=`
-    <div class="ph"><div class="ph-tag">PERSONAL FINANCES</div><div class="ph-title">Monthly Review</div><div class="ph-sub">Each month inherits your baseline. Edit any field to create a monthly override.</div></div>
-
     <!-- 12-month spending/income trend chart — promoted to the top of
          the Monthly Review tab per UX feedback. Sits above the month
          pills, summary, and Income Streams / Expenses cards. -->
@@ -3806,8 +3942,10 @@ function renderYearly() {
 
   const panelYearly=document.getElementById('panel-yearly');
   if(!panelYearly) return;
+  // Page header is rendered once by renderReview() above this panel,
+  // so the per-view ph block has been removed to avoid a duplicate
+  // title. The rest of the Yearly body is unchanged.
   panelYearly.innerHTML=`
-    <div class="ph"><div class="ph-tag">PERSONAL FINANCES</div><div class="ph-title">Yearly Forecast</div><div class="ph-sub">Set base values for a given year. Enable cascade to apply to all future years.</div></div>
     <div style="display:flex;align-items:center;gap:16px;margin-bottom:14px;flex-wrap:wrap">
       <div style="display:flex;align-items:center;gap:10px">
         <button style="background:var(--bg3);border:1px solid var(--border);color:var(--text2);width:32px;height:32px;border-radius:7px;cursor:pointer;font-size:13px" onclick="state.selectedYear=Math.max(${CY+1},state.selectedYear-1);renderYearly()">◀</button>
@@ -6297,6 +6435,7 @@ const AIP_CHIPS=['📊 Analyse my spending','🎯 Am I on track for retirement?'
 const AIP_CHIPS_BY_PANEL = {
   dashboard:      ['📊 Explain my current month','🎯 Am I on track for retirement?','⚠️ Biggest risks in my plan?','💡 What should I focus on next?'],
   transactions:   ['📊 Where is my money going?','🔍 Unusual spending this month?','💰 How can I cut 10% of expenses?','📈 Compare vs last month'],
+  review:         ['📊 Is this month healthy?','📈 Project my next 3 years','💰 Best yearly savings target?','🎯 How does this hit retirement?'],
   monthly:        ['📊 Is this month healthy?','💰 Can I raise my savings rate?','✈️ Can I fit a trip this month?','🎯 How does this hit retirement?'],
   yearly:         ['📈 Project my next 3 years','💰 Best yearly savings target?','⚠️ Any cash-flow risks?','🎯 Stress-test my plan'],
   retirement:     ['🎯 Can I retire 2 years earlier?','💡 Grow my nest egg','⚠️ What if markets drop 30%?','🔍 Review my withdrawal rate'],
