@@ -772,13 +772,32 @@ body.light .loc-card:hover { box-shadow:0 5px 14px -8px rgba(60,40,10,0.18); }
    immediately legible. */
 .ff-run-list { display:flex; flex-direction:column; font-size:12px; }
 .ff-run-row {
-  display:grid; grid-template-columns: 1fr auto auto auto;
+  display:grid; grid-template-columns: 1fr minmax(120px, auto) minmax(120px, auto) minmax(140px, auto);
   align-items:center; gap:10px;
   padding:7px 0; border-bottom:1px solid var(--bg3);
 }
 .ff-run-row:last-child { border-bottom:none; }
-.ff-run-label { color:var(--text2); }
+/* Column header row — same grid as the data rows so every column
+   lines up with its values below. Mono, uppercase, spaced — the
+   standard header treatment used everywhere else in the app. */
+.ff-run-head {
+  padding:4px 0 8px;
+  border-bottom:1px solid var(--border);
+  margin-bottom:4px;
+  font-family:var(--fm);
+  font-size:9px;
+  font-weight:700;
+  letter-spacing:.1em;
+  text-transform:uppercase;
+  color:var(--text3);
+}
+.ff-run-head .ff-run-h-label  { text-align:left; }
+.ff-run-head .ff-run-h-delta  { text-align:right; }
+.ff-run-head .ff-run-h-bal    { text-align:right; }
+.ff-run-head .ff-run-h-status { text-align:right; }
+.ff-run-label { color:var(--text2); justify-self:start; }
 .ff-run-delta {
+  justify-self:end;
   font-family:var(--fm); font-size:11px; font-weight:600;
   padding:2px 7px; border-radius:3px;
   background:var(--bg3); color:var(--text3);
@@ -786,6 +805,7 @@ body.light .loc-card:hover { box-shadow:0 5px 14px -8px rgba(60,40,10,0.18); }
 .ff-run-delta.pos { color:var(--green); background:var(--accent-positive-dim); }
 .ff-run-delta.neg { color:var(--red);   background:var(--accent-critical-dim); }
 .ff-run-bal {
+  justify-self:end;
   font-family:var(--fm); font-weight:700;
   min-width:95px; text-align:right;
 }
@@ -793,6 +813,7 @@ body.light .loc-card:hover { box-shadow:0 5px 14px -8px rgba(60,40,10,0.18); }
 .ff-run-bal.neg { color:var(--red); }
 .ff-run-flag {
   display:inline-block;
+  justify-self:end;
   font-family:var(--fm); font-size:9px; font-weight:700;
   letter-spacing:.08em; text-transform:uppercase;
   padding:2px 7px; border-radius:3px;
@@ -801,6 +822,15 @@ body.light .loc-card:hover { box-shadow:0 5px 14px -8px rgba(60,40,10,0.18); }
 }
 .ff-run-flag.muted {
   background:var(--bg3); color:var(--text3);
+}
+/* Empty status cell — we still need a placeholder to hold the grid
+   column so header ↔ data alignment stays perfect on rows with no
+   flag text. */
+.ff-run-status-empty {
+  justify-self:end;
+  color:var(--text3);
+  font-family:var(--fm);
+  font-size:11px;
 }
 
 .trip-card { background:var(--bg2); border:1px solid var(--border); border-radius:10px; padding:12px; margin-bottom:10px; transition:border-color .2s; }
@@ -6149,6 +6179,12 @@ function renderFunFund() {
           <div class="card-title">Monthly Fun Fund — Running Balance</div>
           <p style="font-size:12px;color:var(--text2);margin-bottom:10px">Each month's allocation (Income − Expenses − Savings) rolls into a continuous running balance. A negative month carries its deficit forward until later surpluses pay it off.</p>
           <div class="ff-run-list">
+            <div class="ff-run-row ff-run-head" aria-hidden="true">
+              <span class="ff-run-h-label">Month</span>
+              <span class="ff-run-h-delta">Monthly Allocation</span>
+              <span class="ff-run-h-bal">Running Balance</span>
+              <span class="ff-run-h-status">Status</span>
+            </div>
             ${(()=>{
               // Build a running Fun Fund balance across the 12-month
               // window. Each row shows: the month, that month's pure
@@ -6163,11 +6199,14 @@ function renderFunFund() {
                 const deltaCls = delta >= 0 ? 'pos' : 'neg';
                 const deltaSign = delta >= 0 ? '+' : '−';
                 const runCls = running >= 0 ? 'pos' : 'neg';
+                // Always emit a 4th cell — either a status flag or an
+                // empty placeholder — so every row's grid columns line
+                // up one-for-one with the header row above.
                 const status = running < 0
                   ? `<span class="ff-run-flag">paying off deficit</span>`
                   : (delta < 0 && running >= 0
                     ? `<span class="ff-run-flag muted">absorbed deficit</span>`
-                    : '');
+                    : `<span class="ff-run-status-empty">—</span>`);
                 return `<div class="ff-run-row">
                   <span class="ff-run-label">${m.label}</span>
                   <span class="ff-run-delta ${deltaCls}">${deltaSign} ${fmt(Math.abs(delta))}</span>
