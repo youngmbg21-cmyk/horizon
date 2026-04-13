@@ -503,6 +503,7 @@ body.light .runway-svg-host { background:var(--bg3); }
 .runway-svg .runway-axis-title { fill:var(--text3); font-size:9px; font-family:'JetBrains Mono', monospace; font-weight:600; letter-spacing:.06em; text-transform:uppercase; }
 .runway-svg .runway-bar-port { fill:#f5a623; }
 .runway-svg .runway-bar-pen  { fill:#4d9fff; }
+.runway-svg .runway-bar-short { fill:url(#runwayShortfallPattern); stroke:#ff4d6d; stroke-width:0.5; }
 .runway-svg .runway-annot-line.life   { stroke:#f5a623; stroke-width:1.5; stroke-dasharray:5,4; opacity:.85; }
 .runway-svg .runway-annot-line.runout { stroke:#ff4d6d; stroke-width:1.5; stroke-dasharray:5,4; opacity:.9; }
 .runway-svg .runway-annot-label { font-family:'JetBrains Mono', monospace; font-size:10px; font-weight:700; }
@@ -2126,30 +2127,60 @@ function _simulateRetirementYears({nestEgg, totalExp, taxRate, realRateMonthly, 
   const earliestPension = pensions.length > 0
     ? Math.min(...pensions.map(p => p.startAge ?? startAge))
     : null;
+  // Per-year arrays. Notes on the post-depletion arrays:
+  //   portWithdrawal[i] is the actual realized withdrawal that year (0 after
+  //   the balance hits zero — we cannot withdraw money that doesn't exist).
+  //   shortfall[i] is max(0, annualGrossNeeded - pension) for years where
+  //   pension alone cannot cover the need. In solvent years it is 0.
+  //   depletedFlag[i] is true in years where the balance is zero at the
+  //   start of the year (i.e. age > runoutAge in whole-year terms).
+  //   actualIncome[i] is the real gross income actually available that year.
   const labels = [], balData = [], portWithdrawal = [], pensionData = [];
+  const shortfall = [], depletedFlag = [], actualIncome = [], needed = [];
   let balance = nestEgg;
   let runoutAge = null;
   for (let age = startAge; age <= endAge; age++) {
     labels.push(age);
     balData.push(Math.max(0, Math.round(balance)));
     const annualPen  = pensionAtAge(age) * 12;
-    const annualPort = Math.max(0, annualGrossNeeded - annualPen);
+    const gapVsPension = Math.max(0, annualGrossNeeded - annualPen);
+    const depleted = balance <= 0;
+    // In solvent years the portfolio covers the full gap. Once depleted,
+    // portfolio withdrawal is zero regardless of what would have been
+    // "needed" — the chart and coverage metric must see the real income,
+    // not an aspirational draw against an empty account.
+    const annualPort = depleted ? 0 : gapVsPension;
     portWithdrawal.push(Math.round(annualPort));
     pensionData.push(Math.round(annualPen));
+    needed.push(Math.round(annualGrossNeeded));
+    const yearShortfall = depleted ? Math.max(0, annualGrossNeeded - annualPen) : 0;
+    shortfall.push(Math.round(yearShortfall));
+    depletedFlag.push(depleted);
+    actualIncome.push(Math.round(annualPen + annualPort));
     // Evolve balance over 12 monthly steps using the annual draw.
-    const portMonthly = annualPort / 12;
-    for (let m = 0; m < 12; m++) {
-      balance = balance * (1 + realRateMonthly) - portMonthly;
-      if (balance <= 0) {
-        balance = 0;
-        if (runoutAge === null) runoutAge = age + (m + 1) / 12;
-        break;
+    if (!depleted) {
+      const portMonthly = annualPort / 12;
+      for (let m = 0; m < 12; m++) {
+        balance = balance * (1 + realRateMonthly) - portMonthly;
+        if (balance <= 0) {
+          balance = 0;
+          if (runoutAge === null) runoutAge = age + (m + 1) / 12;
+          break;
+        }
       }
     }
   }
   const runoutAgeRounded = runoutAge !== null ? Math.round(runoutAge) : null;
+  // A year is "funded" iff its actual income meets the gross need — i.e.
+  // shortfall is zero. Before depletion the portfolio fills any pension
+  // gap; after depletion a year only stays funded if pension alone covers
+  // the need. This is the Issue 3 definition of coverage.
+  const fundedYears = shortfall.reduce((acc, s) => acc + (s === 0 ? 1 : 0), 0);
+  const totalYears  = labels.length;
   return {
     labels, balData, portWithdrawal, pensionData, earliestPension,
+    shortfall, depletedFlag, actualIncome, needed, annualGrossNeeded,
+    fundedYears, totalYears,
     runoutAge: runoutAgeRounded,
     lifeExpIdx: labels.indexOf(endAge),
     runoutIdx:  runoutAgeRounded !== null ? labels.findIndex(a => a >= runoutAgeRounded) : -1,
@@ -2205,21 +2236,24 @@ function getRetirementNumbers() {
     const pensionAvgMonthly = (totalAnnualPension / yearsCount) / 12;
     const grossNeeded = Math.max(0, totalGross - pensionAvgMonthly);
 
-    // Coverage now factors BOTH portfolio-sustainable income AND the
-    // weighted-average pension into the totalExp ratio. The old version
-    // ignored pensions entirely so users with strong pensions appeared
-    // underfunded.
+    // Coverage = funded years / total retirement years (see Issue 3).
+    // A year is funded iff the simulation's actual income meets gross
+    // need — before depletion the portfolio plugs any pension gap;
+    // after depletion, only years where pension alone covers need stay
+    // funded. This replaces the prior annuity-math coverage, which
+    // could report 107% on a simulation that depleted 10 years early.
     const totalRetirementIncome = sustainableAfterTax + pensionAvgMonthly;
     const gap = totalRetirementIncome - totalExp;
-    const coveragePct = totalExp>0 ? (totalRetirementIncome/totalExp)*100 : 100;
+    const coveragePct = simResult.totalYears > 0
+      ? (simResult.fundedYears / simResult.totalYears) * 100
+      : 100;
 
-    // Verdict combines two signals:
-    //   1. Does the simulation deplete the portfolio before life exp?
-    //   2. Does annuity-math coverage clear 100% / 80%?
-    // Hitting life exp exactly (runoutAge >= lifeExp) is "Funded", not
-    // "Underfunded" — the previous threshold logic flagged this scenario
-    // incorrectly.
+    // Verdict is driven directly by the simulation. Once the runout gap
+    // exceeds 3 years, coverage alone can no longer pull the verdict
+    // back to green — the simulation says the money ran out early, and
+    // that is authoritative.
     const lifeExp = state.lifeExp || 90;
+    const yearsShort = runoutAge ? Math.max(0, lifeExp - runoutAge) : 0;
     let verdict, verdictIcon, verdictClass;
     if(!runoutAge) {
       // Simulation never depleted the portfolio
@@ -2227,12 +2261,13 @@ function getRetirementNumbers() {
     } else if(runoutAge >= lifeExp) {
       // Portfolio sustains income exactly to life expectancy
       verdict = 'Fully Funded'; verdictIcon = '✅'; verdictClass = 'overfunded';
-    } else if(runoutAge >= lifeExp - 3) {
+    } else if(yearsShort <= 3) {
       // Depletes within 3 years of life exp — borderline OK
       verdict = 'Borderline Funded'; verdictIcon = '🎯'; verdictClass = 'ontarget';
-    } else if(coveragePct >= 80) {
-      // Annuity math says on track even if simulation depletes earlier
-      verdict = 'On Track'; verdictIcon = '🎯'; verdictClass = 'ontarget';
+    } else if(yearsShort <= 7 && coveragePct >= 90) {
+      // Multi-year gap but pension-only years still keep funded-year
+      // coverage high — at risk, not on track.
+      verdict = 'At Risk'; verdictIcon = '⚠️'; verdictClass = 'ontarget';
     } else {
       verdict = 'Underfunded'; verdictIcon = '❌'; verdictClass = 'underfunded';
     }
@@ -3897,11 +3932,12 @@ function renderRetirement() {
       <div class="runway-wrap" data-section="runway">
         <div class="runway-hd">
           <div>
-            <div class="runway-title">Longevity Runway</div>
-            <div class="runway-sub" id="runway-subtitle">How long your real nest egg lasts</div>
+            <div class="runway-title">Longevity Runway · <span id="runway-mode-tag">${esc(scenLabels[sc]||'Baseline')}</span></div>
+            <div class="runway-sub" id="runway-subtitle">How long your nest egg lasts on ${esc(scenLabels[sc]||'Baseline')} expenses</div>
           </div>
           <div class="runway-hd-meta">
             <span class="runway-chip" id="runway-verdict-chip">${nums.verdict}</span>
+            <span class="runway-chip" id="runway-mode-chip">${esc(scenLabels[sc]||'Baseline')}</span>
             <span class="runway-chip muted">Life exp. ${state.lifeExp||90}</span>
           </div>
         </div>
@@ -4172,10 +4208,13 @@ function renderRunwayChart(){
   // ── SCALES ───────────────────────────────────────────────────────────────
   // Left axis: portfolio balance. +10% headroom.
   const maxBal = Math.max(...cdata.balData, 1) * 1.1;
-  // Right axis: combined annual income (portfolio withdrawal + pension).
-  // +20% headroom.
+  // Right axis: combined annual income (portfolio withdrawal + pension
+  // + post-depletion shortfall, so the red hatched segment fits inside
+  // the same axis). +20% headroom.
   const maxInc = Math.max(
-    ...cdata.labels.map((_, i) => (cdata.portWithdrawal[i]||0) + (cdata.pensionData[i]||0)),
+    ...cdata.labels.map((_, i) =>
+      (cdata.portWithdrawal[i]||0) + (cdata.pensionData[i]||0) + (cdata.shortfall?.[i]||0)
+    ),
     1
   ) * 1.2;
   const xScale = i => pad.l + (n <= 1 ? pw / 2 : (i / (n - 1)) * pw);
@@ -4199,12 +4238,17 @@ function renderRunwayChart(){
   const parts = [];
   parts.push(`<svg class="runway-svg" viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid meet" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Longevity runway chart">`);
 
-  // Gradient defs
+  // Gradient + hatch pattern defs. The hatched red pattern marks years
+  // where pension alone can't meet the full gross need after depletion.
   parts.push(`<defs>
     <linearGradient id="runwayFill" x1="0" y1="0" x2="0" y2="1">
       <stop offset="0%"  stop-color="${lineColor}" stop-opacity="0.32"/>
       <stop offset="100%" stop-color="${lineColor}" stop-opacity="0.02"/>
     </linearGradient>
+    <pattern id="runwayShortfallPattern" patternUnits="userSpaceOnUse" width="6" height="6" patternTransform="rotate(45)">
+      <rect width="6" height="6" fill="#ff4d6d" fill-opacity="0.22"/>
+      <line x1="0" y1="0" x2="0" y2="6" stroke="#ff4d6d" stroke-width="2" stroke-opacity="0.9"/>
+    </pattern>
   </defs>`);
 
   // Layer 1: left balance axis labels only — grid lines that cross the
@@ -4223,30 +4267,47 @@ function renderRunwayChart(){
   });
 
   // Layer 2: stacked income bars — SKIP INDEX 0 (starting state, not a
-  // year of drawdown). Amber (portfolio withdrawal) on the bottom, blue
-  // (pension) stacked on top. After depletion, amber disappears and
-  // remaining pension bars fade to 1/3 opacity.
+  // year of drawdown).
+  //   Pre-depletion: amber (portfolio withdrawal) + blue (pension)
+  //     stacked, full opacity.
+  //   Post-depletion: full-opacity blue pension bar + a red hatched
+  //     "shortfall" segment on top showing (gross need − pension) for
+  //     any year pension alone can't meet the full need. If pension ≥
+  //     need, no red segment appears and the year is funded.
+  let hasAnyShortfall = false;
   for(let i = 1; i < n; i++){
     const cx      = xScale(i);
     const x       = cx - barW / 2;
     const portVal = cdata.portWithdrawal[i] || 0;
     const penVal  = cdata.pensionData[i]     || 0;
+    const shortVal = cdata.shortfall?.[i]    || 0;
     const baseY   = pad.t + ph;
-    const depleted = hasRunout && i >= runoutIdx;
-    const op = depleted ? 0.33 : 1;
+    const depleted = cdata.depletedFlag?.[i] === true;
+    if(shortVal > 0) hasAnyShortfall = true;
     // Portfolio withdrawal (amber) — nothing once the portfolio is gone.
     if(!depleted && portVal > 0){
       const h = (portVal / maxInc) * ph;
-      parts.push(`<rect x="${x}" y="${baseY - h}" width="${barW}" height="${h}" class="runway-bar-port" opacity="${op}"/>`);
+      parts.push(`<rect x="${x}" y="${baseY - h}" width="${barW}" height="${h}" class="runway-bar-port"/>`);
     }
-    // Pension income (blue) — continues after depletion.
+    // Pension income (blue) — continues after depletion at full opacity
+    // because it is the household's real income in those years.
     if(penVal > 0){
       const h = (penVal / maxInc) * ph;
       const portH = depleted ? 0 : ((portVal || 0) / maxInc) * ph;
       const py = baseY - portH - h;
-      parts.push(`<rect x="${x}" y="${py}" width="${barW}" height="${h}" class="runway-bar-pen" opacity="${op}"/>`);
+      parts.push(`<rect x="${x}" y="${py}" width="${barW}" height="${h}" class="runway-bar-pen"/>`);
+    }
+    // Shortfall (red hatched) — only in post-depletion years where
+    // pension < gross need. Sits on top of the pension bar.
+    if(shortVal > 0){
+      const h = (shortVal / maxInc) * ph;
+      const penH = (penVal / maxInc) * ph;
+      const sy = baseY - penH - h;
+      parts.push(`<rect x="${x}" y="${sy}" width="${barW}" height="${h}" class="runway-bar-short"/>`);
     }
   }
+  // Stash for chrome/tooltip so we don't recompute.
+  cdata._hasAnyShortfall = hasAnyShortfall;
 
   // Layer 3: gradient area under balance line
   let area = `M ${xScale(0)} ${pad.t + ph}`;
@@ -4288,7 +4349,18 @@ function renderRunwayChart(){
     const atEnd = runoutIdx >= n - 2;
     const lx = atEnd ? x - 6 : x + 6;
     const anchor = atEnd ? 'end' : 'start';
-    parts.push(`<text x="${lx}" y="${pad.t + 24}" text-anchor="${anchor}" class="runway-annot-label runout">Runs out ~age ${runoutAge}</text>`);
+    const primary = hasAnyShortfall
+      ? `Depleted ~age ${runoutAge} · pension only`
+      : `Depleted ~age ${runoutAge}`;
+    parts.push(`<text x="${lx}" y="${pad.t + 24}" text-anchor="${anchor}" class="runway-annot-label runout">${primary}</text>`);
+    if(hasAnyShortfall){
+      // Sum the per-year shortfall and translate to an avg monthly figure
+      // so the label directly answers "how much is missing per month".
+      const totalShortfall = (cdata.shortfall || []).reduce((a,b) => a + b, 0);
+      const shortYears = (cdata.shortfall || []).filter(v => v > 0).length;
+      const avgMonthlyShort = shortYears > 0 ? (totalShortfall / shortYears / 12) : 0;
+      parts.push(`<text x="${lx}" y="${pad.t + 38}" text-anchor="${anchor}" class="runway-annot-label runout" style="font-size:9px;font-weight:600">Shortfall: ${_svgEsc(fmtC(avgMonthlyShort))}/mo × ${shortYears}yr</text>`);
+    }
   } else {
     parts.push(`<text x="${pad.l + pw - 4}" y="${pad.t + 12}" text-anchor="end" class="runway-annot-label surplus">Surplus at age ${lifeExp}+</text>`);
   }
@@ -4372,8 +4444,10 @@ function _attachRunwayHover(host, {cdata, pad, pw, ph, xScale, yBal}){
     const balance = cdata.balData[nearest];
     const port    = cdata.portWithdrawal[nearest] || 0;
     const pen     = cdata.pensionData[nearest]    || 0;
+    const short   = cdata.shortfall?.[nearest]    || 0;
+    const needed  = cdata.needed?.[nearest]       || (port + pen);
     const total   = port + pen;
-    const dep     = balance === 0;
+    const dep     = cdata.depletedFlag?.[nearest] === true;
     // Move the on-SVG indicator
     const cx = xScale(nearest);
     const cy = yBal(balance);
@@ -4382,12 +4456,17 @@ function _attachRunwayHover(host, {cdata, pad, pw, ph, xScale, yBal}){
     hoverDot.setAttribute('cx', cx); hoverDot.setAttribute('cy', cy);
     hoverDot.style.display = '';
     // Render the floating HTML tooltip — every value is in today's money.
+    const depBadge = dep
+      ? `<span style="color:#ff4d6d;font-weight:600">· depleted</span>`
+      : '';
     tooltip.innerHTML = `
-      <div class="chart-tt-title">Age ${age} <span style="color:var(--text3);font-weight:500">· today&rsquo;s money</span></div>
+      <div class="chart-tt-title">Age ${age} <span style="color:var(--text3);font-weight:500">· today&rsquo;s money</span> ${depBadge}</div>
       <div class="chart-tt-row"><span class="chart-tt-sw" style="background:${dep?'#ff4d6d':'#00e8a0'}"></span><span>Portfolio balance</span><span class="chart-tt-val">${fmt(balance)}</span></div>
-      <div class="chart-tt-row"><span class="chart-tt-sw" style="background:#f5a623"></span><span>Portfolio withdrawal</span><span class="chart-tt-val">${fmt(port)}/yr</span></div>
+      ${!dep ? `<div class="chart-tt-row"><span class="chart-tt-sw" style="background:#f5a623"></span><span>Portfolio withdrawal</span><span class="chart-tt-val">${fmt(port)}/yr</span></div>` : ''}
       ${pen > 0 ? `<div class="chart-tt-row"><span class="chart-tt-sw" style="background:#4d9fff"></span><span>Pension income</span><span class="chart-tt-val">${fmt(pen)}/yr</span></div>` : ''}
-      <div class="chart-tt-total"><span>Total income/yr</span><span class="chart-tt-val">${fmt(total)}</span></div>
+      ${short > 0 ? `<div class="chart-tt-row"><span class="chart-tt-sw" style="background:#ff4d6d"></span><span style="color:#ff4d6d">Shortfall vs need</span><span class="chart-tt-val" style="color:#ff4d6d">−${fmt(short)}/yr</span></div>` : ''}
+      <div class="chart-tt-total"><span>${short > 0 ? 'Actual income/yr' : 'Total income/yr'}</span><span class="chart-tt-val">${fmt(total)}</span></div>
+      ${short > 0 ? `<div class="chart-tt-row" style="color:var(--text3);font-size:10px"><span></span><span>Need ${fmt(needed)}/yr</span><span></span></div>` : ''}
     `;
     // Position tooltip near cursor, avoiding right/bottom edge clipping
     const margin = 14;
@@ -4413,16 +4492,30 @@ function _attachRunwayHover(host, {cdata, pad, pw, ph, xScale, yBal}){
 function _svgEsc(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 
 function _runwayUpdateChrome(cdata, nums, lifeExp, lineColor){
+  // Active expense scenario (Lean / Baseline / Comfortable) — surfaced in
+  // the title, subtitle, and mode chip so the user always knows which
+  // scenario the runway is modelling. The whole chart re-renders on
+  // scenario toggle via renderRetirement → renderRunwayChart, so the
+  // balance line, bars, verdict and coverage all stay in lockstep.
+  const sc = state.retirementScenario || 'baseline';
+  const modeLabel = ({lean:'Lean 🌿', baseline:'Baseline ⚖️', comfortable:'Comfortable 🌟'})[sc] || 'Baseline ⚖️';
+  const plainModeLabel = ({lean:'Lean', baseline:'Baseline', comfortable:'Comfortable'})[sc] || 'Baseline';
+  const modeTag = document.getElementById('runway-mode-tag');
+  if(modeTag) modeTag.textContent = modeLabel;
+  const modeChip = document.getElementById('runway-mode-chip');
+  if(modeChip) modeChip.textContent = modeLabel;
+
   // Subtitle — adapts to whether there's a pension gap period
   const pensions = getPensionAssets();
   const sub = document.getElementById('runway-subtitle');
   if(sub){
     const realRate = Math.max(0, (state.retirementPostGrowth || 4) - state.inflationRate);
     const hasPenGap = pensions.length > 0 && cdata.earliestPension !== null && cdata.earliestPension > state.retirementAge;
+    const intro = `How long your nest egg lasts on ${plainModeLabel} expenses (${fmt(nums.totalExp)}/mo)`;
     if(hasPenGap){
-      sub.textContent = `How long your nest egg lasts — Phase 1: ${fmt(nums.grossNeeded)}/mo (age ${state.retirementAge}–${cdata.earliestPension - 1}), Phase 2: reduced withdrawal + pension (age ${cdata.earliestPension}+) at ${realRate.toFixed(1)}% real growth · all values in today's money`;
+      sub.textContent = `${intro} — Phase 1: ${fmt(nums.grossNeeded)}/mo (age ${state.retirementAge}–${cdata.earliestPension - 1}), Phase 2: reduced withdrawal + pension (age ${cdata.earliestPension}+) at ${realRate.toFixed(1)}% real growth · today's money`;
     } else {
-      sub.textContent = `How long your nest egg lasts — withdrawing ${fmt(nums.grossNeeded)}/mo gross at ${realRate.toFixed(1)}% real growth · all values in today's money`;
+      sub.textContent = `${intro} — withdrawing ${fmt(nums.grossNeeded)}/mo gross at ${realRate.toFixed(1)}% real growth · today's money`;
     }
   }
 
@@ -4463,17 +4556,25 @@ function _runwayUpdateChrome(cdata, nums, lifeExp, lineColor){
     chip.className = 'runway-chip ' + (nums.verdictClass === 'overfunded' ? 'pos' : nums.verdictClass === 'ontarget' ? 'amb' : 'neg');
   }
 
-  // Legend — line swatch + two bar swatches, plus pension-gap callout
+  // Legend — line swatch + two bar swatches + optional shortfall marker,
+  // plus pension-gap callout. The shortfall entry appears only when the
+  // simulation actually has post-depletion years where pension alone
+  // can't meet gross need.
   const legEl = document.getElementById('runway-legend');
   if(legEl){
     const color = lineColor || (nums.runoutAge ? '#ff4d6d' : '#00e8a0');
     const gap = cdata.earliestPension && cdata.earliestPension > state.retirementAge
       ? `<span class="runway-legend-gap">⚡ Pension starts at age ${cdata.earliestPension} (${cdata.earliestPension - state.retirementAge}yr gap)</span>`
       : '';
+    const hasShortfall = (cdata.shortfall || []).some(v => v > 0);
+    const shortSwatch = hasShortfall
+      ? `<span class="runway-legend-item"><span class="runway-legend-sq" style="background:repeating-linear-gradient(45deg,#ff4d6d,#ff4d6d 2px,#ff4d6d44 2px,#ff4d6d44 4px);border:1px solid #ff4d6d"></span>Shortfall vs need · pension below expenses</span>`
+      : '';
     legEl.innerHTML = `
       <span class="runway-legend-item"><span class="runway-legend-line" style="background:${color}"></span>Portfolio balance · today&rsquo;s money (left axis)</span>
       <span class="runway-legend-item"><span class="runway-legend-sq" style="background:#f5a623"></span>Portfolio withdrawal · today&rsquo;s money/yr</span>
       <span class="runway-legend-item"><span class="runway-legend-sq" style="background:#4d9fff"></span>Pension income · today&rsquo;s money/yr</span>
+      ${shortSwatch}
       ${gap}
     `;
   }
