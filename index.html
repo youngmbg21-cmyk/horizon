@@ -73,8 +73,17 @@ input,select,button,textarea { font-family:inherit; }
 /* Number inputs always render in the mono face regardless of what the
    ambient body font is — keeps financial values visually aligned. */
 input[type="number"] { font-family:var(--fm); font-variant-numeric:tabular-nums; }
-/* Tabular numerals on every element that displays money / counts. */
+/* Tabular numerals on every element that displays money / counts. The
+   second selector catches anything rendered in the mono font face so
+   numeric columns stay column-aligned even as values change. */
 .kpi-val, .runway-ms-val, .ireq-kpi-val, .tk, .tkv, .line-amt, .sb-mini-val { font-variant-numeric:tabular-nums; }
+[style*="font-family:var(--fm)"], [style*="font-family: var(--fm)"] { font-variant-numeric:tabular-nums; }
+/* Layout containment on every panel so a value-width change inside one
+   panel never reflows siblings or shifts the page. */
+.panel { contain: layout style; }
+/* Number inputs keep a fixed render box so the input itself doesn't
+   resize when the user types a longer number. */
+input[type="number"] { box-sizing:border-box; }
 input[type="number"]::-webkit-outer-spin-button,
 input[type="number"]::-webkit-inner-spin-button { -webkit-appearance:none; }
 input[type="number"] { -moz-appearance:textfield; }
@@ -1841,6 +1850,59 @@ function memoSelect(key, fn){
 }
 function invalidateSelectors(){ _selGen++; }
 
+// ─── FOCUS PRESERVATION ACROSS RE-RENDERS ───────────────────────────────────
+// Renders tear down the input the user is typing into, which kills focus.
+// `withFocusPreservation` runs a render function while keeping focus + caret
+// pinned to the same input. The "same" input is identified by its index
+// among all inputs in the active panel — stable as long as the render
+// doesn't add/remove inputs above the focused one (the typical case for
+// numeric editing). Falls back gracefully when there's nothing to restore.
+function withFocusPreservation(fn){
+  const active = document.activeElement;
+  const tag = active && active.tagName;
+  const isField = tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT';
+  let panel = null, idx = -1, selStart = null, selEnd = null;
+  if(isField){
+    panel = active.closest('.panel') || active.closest('[id^="panel-"]') || document.body;
+    const fields = Array.from(panel.querySelectorAll('input, textarea, select'));
+    idx = fields.indexOf(active);
+    try { selStart = active.selectionStart; selEnd = active.selectionEnd; } catch(e){ /* number inputs throw */ }
+  }
+  fn();
+  if(idx >= 0 && panel){
+    // The panel reference may now be detached if the render replaced the
+    // node. Re-resolve by id.
+    const pid = panel.id;
+    const newPanel = pid ? document.getElementById(pid) : panel;
+    if(newPanel){
+      const newFields = Array.from(newPanel.querySelectorAll('input, textarea, select'));
+      const target = newFields[idx];
+      if(target){
+        try { target.focus({preventScroll:true}); } catch(e){ target.focus(); }
+        if(selStart != null){
+          try { target.setSelectionRange(selStart, selEnd); } catch(e){ /* numeric */ }
+        }
+      }
+    }
+  }
+}
+
+// Generic debounced + focus-preserved render trampoline. Lets inline
+// oninput handlers re-render a panel without losing focus mid-typing:
+//   oninput="state.x=this.value;save();dr('renderFunFund')"
+// All calls share a single timer keyed by function name so rapid keystrokes
+// collapse into one render after the user pauses typing.
+const _drTimers = {};
+function dr(name, delay){
+  if(delay == null) delay = 300;
+  clearTimeout(_drTimers[name]);
+  _drTimers[name] = setTimeout(() => {
+    const fn = window[name];
+    if(typeof fn === 'function') withFocusPreservation(fn);
+  }, delay);
+}
+window.dr = dr;
+
 // ─── PERSISTENCE ────────────────────────────────────────────────────────────
 // State schema version. Bump this and add a branch to migrate() whenever the
 // shape of `state` changes in a backwards-incompatible way.
@@ -2121,22 +2183,20 @@ function getRetirementNumbers() {
     const mult = RET_SCENARIOS[sc];
     const ytr = Math.max(0,state.retirementAge-state.currentAge);
     const totalExp = sumArr(state.retirementExpenses||[],'amount')*mult;
+    // `pension` (the legacy headline pension) only counts pensions that
+    // are active AT the retirement age — used internally by some surfaces
+    // that need "pension at the moment you retire". The Income Requirements
+    // card and verdict logic now use `pensionAvgMonthly`, computed below
+    // from the full simulation.
     const pension = getTotalPensionIncome();
     const taxRate = Math.min((state.withdrawTaxRate??0)/100, 0.99);
     const totalGross = taxRate>0?totalExp/(1-taxRate):totalExp;
-    const grossNeeded = Math.max(0,totalGross-pension);
     const proj = getProjection();
     const nestEgg = proj.length?proj[proj.length-1].realTotal:0;
     const realRate = Math.max(0.001,(state.retirementPostGrowth||4)-state.inflationRate)/100/12;
     const retMonths = Math.max(1,(state.lifeExp-state.retirementAge)*12);
     const sustainableMonthly = realRate>0?nestEgg*realRate/(1-Math.pow(1+realRate,-retMonths)):nestEgg/retMonths;
     const sustainableAfterTax = sustainableMonthly*(1-taxRate);
-    const gap = sustainableAfterTax-totalExp;
-    const coveragePct = totalExp>0?(sustainableAfterTax/totalExp)*100:100;
-    let verdict,verdictIcon,verdictClass;
-    if(coveragePct>=100){verdict='Well Funded';verdictIcon='✅';verdictClass='overfunded';}
-    else if(coveragePct>=80){verdict='On Track';verdictIcon='🎯';verdictClass='ontarget';}
-    else{verdict='Underfunded';verdictIcon='❌';verdictClass='underfunded';}
 
     // Run the pension-aware simulation once. runoutAge is taken from it
     // (replaces the old constant-grossNeeded loop that ignored pension
@@ -2154,7 +2214,56 @@ function getRetirementNumbers() {
     });
     const runoutAge = simResult.runoutAge;
 
-    return {totalExp,totalGross,pension,grossNeeded,nestEgg,sustainableMonthly,sustainableAfterTax,gap,coveragePct,verdict,verdictIcon,verdictClass,ytr,runoutAge,taxRate,sc,mult,_simResult:simResult};
+    // Weighted-average pension across the FULL retirement period. The
+    // simulation's pensionData array is annual (in today's money), so:
+    //   sum(pensionData) / years / 12 → average monthly pension
+    // For a user who retires at 60 with pensions starting at 69 and
+    // life expectancy 90, this averages 9 zero-pension years against
+    // 22 active-pension years — the correct figure for the headline
+    // "Pension income offset" card and for the cascade calculations.
+    const yearsCount = Math.max(1, simResult.pensionData.length);
+    const totalAnnualPension = simResult.pensionData.reduce((s, v) => s + v, 0);
+    const pensionAvgMonthly = (totalAnnualPension / yearsCount) / 12;
+    const grossNeeded = Math.max(0, totalGross - pensionAvgMonthly);
+
+    // Coverage now factors BOTH portfolio-sustainable income AND the
+    // weighted-average pension into the totalExp ratio. The old version
+    // ignored pensions entirely so users with strong pensions appeared
+    // underfunded.
+    const totalRetirementIncome = sustainableAfterTax + pensionAvgMonthly;
+    const gap = totalRetirementIncome - totalExp;
+    const coveragePct = totalExp>0 ? (totalRetirementIncome/totalExp)*100 : 100;
+
+    // Verdict combines two signals:
+    //   1. Does the simulation deplete the portfolio before life exp?
+    //   2. Does annuity-math coverage clear 100% / 80%?
+    // Hitting life exp exactly (runoutAge >= lifeExp) is "Funded", not
+    // "Underfunded" — the previous threshold logic flagged this scenario
+    // incorrectly.
+    const lifeExp = state.lifeExp || 90;
+    let verdict, verdictIcon, verdictClass;
+    if(!runoutAge) {
+      // Simulation never depleted the portfolio
+      verdict = 'Well Funded'; verdictIcon = '✅'; verdictClass = 'overfunded';
+    } else if(runoutAge >= lifeExp) {
+      // Portfolio sustains income exactly to life expectancy
+      verdict = 'Fully Funded'; verdictIcon = '✅'; verdictClass = 'overfunded';
+    } else if(runoutAge >= lifeExp - 3) {
+      // Depletes within 3 years of life exp — borderline OK
+      verdict = 'Borderline Funded'; verdictIcon = '🎯'; verdictClass = 'ontarget';
+    } else if(coveragePct >= 80) {
+      // Annuity math says on track even if simulation depletes earlier
+      verdict = 'On Track'; verdictIcon = '🎯'; verdictClass = 'ontarget';
+    } else {
+      verdict = 'Underfunded'; verdictIcon = '❌'; verdictClass = 'underfunded';
+    }
+
+    return {
+      totalExp, totalGross, pension, pensionAvgMonthly, grossNeeded,
+      nestEgg, sustainableMonthly, sustainableAfterTax, totalRetirementIncome,
+      gap, coveragePct, verdict, verdictIcon, verdictClass,
+      ytr, runoutAge, taxRate, sc, mult, _simResult: simResult,
+    };
   });
 }
 
@@ -2257,7 +2366,7 @@ function scoreLocation(loc) {
   // only recompute per-location fields and cache per id.
   return memoSelect('loc:'+(loc.id||loc.name), () => {
     const nums = getRetirementNumbers();
-    const monthlyIncome = nums.sustainableAfterTax + nums.pension;
+    const monthlyIncome = nums.totalRetirementIncome;
     const ratio = monthlyIncome>0 ? loc.costOfLiving/monthlyIncome : 2;
     const taxPenalty = loc.taxRate/100;
     const affordabilityScore = Math.max(0, Math.min(1, (1-ratio)*(1-taxPenalty*0.5)));
@@ -3225,7 +3334,7 @@ function renderDashboard() {
   const nominalNestEgg=proj.length?proj[proj.length-1].total:0;
   const retNums=getRetirementNumbers();
   const realNestEgg=retNums.nestEgg; // shared real-value source of truth
-  const realRetirementIncome=retNums.sustainableAfterTax+retNums.pension;
+  const realRetirementIncome=retNums.totalRetirementIncome;
   const ytr=Math.max(0,state.retirementAge-state.currentAge);
   const ti=sumArr(state.baseIncome,'amount');
   const te=sumArr(state.baseExpenses,'amount');
@@ -3248,7 +3357,7 @@ function renderDashboard() {
     <!-- KPI Row 2: Retirement (all values are TODAY'S MONEY / real value) -->
     ${ui.kpiRow([
       {icon:'◈', label:'NEST EGG · TODAY&rsquo;S MONEY', value:fmt(realNestEgg), tone:'pos', sub:`At age ${state.retirementAge} · nominal ${fmt(nominalNestEgg)} (future kr)`, link:'retirement', section:'runway'},
-      {icon:'💰', label:'MONTHLY RETIREMENT INCOME · TODAY&rsquo;S MONEY', value:fmt(realRetirementIncome), tone:'pos', sub:`Portfolio ${fmt(retNums.sustainableAfterTax)} + pension ${fmt(retNums.pension)} (real)`, link:'retirement', section:'runway'},
+      {icon:'💰', label:'MONTHLY RETIREMENT INCOME · TODAY&rsquo;S MONEY', value:fmt(realRetirementIncome), tone:'pos', sub:`Portfolio ${fmt(retNums.sustainableAfterTax)} + pension ${fmt(retNums.pensionAvgMonthly)} (real avg)`, link:'retirement', section:'runway'},
       {icon:'⏱', label:'YEARS TO RETIRE',         value:ytr,              sub:`Age ${state.currentAge} → ${state.retirementAge}`, link:'retirement'},
       {icon:retNums.verdictIcon, label:'RETIREMENT STATUS', value:`<span class="${retNums.verdictClass==='overfunded'?'pos':retNums.verdictClass==='ontarget'?'amb':'neg'}">${retNums.verdict}</span>`, sub:`${retNums.coveragePct.toFixed(0)}% funded · ${fmt(retNums.sustainableAfterTax)}/mo real`, link:'retirement', section:'runway'},
     ])}
@@ -3848,13 +3957,13 @@ function renderRetirement() {
           ${inp(Math.round(a.monthlyContribution*r),`state.externalAssets[${idx}].monthlyContribution=this.value/${r};save();debouncedRenderRetirement()`,'80px')}
           <span style="font-size:10px;color:var(--text3);font-family:var(--fm)">Rate:</span>
           ${inp(gr,`state.externalAssets[${idx}].growthRate=+this.value;save();debouncedRenderRetirement()`,'50px')}%
-          <span style="font-size:10px;color:var(--text3);margin-left:4px">→ <span style="color:var(--green);font-family:var(--fm);font-weight:600">${fmt(projR)}</span> today's kr</span>
+          <span style="font-size:11px;color:var(--text3);margin-left:6px">→ <span style="color:var(--green);font-family:var(--fm);font-weight:700;font-size:13px">${fmt(projR)}</span> <span style="font-size:10px">today's kr</span></span>
         `:`
           <span style="font-size:10px;color:var(--text3);font-family:var(--fm)">Payout/mo:</span>
           ${inp(Math.round((a.monthlyPayout||0)*r),`state.externalAssets[${idx}].monthlyPayout=this.value/${r};save();debouncedRenderRetirement()`,'80px')}
           <span style="font-size:10px;color:var(--text3);font-family:var(--fm)">From age:</span>
           ${inp(a.startAge||state.retirementAge,`state.externalAssets[${idx}].startAge=+this.value;save();debouncedRenderRetirement()`,'52px')}
-          <span style="font-size:10px;color:var(--amber);font-family:var(--fm);margin-left:4px">${fmt(a.monthlyPayout||0)}/mo pension</span>
+          <span style="font-size:11px;color:var(--text3);margin-left:6px">→ <span style="color:var(--amber);font-family:var(--fm);font-weight:700;font-size:13px">${fmt((a.monthlyPayout||0))}</span> <span style="font-size:10px">/mo pension · today's kr</span></span>
         `}
       </div>
       <button class="line-rm" onclick="state.externalAssets.splice(${idx},1);save();renderRetirement()" style="align-self:center">×</button>
@@ -3916,7 +4025,7 @@ function renderRetirement() {
             <div style="display:flex;flex-direction:column;gap:2px;font-size:11px">
               <div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--bg3)"><span style="color:var(--text2)">After-tax expenses needed</span><span style="font-family:var(--fm);font-weight:600">${fmt(nums.totalExp)}/mo</span></div>
               <div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--bg3)"><span style="color:var(--text2)">Gross needed (÷${(1-nums.taxRate).toFixed(2)})</span><span style="font-family:var(--fm);font-weight:600">${fmt(nums.totalGross)}/mo</span></div>
-              <div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--bg3)"><span style="color:var(--text2)">Pension income offset</span><span style="font-family:var(--fm);font-weight:600;color:var(--amber)">− ${fmt(nums.pension)}/mo</span></div>
+              <div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--bg3)"><span style="color:var(--text2)">Pension income offset <span style="color:var(--text3);font-size:10px">(avg)</span></span><span style="font-family:var(--fm);font-weight:600;color:var(--amber)">− ${fmt(nums.pensionAvgMonthly)}/mo</span></div>
               <div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--bg3)"><span style="color:var(--text2)">Portfolio withdrawal needed</span><span style="font-family:var(--fm);font-weight:700;color:var(--red)">${fmt(nums.grossNeeded)}/mo</span></div>
               <div style="display:flex;justify-content:space-between;padding:5px 0"><span style="color:var(--text2)">Portfolio can sustain</span><span style="font-family:var(--fm);font-weight:700;color:var(--green)">${fmt(nums.sustainableAfterTax)}/mo after tax</span></div>
             </div>
@@ -3992,8 +4101,8 @@ function renderRetirement() {
     <div class="ph"><div class="ph-tag">RETIREMENT PLANNING</div><div class="ph-title">Retirement Plan</div><div class="ph-sub">Three interconnected sections — changes anywhere update everything instantly</div></div>
     ${ireq}
     ${sectionWrap(1,'📊','Sustainability & Longevity Runway',`${nums.verdict} · ${nums.coveragePct.toFixed(0)}% funded · ${nums.runoutAge?'Depletes age '+Math.round(nums.runoutAge):'Never depletes'}`,s1)}
-    ${sectionWrap(2,'◈','Portfolio & Pension Accounts',`${fmt(tBal)} invested · ${fmt(projReal)} projected in today's money`,s2)}
-    ${sectionWrap(3,'📝','Retirement Expenses & Parameters',`${fmt(nums.totalExp)}/mo needed · ${state.currentAge}→${state.retirementAge} · ${nums.ytr} years away`,s3)}`;
+    ${sectionWrap(2,'📝','Retirement Expenses & Parameters',`${fmt(nums.totalExp)}/mo needed · ${state.currentAge}→${state.retirementAge} · ${nums.ytr} years away`,s3)}
+    ${sectionWrap(3,'◈','Portfolio & Pension Accounts',`${fmt(tBal)} invested · ${fmt(projReal)} projected in today's money`,s2)}`;
 
   // Render Chart.js runway after DOM settles
   if(window.retSecOpen.s1) setTimeout(renderRunwayChart,80);
@@ -4003,9 +4112,11 @@ function renderRetirement() {
 let _retDebTimer=null;
 function debouncedRenderRetirement(){
   // Short debounce per runway spec — chart updates smoothly after the
-  // user stops typing rather than flickering on every keystroke.
+  // user stops typing rather than flickering on every keystroke. Wrapped
+  // in withFocusPreservation so the input the user is currently typing
+  // into keeps focus + caret position across the re-render.
   clearTimeout(_retDebTimer);
-  _retDebTimer=setTimeout(renderRetirement,400);
+  _retDebTimer=setTimeout(()=>withFocusPreservation(renderRetirement),400);
 }
 
 // ─── LONGEVITY RUNWAY — pure SVG renderer ───────────────────────────────────
@@ -4374,13 +4485,13 @@ function renderFunFund() {
         <div><div style="color:var(--text3);font-family:var(--fm);font-size:9px;letter-spacing:.08em;margin-bottom:2px">BUDGET</div>
           <div style="display:flex;align-items:center;gap:3px;background:var(--bg3);border:1px solid var(--border);border-radius:5px;padding:0 8px">
             <span style="color:var(--text3);font-size:10px">${s}</span>
-            <input type="number" style="background:transparent;border:none;color:var(--text);font-family:var(--fm);font-size:12px;padding:5px 0;outline:none;width:100%" value="${Math.round(t.budget*r)}" oninput="state.trips[${idx}].budget=this.value/${r};save();renderFunFund()">
+            <input type="number" style="background:transparent;border:none;color:var(--text);font-family:var(--fm);font-size:12px;padding:5px 0;outline:none;width:100%" value="${Math.round(t.budget*r)}" oninput="state.trips[${idx}].budget=this.value/${r};save();dr('renderFunFund')">
           </div>
         </div>
         <div><div style="color:var(--text3);font-family:var(--fm);font-size:9px;letter-spacing:.08em;margin-bottom:2px">SPENT</div>
           <div style="display:flex;align-items:center;gap:3px;background:var(--bg3);border:1px solid var(--border);border-radius:5px;padding:0 8px">
             <span style="color:var(--text3);font-size:10px">${s}</span>
-            <input type="number" style="background:transparent;border:none;color:var(--text);font-family:var(--fm);font-size:12px;padding:5px 0;outline:none;width:100%" value="${Math.round(t.spent*r)}" oninput="state.trips[${idx}].spent=this.value/${r};save();renderFunFund()">
+            <input type="number" style="background:transparent;border:none;color:var(--text);font-family:var(--fm);font-size:12px;padding:5px 0;outline:none;width:100%" value="${Math.round(t.spent*r)}" oninput="state.trips[${idx}].spent=this.value/${r};save();dr('renderFunFund')">
           </div>
         </div>
         <div><div style="color:var(--text3);font-family:var(--fm);font-size:9px;letter-spacing:.08em;margin-bottom:2px">STATUS</div>
@@ -4453,7 +4564,7 @@ function renderRetireAnywhere() {
   const scored=retirePlaces().map(scoreLocation);
   const r=rate();
   const nums=getRetirementNumbers();
-  const monthlyIncome=nums.sustainableAfterTax+nums.pension;
+  const monthlyIncome=nums.totalRetirementIncome;
 
   const locCards=scored.map(loc=>{
     // Is there a cached Deep Dive report for this location in the Vault?
@@ -4492,7 +4603,7 @@ function renderRetireAnywhere() {
 
     <div class="callout">
       <span>💡</span>
-      <div><strong>Your Retirement Income: ${fmt(monthlyIncome)}/mo</strong> (${fmt(nums.sustainableAfterTax)}/mo from portfolio + ${fmt(nums.pension)}/mo pension) — all values in <strong>today&rsquo;s money</strong>, the inflation-adjusted real purchasing power your nest egg can sustain.
+      <div><strong>Your Retirement Income: ${fmt(monthlyIncome)}/mo</strong> (${fmt(nums.sustainableAfterTax)}/mo from portfolio + ${fmt(nums.pensionAvgMonthly)}/mo avg pension) — all values in <strong>today&rsquo;s money</strong>, the inflation-adjusted real purchasing power your nest egg can sustain.
       <br>Destinations are rated by whether your real income can comfortably cover local cost of living, after accounting for local tax.</div>
     </div>
 
@@ -4539,7 +4650,7 @@ window.showLocDetail=function(id){
   const r=rate(); const s=sym();
   const months=get12Months();
   const nums=getRetirementNumbers();
-  const monthlyIncome=nums.sustainableAfterTax+nums.pension;
+  const monthlyIncome=nums.totalRetirementIncome;
   document.getElementById('loc-modal-content').innerHTML=`
     <div style="font-size:28px;margin-bottom:6px">${loc.flag}</div>
     <div class="modal-title">${esc(loc.name)}, ${esc(loc.country)}</div>
@@ -4613,7 +4724,7 @@ function renderLocAnalysisSlideover(opts){
   if(!loc) return;
   const r = rate(); const s = sym();
   const nums = getRetirementNumbers();
-  const monthlyIncome = nums.sustainableAfterTax + nums.pension;
+  const monthlyIncome = nums.totalRetirementIncome;
   const cached = (state.vault||[]).find(v => v.type==='deepdive' && v.locationId===id);
 
   // Header
@@ -4641,8 +4752,8 @@ function renderLocAnalysisSlideover(opts){
     <div class="retire-so-section">
       <div class="retire-so-section-hd">Editable Details</div>
       <div class="retire-so-edit-row">
-        <div class="field"><label>Monthly Cost of Living (${s})</label><input type="number" value="${Math.round(loc.costOfLiving*r)}" oninput="updateLocCost('${loc.id}',this.value/${r});renderLocAnalysisSlideover()"></div>
-        <div class="field"><label>Local Tax Rate (%)</label><input type="number" value="${loc.taxRate}" oninput="updateLocTax('${loc.id}',+this.value);renderLocAnalysisSlideover()"></div>
+        <div class="field"><label>Monthly Cost of Living (${s})</label><input type="number" value="${Math.round(loc.costOfLiving*r)}" oninput="updateLocCost('${loc.id}',this.value/${r});dr('renderLocAnalysisSlideover')"></div>
+        <div class="field"><label>Local Tax Rate (%)</label><input type="number" value="${loc.taxRate}" oninput="updateLocTax('${loc.id}',+this.value);dr('renderLocAnalysisSlideover')"></div>
         <div class="field retire-so-notes"><label>Notes</label><input value="${esc(loc.notes||'')}" oninput="updateLocNotes('${loc.id}',this.value)"></div>
       </div>
       <div style="margin-top:10px;display:flex;gap:8px">
@@ -4708,7 +4819,7 @@ window.runLocAnalysis = function(id, opts){
   const cz = countryInfo(state.citizenship);
   const hb = countryInfo(state.homeBase);
   const nums = getRetirementNumbers();
-  const income = nums.sustainableAfterTax + nums.pension;
+  const income = nums.totalRetirementIncome;
   // If rerun, strip the previous cached entry so the new one replaces it
   if(opts && opts.force){
     state.vault = (state.vault||[]).filter(v => !(v.type==='deepdive' && v.locationId===id));
@@ -5400,7 +5511,7 @@ window.aiAnalyzeLocations=function(){
   const key=state.aiKeys?.claude;
   if(!key){toggleAIPanel();return;}
   const nums=getRetirementNumbers();
-  const income=nums.sustainableAfterTax+nums.pension;
+  const income=nums.totalRetirementIncome;
   const ctx = (typeof buildPersonalContext==='function') ? buildPersonalContext() : '';
   const prompt=`${ctx}\n\nThe user is planning to retire with a monthly income of ${fmt(income)} (this is TODAY'S MONEY — real, inflation-adjusted purchasing power, not nominal future kr). Recommend the BEST retirement destinations globally based on this real income. Consider: cost of living, healthcare quality, climate, expat communities, visa/residency requirements, and lifestyle. Tailor visa and tax-treaty advice to the user's citizenship and home base. Give 5 specific recommendations with monthly cost estimates (also in today's money / local-currency-equivalent) and a viability score. Format as a structured list.`;
   // Kick off in the background (fire-and-forget); the UI is driven by the
@@ -5415,7 +5526,7 @@ window.aiAnalyzeLoc=async function(id){
   const key=state.aiKeys?.claude;
   if(!key){alert('Add your Claude API key in Settings first.');return;}
   const nums=getRetirementNumbers();
-  const income=nums.sustainableAfterTax+nums.pension;
+  const income=nums.totalRetirementIncome;
   const el=document.getElementById('loc-ai-out'); el.innerHTML='<span class="pulse">🤖 Analyzing…</span>';
   const ctx = buildPersonalContext();
   const prompt=`${ctx}\n\nDetailed retirement feasibility analysis for ${loc.name}, ${loc.country}. The retiree has a monthly income of ${fmt(income)} (in today's money). Local cost of living: ${fmt(loc.costOfLiving)}/mo. Local income tax: ${loc.taxRate}%. Cover: actual cost of living breakdown, healthcare quality, visa/residency for the user's citizenship, quality of life, pros/cons, and an overall verdict. Be specific and practical. Under 250 words.`;
@@ -5442,7 +5553,7 @@ window.aiDeepDive = function(id){
   const cz = countryInfo(state.citizenship);
   const hb = countryInfo(state.homeBase);
   const nums = getRetirementNumbers();
-  const income = nums.sustainableAfterTax + nums.pension;
+  const income = nums.totalRetirementIncome;
   const el = document.getElementById('loc-ai-out');
   if(el) el.innerHTML = '<div class="card" style="padding:16px"><div class="state-spinner" style="display:inline-block;vertical-align:middle;margin-right:10px;width:16px;height:16px;border-width:2px"></div><span style="color:var(--accent-positive);font-family:var(--fm);font-size:12px">Generating Deep Dive report… this takes 20–40 seconds.</span></div>';
   const ctx = buildPersonalContext();
@@ -5591,7 +5702,7 @@ function renderSettings() {
       <div class="card">
         <div class="card-title">💱 Exchange Rates (vs SEK)</div>
         <div style="display:flex;flex-direction:column;gap:8px;font-size:13px">
-          ${['USD','EUR','KES'].map(cur=>`<div style="display:flex;align-items:center;gap:10px"><span style="font-family:var(--fm);min-width:50px;font-weight:600">${CURRENCY_SYMBOLS[cur]} ${cur}</span><span style="color:var(--text2)">1 SEK =</span><div style="display:flex;align-items:center;gap:3px;background:var(--bg3);border:1px solid var(--border);border-radius:6px;padding:0 10px;flex:1;max-width:140px"><input type="number" style="background:transparent;border:none;color:var(--text);font-family:var(--fm);font-size:13px;padding:6px 0;outline:none;width:100%" value="${state.exchangeRates[cur]||DEFAULT_RATES[cur]}" oninput="state.exchangeRates['${cur}']=+this.value;save();renderAll()"></div><span style="font-size:11px;color:var(--text3)">≈ ${Math.round(1/(state.exchangeRates[cur]||DEFAULT_RATES[cur]))} SEK/${cur==='KES'?'KSh':cur==='EUR'?'€':'$'}</span></div>`).join('')}
+          ${['USD','EUR','KES'].map(cur=>`<div style="display:flex;align-items:center;gap:10px"><span style="font-family:var(--fm);min-width:50px;font-weight:600">${CURRENCY_SYMBOLS[cur]} ${cur}</span><span style="color:var(--text2)">1 SEK =</span><div style="display:flex;align-items:center;gap:3px;background:var(--bg3);border:1px solid var(--border);border-radius:6px;padding:0 10px;flex:1;max-width:140px"><input type="number" style="background:transparent;border:none;color:var(--text);font-family:var(--fm);font-size:13px;padding:6px 0;outline:none;width:100%" value="${state.exchangeRates[cur]||DEFAULT_RATES[cur]}" oninput="state.exchangeRates['${cur}']=+this.value;save();dr('renderAll',500)"></div><span style="font-size:11px;color:var(--text3)">≈ ${Math.round(1/(state.exchangeRates[cur]||DEFAULT_RATES[cur]))} SEK/${cur==='KES'?'KSh':cur==='EUR'?'€':'$'}</span></div>`).join('')}
         </div>
       </div>
       <!-- AI Keys -->
@@ -5605,7 +5716,7 @@ function renderSettings() {
       <!-- Ticker quote -->
       <div class="card">
         <div class="card-title">✦ Ticker Quote & Appearance</div>
-        <div class="field"><label>Personal quote / mantra</label><input value="${esc(state.tickerQuote||'')}" oninput="state.tickerQuote=this.value;save();renderTicker()"></div>
+        <div class="field"><label>Personal quote / mantra</label><input value="${esc(state.tickerQuote||'')}" oninput="state.tickerQuote=this.value;save();dr('renderTicker',500)"></div>
         <div style="margin-top:6px">
           <label class="toggle-wrap">
             <input type="checkbox" ${state.darkMode?'checked':''} onchange="state.darkMode=this.checked;save();applyTheme()">
@@ -6079,7 +6190,7 @@ function buildAIContext() {
   const proj = getProjection().slice(-1)[0] || {};
   const realNestEgg = nums.nestEgg;
   const nominalNestEgg = proj.total || 0;
-  const realRetirementIncome = nums.sustainableAfterTax + nums.pension;
+  const realRetirementIncome = nums.totalRetirementIncome;
   const realRate = Math.max(0, (state.retirementPostGrowth || 4) - state.inflationRate);
   return `You are HORIZON AI — a personal finance and life planning assistant embedded in Horizon Finance OS.
 
@@ -6097,7 +6208,7 @@ User's financial snapshot (SEK):
 - Monthly surplus: ${Math.round(cm.surplus).toLocaleString()} kr | Fun Fund: ${Math.round(cm.funFund).toLocaleString()} kr/mo
 - Age: ${state.currentAge} | Retiring at: ${state.retirementAge} (${Math.max(0,state.retirementAge-state.currentAge)} years away) | Life expectancy: ${state.lifeExp || 90}
 - Nest egg at retirement: ${Math.round(realNestEgg).toLocaleString()} kr (today's money) — equivalent to ${Math.round(nominalNestEgg).toLocaleString()} kr nominal/future kr at retirement
-- Sustainable monthly retirement income: ${Math.round(realRetirementIncome).toLocaleString()} kr/mo (today's money) — ${Math.round(nums.sustainableAfterTax).toLocaleString()} kr from portfolio + ${Math.round(nums.pension).toLocaleString()} kr from pension, all real
+- Sustainable monthly retirement income: ${Math.round(realRetirementIncome).toLocaleString()} kr/mo (today's money) — ${Math.round(nums.sustainableAfterTax).toLocaleString()} kr from portfolio + ${Math.round(nums.pensionAvgMonthly).toLocaleString()} kr from pension (weighted avg across full retirement period), all real
 - Monthly expenses needed in retirement: ${Math.round(nums.totalExp).toLocaleString()} kr (today's money) — coverage ${nums.coveragePct.toFixed(0)}% — verdict: ${nums.verdict}
 - Real growth rate assumption: ${realRate.toFixed(1)}% (post-retirement growth ${state.retirementPostGrowth||4}% minus ${state.inflationRate}% inflation)
 - Portfolio depletion age (from shared simulation): ${nums.runoutAge ? 'Age ' + nums.runoutAge : 'never depletes'}
