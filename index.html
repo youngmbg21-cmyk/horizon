@@ -854,6 +854,7 @@ body.light .loc-card:hover { box-shadow:0 5px 14px -8px rgba(60,40,10,0.18); }
   grid-template-columns: repeat(2, minmax(0, 1fr));
   grid-auto-rows:1fr;
   gap:14px;
+  align-items:stretch;
 }
 @media (max-width: 860px){
   .dash-ai-sections { grid-template-columns: 1fr; grid-auto-rows:auto; }
@@ -865,8 +866,8 @@ body.light .loc-card:hover { box-shadow:0 5px 14px -8px rgba(60,40,10,0.18); }
   display:flex;
   flex-direction:column;
   min-width:0;
+  height:100%;
 }
-.dash-ai-sec .md { flex:1; min-width:0; }
 .dash-ai-sec.sec-position { border-top-color:#4d9fff; }
 .dash-ai-sec.sec-good     { border-top-color:var(--green); }
 .dash-ai-sec.sec-concern  { border-top-color:var(--red); }
@@ -878,12 +879,35 @@ body.light .loc-card:hover { box-shadow:0 5px 14px -8px rgba(60,40,10,0.18); }
   color:var(--text2); margin-bottom:10px;
 }
 .dash-ai-sec-hd .ic { font-size:13px; }
-.dash-ai-sec .md { font-size:12.5px; line-height:1.65; color:var(--text); }
-.dash-ai-sec .md p { margin:0 0 8px; }
-.dash-ai-sec .md p:last-child { margin-bottom:0; }
-.dash-ai-sec .md ul, .dash-ai-sec .md ol { margin:6px 0 8px 20px; }
+.dash-ai-sec .md {
+  flex:1 1 auto; min-width:0;
+  font-size:12.5px; line-height:1.65; color:var(--text);
+  display:flex; flex-direction:column; gap:8px;
+}
+.dash-ai-sec .md > *:first-child { margin-top:0; }
+.dash-ai-sec .md > *:last-child  { margin-bottom:0; }
+.dash-ai-sec .md p { margin:0; }
+.dash-ai-sec .md ul,
+.dash-ai-sec .md ol { margin:0 0 0 20px; padding:0; }
 .dash-ai-sec .md li { margin:3px 0; }
-.dash-ai-sec .md strong { color:var(--text); }
+.dash-ai-sec .md strong { color:var(--text); font-weight:700; }
+/* ── AI Financial Analysis · inline tone markers ──────
+   The model emits {+…} / {-…} / {!…} / {~…} and the
+   client rewrites them into these spans. Subtle pill
+   treatment so they read as tonal highlights without
+   shouting. Colours line up with var() accents used
+   throughout the rest of the app. */
+.dash-ai-sec .ai-tone {
+  display:inline;
+  padding:1px 4px;
+  border-radius:3px;
+  font-weight:600;
+}
+.dash-ai-sec .ai-tone.ai-pos  { color:var(--green); background:var(--accent-positive-dim); }
+.dash-ai-sec .ai-tone.ai-neg  { color:var(--red);   background:var(--accent-critical-dim); }
+.dash-ai-sec .ai-tone.ai-warn { color:var(--amber); background:var(--accent-warning-dim); }
+.dash-ai-sec .ai-tone.ai-dim  { color:var(--text3); background:var(--bg2); }
+.dash-ai-sec .ai-tone strong  { color:inherit; }
 .dash-ai-err {
   padding:14px 18px; border-radius:8px;
   background:var(--accent-critical-dim); color:var(--red);
@@ -4526,6 +4550,77 @@ const DASH_REPORT_SECTIONS = [
   { key:'concern',  title:'Areas of concern',           icon:'⚠️', cls:'sec-concern' },
   { key:'recs',     title:'Recommendations',            icon:'🧭', cls:'sec-recs' },
 ];
+// ── AI Financial Analysis: post-processors ─────────────────────────────────
+// Safety-net truncation to 250 words per section, regardless of what the
+// model returned. We split the markdown into whole sentences/lines and
+// include them until the running word count hits the cap — whole sentences
+// preserved so we never chop a number in half or leave an unbalanced **…**.
+const DASH_REPORT_WORD_CAP = 250;
+function _capWordsPerSection(md, cap){
+  const text = String(md || '').trim();
+  if(!text) return text;
+  // Tokenise by blank-line blocks so list items, headings, and paragraphs
+  // stay intact. Count words by stripping markdown syntax for the tally.
+  const blocks = text.split(/\n{2,}/);
+  const wordCount = s => (String(s).replace(/[*_`>#\-\u2022]+/g, ' ').match(/\S+/g) || []).length;
+  let running = 0;
+  const out = [];
+  for(const block of blocks){
+    const w = wordCount(block);
+    if(running + w <= cap){
+      out.push(block);
+      running += w;
+      continue;
+    }
+    // Partial block — fit as many sentences / list items as possible.
+    const remaining = cap - running;
+    if(remaining <= 0) break;
+    const lines = block.split('\n');
+    const picked = [];
+    let sub = 0;
+    for(const line of lines){
+      // Keep whole line if it fits, else break into sentences.
+      const lw = wordCount(line);
+      if(sub + lw <= remaining){
+        picked.push(line);
+        sub += lw;
+        continue;
+      }
+      const sentences = line.split(/(?<=[.!?])\s+/);
+      for(const sentence of sentences){
+        const sw = wordCount(sentence);
+        if(sub + sw > remaining) break;
+        picked[picked.length-1] = (picked[picked.length-1] ? picked[picked.length-1] + ' ' : '') + sentence;
+        sub += sw;
+      }
+      break;
+    }
+    if(picked.length) out.push(picked.join('\n') + ' …');
+    break;
+  }
+  return out.join('\n\n');
+}
+// Replace the inline tone markers ({+text} / {-text} / {!text} / {~text})
+// with colour-coded spans. Runs on the HTML produced by mdParse() so the
+// curly-brace markers survive the markdown pass (they're not special
+// markdown syntax). Supports nested markdown inside the markers, e.g.
+// {+ **+12%** growth} → green span wrapping a bold number.
+function _enhanceAIMarkup(html){
+  if(!html) return html;
+  const toneClass = { '+':'ai-pos', '-':'ai-neg', '!':'ai-warn', '~':'ai-dim' };
+  // Match {Xtext} where X is one of +/-/!/~ and text has no braces.
+  return String(html).replace(/\{([+\-!~])\s*([^{}]*?)\s*\}/g, (_, sym, body) => {
+    const cls = toneClass[sym] || '';
+    return `<span class="ai-tone ${cls}">${body}</span>`;
+  });
+}
+// Render one section's markdown block with cap + colour enhancement.
+function _renderAISectionBody(md){
+  const capped = _capWordsPerSection(md, DASH_REPORT_WORD_CAP);
+  const parsed = mdParse(capped);
+  return _enhanceAIMarkup(parsed);
+}
+
 // Parse the model's reply into the four sections. The prompt asks for
 // H2 headings exactly matching the section titles; we split on those and
 // gracefully fall back to the whole response if the shape is off.
@@ -4591,7 +4686,7 @@ function renderDashboardAIReportBody(){
     const body = (r.sections && r.sections[sec.key]) || '';
     return `<div class="dash-ai-sec ${sec.cls}">
       <div class="dash-ai-sec-hd"><span class="ic">${sec.icon}</span><span>${sec.title}</span></div>
-      ${body ? mdParse(body) : '<div class="md" style="color:var(--text3);font-style:italic">No notes for this section.</div>'}
+      ${body ? _renderAISectionBody(body) : '<div class="md" style="color:var(--text3);font-style:italic">No notes for this section.</div>'}
     </div>`;
   }).join('');
   return head(actions) + `<div class="dash-ai-sections">${sections}</div>`;
@@ -4630,18 +4725,41 @@ window.runDashboardAIReport = async function(){
     // A focused prompt: one-shot, structured, with enough numeric
     // context to make the advice specific. The system prompt from
     // buildAIContext() already injects the full financial snapshot.
-    const prompt = `Write a comprehensive end-to-end financial analysis for me, the user, based on the snapshot in the system prompt.
+    const prompt = `Write a punchy, scannable financial analysis for me based on the snapshot in the system prompt. This is a brief — not an essay.
 
-Use EXACTLY these four markdown H2 headings, in this order, nothing before or after them:
+STRUCTURE · EXACTLY these four markdown H2 headings, in this order, nothing before or after:
 
 ## Current financial position
 ## What is going well
 ## Areas of concern
 ## Recommendations
 
-Under each heading, write 2–4 short paragraphs or a tight bulleted list. Reference specific numbers (in kr) from the snapshot so the advice feels personal and grounded. Be honest — call out risks as well as strengths. The "Recommendations" section should contain 3–6 concrete, actionable items the user can act on this month.
+WORD BUDGET · Each section must be 120–200 words. Absolute max 250. Every section should be about the same length so the cards read as a balanced brief.
 
-Focus areas to weave in where relevant: current-month cash flow (income ${Math.round(cm.pureIncome).toLocaleString()} kr, expenses ${Math.round(cm.pureExpenses).toLocaleString()} kr, savings ${Math.round(cm.savings).toLocaleString()} kr, fun fund ${Math.round(cm.pureFunFund).toLocaleString()} kr), the 12-month Fun Fund outlook (${Math.round(funFundTotal).toLocaleString()} kr total), retirement coverage (${nums.coveragePct.toFixed(0)}% · verdict ${nums.verdict}), nest egg, and any planned trips. Avoid fluff.
+FORMATTING · Follow these rules exactly. No walls of prose.
+
+1. **Bold** every currency figure, percentage, rate, ratio, and key metric. Example: "Your **29% savings rate** produces **kr 27 000/mo** of surplus."
+
+2. Use these inline colour markers to tone-code numbers and verdicts (the UI renders them as coloured spans):
+   · {+text} → POSITIVE signal (green). Surpluses, strong savings rates, coverage above target, good trends.
+   · {-text} → NEGATIVE signal (red). Shortfalls, deficits, overspend, coverage below target.
+   · {!text} → WARNING (amber). Items that need attention but aren't critical yet.
+   · {~text} → NEUTRAL (muted). Context figures you want to de-emphasise.
+   Example: "You're {+on track to retire at 60} with **78% coverage**, though {!housing still eats 34% of income}."
+
+3. Use bulleted lists (\`- \`) for 2–4 sub-points per section wherever it improves scannability.
+
+4. Short sentences — aim for 10–18 words on average. Cut every filler word.
+
+5. Reference specific numbers from the snapshot so the advice feels grounded — not generic.
+
+6. Recommendations must contain **3–5 concrete, actionable bullets** the user can act on THIS month.
+
+Key snapshot values to reference where relevant:
+- Current month (${cm.label}): income **${Math.round(cm.pureIncome).toLocaleString()} kr**, expenses **${Math.round(cm.pureExpenses).toLocaleString()} kr**, savings **${Math.round(cm.savings).toLocaleString()} kr**, fun fund **${Math.round(cm.pureFunFund).toLocaleString()} kr**
+- 12-month Fun Fund outlook: **${Math.round(funFundTotal).toLocaleString()} kr**
+- Retirement coverage: **${nums.coveragePct.toFixed(0)}%** (verdict: ${nums.verdict})
+- Nest egg (today's money): **${Math.round(nums.nestEgg).toLocaleString()} kr** at age **${state.retirementAge}**
 
 Return plain markdown only — no preamble, no sign-off, no JSON.`;
     const raw = await callClaude(prompt, 1800);
@@ -8159,7 +8277,7 @@ function renderVault(){
         ? DASH_REPORT_SECTIONS.map(s => `
             <div class="vault-cmp-sec">
               <div class="vault-cmp-sec-hd">${s.icon} ${s.title}</div>
-              ${secs[s.key] ? mdParse(secs[s.key]) : '<div class="md" style="color:var(--text3);font-style:italic">—</div>'}
+              ${secs[s.key] ? _renderAISectionBody(secs[s.key]) : '<div class="md" style="color:var(--text3);font-style:italic">—</div>'}
             </div>
           `).join('')
         : `<div class="vault-cmp-sec"><div class="vault-cmp-sec-hd">Report</div>${mdParse(e.markdown || '')}</div>`;
@@ -8197,7 +8315,7 @@ function renderVault(){
       ? DASH_REPORT_SECTIONS.map(s => `
           <div class="dash-ai-sec ${s.cls}" style="margin-bottom:12px">
             <div class="dash-ai-sec-hd"><span class="ic">${s.icon}</span><span>${s.title}</span></div>
-            ${open.sections[s.key] ? mdParse(open.sections[s.key]) : '<div class="md" style="color:var(--text3);font-style:italic">—</div>'}
+            ${open.sections[s.key] ? _renderAISectionBody(open.sections[s.key]) : '<div class="md" style="color:var(--text3);font-style:italic">—</div>'}
           </div>
         `).join('')
       : mdParse(open.markdown || '');
