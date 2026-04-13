@@ -1600,26 +1600,6 @@ body.light .retire-slideover { box-shadow:-10px 0 32px -10px rgba(60,40,10,0.25)
 .vault-open-title { font-family:var(--ff); font-size:22px; font-weight:800; color:var(--text); letter-spacing:-.01em; line-height:1.2; }
 .vault-open-sub { font-family:var(--fm); font-size:10px; color:var(--text3); margin-top:3px; }
 .vault-open-actions { display:flex; gap:8px; flex-shrink:0; align-items:center; flex-wrap:wrap; }
-/* Category editor in the detail pane header — replaces the inline
-   dropdown that used to live inside each library card. */
-.vault-cat-editor {
-  display:inline-flex; align-items:center; gap:8px;
-  padding:4px 10px 4px 12px;
-  background:var(--bg3);
-  border:1px solid var(--border);
-  border-radius:6px;
-  cursor:pointer;
-}
-.vault-cat-editor-lbl {
-  font-family:var(--fm); font-size:9px; font-weight:700;
-  letter-spacing:.1em; text-transform:uppercase;
-  color:var(--text3);
-}
-.vault-cat-editor-sel {
-  background:transparent; border:none; outline:none;
-  color:var(--text); font-family:var(--ff); font-size:12px; font-weight:600;
-  padding:4px 0; cursor:pointer;
-}
 .vault-open-body { font-size:13px; line-height:1.65; }
 /* ── VAULT · category chips, multi-select, compare view ─────────── */
 .vault-chips {
@@ -8482,20 +8462,14 @@ function renderVault(){
           </div>
         `).join('')
       : mdParse(open.markdown || '');
-    const catEditorOptions = VAULT_CATEGORIES.filter(c => c.key !== 'all')
-      .map(c => `<option value="${c.key}" ${c.key===open.category?'selected':''}>${c.icon} ${c.label}</option>`).join('');
     rightPane = `<div class="vault-open">
       <div class="vault-open-head">
         <div>
-          <div class="vault-open-tag">${openTag}</div>
+          <div class="vault-open-tag">${openTag} · ${esc2(catLabel)}</div>
           <div class="vault-open-title">${esc2(open.title)}</div>
           <div class="vault-open-sub">${esc2(_fmtWhen(open.when))}${tailored}</div>
         </div>
         <div class="vault-open-actions">
-          <label class="vault-cat-editor" title="Recategorise this report">
-            <span class="vault-cat-editor-lbl">Category</span>
-            <select class="vault-cat-editor-sel" onchange="setVaultEntryCategory('${open.id}',this.value)">${catEditorOptions}</select>
-          </label>
           ${open.markdown ? `<button class="btn btn-g btn-sm" onclick="exportVaultEntryPdf('${open.id}')">📄 Download PDF</button>` : ''}
         </div>
       </div>
