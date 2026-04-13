@@ -444,9 +444,8 @@ input[type="number"] { -moz-appearance:textfield; }
 .ireq-head { margin-bottom:14px; }
 .ireq-title { font-family:var(--ff); font-size:18px; font-weight:800; color:var(--text); letter-spacing:-.01em; margin-bottom:3px; }
 .ireq-sub { font-size:12px; color:var(--text2); }
-.ireq-kpi-row { display:grid; grid-template-columns:repeat(5, minmax(0, 1fr)); gap:10px; margin-bottom:14px; }
-@media (max-width:1100px){ .ireq-kpi-row { grid-template-columns:repeat(3, minmax(0, 1fr)); } }
-@media (max-width:680px){  .ireq-kpi-row { grid-template-columns:repeat(2, minmax(0, 1fr)); } }
+.ireq-kpi-row { display:grid; grid-template-columns:repeat(auto-fit, minmax(150px, 1fr)); gap:10px; margin-bottom:14px; }
+.ireq-kpi-val.ireq-blue  { color:#4d9fff; }
 .ireq-kpi { background:var(--bg3); border:1px solid var(--border); border-radius:10px; padding:14px 12px; text-align:center; min-height:96px; display:flex; flex-direction:column; justify-content:center; align-items:center; gap:4px; }
 .ireq-kpi-lbl { font-family:var(--fm); font-size:9px; font-weight:700; letter-spacing:.08em; color:var(--text2); text-transform:uppercase; margin-bottom:2px; }
 .ireq-kpi-val { font-family:var(--fm); font-size:22px; font-weight:800; color:var(--text); letter-spacing:-.01em; line-height:1.1; word-break:break-word; }
@@ -2315,10 +2314,31 @@ function getRetirementNumbers() {
       verdict = 'Underfunded'; verdictIcon = '❌'; verdictClass = 'underfunded';
     }
 
+    // Pension contribution surfacing — makes pension's role in the
+    // headline verdict visible to the user, so a "Well Funded" outcome
+    // on a pension-heavy plan is obviously pension-supported rather
+    // than implying portfolio strength alone. Two ratios drive this:
+    //   pensionShareOfNeed    — pension as a % of monthly expense need
+    //   portfolioShareOfNeed  — what portfolio adds on top (clamped so
+    //                           pension + portfolio never exceed 100%)
+    // pensionMaterial is a simple "should we mention pensions in the
+    // summary?" flag — true once pension covers at least 5% of need.
+    const pensionShareOfNeed = totalExp > 0
+      ? Math.min(100, (pensionAvgMonthly / totalExp) * 100)
+      : 0;
+    const portfolioShareOfNeed = totalExp > 0
+      ? Math.max(0, Math.min(
+          100 - pensionShareOfNeed,
+          (sustainableAfterTax / totalExp) * 100,
+        ))
+      : 0;
+    const pensionMaterial = pensionAvgMonthly > 0 && pensionShareOfNeed >= 5;
+
     return {
       totalExp, totalGross, pension, pensionAvgMonthly, grossNeeded,
       nestEgg, sustainableMonthly, sustainableAfterTax, totalRetirementIncome,
       gap, coveragePct, verdict, verdictIcon, verdictClass,
+      pensionShareOfNeed, portfolioShareOfNeed, pensionMaterial,
       ytr, runoutAge, taxRate, sc, mult, _simResult: simResult,
     };
   });
@@ -3955,19 +3975,32 @@ function renderRetirement() {
         <div class="sust-verdict-icon">${nums.verdictIcon}</div>
         <div>
           <div style="font-size:9px;color:var(--text2);font-family:var(--fm);letter-spacing:.12em;margin-bottom:2px">RETIREMENT SUSTAINABILITY</div>
-          <div class="sust-verdict-text ${nums.verdictClass}">${nums.verdict}</div>
+          <div class="sust-verdict-text ${nums.verdictClass}">${nums.verdict}${nums.pensionMaterial?` <span style="font-size:10px;font-weight:600;color:#4d9fff;letter-spacing:.02em;text-transform:uppercase;vertical-align:middle;margin-left:6px;padding:2px 6px;border:1px solid rgba(77,159,255,.4);border-radius:3px;font-family:var(--fm)">Pension-supported</span>`:''}</div>
         </div>
         <div style="margin-left:auto;text-align:right;font-size:11px;color:var(--text2);line-height:1.6">
-          Portfolio ${nums.runoutAge?`depletes at age <strong style="color:var(--red)">~${Math.round(nums.runoutAge)}</strong>`:`<strong style="color:var(--green)">never depletes</strong>`} · Coverage: <strong>${nums.coveragePct.toFixed(0)}%</strong><br>${nums.gap>=0?`Surplus <strong style="color:var(--green)">${fmt(nums.gap)}/mo</strong>`:`Shortfall <strong style="color:var(--red)">${fmt(Math.abs(nums.gap))}/mo</strong>`}
+          Portfolio ${nums.runoutAge?`depletes at age <strong style="color:var(--red)">~${Math.round(nums.runoutAge)}</strong>`:`<strong style="color:var(--green)">never depletes</strong>`} · Coverage: <strong>${nums.coveragePct.toFixed(0)}%</strong><br>${nums.gap>=0?`Surplus <strong style="color:var(--green)">${fmt(nums.gap)}/mo</strong>`:`Shortfall <strong style="color:var(--red)">${fmt(Math.abs(nums.gap))}/mo</strong>`}${nums.pensionMaterial?` · <strong style="color:#4d9fff">Pension ${nums.pensionShareOfNeed.toFixed(0)}% of need</strong>`:''}
         </div>
       </div>
+      ${nums.pensionMaterial ? `
+      <div class="sust-bar-track" style="margin-bottom:3px;position:relative;display:flex">
+        <div style="width:${nums.pensionShareOfNeed}%;background:#4d9fff;border-radius:3px 0 0 3px" title="Pension: ${nums.pensionShareOfNeed.toFixed(0)}% of need"></div>
+        <div style="width:${nums.portfolioShareOfNeed}%;background:${nums.verdictClass==='overfunded'?'var(--green)':nums.verdictClass==='ontarget'?'var(--amber)':'var(--red)'}" title="Portfolio: ${nums.portfolioShareOfNeed.toFixed(0)}% of need"></div>
+      </div>
+      <div style="display:flex;justify-content:space-between;font-size:9px;color:var(--text3);font-family:var(--fm);margin-bottom:10px">
+        <span><span style="display:inline-block;width:8px;height:8px;background:#4d9fff;border-radius:2px;margin-right:4px;vertical-align:middle"></span>Pension ${nums.pensionShareOfNeed.toFixed(0)}% · <span style="display:inline-block;width:8px;height:8px;background:${nums.verdictClass==='overfunded'?'var(--green)':nums.verdictClass==='ontarget'?'var(--amber)':'var(--red)'};border-radius:2px;margin:0 4px 0 6px;vertical-align:middle"></span>Portfolio ${nums.portfolioShareOfNeed.toFixed(0)}%</span>
+        <span style="color:${nums.coveragePct>=100?'var(--green)':'var(--amber)'}">Total coverage: ${nums.coveragePct.toFixed(0)}%</span>
+        <span>100%</span>
+      </div>
+      ` : `
       <div class="sust-bar-track" style="margin-bottom:3px"><div class="sust-bar-fill" style="width:${Math.min(nums.coveragePct,100)}%;background:${nums.verdictClass==='overfunded'?'var(--green)':nums.verdictClass==='ontarget'?'var(--amber)':'var(--red)'}"></div></div>
       <div style="display:flex;justify-content:space-between;font-size:9px;color:var(--text3);font-family:var(--fm);margin-bottom:10px">
         <span>0%</span><span style="color:${nums.coveragePct>=100?'var(--green)':'var(--amber)'}">Coverage: ${nums.coveragePct.toFixed(0)}%</span><span>100%</span>
       </div>
+      `}
       <div class="sust-nums" style="margin-bottom:14px">
         <div class="sust-num"><div class="sust-num-lbl">Nest Egg · today&rsquo;s money</div><div class="sust-num-val">${fmt(nums.nestEgg)}</div></div>
         <div class="sust-num"><div class="sust-num-lbl">Portfolio sustains · today&rsquo;s money</div><div class="sust-num-val pos">${fmt(nums.sustainableAfterTax)}/mo</div></div>
+        ${nums.pensionAvgMonthly > 0 ? `<div class="sust-num"><div class="sust-num-lbl">Pension covers · today&rsquo;s money</div><div class="sust-num-val" style="color:#4d9fff">${fmt(nums.pensionAvgMonthly)}/mo</div><div style="font-size:9px;color:var(--text3);margin-top:2px;font-family:var(--fm)">${nums.pensionShareOfNeed.toFixed(0)}% of need</div></div>` : ''}
         <div class="sust-num"><div class="sust-num-lbl">You need · today&rsquo;s money</div><div class="sust-num-val">${fmt(nums.totalExp)}/mo</div></div>
         <div class="sust-num"><div class="sust-num-lbl">Depletion age</div><div class="sust-num-val ${nums.runoutAge?'neg':'pos'}">${nums.runoutAge?`Age ${Math.round(nums.runoutAge)}`:'Never'}</div></div>
       </div>
@@ -4112,10 +4145,16 @@ function renderRetirement() {
           <div class="ireq-kpi-val">${fmt(grossMonthly)}</div>
           <div class="ireq-kpi-sub">${fmt(grossAnnual)}/yr · ÷(1−${taxPct}% tax) · today&rsquo;s money</div>
         </div>
+        ${nums.pensionAvgMonthly > 0 ? `
+        <div class="ireq-kpi">
+          <div class="ireq-kpi-lbl">Pension covers</div>
+          <div class="ireq-kpi-val ireq-blue">${fmt(nums.pensionAvgMonthly)}</div>
+          <div class="ireq-kpi-sub">${nums.pensionShareOfNeed.toFixed(0)}% of need · avg across retirement</div>
+        </div>` : ''}
         <div class="ireq-kpi">
           <div class="ireq-kpi-lbl">Avg portfolio withdrawal</div>
           <div class="ireq-kpi-val ireq-amber">${fmt(avgPortMonthly)}</div>
-          <div class="ireq-kpi-sub">${fmt(avgPortAnnual)}/yr · weighted across phases · today&rsquo;s money</div>
+          <div class="ireq-kpi-sub">${fmt(avgPortAnnual)}/yr · ${nums.pensionAvgMonthly > 0 ? 'after pension offset' : 'weighted across phases'} · today&rsquo;s money</div>
         </div>
         <div class="ireq-kpi">
           <div class="ireq-kpi-lbl">Avg withdrawal rate</div>
@@ -4132,8 +4171,12 @@ function renderRetirement() {
         <span><strong>${fmt(expensesMonthly)}/mo</strong> expenses</span>
         <span class="ireq-formula-op">÷ ${(1-nums.taxRate).toFixed(2)}</span>
         <span>= <strong>${fmt(grossMonthly)}</strong> gross needed</span>
+        ${nums.pensionAvgMonthly > 0 ? `
+          <span class="ireq-formula-op">−</span>
+          <span class="ireq-blue"><strong>${fmt(nums.pensionAvgMonthly)}/mo</strong> pension</span>
+        ` : ''}
         <span class="ireq-formula-op">=</span>
-        <span class="ireq-amber"><strong>${fmt(avgPortMonthly)}/mo</strong> avg from portfolio</span>
+        <span class="ireq-amber"><strong>${fmt(avgPortMonthly)}/mo</strong> ${nums.pensionAvgMonthly > 0 ? 'portfolio burden' : 'avg from portfolio'}</span>
         <span class="ireq-formula-op">→ ÷</span>
         <span><strong>${fmt(nums.nestEgg)}</strong> nest egg</span>
         <span class="ireq-formula-op">=</span>
@@ -4160,9 +4203,9 @@ function renderRetirement() {
   document.getElementById('panel-retirement').innerHTML=`
     <div class="ph"><div class="ph-tag">RETIREMENT PLANNING</div><div class="ph-title">Retirement Plan</div><div class="ph-sub">Three interconnected sections — changes anywhere update everything instantly</div></div>
     ${ireq}
-    ${sectionWrap(1,'📊','Sustainability & Longevity Runway',`${nums.verdict} · ${nums.coveragePct.toFixed(0)}% funded · ${nums.runoutAge?'Depletes age '+Math.round(nums.runoutAge):'Never depletes'}`,s1)}
+    ${sectionWrap(1,'📊','Sustainability & Longevity Runway',`${nums.verdict} · ${nums.coveragePct.toFixed(0)}% funded · ${nums.runoutAge?'Depletes age '+Math.round(nums.runoutAge):'Never depletes'}${nums.pensionMaterial?` · Pension ${nums.pensionShareOfNeed.toFixed(0)}% of need`:''}`,s1)}
     ${sectionWrap(2,'📝','Retirement Expenses & Parameters',`${fmt(nums.totalExp)}/mo needed · ${state.currentAge}→${state.retirementAge} · ${nums.ytr} years away`,s3)}
-    ${sectionWrap(3,'◈','Portfolio & Pension Accounts',`${fmt(tBal)} invested · ${fmt(projReal)} projected in today's money`,s2)}`;
+    ${sectionWrap(3,'◈','Portfolio & Pension Accounts',`${fmt(tBal)} invested${pensions.length>0?` · ${fmt(getAllPensionIncome())}/mo pension`:''} · ${fmt(projReal)} projected in today's money`,s2)}`;
 
   // Render Chart.js runway after DOM settles
   if(window.retSecOpen.s1) setTimeout(renderRunwayChart,80);
