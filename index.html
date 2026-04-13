@@ -3885,7 +3885,7 @@ function renderMonthly() {
         <div class="card-title">Monthly Savings Target</div>
         <div style="display:flex;align-items:center;gap:8px;background:var(--bg3);border-radius:8px;padding:4px 14px;max-width:280px">
           <span style="color:var(--text3);font-size:12px;font-family:var(--fm)">${s}</span>
-          <input type="number" value="${Math.round(sel.savings*r)}" style="background:transparent;border:none;color:var(--text);font-family:var(--fm);font-size:20px;font-weight:700;padding:10px 0;outline:none;width:200px" oninput="setMonthSavings('${selKey}',this.value/${r})">
+          <input type="number" value="${Math.round(sel.savings*r)}" style="background:transparent;border:none;color:var(--text);font-family:var(--fm);font-size:20px;font-weight:700;padding:10px 0;outline:none;width:200px" oninput="setMonthSavings('${selKey}',this.value/${r})" onchange="commitRender('renderMonthly')">
         </div>
       </div>
     </div>`;
