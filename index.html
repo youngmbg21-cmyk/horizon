@@ -6337,6 +6337,36 @@ function buildPersonalContext(){
 - Current home base: ${hb.name} (${hb.code}) — use this as the baseline for comparisons, assume the user currently files taxes here, and reference this country's cost of living / healthcare / rules when drawing contrasts.`;
 }
 
+// Build the "dynamic catalog" section of the system prompt. Runs
+// buildSeriesCatalog() (cheap — just key metadata, no data fetching)
+// and groups the entries whose keys come from user data (investment /
+// pension / expense) so the model sees exactly the accounts, pensions,
+// and expense categories the user has currently saved. Called once per
+// chat turn from buildAIContext() so updates to state surface on the
+// very next message.
+function _catalogDynamicListing(){
+  let catalog;
+  try { catalog = buildSeriesCatalog(); } catch(e) { return ''; }
+  const groups = { investment:[], pension:[], expense:[] };
+  Object.entries(catalog).forEach(([key, entry]) => {
+    const prefix = key.split('.')[0];
+    if(groups[prefix] !== undefined && !['portfolio.investments','portfolio.pensions'].includes(key)){
+      groups[prefix].push(`- ${key} — ${entry.label} (${entry.unit}, ${entry.xAxis})`);
+    }
+  });
+  const sections = [];
+  if(groups.investment.length){
+    sections.push('Per-investment account (x-axis = age, accumulation phase):\n' + groups.investment.join('\n'));
+  }
+  if(groups.pension.length){
+    sections.push('Per-pension plan (x-axis = age, drawdown phase):\n' + groups.pension.join('\n'));
+  }
+  if(groups.expense.length){
+    sections.push('Per-expense category (x-axis = month, next 12 months):\n' + groups.expense.join('\n'));
+  }
+  return sections.length ? (sections.join('\n\n') + '\n\n') : '';
+}
+
 function buildAIContext() {
   const nums=getRetirementNumbers();
   const months=get12Months(); const cm=months[0];
@@ -6427,8 +6457,8 @@ Hard rules for "custom":
 - "display" defaults to "line". "bar" draws a bar. "area" draws a filled line. Mixing "bar" and "line" in one chart is allowed and renders as a proper Chart.js mixed chart.
 - Do NOT include any "data" / "values" / "labels" / numeric arrays in the block. The client fetches data from live app state via the series key.
 
-SERIES CATALOG (Phase 1 — static)
-Each entry is "series-key — label (unit, x-axis)".
+SERIES CATALOG
+Each entry is "series-key — label (unit, x-axis)". The "Per-investment account", "Per-pension plan" and "Per-expense category" sections below are DYNAMIC — they list the user's actual accounts, pensions and expense line items as they exist right now in state. Use only the keys that appear in this list; do not invent account / pension / category names.
 
 Retirement & nest egg (x-axis = age, currentAge → retirementAge):
 - nestEgg.real — Nest egg · today's money (currency, age)
@@ -6459,7 +6489,11 @@ Retire Anywhere destinations (x-axis = destination name):
 - destinations.taxRate — Tax rate · % (percent, destination)
 - destinations.affordabilityScore — Affordability score · % (percent, destination)
 
-Worked examples:
+Portfolio split (x-axis = age, full lifetime):
+- portfolio.investments — Portfolio · investments (currency, age)
+- portfolio.pensions — Portfolio · pensions · annual income (currency, age)
+
+${_catalogDynamicListing()}Worked examples:
 
 1) User: "Show the nominal nest egg as bars alongside the real value"
 \`\`\`horizon-chart
@@ -6487,6 +6521,21 @@ Worked examples:
 \`\`\`horizon-chart
 {"kind":"custom","title":"Tax rate by destination","datasets":[
   {"series":"destinations.taxRate","display":"bar"}
+]}
+\`\`\`
+
+5) User: "Compare my two pension plans" (use the pension.* keys actually listed above — they come from the user's current pension names, not from memory)
+\`\`\`horizon-chart
+{"kind":"custom","title":"Pension comparison","datasets":[
+  {"series":"pension.<first-plan-slug>","display":"line","label":"Plan A"},
+  {"series":"pension.<second-plan-slug>","display":"line","label":"Plan B"}
+]}
+\`\`\`
+
+6) User: "Show only my Vanguard growth" (match against the investment.* keys listed above)
+\`\`\`horizon-chart
+{"kind":"custom","title":"Vanguard projected balance","datasets":[
+  {"series":"investment.<matching-slug>","display":"area"}
 ]}
 \`\`\`
 
@@ -6871,6 +6920,135 @@ function buildSeriesCatalog(){
   addDestSeries('destinations.surplus',       'Monthly surplus',           'currency', l => l.surplus);
   addDestSeries('destinations.taxRate',       'Tax rate · %',              'percent',  l => l.taxRate);
   addDestSeries('destinations.affordabilityScore', 'Affordability score · %', 'percent', l => (l.affordabilityScore || 0) * 100);
+
+  // ── DYNAMIC: PER-INVESTMENT ACCOUNT (x = age, accumulation phase) ──────
+  // One series per investment-type external asset, keyed by a slug of
+  // the account name. Reads per-account balances from the `perAccount`
+  // field added to getProjection(), so the math is shared with the
+  // total-nest-egg line that the rest of the app shows — no independent
+  // compounding loop.
+  const investments = state.externalAssets.filter(a => (a.assetType || 'investment') === 'investment');
+  const seenSlugs = new Set(Object.keys(cat));
+  const slugify = (name, prefix) => {
+    const base = (name || '').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'').slice(0,32) || 'item';
+    let candidate = `${prefix}.${base}`, n = 2;
+    while(seenSlugs.has(candidate)) candidate = `${prefix}.${base}-${n++}`;
+    seenSlugs.add(candidate);
+    return candidate;
+  };
+  investments.forEach(acc => {
+    const key = slugify(acc.name, 'investment');
+    cat[key] = {
+      label: `${acc.name || 'Account'} · projected balance`,
+      unit: 'currency', xAxis: 'age',
+      get(){
+        const proj = getProjection();
+        return {
+          xValues: proj.map(p => p.age),
+          values:  proj.map(p => (p.perAccount && p.perAccount[acc.id]) || 0),
+        };
+      },
+    };
+  });
+
+  // ── DYNAMIC: PER-PENSION ANNUAL PAYOUT (x = age, drawdown phase) ──────
+  // One series per pension-type external asset. In accumulation years
+  // (currentAge..retirementAge) the pension is inactive and the series
+  // is zero. In drawdown years the series is monthlyPayout*12 whenever
+  // the age is inside the pension's [startAge, endAge) window — the
+  // same activation rule _simulateRetirementYears uses internally, so
+  // the per-pension view never disagrees with the aggregate.
+  const pensionAssets = state.externalAssets.filter(a => a.assetType === 'pension');
+  pensionAssets.forEach(pen => {
+    const key = slugify(pen.name, 'pension');
+    cat[key] = {
+      label: `${pen.name || 'Pension'} · annual payout`,
+      unit: 'currency', xAxis: 'age',
+      get(){
+        const proj = getProjection();
+        const sim  = getRetirementNumbers()._simResult;
+        const xAcc = proj.map(p => p.age);
+        const xDraw = (sim && sim.labels) ? sim.labels.slice(1) : [];
+        const pStart = pen.startAge ?? state.retirementAge;
+        const pEnd   = pen.endAge || 999;
+        const annual = (pen.monthlyPayout || 0) * 12;
+        const active = age => (age >= pStart && age < pEnd) ? annual : 0;
+        return {
+          xValues: xAcc.concat(xDraw),
+          values:  xAcc.map(active).concat(xDraw.map(active)),
+        };
+      },
+    };
+  });
+
+  // ── DYNAMIC: PER-EXPENSE CATEGORY (x = month, next 12 months) ─────────
+  // One series per baseline-expenses line item. Each month's value is
+  // pulled from get12Months()[i].expenseItems (which already applies
+  // overrides / yearly cascades / baselines), matched by line-item id
+  // first with a case-insensitive name fallback so renamed overrides
+  // still map back to the baseline.
+  (state.baseExpenses || []).forEach(item => {
+    const key = slugify(item.name, 'expense');
+    const itemId = item.id;
+    const itemName = (item.name || '').toLowerCase().trim();
+    cat[key] = {
+      label: `${item.name || 'Expense'} · monthly`,
+      unit: 'currency', xAxis: 'month',
+      get(){
+        const months = get12Months();
+        return {
+          xValues: months.map(m => m.short),
+          values:  months.map(m => {
+            const list = m.expenseItems || [];
+            const hit = list.find(e => e.id === itemId)
+                     || list.find(e => (e.name || '').toLowerCase().trim() === itemName);
+            return hit ? (hit.amount || 0) : 0;
+          }),
+        };
+      },
+    };
+  });
+
+  // ── PORTFOLIO SPLIT (x = age, full lifetime: currentAge → lifeExp) ────
+  // Two composite series covering the whole lifetime, stitched from
+  // getProjection (accumulation) and _simResult (drawdown). The
+  // investments trace is the wealth the user actually holds (app
+  // savings + external investment accounts during accumulation, real
+  // nest egg drawdown during retirement). The pensions trace is the
+  // annual pension income that comes online during retirement —
+  // pensions in this app are income streams, not balances, so this is
+  // the truthful "value delivered" measure. Both are age-axis and
+  // currency-unit so they plot cleanly side by side.
+  const buildLifetimeSeries = (accPick, drawPick) => ({
+    get(){
+      const proj = getProjection();
+      const sim  = getRetirementNumbers()._simResult;
+      const xAcc = proj.map(p => p.age);
+      const valAcc = proj.map(accPick);
+      const xDraw = (sim && sim.labels) ? sim.labels.slice(1) : [];
+      const valDraw = xDraw.map((_, i) => drawPick(sim, i + 1));
+      return {
+        xValues: xAcc.concat(xDraw),
+        values:  valAcc.concat(valDraw),
+      };
+    },
+  });
+  cat['portfolio.investments'] = {
+    label: 'Portfolio · investments (accumulation → drawdown)',
+    unit: 'currency', xAxis: 'age',
+    ...buildLifetimeSeries(
+      p => p.realTotal || 0,
+      (s, i) => (s && s.balData) ? (s.balData[i] || 0) : 0,
+    ),
+  };
+  cat['portfolio.pensions'] = {
+    label: 'Portfolio · pensions · annual income',
+    unit: 'currency', xAxis: 'age',
+    ...buildLifetimeSeries(
+      () => 0,
+      (s, i) => (s && s.pensionData) ? (s.pensionData[i] || 0) : 0,
+    ),
+  };
 
   return cat;
 }
