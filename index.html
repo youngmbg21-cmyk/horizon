@@ -668,6 +668,141 @@ body.light .loc-card:hover { box-shadow:0 5px 14px -8px rgba(60,40,10,0.18); }
 @media (max-width:900px){ #retire-map { height:260px; } }
 
 /* ── FUN FUND ────────────────────────────────────────── */
+/* ── DASHBOARD · WELCOMING AI CARD ─────────────────────
+   Sits above the KPI rows. Horizontal layout: icon, body
+   (headline + sub-line), and a CTA button that fires the
+   full AI financial analysis. Colour-banded by verdict
+   so the tone (green/amber/red) matches the greeting. */
+.dash-welcome {
+  display:flex; align-items:center; gap:14px;
+  padding:14px 18px; margin-bottom:14px;
+  background:var(--bg2); border:1px solid var(--border);
+  border-radius:10px; border-left:4px solid var(--green);
+}
+.dash-welcome.amb { border-left-color:var(--amber); }
+.dash-welcome.neg { border-left-color:var(--red); }
+.dash-welcome-icon {
+  font-size:26px; line-height:1; flex-shrink:0;
+}
+.dash-welcome-body { flex:1; min-width:0; }
+.dash-welcome-hd {
+  font-family:var(--ff); font-size:15px; font-weight:700;
+  color:var(--text); line-height:1.45;
+}
+.dash-welcome-sub {
+  font-size:12px; color:var(--text2); margin-top:4px;
+  line-height:1.55;
+}
+.dash-welcome-cta { flex-shrink:0; }
+
+/* ── DASHBOARD · FULL AI REPORT CARD ───────────────────
+   The polished end-to-end financial analysis. Four
+   labelled sections (position, strengths, concerns,
+   recommendations) rendered via mdParse() so the AI
+   output inherits the platform's markdown styling. */
+.dash-ai-report {
+  margin-top:10px;
+}
+.dash-ai-report .dash-ai-hd {
+  display:flex; align-items:center; justify-content:space-between;
+  flex-wrap:wrap; gap:10px;
+  margin-bottom:14px;
+  padding-bottom:12px; border-bottom:1px dashed var(--border);
+}
+.dash-ai-report .dash-ai-title {
+  font-family:var(--ff); font-size:18px; font-weight:800; color:var(--text);
+  display:flex; align-items:center; gap:10px;
+}
+.dash-ai-report .dash-ai-stamp {
+  font-family:var(--fm); font-size:10px; color:var(--text3);
+  letter-spacing:.06em;
+}
+.dash-ai-report .dash-ai-actions { display:flex; gap:6px; flex-wrap:wrap; }
+.dash-ai-report .dash-ai-empty {
+  padding:28px 24px; text-align:center; color:var(--text3);
+  font-family:var(--ff); font-size:13px; line-height:1.6;
+}
+.dash-ai-report .dash-ai-empty .big {
+  font-size:26px; display:block; margin-bottom:10px;
+}
+.dash-ai-report .dash-ai-running {
+  display:flex; align-items:center; gap:12px; justify-content:center;
+  padding:28px 24px; color:var(--text2);
+}
+.dash-ai-report .dash-ai-running .spinner {
+  width:18px; height:18px; border-radius:50%;
+  border:2px solid var(--border); border-top-color:var(--green);
+  animation:spin 1s linear infinite;
+}
+@keyframes spin { to { transform:rotate(360deg); } }
+.dash-ai-sections { display:grid; grid-template-columns: 1fr 1fr; gap:14px; }
+@media (max-width: 960px){ .dash-ai-sections { grid-template-columns: 1fr; } }
+.dash-ai-sec {
+  background:var(--bg3); border:1px solid var(--border);
+  border-radius:8px; padding:14px 16px;
+  border-top:3px solid var(--border2);
+}
+.dash-ai-sec.sec-position { border-top-color:#4d9fff; }
+.dash-ai-sec.sec-good     { border-top-color:var(--green); }
+.dash-ai-sec.sec-concern  { border-top-color:var(--red); }
+.dash-ai-sec.sec-recs     { border-top-color:var(--violet); grid-column: 1 / -1; }
+.dash-ai-sec-hd {
+  display:flex; align-items:center; gap:8px;
+  font-family:var(--fm); font-size:10px; font-weight:700;
+  letter-spacing:.1em; text-transform:uppercase;
+  color:var(--text2); margin-bottom:10px;
+}
+.dash-ai-sec-hd .ic { font-size:13px; }
+.dash-ai-sec .md { font-size:12.5px; line-height:1.65; color:var(--text); }
+.dash-ai-sec .md p { margin:0 0 8px; }
+.dash-ai-sec .md p:last-child { margin-bottom:0; }
+.dash-ai-sec .md ul, .dash-ai-sec .md ol { margin:6px 0 8px 20px; }
+.dash-ai-sec .md li { margin:3px 0; }
+.dash-ai-sec .md strong { color:var(--text); }
+.dash-ai-err {
+  padding:14px 18px; border-radius:8px;
+  background:var(--accent-critical-dim); color:var(--red);
+  font-size:12px; font-family:var(--fm);
+}
+
+/* ── FUN FUND · RUNNING BALANCE TABLE ──────────────────
+   Two-column row: month label on the left, "+ delta" pill
+   and running balance on the right. Deficit rows light up
+   red with a "paying off" flag so the roll-forward is
+   immediately legible. */
+.ff-run-list { display:flex; flex-direction:column; font-size:12px; }
+.ff-run-row {
+  display:grid; grid-template-columns: 1fr auto auto auto;
+  align-items:center; gap:10px;
+  padding:7px 0; border-bottom:1px solid var(--bg3);
+}
+.ff-run-row:last-child { border-bottom:none; }
+.ff-run-label { color:var(--text2); }
+.ff-run-delta {
+  font-family:var(--fm); font-size:11px; font-weight:600;
+  padding:2px 7px; border-radius:3px;
+  background:var(--bg3); color:var(--text3);
+}
+.ff-run-delta.pos { color:var(--green); background:var(--accent-positive-dim); }
+.ff-run-delta.neg { color:var(--red);   background:var(--accent-critical-dim); }
+.ff-run-bal {
+  font-family:var(--fm); font-weight:700;
+  min-width:95px; text-align:right;
+}
+.ff-run-bal.pos { color:var(--cyan); }
+.ff-run-bal.neg { color:var(--red); }
+.ff-run-flag {
+  display:inline-block;
+  font-family:var(--fm); font-size:9px; font-weight:700;
+  letter-spacing:.08em; text-transform:uppercase;
+  padding:2px 7px; border-radius:3px;
+  background:var(--accent-critical-dim); color:var(--red);
+  white-space:nowrap;
+}
+.ff-run-flag.muted {
+  background:var(--bg3); color:var(--text3);
+}
+
 .trip-card { background:var(--bg2); border:1px solid var(--border); border-radius:10px; padding:12px; margin-bottom:10px; transition:border-color .2s; }
 .trip-card:hover { border-color:var(--border2); }
 .trip-card-head { display:flex; align-items:flex-start; gap:10px; margin-bottom:10px; }
@@ -1149,6 +1284,110 @@ body.light .retire-slideover { box-shadow:-10px 0 32px -10px rgba(60,40,10,0.25)
 .vault-open-sub { font-family:var(--fm); font-size:10px; color:var(--text3); margin-top:3px; }
 .vault-open-actions { display:flex; gap:6px; flex-shrink:0; }
 .vault-open-body { font-size:13px; line-height:1.65; }
+/* ── VAULT · category chips, multi-select, compare view ─────────── */
+.vault-chips {
+  display:flex; gap:6px; flex-wrap:wrap;
+  margin-bottom:12px;
+}
+.vault-chip {
+  display:inline-flex; align-items:center; gap:6px;
+  background:var(--bg2); border:1px solid var(--border);
+  color:var(--text2); font-family:var(--ff); font-size:12px;
+  padding:6px 10px; border-radius:20px; cursor:pointer;
+  transition:border-color .15s, background .15s, color .15s;
+}
+.vault-chip:hover { border-color:var(--border2); color:var(--text); }
+.vault-chip.active { background:var(--accent-positive-dim); color:var(--green); border-color:var(--green); }
+.vault-chip.dim { opacity:.55; }
+.vault-chip .ic { font-size:13px; }
+.vault-chip .n {
+  font-family:var(--fm); font-size:10px; font-weight:700;
+  padding:1px 6px; border-radius:10px;
+  background:var(--bg3); color:var(--text3);
+}
+.vault-chip.active .n { background:var(--green); color:var(--bg); }
+.vault-list-sel {
+  margin-left:8px; font-family:var(--fm); font-size:9px; font-weight:700;
+  letter-spacing:.06em; color:var(--violet);
+  padding:2px 8px; border-radius:3px;
+  background:var(--violet-dim);
+}
+.vault-row-sel {
+  display:flex; align-items:center; justify-content:center;
+  width:18px; height:18px; flex-shrink:0;
+}
+.vault-row-sel input[type="checkbox"] {
+  margin:0; accent-color:var(--violet);
+  cursor:pointer;
+}
+.vault-row-cat {
+  background:var(--bg3); border:1px solid var(--border); border-radius:5px;
+  padding:4px 6px; color:var(--text2); font-family:var(--fm); font-size:10px;
+  outline:none; max-width:140px; flex-shrink:0;
+  cursor:pointer;
+}
+.vault-type-badge.analysis {
+  background:var(--violet-dim); color:var(--violet);
+}
+.vault-compare {
+  padding:4px 0;
+}
+.vault-compare-head {
+  display:flex; align-items:flex-start; justify-content:space-between;
+  gap:14px; padding-bottom:14px; border-bottom:1px solid var(--border);
+  margin-bottom:14px; flex-wrap:wrap;
+}
+.vault-compare-snap {
+  background:var(--bg3); border:1px solid var(--border); border-radius:8px;
+  padding:10px 12px; margin-bottom:14px; overflow-x:auto;
+}
+.vault-compare-tbl {
+  width:100%; border-collapse:collapse;
+  font-family:var(--fm); font-size:11px;
+}
+.vault-compare-tbl th,
+.vault-compare-tbl td {
+  padding:6px 10px; text-align:right; white-space:nowrap;
+  border-bottom:1px solid var(--border);
+}
+.vault-compare-tbl th {
+  color:var(--text3); font-weight:700; letter-spacing:.06em;
+  text-transform:uppercase; font-size:9px;
+}
+.vault-compare-tbl th:first-child,
+.vault-compare-tbl td:first-child { text-align:left; color:var(--text2); }
+.vault-compare-tbl tbody td { color:var(--text); font-weight:600; }
+.vault-compare-tbl tbody tr:last-child td { border-bottom:none; }
+.vault-compare-grid {
+  display:grid; gap:14px;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+}
+.vault-cmp-col {
+  background:var(--bg3); border:1px solid var(--border); border-radius:8px;
+  padding:14px 16px;
+}
+.vault-cmp-col-hd {
+  padding-bottom:8px; border-bottom:1px dashed var(--border);
+  margin-bottom:10px;
+}
+.vault-cmp-col-title {
+  font-family:var(--ff); font-size:14px; font-weight:800; color:var(--text);
+  line-height:1.3;
+}
+.vault-cmp-col-sub {
+  font-family:var(--fm); font-size:10px; color:var(--text3); margin-top:2px;
+}
+.vault-cmp-sec { margin-bottom:12px; }
+.vault-cmp-sec:last-child { margin-bottom:0; }
+.vault-cmp-sec-hd {
+  font-family:var(--fm); font-size:9px; font-weight:700;
+  letter-spacing:.08em; text-transform:uppercase; color:var(--text2);
+  margin-bottom:6px;
+}
+.vault-cmp-sec .md { font-size:12px; line-height:1.6; color:var(--text); }
+.vault-cmp-sec .md p { margin:0 0 6px; }
+.vault-cmp-sec .md p:last-child { margin-bottom:0; }
+.vault-cmp-sec .md ul, .vault-cmp-sec .md ol { margin:4px 0 6px 18px; }
 
 /* ── ONBOARDING BLOCK (mandatory citizenship + home base) ──────────── */
 .modal.onboarding-modal { max-width:520px; text-align:center; padding:30px 28px; }
@@ -4001,6 +4240,192 @@ function mdParse(raw){
 // ─────────────────────────────────────────────────────────────────────────────
 
 // ══ DASHBOARD ════════════════════════════════════════════════════════════════
+// ── Full AI financial analysis ────────────────────────────────────────────
+// Builds a four-section Markdown report (position / strengths / concerns /
+// recommendations) via callClaude(), stashes the parsed result on state so
+// it survives panel re-renders, and exposes a tiny render helper the
+// dashboard template calls to draw the card body. The live-sync bus
+// patches just the card body when the status changes — no full rebuild.
+const DASH_REPORT_SECTIONS = [
+  { key:'position', title:'Current financial position', icon:'📍', cls:'sec-position' },
+  { key:'good',     title:'What is going well',         icon:'✅', cls:'sec-good' },
+  { key:'concern',  title:'Areas of concern',           icon:'⚠️', cls:'sec-concern' },
+  { key:'recs',     title:'Recommendations',            icon:'🧭', cls:'sec-recs' },
+];
+// Parse the model's reply into the four sections. The prompt asks for
+// H2 headings exactly matching the section titles; we split on those and
+// gracefully fall back to the whole response if the shape is off.
+function _parseDashboardReport(raw){
+  const txt = String(raw || '').trim();
+  if(!txt) return null;
+  const result = { position:'', good:'', concern:'', recs:'' };
+  const order = [
+    { key:'position', re:/(^|\n)##\s*(?:1[.)]\s*)?current[^\n]*\n/i },
+    { key:'good',     re:/(^|\n)##\s*(?:2[.)]\s*)?what[^\n]*(?:going\s*well|strengths)[^\n]*\n/i },
+    { key:'concern',  re:/(^|\n)##\s*(?:3[.)]\s*)?(?:areas?\s*of\s*)?concern[^\n]*\n/i },
+    { key:'recs',     re:/(^|\n)##\s*(?:4[.)]\s*)?recommendations?[^\n]*\n/i },
+  ];
+  // Find heading positions and slice content between them.
+  const hits = order.map(o => {
+    const m = o.re.exec(txt);
+    return m ? { key: o.key, start: m.index + m[0].length, headingStart: m.index } : null;
+  });
+  const present = hits.filter(Boolean).sort((a,b) => a.headingStart - b.headingStart);
+  if(present.length === 0){
+    // Could not parse — dump the entire text into the position slot.
+    result.position = txt;
+    return result;
+  }
+  for(let i = 0; i < present.length; i++){
+    const cur = present[i];
+    const nextStart = (i + 1 < present.length) ? present[i+1].headingStart : txt.length;
+    result[cur.key] = txt.slice(cur.start, nextStart).trim();
+  }
+  return result;
+}
+// In-memory running flag — deliberately NOT persisted to state so the
+// transient "Analysing…" spinner doesn't trigger a full panel rebuild
+// through the save() → live-render pipeline. The real result lands in
+// state.dashboardReport once it arrives.
+let _dashReportRunning = false;
+function renderDashboardAIReportBody(){
+  const r = state.dashboardReport;
+  const running = _dashReportRunning;
+  const err = state.dashboardReportError;
+  const head = (extraActions='') => `
+    <div class="dash-ai-hd">
+      <div class="dash-ai-title">🤖 AI Financial Analysis ${r && r.generatedAt ? `<span class="dash-ai-stamp">· generated ${_fmtWhen(r.generatedAt)}</span>`:''}</div>
+      <div class="dash-ai-actions">${extraActions}</div>
+    </div>`;
+  if(running){
+    return head('') + `<div class="dash-ai-running"><div class="spinner"></div><span>Running end-to-end financial analysis…</span></div>`;
+  }
+  if(err){
+    return head(`<button class="btn btn-sm btn-o" onclick="runDashboardAIReport()">Try again</button>`)
+      + `<div class="dash-ai-err">${esc(err)}</div>`;
+  }
+  if(!r){
+    return `<div class="dash-ai-empty">
+      <span class="big">🤖</span>
+      Ready when you are. Click <strong>Run full financial analysis</strong> above to generate a polished, end-to-end review of where you stand, what's going well, what needs attention, and what to do next.
+    </div>`;
+  }
+  const actions = `
+    <button class="btn btn-sm btn-o" onclick="saveDashboardReportToVault()">💾 Save to Vault</button>
+    <button class="btn btn-sm btn-o" onclick="runDashboardAIReport()">🔄 Re-run</button>`;
+  const sections = DASH_REPORT_SECTIONS.map(sec => {
+    const body = (r.sections && r.sections[sec.key]) || '';
+    return `<div class="dash-ai-sec ${sec.cls}">
+      <div class="dash-ai-sec-hd"><span class="ic">${sec.icon}</span><span>${sec.title}</span></div>
+      ${body ? mdParse(body) : '<div class="md" style="color:var(--text3);font-style:italic">No notes for this section.</div>'}
+    </div>`;
+  }).join('');
+  return head(actions) + `<div class="dash-ai-sections">${sections}</div>`;
+}
+function _fmtWhen(ts){
+  if(!ts) return '';
+  const d = new Date(ts);
+  const now = new Date();
+  const sameDay = d.toDateString() === now.toDateString();
+  const opts = sameDay
+    ? { hour:'2-digit', minute:'2-digit' }
+    : { year:'numeric', month:'short', day:'numeric', hour:'2-digit', minute:'2-digit' };
+  try { return d.toLocaleString(undefined, opts); } catch(e){ return d.toISOString(); }
+}
+// Update just the #dash-ai-report card body — no panel rebuild, no layout
+// shift. Used by the run/save/error handlers so the status flips land
+// smoothly in place.
+function _syncDashboardReportBody(){
+  const host = document.getElementById('dash-ai-report');
+  if(host) host.innerHTML = renderDashboardAIReportBody();
+}
+window.runDashboardAIReport = async function(){
+  if(_dashReportRunning) return;
+  _dashReportRunning = true;
+  state.dashboardReportError = null;
+  _syncDashboardReportBody();
+  // Flip the welcome-card CTA label inline (no full re-render).
+  try {
+    const btn = document.querySelector('.dash-welcome-cta .btn');
+    if(btn){ btn.disabled = true; btn.innerHTML = '⏳ Analysing…'; }
+  } catch(_e){}
+  try {
+    const cm = get12Months()[0];
+    const nums = getRetirementNumbers();
+    const funFundTotal = getMonthlyFunFundBalance();
+    // A focused prompt: one-shot, structured, with enough numeric
+    // context to make the advice specific. The system prompt from
+    // buildAIContext() already injects the full financial snapshot.
+    const prompt = `Write a comprehensive end-to-end financial analysis for me, the user, based on the snapshot in the system prompt.
+
+Use EXACTLY these four markdown H2 headings, in this order, nothing before or after them:
+
+## Current financial position
+## What is going well
+## Areas of concern
+## Recommendations
+
+Under each heading, write 2–4 short paragraphs or a tight bulleted list. Reference specific numbers (in kr) from the snapshot so the advice feels personal and grounded. Be honest — call out risks as well as strengths. The "Recommendations" section should contain 3–6 concrete, actionable items the user can act on this month.
+
+Focus areas to weave in where relevant: current-month cash flow (income ${Math.round(cm.pureIncome).toLocaleString()} kr, expenses ${Math.round(cm.pureExpenses).toLocaleString()} kr, savings ${Math.round(cm.savings).toLocaleString()} kr, fun fund ${Math.round(cm.pureFunFund).toLocaleString()} kr), the 12-month Fun Fund outlook (${Math.round(funFundTotal).toLocaleString()} kr total), retirement coverage (${nums.coveragePct.toFixed(0)}% · verdict ${nums.verdict}), nest egg, and any planned trips. Avoid fluff.
+
+Return plain markdown only — no preamble, no sign-off, no JSON.`;
+    const raw = await callClaude(prompt, 1800);
+    const parsed = _parseDashboardReport(raw);
+    state.dashboardReport = {
+      generatedAt: Date.now(),
+      raw,
+      sections: parsed || { position: raw, good:'', concern:'', recs:'' },
+      snapshot: {
+        month: cm.label,
+        income: cm.pureIncome, expenses: cm.pureExpenses, savings: cm.savings, funFund: cm.pureFunFund,
+        funFund12mo: funFundTotal,
+        coveragePct: nums.coveragePct, verdict: nums.verdict,
+        nestEgg: nums.nestEgg, retirementAge: state.retirementAge,
+      },
+    };
+    state.dashboardReportError = null;
+  } catch(e){
+    state.dashboardReportError = (e && e.message) || String(e);
+  } finally {
+    _dashReportRunning = false;
+    save();
+    _syncDashboardReportBody();
+    // Also refresh the welcome card's CTA label (running → idle).
+    try {
+      const btn = document.querySelector('.dash-welcome-cta .btn');
+      if(btn){
+        btn.disabled = false;
+        btn.innerHTML = state.dashboardReport ? '🔄 Re-run full analysis' : '🤖 Run full financial analysis';
+      }
+    } catch(_e){}
+  }
+};
+window.saveDashboardReportToVault = function(){
+  const r = state.dashboardReport;
+  if(!r){ alert('No report to save yet — run the analysis first.'); return; }
+  if(!Array.isArray(state.vault)) state.vault = [];
+  const entry = {
+    id: genId(),
+    type: 'analysis',
+    category: 'monthly-analysis',
+    title: `Monthly Financial Analysis · ${r.snapshot?.month || ''}`.trim(),
+    generatedAt: r.generatedAt || Date.now(),
+    snapshot: r.snapshot || null,
+    markdown: r.raw || '',
+    sections: r.sections || null,
+  };
+  state.vault.unshift(entry);
+  // Cap at 100 so the newer analysis vault doesn't grow unbounded.
+  if(state.vault.length > 100) state.vault = state.vault.slice(0, 100);
+  save();
+  // Tiny inline toast on the button
+  try {
+    const btn = document.querySelector('#dash-ai-report .dash-ai-actions .btn');
+    if(btn){ btn.textContent = '✓ Saved to Vault'; setTimeout(() => _syncDashboardReportBody(), 1400); }
+  } catch(_e){}
+};
+
 function renderDashboard() {
   const months=get12Months(); const cm=months[0];
   const proj=getProjection();
@@ -4030,8 +4455,44 @@ function renderDashboard() {
 
   const el=document.getElementById('panel-dashboard');
   if(!el) return;
+  // Compose the short, contextual welcome message that sits above
+  // the KPI rows. It's deterministic (not an LLM call) so it always
+  // renders instantly when the panel loads — the user then opts in
+  // to a full AI analysis via the CTA below it. Values come from
+  // the same `cm` + `retNums` source of truth every KPI uses, so
+  // the greeting can never disagree with the tiles beside it.
+  const hour = new Date().getHours();
+  const greet = hour < 5 ? 'Up late' : hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : hour < 22 ? 'Good evening' : 'Burning the midnight oil';
+  const funFlow = cm.pureFunFund;
+  const savePct = ti > 0 ? Math.round(curSavings / ti * 100) : 0;
+  let verdictTone = 'pos';
+  let verdictBits = [];
+  if(funFlow >= 0) verdictBits.push(`your cash flow is green — this month you have <strong>${fmt(funFlow)}</strong> of Fun Fund to play with`);
+  else { verdictTone = 'neg'; verdictBits.push(`this month is running <strong>${fmt(Math.abs(funFlow))}</strong> short — Expenses + Savings are outpacing Income`); }
+  if(retNums.verdictClass === 'overfunded') verdictBits.push(`and your retirement plan is ahead of target at ${retNums.coveragePct.toFixed(0)}% funded`);
+  else if(retNums.verdictClass === 'ontarget') verdictBits.push(`and your retirement plan is on track at ${retNums.coveragePct.toFixed(0)}% funded`);
+  else { verdictBits.push(`and retirement coverage is light at ${retNums.coveragePct.toFixed(0)}% — worth a closer look`); if(verdictTone === 'pos') verdictTone = 'amb'; }
+  const welcomeLine = `${verdictBits.join(', ')}.`;
+  const ctxLine = `You're saving <strong>${savePct}%</strong> of income (${fmt(curSavings)}/mo), on track to retire at <strong>age ${state.retirementAge}</strong> with <strong>${fmt(realRetirementIncome)}/mo</strong> of real retirement income.`;
+  const hasReport = !!state.dashboardReport;
+  const reportRunning = _dashReportRunning;
+
   el.innerHTML=`
     ${ui.ph({tag:'HORIZON FINANCE OS', title:'Your Financial Dashboard', sub:'360° view — cash flow, portfolio, retirement health, and lifestyle planning'})}
+
+    <!-- Welcoming AI summary — short, personal snapshot + CTA to run a full analysis. -->
+    <div class="dash-welcome ${verdictTone}">
+      <div class="dash-welcome-icon">${verdictTone==='pos'?'✨':verdictTone==='amb'?'🧭':'⚠️'}</div>
+      <div class="dash-welcome-body">
+        <div class="dash-welcome-hd">${greet}, ${esc(state.userName || 'there')} — ${welcomeLine}</div>
+        <div class="dash-welcome-sub">${ctxLine}</div>
+      </div>
+      <div class="dash-welcome-cta">
+        <button class="btn btn-g" onclick="runDashboardAIReport()" ${reportRunning?'disabled':''}>
+          ${reportRunning ? '⏳ Analysing…' : (hasReport ? '🔄 Re-run full analysis' : '🤖 Run full financial analysis')}
+        </button>
+      </div>
+    </div>
 
     <!-- KPI Row 1: Cash Flow (each KPI drills into its owning panel) -->
     ${ui.kpiRow([
@@ -4071,6 +4532,11 @@ function renderDashboard() {
         <div class="card-title">🎯 Nest Egg Growth Curve</div>
         <div class="chart-wrap lg"><canvas id="dash-nestegg-chart"></canvas></div>
       </div>
+    </div>
+
+    <!-- Full AI financial analysis report — rendered below all charts. -->
+    <div id="dash-ai-report" class="card dash-ai-report" data-section="analysis">
+      ${renderDashboardAIReportBody()}
     </div>`;
     /* Quick-access shortcut cards removed — the "Next ↗" related-row at
        the bottom of the Dashboard already links to Monthly Review, Fun
@@ -5614,10 +6080,36 @@ function renderFunFund() {
           <div class="chart-wrap md"><canvas id="ff-chart"></canvas></div>
         </div>
         <div class="card">
-          <div class="card-title">Monthly Fun Fund Settings</div>
-          <p style="font-size:12px;color:var(--text2);margin-bottom:10px">Fun Fund = Income − Expenses − Savings (set in Baseline). It auto-calculates each month based on your overrides.</p>
-          <div style="display:flex;flex-direction:column;gap:6px;font-size:12px">
-            ${months.map(m=>`<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--bg3)"><span style="color:var(--text2)">${m.label}</span><span style="font-family:var(--fm);font-weight:600;color:${m.pureFunFund>=0?'var(--cyan)':'var(--red)'}">${fmt(m.pureFunFund)}</span></div>`).join('')}
+          <div class="card-title">Monthly Fun Fund — Running Balance</div>
+          <p style="font-size:12px;color:var(--text2);margin-bottom:10px">Each month's allocation (Income − Expenses − Savings) rolls into a continuous running balance. A negative month carries its deficit forward until later surpluses pay it off.</p>
+          <div class="ff-run-list">
+            ${(()=>{
+              // Build a running Fun Fund balance across the 12-month
+              // window. Each row shows: the month, that month's pure
+              // allocation (delta), and the cumulative balance after
+              // applying the delta. A negative delta pulls the running
+              // balance down; subsequent positive deltas pay off the
+              // deficit until the balance flips positive again.
+              let running = 0;
+              return months.map(m => {
+                const delta = m.pureFunFund || 0;
+                running += delta;
+                const deltaCls = delta >= 0 ? 'pos' : 'neg';
+                const deltaSign = delta >= 0 ? '+' : '−';
+                const runCls = running >= 0 ? 'pos' : 'neg';
+                const status = running < 0
+                  ? `<span class="ff-run-flag">paying off deficit</span>`
+                  : (delta < 0 && running >= 0
+                    ? `<span class="ff-run-flag muted">absorbed deficit</span>`
+                    : '');
+                return `<div class="ff-run-row">
+                  <span class="ff-run-label">${m.label}</span>
+                  <span class="ff-run-delta ${deltaCls}">${deltaSign} ${fmt(Math.abs(delta))}</span>
+                  <span class="ff-run-bal ${runCls}">${fmt(running)}</span>
+                  ${status}
+                </div>`;
+              }).join('');
+            })()}
           </div>
         </div>
       </div>
@@ -6945,68 +7437,297 @@ function renderSettings() {
 }
 
 // ══ VAULT ════════════════════════════════════════════════════════════════════
-// All generated Deep Dive reports live in state.vault. This panel gives
-// the user a chronological list + full-read view + a "Download as PDF"
-// export that opens a print-ready window.
+// state.vault holds three kinds of reports:
+//   · Dashboard "Monthly Financial Analysis" — our new AI report
+//   · Retire Anywhere "Deep Dive" location reports
+//   · Property IQ "Full Report" property reports
+//
+// Each entry carries a `category` tag the user can relabel from a small
+// dropdown (monthly-analysis / retirement-review / property-report /
+// trip-planning / other). The panel shows filter chips across the top,
+// a chronological list on the left, and on the right either a single
+// open report OR — when 2+ rows are ticked — a side-by-side compare
+// view that stacks the latest snapshots month-over-month.
+const VAULT_CATEGORIES = [
+  { key:'all',               label:'All',               icon:'🗄' },
+  { key:'monthly-analysis',  label:'Monthly analysis',  icon:'🤖' },
+  { key:'retirement-review', label:'Retirement review', icon:'🏖' },
+  { key:'property-report',   label:'Property report',   icon:'🏠' },
+  { key:'trip-planning',     label:'Trip planning',     icon:'✈️' },
+  { key:'other',             label:'Other',             icon:'🔖' },
+];
+// Normalise every vault entry to a single shape so the list code can
+// render both the old Deep Dive / PIQ entries and the new analysis
+// entries without branching every step of the way.
+function _vaultNormalise(v){
+  // Dashboard analysis entry
+  if(v.type === 'analysis'){
+    return {
+      id: v.id,
+      kind: 'analysis',
+      category: v.category || 'monthly-analysis',
+      icon: '🤖',
+      title: v.title || `Monthly Financial Analysis${v.snapshot?.month?' · '+v.snapshot.month:''}`,
+      sub: v.snapshot?.month || '',
+      when: v.generatedAt || v.date || 0,
+      markdown: v.markdown || '',
+      sections: v.sections || null,
+      snapshot: v.snapshot || null,
+      raw: v,
+    };
+  }
+  // Retire Anywhere deep-dive
+  if(v.type === 'deepdive' || (!v.type && v.locationId)){
+    return {
+      id: v.id,
+      kind: 'deepdive',
+      category: v.category || 'retirement-review',
+      icon: v.flag || '🌍',
+      title: `${v.location || 'Location'}${v.country?`, ${v.country}`:''}`,
+      sub: 'Retire Anywhere · Deep Dive',
+      when: v.date || 0,
+      markdown: v.markdown || '',
+      sections: null,
+      snapshot: null,
+      raw: v,
+    };
+  }
+  // Property IQ full report
+  if(v.type === 'piq'){
+    return {
+      id: v.id,
+      kind: 'piq',
+      category: v.category || 'property-report',
+      icon: v.flag || '🏠',
+      title: `${v.location || 'Property'}${v.country?`, ${v.country}`:''}`,
+      sub: 'Property IQ · Full Report',
+      when: v.date || 0,
+      markdown: v.markdown || '',
+      sections: null,
+      snapshot: null,
+      raw: v,
+    };
+  }
+  // Fallback for any future / unknown type
+  return {
+    id: v.id,
+    kind: 'other',
+    category: v.category || 'other',
+    icon: '🔖',
+    title: v.title || v.location || 'Saved item',
+    sub: '',
+    when: v.generatedAt || v.date || 0,
+    markdown: v.markdown || '',
+    sections: v.sections || null,
+    snapshot: v.snapshot || null,
+    raw: v,
+  };
+}
 function renderVault(){
   const el = document.getElementById('panel-vault'); if(!el) return;
-  const vault = Array.isArray(state.vault) ? state.vault : [];
-  const hasReports = vault.length > 0;
-  const openId = state.vaultOpenId && vault.find(v => v.id === state.vaultOpenId) ? state.vaultOpenId : (vault[0]?.id || null);
-  const open = vault.find(v => v.id === openId);
+  const rawVault = Array.isArray(state.vault) ? state.vault : [];
+  const entries = rawVault.map(_vaultNormalise).sort((a,b) => (b.when||0) - (a.when||0));
+  const hasReports = entries.length > 0;
+  const activeCat = state.vaultFilter || 'all';
+  const visible = activeCat === 'all' ? entries : entries.filter(e => e.category === activeCat);
+  if(!Array.isArray(state.vaultSelected)) state.vaultSelected = [];
+  // Purge stale selections for entries that no longer exist or are
+  // filtered out of the current view.
+  const visibleIds = new Set(visible.map(e => e.id));
+  state.vaultSelected = state.vaultSelected.filter(id => visibleIds.has(id));
+  const selectedIds = state.vaultSelected;
+  const openId = state.vaultOpenId && visible.find(v => v.id === state.vaultOpenId) ? state.vaultOpenId : (visible[0]?.id || null);
+  const open = visible.find(v => v.id === openId);
+
+  const counts = {};
+  entries.forEach(e => { counts[e.category] = (counts[e.category] || 0) + 1; });
+  counts.all = entries.length;
+  const chips = VAULT_CATEGORIES.map(c => {
+    const n = counts[c.key] || 0;
+    const active = c.key === activeCat ? ' active' : '';
+    const dim = (c.key !== 'all' && n === 0) ? ' dim' : '';
+    return `<button class="vault-chip${active}${dim}" onclick="setVaultFilter('${c.key}')">
+      <span class="ic">${c.icon}</span><span>${c.label}</span><span class="n">${n}</span>
+    </button>`;
+  }).join('');
 
   const list = !hasReports
     ? `<div class="state state-empty" style="margin-top:14px">
         <div class="state-icon">🗄</div>
-        <div class="state-title">No reports yet</div>
-        <div class="state-sub">Run a <strong>Deep Dive Report</strong> on any destination in Retire Anywhere and it will be saved here automatically. You can browse, reopen, and export every saved report from the Vault.</div>
-        <div class="state-cta"><button class="btn btn-o btn-sm" onclick="nav('retireanywhere')">🌍 Open Retire Anywhere</button></div>
-      </div>`
-    : vault.map(v => {
-        const d = new Date(v.date);
-        const when = d.toLocaleDateString(undefined, {day:'numeric',month:'short',year:'numeric'}) + ' · ' + d.toLocaleTimeString(undefined, {hour:'2-digit',minute:'2-digit'});
-        const active = v.id === openId ? ' active' : '';
-        // Badge distinguishes Retire Anywhere Deep Dives from Property IQ Full Reports
-        const typeLabel = v.type === 'piq' ? 'PROPERTY IQ' : 'DEEP DIVE';
-        const typeClass = v.type === 'piq' ? 'piq' : 'deepdive';
-        return `<div class="vault-row${active}" onclick="openVaultEntry('${v.id}')">
-          <div class="vault-row-flag">${v.flag || '🌍'}</div>
-          <div class="vault-row-meta">
-            <div class="vault-row-title">${esc2(v.location)}${v.country?`, ${esc2(v.country)}`:''}</div>
-            <div class="vault-row-sub"><span class="vault-type-badge ${typeClass}">${typeLabel}</span> ${esc2(when)}</div>
-          </div>
-          <button class="btn btn-o btn-xs" onclick="event.stopPropagation();exportVaultEntryPdf('${v.id}')" title="Download as PDF">📄 PDF</button>
-          <button class="line-rm" onclick="event.stopPropagation();deleteVaultEntry('${v.id}')" title="Delete">×</button>
-        </div>`;
-      }).join('');
-
-  const openTag = open?.type === 'piq' ? 'PROPERTY IQ FULL REPORT' : 'DEEP DIVE REPORT';
-  const openPane = open
-    ? `<div class="vault-open">
-        <div class="vault-open-head">
-          <div>
-            <div class="vault-open-tag">${openTag}</div>
-            <div class="vault-open-title">${esc2(open.location)}${open.country?`, ${esc2(open.country)}`:''}</div>
-            <div class="vault-open-sub">${esc2(new Date(open.date).toLocaleString())}${open.citizenship?` · tailored for ${esc2((countryInfo(open.citizenship)||{}).name||open.citizenship)} citizen based in ${esc2((countryInfo(open.homeBase)||{}).name||open.homeBase||'')}`:''}</div>
-          </div>
-          <div class="vault-open-actions">
-            <button class="btn btn-g btn-sm" onclick="exportVaultEntryPdf('${open.id}')">📄 Download PDF</button>
-          </div>
+        <div class="state-title">No saved reports yet</div>
+        <div class="state-sub">Save any AI financial analysis from the <strong>Dashboard</strong>, run a <strong>Deep Dive</strong> in Retire Anywhere, or generate a <strong>Property IQ full report</strong> — everything you save will live here, organised by category, so you can compare summaries month over month.</div>
+        <div class="state-cta">
+          <button class="btn btn-o btn-sm" onclick="nav('dashboard')">📊 Open Dashboard</button>
+          <button class="btn btn-o btn-sm" onclick="nav('retireanywhere')">🌍 Open Retire Anywhere</button>
         </div>
-        <div class="vault-open-body">${mdParse(open.markdown||'')}</div>
       </div>`
-    : (hasReports ? `<div class="state state-empty"><div class="state-sub">Select a report on the left to read it.</div></div>` : '');
+    : (visible.length === 0
+      ? `<div class="state state-empty" style="margin-top:14px"><div class="state-sub">No reports in this category yet.</div></div>`
+      : visible.map(e => {
+          const d = new Date(e.when || Date.now());
+          const when = d.toLocaleDateString(undefined, {day:'numeric',month:'short',year:'numeric'}) + ' · ' + d.toLocaleTimeString(undefined, {hour:'2-digit',minute:'2-digit'});
+          const active = e.id === openId ? ' active' : '';
+          const isSel = selectedIds.includes(e.id);
+          const selAttr = isSel ? ' checked' : '';
+          const kindBadgeLabel = e.kind === 'analysis' ? 'ANALYSIS' : e.kind === 'piq' ? 'PROPERTY IQ' : e.kind === 'deepdive' ? 'DEEP DIVE' : 'REPORT';
+          const kindBadgeCls = e.kind === 'analysis' ? 'analysis' : e.kind === 'piq' ? 'piq' : 'deepdive';
+          const catOptions = VAULT_CATEGORIES.filter(c => c.key !== 'all')
+            .map(c => `<option value="${c.key}" ${c.key===e.category?'selected':''}>${c.icon} ${c.label}</option>`).join('');
+          return `<div class="vault-row${active}" onclick="openVaultEntry('${e.id}')">
+            <label class="vault-row-sel" onclick="event.stopPropagation()" title="Select for compare">
+              <input type="checkbox" ${selAttr} onchange="toggleVaultSelect('${e.id}',this.checked)">
+            </label>
+            <div class="vault-row-flag">${e.icon}</div>
+            <div class="vault-row-meta">
+              <div class="vault-row-title">${esc2(e.title)}</div>
+              <div class="vault-row-sub">
+                <span class="vault-type-badge ${kindBadgeCls}">${kindBadgeLabel}</span>
+                ${esc2(when)}
+              </div>
+            </div>
+            <select class="vault-row-cat" onclick="event.stopPropagation()" onchange="setVaultEntryCategory('${e.id}',this.value)" title="Change category">${catOptions}</select>
+            ${e.markdown ? `<button class="btn btn-o btn-xs" onclick="event.stopPropagation();exportVaultEntryPdf('${e.id}')" title="Download as PDF">📄 PDF</button>` : ''}
+            <button class="line-rm" onclick="event.stopPropagation();deleteVaultEntry('${e.id}')" title="Delete">×</button>
+          </div>`;
+        }).join(''));
+
+  // Right pane: compare mode if 2+ selected, otherwise the single open entry.
+  const compareEntries = visible.filter(e => selectedIds.includes(e.id))
+    .sort((a,b) => (a.when||0) - (b.when||0));
+  let rightPane = '';
+  if(compareEntries.length >= 2){
+    // Snapshot row for analysis entries — shows the headline numbers
+    // from each report's stored snapshot so the user can see the
+    // month-over-month trajectory at a glance.
+    const snapRow = (() => {
+      const snaps = compareEntries.filter(e => e.snapshot);
+      if(snaps.length === 0) return '';
+      const headers = snaps.map(e => `<th>${esc2(e.snapshot.month || _fmtWhen(e.when))}</th>`).join('');
+      const row = (label, pick, fmtFn) => `<tr><td>${label}</td>${snaps.map(e=>`<td>${fmtFn((e.snapshot||{})[pick])}</td>`).join('')}</tr>`;
+      return `<div class="vault-compare-snap">
+        <table class="vault-compare-tbl">
+          <thead><tr><th>Metric</th>${headers}</tr></thead>
+          <tbody>
+            ${row('Income',     'income',     v => v!=null?fmt(v):'—')}
+            ${row('Expenses',   'expenses',   v => v!=null?fmt(v):'—')}
+            ${row('Savings',    'savings',    v => v!=null?fmt(v):'—')}
+            ${row('Fun Fund',   'funFund',    v => v!=null?fmt(v):'—')}
+            ${row('12mo Fun Fund','funFund12mo', v => v!=null?fmt(v):'—')}
+            ${row('Retire cvg', 'coveragePct', v => v!=null?v.toFixed(0)+'%':'—')}
+            ${row('Nest egg',   'nestEgg',    v => v!=null?fmt(v):'—')}
+          </tbody>
+        </table>
+      </div>`;
+    })();
+    // Section-by-section grid — one column per selected report.
+    const cols = compareEntries.map(e => {
+      const secs = e.sections;
+      const when = _fmtWhen(e.when);
+      const bodies = secs
+        ? DASH_REPORT_SECTIONS.map(s => `
+            <div class="vault-cmp-sec">
+              <div class="vault-cmp-sec-hd">${s.icon} ${s.title}</div>
+              ${secs[s.key] ? mdParse(secs[s.key]) : '<div class="md" style="color:var(--text3);font-style:italic">—</div>'}
+            </div>
+          `).join('')
+        : `<div class="vault-cmp-sec"><div class="vault-cmp-sec-hd">Report</div>${mdParse(e.markdown || '')}</div>`;
+      return `<div class="vault-cmp-col">
+        <div class="vault-cmp-col-hd">
+          <div class="vault-cmp-col-title">${esc2(e.title)}</div>
+          <div class="vault-cmp-col-sub">${esc2(when)}</div>
+        </div>
+        ${bodies}
+      </div>`;
+    }).join('');
+    rightPane = `<div class="vault-compare">
+      <div class="vault-compare-head">
+        <div>
+          <div class="vault-open-tag">COMPARE · ${compareEntries.length} REPORTS</div>
+          <div class="vault-open-title">Side-by-side snapshot</div>
+          <div class="vault-open-sub">Untick rows on the left to return to single-report mode.</div>
+        </div>
+        <button class="btn btn-o btn-sm" onclick="clearVaultSelection()">Clear selection</button>
+      </div>
+      ${snapRow}
+      <div class="vault-compare-grid">${cols}</div>
+    </div>`;
+  } else if(open){
+    const catLabel = (VAULT_CATEGORIES.find(c => c.key === open.category) || {}).label || open.category;
+    const openTag = open.kind === 'analysis' ? 'MONTHLY FINANCIAL ANALYSIS'
+                  : open.kind === 'piq' ? 'PROPERTY IQ FULL REPORT'
+                  : open.kind === 'deepdive' ? 'DEEP DIVE REPORT' : 'REPORT';
+    const tailored = open.raw && open.raw.citizenship
+      ? ` · tailored for ${esc2((countryInfo(open.raw.citizenship)||{}).name||open.raw.citizenship)} citizen based in ${esc2((countryInfo(open.raw.homeBase)||{}).name||open.raw.homeBase||'')}`
+      : '';
+    // For analyses, render the four structured sections. For deep
+    // dives / PIQ, keep the existing full-markdown body.
+    const body = (open.kind === 'analysis' && open.sections)
+      ? DASH_REPORT_SECTIONS.map(s => `
+          <div class="dash-ai-sec ${s.cls}" style="margin-bottom:12px">
+            <div class="dash-ai-sec-hd"><span class="ic">${s.icon}</span><span>${s.title}</span></div>
+            ${open.sections[s.key] ? mdParse(open.sections[s.key]) : '<div class="md" style="color:var(--text3);font-style:italic">—</div>'}
+          </div>
+        `).join('')
+      : mdParse(open.markdown || '');
+    rightPane = `<div class="vault-open">
+      <div class="vault-open-head">
+        <div>
+          <div class="vault-open-tag">${openTag} · ${esc2(catLabel)}</div>
+          <div class="vault-open-title">${esc2(open.title)}</div>
+          <div class="vault-open-sub">${esc2(_fmtWhen(open.when))}${tailored}</div>
+        </div>
+        <div class="vault-open-actions">
+          ${open.markdown ? `<button class="btn btn-g btn-sm" onclick="exportVaultEntryPdf('${open.id}')">📄 Download PDF</button>` : ''}
+        </div>
+      </div>
+      <div class="vault-open-body">${body}</div>
+    </div>`;
+  } else {
+    rightPane = hasReports
+      ? `<div class="state state-empty"><div class="state-sub">Select a report on the left to read it — or tick 2+ rows to compare them side by side.</div></div>`
+      : '';
+  }
 
   el.innerHTML = `
-    ${ui.ph({tag:'LIBRARY', title:'Vault', sub:'Every Deep Dive report you generate is saved here. Reopen any report for a full read, or export it as a print-ready PDF.'})}
+    ${ui.ph({tag:'LIBRARY', title:'Vault', sub:'Every saved analysis, Deep Dive, and property report lives here. Filter by category, reopen any report for a full read, or tick multiple rows to compare them side by side.'})}
+    <div class="vault-chips">${chips}</div>
     <div class="vault-grid">
       <div class="vault-list-wrap">
-        <div class="vault-list-head">${hasReports ? `${vault.length} report${vault.length===1?'':'s'}` : 'Empty'}</div>
+        <div class="vault-list-head">
+          ${visible.length ? `${visible.length} report${visible.length===1?'':'s'}` : 'Empty'}
+          ${selectedIds.length >= 2 ? `<span class="vault-list-sel">${selectedIds.length} selected for compare</span>` : ''}
+        </div>
         <div class="vault-list">${list}</div>
       </div>
-      <div class="vault-open-wrap">${openPane}</div>
+      <div class="vault-open-wrap">${rightPane}</div>
     </div>`;
 }
+window.setVaultFilter = function(cat){
+  state.vaultFilter = cat;
+  state.vaultOpenId = null;
+  save();
+  renderVault();
+};
+window.setVaultEntryCategory = function(id, cat){
+  const v = (state.vault || []).find(x => x.id === id);
+  if(!v) return;
+  v.category = cat;
+  save();
+  renderVault();
+};
+window.toggleVaultSelect = function(id, checked){
+  if(!Array.isArray(state.vaultSelected)) state.vaultSelected = [];
+  const idx = state.vaultSelected.indexOf(id);
+  if(checked && idx < 0) state.vaultSelected.push(id);
+  if(!checked && idx >= 0) state.vaultSelected.splice(idx, 1);
+  save();
+  renderVault();
+};
+window.clearVaultSelection = function(){
+  state.vaultSelected = [];
+  save();
+  renderVault();
+};
 window.openVaultEntry = function(id){
   state.vaultOpenId = id;
   renderVault();
@@ -7015,6 +7736,7 @@ window.deleteVaultEntry = function(id){
   if(!confirm('Delete this saved report? This cannot be undone.')) return;
   state.vault = (state.vault || []).filter(v => v.id !== id);
   if(state.vaultOpenId === id) state.vaultOpenId = null;
+  if(Array.isArray(state.vaultSelected)) state.vaultSelected = state.vaultSelected.filter(x => x !== id);
   save();
   renderVault();
 };
@@ -7025,11 +7747,19 @@ window.deleteVaultEntry = function(id){
 window.exportVaultEntryPdf = function(id){
   const entry = (state.vault || []).find(v => v.id === id);
   if(!entry){ alert('Report not found in Vault.'); return; }
-  const dateStr = new Date(entry.date).toLocaleDateString(undefined, {day:'numeric',month:'long',year:'numeric'});
-  const timeStr = new Date(entry.date).toLocaleTimeString(undefined, {hour:'2-digit',minute:'2-digit'});
+  // All vault types are supported. Analysis entries use `generatedAt`
+  // and `title`; Deep Dive / PIQ entries use `date` + `location` /
+  // `country`. Pick whichever is present so the PDF header stays
+  // accurate across report kinds.
+  const ts = entry.generatedAt || entry.date || Date.now();
+  const dateStr = new Date(ts).toLocaleDateString(undefined, {day:'numeric',month:'long',year:'numeric'});
+  const timeStr = new Date(ts).toLocaleTimeString(undefined, {hour:'2-digit',minute:'2-digit'});
   const cz = countryInfo(entry.citizenship);
   const hb = countryInfo(entry.homeBase);
-  const titleEsc = esc2(`${entry.location}${entry.country?', '+entry.country:''}`);
+  const headerTitle = entry.type === 'analysis'
+    ? (entry.title || 'Financial Analysis')
+    : `${entry.location || ''}${entry.country?', '+entry.country:''}`;
+  const titleEsc = esc2(headerTitle);
   // Build the print-ready HTML document as a single self-contained
   // string. Styles match the in-app .md vocabulary so the PDF keeps
   // the same typographic hierarchy, tables, and colour semantics the
@@ -7085,7 +7815,7 @@ window.exportVaultEntryPdf = function(id){
 <div class="pdf-wrap">
   <div class="pdf-head">
     <div>
-      <div class="pdf-app">HORIZON FINANCE OS · DEEP DIVE</div>
+      <div class="pdf-app">HORIZON FINANCE OS · ${entry.type==='analysis'?'FINANCIAL ANALYSIS':entry.type==='piq'?'PROPERTY IQ':'DEEP DIVE'}</div>
       <div class="pdf-title">${titleEsc}</div>
     </div>
     <div class="pdf-meta">
