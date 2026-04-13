@@ -432,6 +432,45 @@ input[type="number"] { -moz-appearance:textfield; }
   font-size:9px; color:var(--violet); font-family:var(--fm);
   letter-spacing:.04em; white-space:nowrap;
 }
+/* Read-only linked rows (e.g. trip expenses): the inputs are
+   `disabled readonly` so the browser prevents edits, and a small
+   lock glyph + "Edit in Fun Fund ↗" shortcut tell the user where
+   to go. Cursor + muted tone communicate non-editability. */
+.line-item-linked-ro .line-name,
+.line-item-linked-ro .line-amt {
+  color:var(--text2);
+  cursor:not-allowed;
+  opacity:.85;
+}
+.line-item-linked-ro .line-amt-wrap-ro {
+  position:relative;
+  background:var(--bg3);
+  border-style:dashed;
+}
+.line-item-linked-ro .line-lock {
+  font-size:11px;
+  opacity:.6;
+  margin-left:4px;
+  pointer-events:none;
+}
+.line-item-linked-ro .line-linked-jump {
+  background:transparent;
+  border:1px solid var(--violet);
+  color:var(--violet);
+  font-family:var(--fm);
+  font-size:9px;
+  font-weight:700;
+  letter-spacing:.04em;
+  padding:3px 8px;
+  border-radius:4px;
+  cursor:pointer;
+  white-space:nowrap;
+  transition:background .15s, color .15s;
+}
+.line-item-linked-ro .line-linked-jump:hover {
+  background:var(--violet);
+  color:#fff;
+}
 
 /* ── MONTH SELECTOR ──────────────────────────────────── */
 .month-pills { display:flex; gap:4px; overflow-x:auto; padding-bottom:6px; margin-bottom:12px; }
@@ -807,17 +846,31 @@ body.light .loc-card:hover { box-shadow:0 5px 14px -8px rgba(60,40,10,0.18); }
   animation:spin 1s linear infinite;
 }
 @keyframes spin { to { transform:rotate(360deg); } }
-.dash-ai-sections { display:grid; grid-template-columns: 1fr 1fr; gap:14px; }
-@media (max-width: 960px){ .dash-ai-sections { grid-template-columns: 1fr; } }
+/* Balanced 2x2 grid so every section fills its cell — no empty
+   column, no orphan row. Each box stretches to match its
+   neighbour's height so the four sections read symmetrically. */
+.dash-ai-sections {
+  display:grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-auto-rows:1fr;
+  gap:14px;
+}
+@media (max-width: 860px){
+  .dash-ai-sections { grid-template-columns: 1fr; grid-auto-rows:auto; }
+}
 .dash-ai-sec {
   background:var(--bg3); border:1px solid var(--border);
   border-radius:8px; padding:14px 16px;
   border-top:3px solid var(--border2);
+  display:flex;
+  flex-direction:column;
+  min-width:0;
 }
+.dash-ai-sec .md { flex:1; min-width:0; }
 .dash-ai-sec.sec-position { border-top-color:#4d9fff; }
 .dash-ai-sec.sec-good     { border-top-color:var(--green); }
 .dash-ai-sec.sec-concern  { border-top-color:var(--red); }
-.dash-ai-sec.sec-recs     { border-top-color:var(--violet); grid-column: 1 / -1; }
+.dash-ai-sec.sec-recs     { border-top-color:var(--violet); }
 .dash-ai-sec-hd {
   display:flex; align-items:center; gap:8px;
   font-family:var(--fm); font-size:10px; font-weight:700;
@@ -3663,7 +3716,13 @@ function scopeShift(dir){
   const panel = state.activePanel||'dashboard';
   const kind = _scopeKind();
   if(kind === 'year'){
-    state.selectedYear = Math.max(CY, (state.selectedYear||CY+1) + dir);
+    // Clamp the year navigator to [CY+1, retireYear]. Past the
+    // retirement year the Yearly Forecast has nothing to project
+    // because the Retirement Plan tab's retirement expenses take
+    // over as the active expense set.
+    const retireYear = CY + Math.max(0, (state.retirementAge||65) - (state.currentAge||30));
+    const next = (state.selectedYear||CY+1) + dir;
+    state.selectedYear = Math.min(Math.max(CY+1, next), retireYear);
     save(); renderAll();
   } else {
     // advance selectedMonth; clamp into the 12-month forward window
@@ -4123,11 +4182,18 @@ function renderLineItems(containerId, items, stateKey, readOnly, showPaid) {
     // NOT originate in the Monthly Review tab and that edits have
     // downstream effects.
     if(it.fromTrip){
-      return `<div class="line-item line-item-linked" title="Linked from Fun Fund · Trip. Editing the amount updates the trip expense — open the Fun Fund tab to change the name, date, or add/remove lines.">
+      // Trip rows are fully read-only in the Monthly Review. The
+      // Fun Fund tab is the single edit point for a trip's name,
+      // month, and amount; any change there propagates into this
+      // row automatically via get12Months(). A click on the locked
+      // amount input surfaces an inline hint so the user knows
+      // exactly where to go.
+      const hint = `Trip expenses are managed in the Fun Fund tab — click there to edit the name, month, or amount.`;
+      return `<div class="line-item line-item-linked line-item-linked-ro" title="${esc(hint)}">
         <span class="line-linked-icon" aria-hidden="true">✈︎</span>
-        <input class="line-name" value="${esc(it.name)}" disabled>
-        <div class="line-amt-wrap"><span class="line-cur">${s}</span><input class="line-amt" type="number" value="${Math.round(it.amount*r)}" oninput="updateLinkedTripAmount('${it.tripId}','${it.tripExpenseId}',this.value/${r})"></div>
-        <span class="line-linked-src">Fun Fund</span>
+        <input class="line-name" value="${esc(it.name)}" disabled title="${esc(hint)}">
+        <div class="line-amt-wrap line-amt-wrap-ro" title="${esc(hint)}"><span class="line-cur">${s}</span><input class="line-amt" type="number" value="${Math.round(it.amount*r)}" disabled readonly title="${esc(hint)}"><span class="line-lock" aria-hidden="true" title="${esc(hint)}">🔒</span></div>
+        <button class="line-linked-jump" onclick="nav('funfund')" title="Open the Fun Fund tab to edit this trip">Edit in Fun Fund ↗</button>
         <span class="line-linked-pill trip">TRIP</span>
       </div>`;
     }
@@ -4764,28 +4830,37 @@ function renderDashboard() {
       const cd=chartDefaults();
       const proj=getProjection();
       const mode = state.dashNestEggMode || 'real';
-      // Nominal: use compounded raw values. Today's Money: divide by
-      // cumulative inflation so every series is expressed in the
-      // user's real purchasing power (same lens the rest of the app
-      // uses by default). Both datasets come straight from the
-      // single getProjection() source of truth so the Savings curve
-      // on this chart is identical to the projection used for the
-      // Savings line item in the Retirement Plan tab.
+      // Three distinct series, all sourced from the same single
+      // getProjection() result so they stay in lockstep with the
+      // Retirement Plan portfolio KPIs and the Savings line item.
+      //
+      //   · Savings Growth   — in-app savings stream only (p.appSavings)
+      //   · Investment Growth — external investment accounts only
+      //                        (p.external) — EXCLUDES savings
+      //   · Total            — Savings + Investment (p.total)
+      //
+      // The Today's Money / Nominal toggle divides every series by
+      // cumulative inflation when active.
       const inflF = y => Math.pow(1+state.inflationRate/100, y);
-      const savings = proj.map(p => mode === 'real' ? Math.round(p.appSavings / inflF(p.age - state.currentAge)) : p.appSavings);
-      const total   = proj.map(p => mode === 'real' ? p.realTotal : p.total);
+      const toReal = (v, y) => Math.round(v / inflF(y));
+      const savings    = proj.map(p => mode === 'real' ? toReal(p.appSavings || 0, p.age - state.currentAge) : (p.appSavings || 0));
+      const investment = proj.map(p => mode === 'real' ? toReal(p.external   || 0, p.age - state.currentAge) : (p.external   || 0));
+      const total      = proj.map(p => mode === 'real' ? p.realTotal : p.total);
       charts['dash-ne']=new Chart(ne.getContext('2d'),{
         type:'line',
         data:{
           labels:proj.map(p=>'Age '+p.age),
           datasets:[
-            // Combined Nest Egg — in-app savings + every external
-            // investment account compounded. Solid green line.
-            {label:'Combined Nest Egg', data: total,   borderColor:'#00e8a0', backgroundColor:'#00e8a012', fill:true,  tension:.3, pointRadius:0, borderWidth:2.25, order:1},
-            // Savings Growth — ONLY the in-app monthly/yearly savings
-            // stream, compounded at state.growthRate. Same numbers
-            // that drive the Retirement Plan Savings line item.
-            {label:'Savings Growth',    data: savings, borderColor:'#f5a623', backgroundColor:'transparent',fill:false, tension:.3, pointRadius:0, borderWidth:2,    borderDash:[5,4], order:2},
+            // Total — combined nest egg. Solid green line with a
+            // faint area fill so it reads as the headline series.
+            {label:'Total',             data: total,      borderColor:'#00e8a0', backgroundColor:'#00e8a012', fill:true,  tension:.3, pointRadius:0, borderWidth:2.5, order:1},
+            // Investment Growth — external accounts only. Dashed
+            // blue line so it's visually distinct from the total.
+            {label:'Investment Growth', data: investment, borderColor:'#4d9fff', backgroundColor:'transparent', fill:false, tension:.3, pointRadius:0, borderWidth:2,   borderDash:[6,4], order:2},
+            // Savings Growth — the in-app monthly/yearly savings
+            // stream only. Dashed amber line matching the Retirement
+            // Plan's derived Savings line item colour treatment.
+            {label:'Savings Growth',    data: savings,    borderColor:'#f5a623', backgroundColor:'transparent', fill:false, tension:.3, pointRadius:0, borderWidth:2,   borderDash:[2,4], order:3},
           ]
         },
         options:chartPreset({scales:{
@@ -5269,6 +5344,14 @@ function liveSyncMonthlyReview(selKey){
 }
 
 // ══ YEARLY ═══════════════════════════════════════════════════════════════════
+// The Yearly Forecast tab displays and edits all line items as
+// ANNUAL amounts (multiplied by 12 for display, divided by 12 on
+// input). This is the source of the old "double counting" bug —
+// items were stored as monthly values but the tab was labelled
+// "Yearly", so a user who typed 60,000 for rent saw the working
+// year's expenses shoot up to 60,000 × 12 = 720,000. Now the
+// displayed number IS the annual total, and the stored amount is
+// always the per-month slice that downstream calculations expect.
 function renderYearly() {
   const yr=state.selectedYear;
   const yb=state.yearlyBases[String(yr)];
@@ -5282,17 +5365,38 @@ function renderYearly() {
   const sav=yb?.savings??cascBase?.savings??state.baseSavings;
   const r=rate(); const s=sym();
 
+  // The Yearly Forecast stops at the user's retirement year. Past
+  // that point, retirement expenses from the Retire tab take over
+  // so there's no useful "working life" projection to edit. We cap
+  // the ▶ arrow + show a cut-off card at the retirement year and
+  // clamp state.selectedYear on render so the UI can never land in
+  // a year beyond retirement via legacy state.
+  const retireYear = CY + Math.max(0, (state.retirementAge||65) - (state.currentAge||30));
+  const clampedYr = Math.min(Math.max(yr, CY+1), retireYear);
+  if(clampedYr !== yr) {
+    state.selectedYear = clampedYr;
+    save();
+  }
+  const isRetireYear = clampedYr >= retireYear;
+  const canGoFwd = clampedYr < retireYear;
+  const canGoBwd = clampedYr > CY+1;
+
+  // Headline totals (annual rollup of the items shown below) so the
+  // user sees the sum at a glance — matches what's typed in each row.
+  const incAnnual  = sumArr(incItems,  'amount') * 12;
+  const expAnnual  = sumArr(expItems, 'amount') * 12;
+  const savAnnual  = sav * 12;
+  const netAnnual  = incAnnual - expAnnual - savAnnual;
+
   const panelYearly=document.getElementById('panel-yearly');
   if(!panelYearly) return;
-  // Page header is rendered once by renderReview() above this panel,
-  // so the per-view ph block has been removed to avoid a duplicate
-  // title. The rest of the Yearly body is unchanged.
   panelYearly.innerHTML=`
     <div style="display:flex;align-items:center;gap:16px;margin-bottom:14px;flex-wrap:wrap">
       <div style="display:flex;align-items:center;gap:10px">
-        <button style="background:var(--bg3);border:1px solid var(--border);color:var(--text2);width:32px;height:32px;border-radius:7px;cursor:pointer;font-size:13px" onclick="state.selectedYear=Math.max(${CY+1},state.selectedYear-1);renderYearly()">◀</button>
-        <span style="font-family:var(--ff);font-size:26px;font-weight:800;min-width:90px;text-align:center">${yr}</span>
-        <button style="background:var(--bg3);border:1px solid var(--border);color:var(--text2);width:32px;height:32px;border-radius:7px;cursor:pointer;font-size:13px" onclick="state.selectedYear++;renderYearly()">▶</button>
+        <button style="background:var(--bg3);border:1px solid var(--border);color:${canGoBwd?'var(--text2)':'var(--text3)'};width:32px;height:32px;border-radius:7px;cursor:${canGoBwd?'pointer':'not-allowed'};font-size:13px;opacity:${canGoBwd?1:.4}" ${canGoBwd?'':'disabled'} onclick="state.selectedYear=Math.max(${CY+1},state.selectedYear-1);renderYearly()">◀</button>
+        <span style="font-family:var(--ff);font-size:26px;font-weight:800;min-width:90px;text-align:center">${clampedYr}</span>
+        <button style="background:var(--bg3);border:1px solid var(--border);color:${canGoFwd?'var(--text2)':'var(--text3)'};width:32px;height:32px;border-radius:7px;cursor:${canGoFwd?'pointer':'not-allowed'};font-size:13px;opacity:${canGoFwd?1:.4}" ${canGoFwd?'':'disabled'} onclick="if(state.selectedYear<${retireYear}){state.selectedYear++;renderYearly()}">▶</button>
+        <span style="font-family:var(--fm);font-size:10px;color:var(--text3);margin-left:6px;letter-spacing:.06em">Window: ${CY+1}–${retireYear} · age ${state.currentAge}→${state.retirementAge}</span>
       </div>
       <label class="toggle-wrap">
         <input type="checkbox" ${state.cascadeEnabled?'checked':''} onchange="state.cascadeEnabled=this.checked;syncYearCascade();save()">
@@ -5301,15 +5405,38 @@ function renderYearly() {
       </label>
       ${state.cascadeEnabled?`<span style="background:var(--violet-dim);color:var(--violet);padding:4px 10px;border-radius:6px;font-size:11px;font-weight:700;font-family:var(--fm)">⚡ CASCADING → ALL FUTURE YEARS</span>`:''}
     </div>
-    <div class="two-col">
-      <div class="card"><div class="card-title">Yearly Income</div><div id="yr-inc"></div><button class="btn-add" onclick="addYearlyItem('income')">+ Add Income</button></div>
-      <div class="card"><div class="card-title">Yearly Expenses</div><div id="yr-exp"></div><button class="btn-add" onclick="addYearlyItem('expenses')">+ Add Expense</button></div>
-      <div class="card" style="grid-column:1/-1">
-        <div class="card-title">Savings Target for ${yr}</div>
-        <div style="display:flex;align-items:center;gap:8px;background:var(--bg3);border-radius:8px;padding:4px 14px;max-width:280px">
-          <span style="color:var(--text3);font-size:12px;font-family:var(--fm)">${s}</span>
-          <input type="number" value="${Math.round(sav*r)}" style="background:transparent;border:none;color:var(--text);font-family:var(--fm);font-size:20px;font-weight:700;padding:10px 0;outline:none;width:200px" oninput="setYearlySavings(this.value/${r})">
+
+    ${isRetireYear ? `
+      <div class="callout" style="margin-bottom:14px">
+        <span>🏖</span>
+        <div>
+          <strong>${clampedYr} is your retirement year</strong> — this is the last year the Yearly Forecast projects. From age <strong>${state.retirementAge}</strong> onward, your <strong>Retirement Expenses</strong> take over as the active expense set. Edit those on the <a href="#" onclick="nav('retirement');return false" style="color:var(--green);font-weight:700">Retirement Plan tab →</a>
         </div>
+      </div>
+    ` : ''}
+
+    <!-- Annual rollup summary — shows the sum of every line item
+         below, so typing a 60,000 rent annual value produces a
+         60,000 line in the Yearly Expenses total (not 720,000).
+         No double counting. -->
+    <div class="kpi-row" style="margin-bottom:14px">
+      <div class="kpi"><div class="kpi-icon">💰</div><div class="kpi-lbl">ANNUAL INCOME · ${clampedYr}</div><div class="kpi-val pos">${fmt(incAnnual)}</div><div class="kpi-sub">${incItems.length} line item${incItems.length===1?'':'s'}</div></div>
+      <div class="kpi"><div class="kpi-icon">📤</div><div class="kpi-lbl">ANNUAL EXPENSES · ${clampedYr}</div><div class="kpi-val neg">${fmt(expAnnual)}</div><div class="kpi-sub">${incAnnual>0?Math.round(expAnnual/incAnnual*100):0}% of income</div></div>
+      <div class="kpi"><div class="kpi-icon">🏦</div><div class="kpi-lbl">ANNUAL SAVINGS TARGET</div><div class="kpi-val" style="color:var(--amber)">${fmt(savAnnual)}</div><div class="kpi-sub">${fmt(sav)}/mo</div></div>
+      <div class="kpi"><div class="kpi-icon">${netAnnual>=0?'✨':'⚠️'}</div><div class="kpi-lbl">NET · AFTER SAVINGS</div><div class="kpi-val ${netAnnual>=0?'pos':'neg'}">${fmt(netAnnual)}</div><div class="kpi-sub">Income − Expenses − Savings</div></div>
+    </div>
+
+    <div class="two-col">
+      <div class="card"><div class="card-title">Yearly Income <span style="font-size:9px;font-weight:400;color:var(--text3);text-transform:none;margin-left:6px">· enter amounts as annual totals</span></div><div id="yr-inc"></div><button class="btn-add" onclick="addYearlyItem('income')">+ Add Income</button></div>
+      <div class="card"><div class="card-title">Yearly Expenses <span style="font-size:9px;font-weight:400;color:var(--text3);text-transform:none;margin-left:6px">· enter amounts as annual totals</span></div><div id="yr-exp"></div><button class="btn-add" onclick="addYearlyItem('expenses')">+ Add Expense</button></div>
+      <div class="card" style="grid-column:1/-1">
+        <div class="card-title">Annual Savings Target for ${clampedYr}</div>
+        <div style="display:flex;align-items:center;gap:8px;background:var(--bg3);border-radius:8px;padding:4px 14px;max-width:320px">
+          <span style="color:var(--text3);font-size:12px;font-family:var(--fm)">${s}</span>
+          <input type="number" value="${Math.round(savAnnual*r)}" style="background:transparent;border:none;color:var(--text);font-family:var(--fm);font-size:20px;font-weight:700;padding:10px 0;outline:none;width:200px" oninput="setYearlySavings(this.value/${r}/12)">
+          <span style="font-size:11px;color:var(--text3);font-family:var(--fm)">/yr</span>
+        </div>
+        <div style="font-size:10px;color:var(--text3);margin-top:4px;font-family:var(--fm)">Equivalent to ${fmt(sav)}/mo applied to every month in ${clampedYr}.</div>
       </div>
     </div>`;
 
@@ -5317,12 +5444,17 @@ function renderYearly() {
   renderYearlyLineItems('yr-exp',expItems,'expenses');
   if(typeof updateScopeChip==='function') updateScopeChip();
 }
+// Line items are stored per-month but displayed as their annual
+// equivalent (× 12). updateYrItem divides inbound values by 12 so
+// downstream calculations (getEffective, get12Months, getProjection)
+// keep seeing the monthly-shape amounts they expect — no migration,
+// no double-count.
 function renderYearlyLineItems(cid,items,field){
   const el=document.getElementById(cid); if(!el) return;
   const r=rate(); const s=sym();
   el.innerHTML=items.map(it=>`<div class="line-item">
     <input class="line-name" value="${esc(it.name)}" placeholder="Name" oninput="updateYrItem('${field}','${it.id}','name',this.value)">
-    <div class="line-amt-wrap"><span class="line-cur">${s}</span><input class="line-amt" type="number" value="${Math.round(it.amount*r)}" oninput="updateYrItem('${field}','${it.id}','amount',this.value/${r})"></div>
+    <div class="line-amt-wrap"><span class="line-cur">${s}</span><input class="line-amt" type="number" value="${Math.round(it.amount*12*r)}" oninput="updateYrItem('${field}','${it.id}','amount',this.value/${r}/12)"><span style="font-size:10px;color:var(--text3);font-family:var(--fm);padding-right:4px">/yr</span></div>
     <select class="line-type" onchange="updateYrItem('${field}','${it.id}','type',this.value)">
       <option value="fixed" ${it.type==='fixed'?'selected':''}>Fixed</option>
       <option value="variable" ${it.type==='variable'?'selected':''}>Variable</option>
@@ -5356,6 +5488,8 @@ window.addYearlyItem=function(field){
   state.yearlyBases[y][field].push({id:genId(),name:'',amount:0,type:field==='income'?'fixed':'variable'});
   save();renderYearly();
 };
+// Accepts a monthly value (already divided by 12 by the caller) so
+// downstream storage stays in per-month units.
 window.setYearlySavings=function(val){
   const y=String(state.selectedYear);
   if(!state.yearlyBases[y]) state.yearlyBases[y]={};
