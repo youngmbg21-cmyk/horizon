@@ -10262,31 +10262,76 @@ function _buildCustomChartConfig(validated, catalog, rawSpec){
   };
 }
 
-// Extract every fenced horizon-chart block from a reply and replace each
-// with a plain-text sentinel token. We use a sentinel (not an HTML div)
+// Extract every horizon-chart block from a reply and replace each with
+// a plain-text sentinel token. We use a sentinel (not an HTML div)
 // because mdParse() HTML-escapes all text — any raw tags we injected
-// would come out as &lt;div&gt;. The sentinel is a unique, alphanumeric-
-// only string that survives markdown-escaping unchanged. The render step
+// would come out as &lt;div&gt;. The sentinel is a unique alphanumeric
+// string that survives markdown-escaping unchanged. The render step
 // then swaps each sentinel (wrapped by mdParse in its own <p>) for a
 // real Chart.js host card. Returns {text: replyWithSentinels, blocks: []}.
+//
+// The extractor is deliberately tolerant of the shapes Claude actually
+// emits in practice, not just the shape the prompt asks for. We look
+// for, in order:
+//   1. Fenced ```horizon-chart``` blocks (the contracted form) — any
+//      case, any spacing, optional same-line body.
+//   2. Fenced ```json```, ```JSON```, or plain ``` blocks whose JSON
+//      body has a `kind` key naming a known recipe — a common drift.
+//   3. Bare inline JSON objects like {"kind":"runway", …} with no
+//      fence at all — the failure mode that was dumping raw strings
+//      into the chat.
+// Every path funnels into _chartBlockFromJSON() so the sentinel
+// emission + payload parsing logic stays in one place.
 function _extractAIChartBlocks(reply, msgIdx){
   const blocks = [];
-  // Match ```horizon-chart\n...\n``` — tolerant of trailing whitespace and
-  // optional language suffix spaces. Non-greedy body.
-  const re = /```horizon-chart\s*\n([\s\S]*?)```/g;
-  const rewritten = reply.replace(re, (_full, body) => {
+  let text = String(reply || '');
+  const pushBlock = (rawBody) => {
     const blockIdx = blocks.length;
     const chartId = `aichart-${msgIdx}-${blockIdx}`;
     let payload = null, parseError = null;
-    try { payload = JSON.parse(body.trim()); }
+    try { payload = JSON.parse(String(rawBody || '').trim()); }
     catch(e){ parseError = e.message; }
     blocks.push({ chartId, payload, parseError });
     // Blank lines around the sentinel force mdParse to treat it as its
     // own paragraph, so the post-render substitution can safely replace
-    // the whole <p>...</p> wrapper with a block-level chart card.
+    // the whole <p>…</p> wrapper with a block-level chart card.
     return `\n\nHORIZONCHARTPLACEHOLDER${chartId.replace(/-/g,'X')}\n\n`;
-  });
-  return { text: rewritten, blocks };
+  };
+  // Pass 1 — explicit ```horizon-chart``` (or variants) fenced blocks.
+  // Case-insensitive, tolerant of extra whitespace, the body may start
+  // on the same line as the tag.
+  const fencedHorizonRe = /```\s*horizon[-_ ]?chart\s*\n?([\s\S]*?)```/gi;
+  text = text.replace(fencedHorizonRe, (_full, body) => pushBlock(body));
+  // Pass 2 — ```json``` (or bare ```) fenced blocks whose JSON looks
+  // like a horizon-chart spec (has a top-level `kind` naming one of
+  // our recipes). This catches the common drift where Claude reaches
+  // for the more familiar `json` language tag.
+  const recipeKinds = Object.keys(AI_CHART_RECIPES || {});
+  const kindAlt = recipeKinds.map(k => k.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')).join('|');
+  if(kindAlt){
+    const fencedJsonRe = /```(?:json|JSON|js|javascript)?\s*\n?(\{[\s\S]*?\})\s*```/g;
+    text = text.replace(fencedJsonRe, (full, body) => {
+      const looksLikeChart = new RegExp('"kind"\\s*:\\s*"(' + kindAlt + ')"').test(body);
+      return looksLikeChart ? pushBlock(body) : full;
+    });
+  }
+  // Pass 3 — bare inline JSON. Scan the plain text for balanced curly
+  // objects whose first `kind` token names a known recipe. This is the
+  // failure mode where Claude ignores the fence entirely and just
+  // pastes the JSON into the narrative. We only match once per scan
+  // iteration and loop until none remain, so multiple inline blocks
+  // all get intercepted.
+  if(kindAlt){
+    let guard = 0;
+    while(guard++ < 10){
+      const re = new RegExp('(\\{[^{}]*?"kind"\\s*:\\s*"(?:' + kindAlt + ')"[^{}]*?\\})', '');
+      const m = re.exec(text);
+      if(!m) break;
+      const body = m[1];
+      text = text.slice(0, m.index) + pushBlock(body) + text.slice(m.index + body.length);
+    }
+  }
+  return { text, blocks };
 }
 
 // Given a rendered HTML string and the block list, substitute each
