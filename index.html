@@ -6482,6 +6482,29 @@ function buildAIContext() {
   const nominalNestEgg = proj.total || 0;
   const realRetirementIncome = nums.totalRetirementIncome;
   const realRate = Math.max(0, (state.retirementPostGrowth || 4) - state.inflationRate);
+  // Compute all three retirement-expense scenarios so the AI can quote any
+  // of them accurately and never has to multiply manually. The active
+  // scenario is marked explicitly so the AI knows which lens the
+  // headline figures (totalExp, runoutAge, coveragePct, verdict) were
+  // computed under. Without this, the AI has no way to answer
+  // "what's my Comfortable expense level?" or to disambiguate the user
+  // saying "baseline monthly expenses" between today's household budget
+  // and the Retire-tab Baseline scenario.
+  const retExpRaw = sumArr(state.retirementExpenses || [], 'amount');
+  const activeScen = state.retirementScenario || 'baseline';
+  const scenLabelMap = { lean: 'Lean', baseline: 'Baseline', comfortable: 'Comfortable' };
+  const scenLine = (key) => {
+    const m = RET_SCENARIOS[key];
+    const v = Math.round(retExpRaw * m).toLocaleString();
+    const marker = key === activeScen ? '  ← ACTIVE' : '';
+    return `    ${scenLabelMap[key]} (×${m}): ${v} kr/mo${marker}`;
+  };
+  // Per-line breakdown of state.retirementExpenses so questions like
+  // "what makes up my retirement expenses" can be answered without
+  // guessing. Capped at 12 items to keep the prompt compact.
+  const retExpItems = (state.retirementExpenses || []).slice(0, 12)
+    .map(e => `    · ${e.name}: ${Math.round(e.amount).toLocaleString()} kr/mo`)
+    .join('\n');
   return `You are HORIZON AI — a personal finance and life planning assistant embedded in Horizon Finance OS.
 
 ${ctx}
@@ -6493,13 +6516,43 @@ ${modeInstruction}
 VALUE BASIS — IMPORTANT
 Every monetary retirement figure below is in TODAY'S MONEY (real, inflation-adjusted). When you quote retirement income, portfolio balance, withdrawals, or pension payouts in your response, use these real figures as the headline value. If you want to mention nominal/future kr for context, label it explicitly as "nominal" or "future value". Never present a nominal figure as the headline.
 
+CRITICAL — TWO DIFFERENT "EXPENSES" EXIST IN THIS APP
+The word "expenses" (and the word "baseline") is overloaded in this product. There are TWO completely separate expense figures, stored in two different state slices, controlled from two different tabs. NEVER conflate them:
+
+  (A) TODAY'S HOUSEHOLD BUDGET — the user's CURRENT monthly spending. Lives in state.baseExpenses, edited on the Monthly Review tab. This is what they spend right now, this month, before retirement. The word "baseline" sometimes refers to this when the user is talking about their Monthly Review setup.
+
+  (B) RETIREMENT EXPENSES — the FUTURE monthly spend the user is planning for in retirement. Lives in state.retirementExpenses, edited on the Retire tab. There are THREE scenarios driven by a Lean / Baseline / Comfortable toggle at the top of the Retire tab. The word "baseline" usually refers to the MIDDLE scenario of these three when the user is on the Retire tab.
+
+Routing rules — use these to pick the right figure:
+  • If the user is on the Retirement panel and says "expenses", "monthly expenses", "Lean expenses", "Baseline expenses", or "Comfortable expenses", they almost always mean (B) — the active retirement scenario figure.
+  • If the user is on the Dashboard or Monthly Review and says "expenses" or "monthly expenses", they almost always mean (A) — the current household budget.
+  • If the user explicitly says "today", "right now", "this month", "current spending", or "household budget", they mean (A) regardless of panel.
+  • If the user explicitly says "in retirement", "when I retire", "at retirement age", "Lean", "Baseline" (on the Retire tab), or "Comfortable", they mean (B).
+  • When ambiguous, ASK before quoting a number. Never guess between (A) and (B).
+
 User's financial snapshot (SEK):
-- Current monthly income: ${Math.round(ti).toLocaleString()} kr | Expenses: ${Math.round(te).toLocaleString()} kr | Savings: ${Math.round(state.baseSavings).toLocaleString()} kr/mo
-- Monthly surplus: ${Math.round(cm.surplus).toLocaleString()} kr | Fun Fund: ${Math.round(cm.funFund).toLocaleString()} kr/mo
+
+(A) TODAY'S HOUSEHOLD BUDGET — Monthly Review baseline · today's money
+- Current monthly income: ${Math.round(ti).toLocaleString()} kr
+- Current monthly expenses: ${Math.round(te).toLocaleString()} kr  ← household budget total, NOT a retirement figure
+- Current monthly savings rate: ${Math.round(state.baseSavings).toLocaleString()} kr
+- Current month surplus (income − expenses − savings): ${Math.round(cm.surplus).toLocaleString()} kr · Fun Fund: ${Math.round(cm.funFund).toLocaleString()} kr/mo
+
+(B) RETIREMENT EXPENSES — Retire tab · today's money · ${state.retirementExpenses?.length || 0} line items
+  Raw line-item total (no scenario applied): ${Math.round(retExpRaw).toLocaleString()} kr/mo
+  Three scenarios driven by the Lean / Baseline / Comfortable toggle:
+${scenLine('lean')}
+${scenLine('baseline')}
+${scenLine('comfortable')}
+  → Active scenario: ${scenLabelMap[activeScen]}. The retirement figures below (totalExp, depletion, coverage, verdict) ALL reflect this scenario.
+${retExpItems ? '  Line items:\n' + retExpItems : ''}
+
+Retirement plan figures — computed under the ACTIVE ${scenLabelMap[activeScen]} scenario (today's money):
 - Age: ${state.currentAge} | Retiring at: ${state.retirementAge} (${Math.max(0,state.retirementAge-state.currentAge)} years away) | Life expectancy: ${state.lifeExp || 90}
+- Active retirement expenses (after-tax, ${scenLabelMap[activeScen]}): ${Math.round(nums.totalExp).toLocaleString()} kr/mo  ← this is figure (B), NOT figure (A)
 - Nest egg at retirement: ${Math.round(realNestEgg).toLocaleString()} kr (today's money) — equivalent to ${Math.round(nominalNestEgg).toLocaleString()} kr nominal/future kr at retirement
 - Sustainable monthly retirement income: ${Math.round(realRetirementIncome).toLocaleString()} kr/mo (today's money) — ${Math.round(nums.sustainableAfterTax).toLocaleString()} kr from portfolio + ${Math.round(nums.pensionAvgMonthly).toLocaleString()} kr from pension (weighted avg across full retirement period), all real
-- Monthly expenses needed in retirement: ${Math.round(nums.totalExp).toLocaleString()} kr (today's money) — coverage ${nums.coveragePct.toFixed(0)}% — verdict: ${nums.verdict}
+- Coverage: ${nums.coveragePct.toFixed(0)}% · Verdict: ${nums.verdict}${nums.pensionMaterial ? ` (pension covers ${nums.pensionShareOfNeed.toFixed(0)}% of need)` : ''}
 - Real growth rate assumption: ${realRate.toFixed(1)}% (post-retirement growth ${state.retirementPostGrowth||4}% minus ${state.inflationRate}% inflation)
 - Portfolio depletion age (from shared simulation): ${nums.runoutAge ? 'Age ' + nums.runoutAge : 'never depletes'}
 - External portfolio (current balance, today's kr): ${Math.round(state.externalAssets.filter(a=>(a.assetType||'investment')==='investment').reduce((s,a)=>s+a.balance,0)).toLocaleString()} kr across ${state.externalAssets.length} accounts
