@@ -3361,13 +3361,21 @@ function _liveSyncCharts(){
     'Savings':  () => months.map(m => m.savings),
     'Fun Fund': () => months.map(m => m.funFund),
   });
-  // Monthly Review — 12-Month Forward Overview
-  patch('mo', {
+  // Monthly Review — Income vs Expenses (left chart)
+  patch('mo-ie', {
     'Income':   () => months.map(m => m.pureIncome),
     'Expenses': () => months.map(m => m.pureExpenses),
-    'Savings':  () => months.map(m => m.savings),
-    'Fun Fund': () => months.map(m => m.funFund),
   });
+  // Monthly Review — Savings & Fun Fund running net flow (right chart)
+  {
+    let savRun = 0;
+    const savingsRunning = months.map(m => { savRun += (m.savings || 0); return savRun; });
+    const funFundRunning = months.map(m => m.funFund || 0);
+    patch('mo-nf', {
+      'Savings · running':  () => savingsRunning,
+      'Fun Fund · running': () => funFundRunning,
+    });
+  }
   // Transactions — Next 12 Months spending chart (next scope only)
   patch('tx', {
     'Income':   () => fwd.map(m => m.pureIncome),
@@ -5181,7 +5189,16 @@ function renderMonthly() {
     <!-- 12-month spending/income trend chart — promoted to the top of
          the Monthly Review tab per UX feedback. Sits above the month
          pills, summary, and Income Streams / Expenses cards. -->
-    <div class="card"><div class="card-title">12-Month Forward Overview</div><div class="chart-wrap xl"><canvas id="mo-chart"></canvas></div></div>
+    <!-- 12-month overview split into two side-by-side charts — one
+         focused on month-to-month cash flow (Income vs Expenses
+         bars) and one focused on the running cumulative balance
+         (Savings + Fun Fund net flow lines). Equal-width two-col
+         grid keeps them visually balanced and matches the app's
+         existing card/chart vocabulary. -->
+    <div class="two-col">
+      <div class="card"><div class="card-title">12-Month Income vs Expenses</div><div class="chart-wrap lg"><canvas id="mo-chart-ie"></canvas></div></div>
+      <div class="card"><div class="card-title">Savings &amp; Fun Fund · Running Net Flow</div><div class="chart-wrap lg"><canvas id="mo-chart-nf"></canvas></div></div>
+    </div>
 
     <div class="month-pills">${months.map(m=>`<button class="month-pill ${m.key===selKey?'active':''} ${m.isCurrent?'current':''} ${m.hasOverride?'has-override':''}" onclick="state.selectedMonth='${m.key}';renderMonthly()">${m.short}${m.hasOverride?' ✎':''}</button>`).join('')}</div>
     ${sel.hasOverride?`<div style="display:inline-flex;align-items:center;gap:8px;margin-bottom:12px"><span style="background:var(--violet-dim);color:var(--violet);padding:3px 9px;border-radius:5px;font-size:11px;font-weight:700;font-family:var(--fm)">✎ CUSTOM OVERRIDE ACTIVE</span><button style="background:none;border:1px solid var(--border);color:var(--text2);padding:3px 9px;border-radius:5px;font-size:11px;cursor:pointer" onclick="delete state.monthlyOverrides['${selKey}'];save();renderMonthly()">Reset</button></div>`:'<div style="margin-bottom:12px;font-size:12px;color:var(--text3)">Showing inherited baseline — edit any field to create an override</div>'}
@@ -5238,29 +5255,59 @@ function renderMonthly() {
   renderLineItems('mo-exp',sel.expenseItems,expKey,false,sel.isCurrent?selKey:false);
 
   setTimeout(()=>{
-    destroyChart('mo');
-    const ctx=document.getElementById('mo-chart');
-    if(ctx){
-      const all=get12Months();
-      // Four datasets — exactly the four values shown in the Month
-      // Summary bar below: Income (bars, green), Expenses (bars, red),
-      // Savings (line, amber), Fun Fund (line, cyan). Savings + Fun Fund
-      // are rendered as lines to distinguish "plan/derived targets" from
-      // the raw monthly flows. Colours match the Month Summary pills
-      // and the SAVINGS colour used across the rest of the app.
-      // 12-Month Forward Overview — pure per-month values (no cross-
-      // month carry-forward chain) so this chart, the Fun Fund tab
-      // chart, and the Dashboard cash flow chart all plot the same
-      // Income / Expenses / Savings / Fun Fund for each month.
-      charts['mo']=new Chart(ctx.getContext('2d'),{type:'bar',data:{labels:all.map(m=>m.short),datasets:[
-        {label:'Income',data:all.map(m=>m.pureIncome),backgroundColor:'#00e8a018',borderColor:'#00e8a0',borderWidth:1.5,borderRadius:3},
-        {label:'Expenses',data:all.map(m=>m.pureExpenses),backgroundColor:'#ff4d6d14',borderColor:'#ff4d6d',borderWidth:1.5,borderRadius:3},
-        {label:'Savings',data:all.map(m=>m.savings),type:'line',borderColor:'#f5a623',backgroundColor:'transparent',fill:false,tension:.3,pointRadius:2,borderWidth:1.5,yAxisID:'y'},
-        {label:'Fun Fund',data:all.map(m=>m.funFund),type:'line',borderColor:'#00d4ff',backgroundColor:'transparent',fill:false,tension:.3,pointRadius:2,borderWidth:1.5,yAxisID:'y'},
-      ]},options:chartPreset()});
-      // Summing Income + Expenses + Savings + Fun Fund is meaningless,
-      // so suppress the tooltip's auto "Total" row on this chart.
-      charts['mo']._skipTotalRow = true;
+    // Two charts. Both are driven by the same get12Months() result so
+    // they never disagree. The left chart is a simple bar-vs-bar read
+    // of money in vs money out for each month; the right chart is the
+    // running cumulative balance of the savings and fun-fund streams,
+    // which is what the user actually wants to see when they ask
+    // "how much am I stacking up?".
+    destroyChart('mo-ie');
+    destroyChart('mo-nf');
+    const all = get12Months();
+    const labels = all.map(m => m.short);
+    // Running cumulative: savings compound purely on their own (each
+    // month's target adds to a cumulative total), and Fun Fund reads
+    // straight from m.funFund which is already the chained running
+    // balance computed in get12Months() pass 2.
+    let savRun = 0;
+    const savingsRunning = all.map(m => { savRun += (m.savings || 0); return savRun; });
+    const funFundRunning = all.map(m => m.funFund || 0);
+
+    const ctxIE = document.getElementById('mo-chart-ie');
+    if(ctxIE){
+      charts['mo-ie'] = new Chart(ctxIE.getContext('2d'), {
+        type:'bar',
+        data:{
+          labels,
+          datasets:[
+            {label:'Income',   data: all.map(m => m.pureIncome),   backgroundColor:'#00e8a028', borderColor:'#00e8a0', borderWidth:1.75, borderRadius:4, categoryPercentage:0.7, barPercentage:0.85},
+            {label:'Expenses', data: all.map(m => m.pureExpenses), backgroundColor:'#ff4d6d22', borderColor:'#ff4d6d', borderWidth:1.75, borderRadius:4, categoryPercentage:0.7, barPercentage:0.85},
+          ]
+        },
+        options:chartPreset()
+      });
+    }
+
+    const ctxNF = document.getElementById('mo-chart-nf');
+    if(ctxNF){
+      charts['mo-nf'] = new Chart(ctxNF.getContext('2d'), {
+        type:'line',
+        data:{
+          labels,
+          datasets:[
+            // Savings · running net flow — cumulative sum of the
+            // user's monthly savings target across the 12-month
+            // window. Amber dashed line matches the Savings colour
+            // used everywhere else in the app.
+            {label:'Savings · running',   data: savingsRunning,  borderColor:'#f5a623', backgroundColor:'#f5a62318', fill:true,  tension:.3, pointRadius:2, pointHoverRadius:4, borderWidth:2, borderDash:[5,4], order:2},
+            // Fun Fund · running net flow — the chained value from
+            // get12Months() pass 2 which already IS the running
+            // Fun Fund balance (monthly allocation + prior carry).
+            {label:'Fun Fund · running',  data: funFundRunning,  borderColor:'#00d4ff', backgroundColor:'#00d4ff18', fill:true,  tension:.3, pointRadius:2, pointHoverRadius:4, borderWidth:2, order:1},
+          ]
+        },
+        options:chartPreset()
+      });
     }
   },50);
   if(typeof updateScopeChip==='function') updateScopeChip();
@@ -5328,18 +5375,27 @@ function liveSyncMonthlyReview(selKey){
   if(numExp)     numExp.textContent     = fmt(sel.expenses);
   if(numSavings) numSavings.textContent = fmt(sel.savings);
   if(numFunFund) numFunFund.textContent = fmt(sel.funFund);
-  // Chart datasets — mutate the existing Chart.js instance's data
-  // arrays and call update('none') for a zero-animation live refresh.
-  // No canvas teardown, no destroyChart, no focus loss.
-  const ch = charts['mo'];
-  if(ch && ch.data && Array.isArray(ch.data.datasets)){
-    ch.data.datasets.forEach(ds => {
+  // Chart datasets — mutate each Chart.js instance's data arrays
+  // and call update('none') for a zero-animation live refresh. No
+  // canvas teardown, no destroyChart, no focus loss.
+  const ieChart = charts['mo-ie'];
+  if(ieChart && ieChart.data && Array.isArray(ieChart.data.datasets)){
+    ieChart.data.datasets.forEach(ds => {
       if(ds.label === 'Income')        ds.data = months.map(m => m.pureIncome);
       else if(ds.label === 'Expenses') ds.data = months.map(m => m.pureExpenses);
-      else if(ds.label === 'Savings')  ds.data = months.map(m => m.savings);
-      else if(ds.label === 'Fun Fund') ds.data = months.map(m => m.funFund);
     });
-    ch.update('none');
+    ieChart.update('none');
+  }
+  const nfChart = charts['mo-nf'];
+  if(nfChart && nfChart.data && Array.isArray(nfChart.data.datasets)){
+    let savRun = 0;
+    const savingsRunning = months.map(m => { savRun += (m.savings || 0); return savRun; });
+    const funFundRunning = months.map(m => m.funFund || 0);
+    nfChart.data.datasets.forEach(ds => {
+      if(ds.label === 'Savings · running')       ds.data = savingsRunning;
+      else if(ds.label === 'Fun Fund · running') ds.data = funFundRunning;
+    });
+    nfChart.update('none');
   }
 }
 
