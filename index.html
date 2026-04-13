@@ -6397,13 +6397,98 @@ Allowed kinds and when to use them:
 - "expense12mo": next 12 months of monthly expenses (bar chart). Use for "where is my money going this year" style questions.
 - "cashflow12mo": next 12 months of income vs expenses with a surplus line. Use for "am I saving enough" / budget health questions.
 - "retireAnywhere": top destinations from Retire Anywhere ranked by monthly surplus (horizontal bars, green = feasible, amber = conditional, red = infeasible). Optional param: {"top": 5} to cap the list.
+- "custom": flexible chart assembled from named data series. Use this when the user asks for a variation the fixed recipes don't cover (e.g. "show nominal values as bars", "only my shortfall", "withdrawal rate over time", "coverage percentage trajectory"). Schema below.
 
 Rules:
 - At most ONE chart per reply. Pick the single most useful one.
 - Do NOT emit a chart block for small talk, definitions, advice-only answers, or questions where a chart would add noise.
-- Do NOT invent kinds. Only the five above are valid — any other value renders as an error.
-- Do NOT put numbers, arrays, labels, or data inside the block. The client owns data.
+- Do NOT invent kinds. Only the six above are valid — any other value renders as an error.
+- Do NOT put numbers, arrays, labels, or data inside the block. The client owns data — you only choose the chart kind (and, for "custom", the series keys and display options).
 - Reference the chart explicitly in your narrative ("See the runway chart below — you deplete at age X") so the user understands what they're looking at.
+
+CUSTOM CHART SCHEMA — for "kind": "custom"
+\`\`\`horizon-chart
+{
+  "kind": "custom",
+  "title": "Short chart title",
+  "subtitle": "Optional subtitle",
+  "datasets": [
+    { "series": "<series-key>", "display": "line" | "bar" | "area", "label": "Optional label", "color": "#hex (optional)" }
+  ],
+  "stacked": false
+}
+\`\`\`
+
+Hard rules for "custom":
+- 1 to 6 datasets.
+- Every dataset.series must be a key from the catalog listed below — unknown keys render as an error.
+- Every dataset in ONE custom chart must share the same x-axis (you cannot mix "age" series with "month" series on the same chart).
+- Every dataset must share the same unit (you cannot mix currency with percent).
+- "display" defaults to "line". "bar" draws a bar. "area" draws a filled line. Mixing "bar" and "line" in one chart is allowed and renders as a proper Chart.js mixed chart.
+- Do NOT include any "data" / "values" / "labels" / numeric arrays in the block. The client fetches data from live app state via the series key.
+
+SERIES CATALOG (Phase 1 — static)
+Each entry is "series-key — label (unit, x-axis)".
+
+Retirement & nest egg (x-axis = age, currentAge → retirementAge):
+- nestEgg.real — Nest egg · today's money (currency, age)
+- nestEgg.nominal — Nest egg · nominal (currency, age)
+- nestEgg.contrib — Annual contributions (currency, age)
+- portfolio.contributions — Portfolio contributions · annual (currency, age)
+
+Runway simulation (x-axis = age, retirementAge → life expectancy):
+- runway.balance — Portfolio balance (currency, age)
+- runway.portfolioWithdrawal — Portfolio withdrawal · annual (currency, age)
+- runway.pensionIncome — Pension income · annual (currency, age)
+- runway.shortfall — Shortfall vs need (currency, age)
+- runway.needed — Gross income needed (currency, age)
+- runway.withdrawalRate — Withdrawal rate · % (percent, age)
+- runway.coverage — Coverage · cumulative % (percent, age)
+
+Cashflow (x-axis = month, next 12 months):
+- cashflow.income — Income · monthly (currency, month)
+- cashflow.expenses — Expenses · monthly (currency, month)
+- cashflow.surplus — Surplus · monthly (currency, month)
+- cashflow.gap — Monthly gap (same as surplus, framed as gap) (currency, month)
+- cashflow.funFund — Fun Fund · monthly (currency, month)
+
+Retire Anywhere destinations (x-axis = destination name):
+- destinations.income — Monthly retirement income (currency, destination)
+- destinations.costOfLiving — Cost of living · monthly (currency, destination)
+- destinations.surplus — Monthly surplus (currency, destination)
+- destinations.taxRate — Tax rate · % (percent, destination)
+- destinations.affordabilityScore — Affordability score · % (percent, destination)
+
+Worked examples:
+
+1) User: "Show the nominal nest egg as bars alongside the real value"
+\`\`\`horizon-chart
+{"kind":"custom","title":"Nest egg · real vs nominal","datasets":[
+  {"series":"nestEgg.real","display":"line","label":"Real (today's money)"},
+  {"series":"nestEgg.nominal","display":"bar","label":"Nominal (future kr)"}
+]}
+\`\`\`
+
+2) User: "Plot only my shortfall during retirement"
+\`\`\`horizon-chart
+{"kind":"custom","title":"Shortfall during retirement","datasets":[
+  {"series":"runway.shortfall","display":"bar"}
+]}
+\`\`\`
+
+3) User: "How does my withdrawal rate change over time?"
+\`\`\`horizon-chart
+{"kind":"custom","title":"Withdrawal rate over retirement","datasets":[
+  {"series":"runway.withdrawalRate","display":"line"}
+]}
+\`\`\`
+
+4) User: "Compare my destinations by tax rate"
+\`\`\`horizon-chart
+{"kind":"custom","title":"Tax rate by destination","datasets":[
+  {"series":"destinations.taxRate","display":"bar"}
+]}
+\`\`\`
 
 Be concise, direct, insightful. Reference specific numbers from THIS snapshot — never recompute independently. Give actionable advice.`;
 }
@@ -6642,7 +6727,285 @@ const AI_CHART_RECIPES = {
       options: chartPreset({ indexAxis:'y' }),
     };
   },
+
+  // The `custom` recipe is the flexible escape hatch that lets the model
+  // assemble a chart from the series catalog when none of the five fixed
+  // recipes above cover the user's request (e.g. "nominal as bars", "only
+  // my shortfall", "withdrawal rate over time"). It validates the spec
+  // against the catalog, assembles a Chart.js config using live data,
+  // and throws a readable error on any invalid input so _renderAIChartBlocks
+  // can show an inline error badge. The model NEVER supplies data values
+  // — only series keys from the catalog.
+  custom(params){
+    const catalog = buildSeriesCatalog();
+    const spec = params || {};
+    const validated = _validateCustomChartSpec(spec, catalog); // throws on error
+    return _buildCustomChartConfig(validated, catalog, spec);
+  },
 };
+
+// ─── IN-CHAT CHART SERIES CATALOG ─────────────────────────────────────────
+// Single source of truth for every named data series the chatbot is allowed
+// to reference. Each entry is a small object:
+//
+//   { label, unit, xAxis, get }
+//
+//   label   — human-readable name used as the dataset label on the chart
+//   unit    — 'currency' | 'percent' — drives y-axis formatting and
+//             prevents currency/percent series being mixed on one chart
+//   xAxis   — 'age' | 'month' | 'destination' — what the x-axis represents,
+//             must match across every dataset in a single custom chart
+//   get()   — reads LIVE app state and returns {xValues, values} of equal
+//             length. The model never supplies numbers — only series keys.
+//
+// Phase 1 ships the STATIC set only. Phase 2 will add dynamic entries
+// generated per user account / expense category / pension plan. Phase 3
+// adds Fun Fund, Travel, and PropertyIQ series.
+function buildSeriesCatalog(){
+  const cat = {};
+
+  // ── NEST EGG PROJECTION (x = age, currentAge → retirementAge) ─────────
+  const addProjSeries = (key, label, pick) => {
+    cat[key] = {
+      label, unit:'currency', xAxis:'age',
+      get(){
+        const proj = getProjection();
+        return {
+          xValues: proj.map(p => p.age),
+          values:  proj.map(p => pick(p) || 0),
+        };
+      },
+    };
+  };
+  addProjSeries('nestEgg.real',        'Nest egg · today\u2019s money', p => p.realTotal);
+  addProjSeries('nestEgg.nominal',     'Nest egg · nominal (future kr)', p => p.total);
+  addProjSeries('nestEgg.contrib',     'Annual contributions',            p => p.yearlyContrib);
+  // Alias: portfolio.contributions → same data, different semantic label.
+  addProjSeries('portfolio.contributions', 'Portfolio contributions · annual', p => p.yearlyContrib);
+
+  // ── RUNWAY SIMULATION (x = age, retirementAge → lifeExp) ──────────────
+  const addRunwaySeries = (key, label, unit, pick) => {
+    cat[key] = {
+      label, unit, xAxis:'age',
+      get(){
+        const sim = getRetirementNumbers()._simResult;
+        if(!sim || !sim.labels) return { xValues:[], values:[] };
+        return {
+          xValues: sim.labels.slice(),
+          values:  sim.labels.map((_, i) => pick(sim, i)),
+        };
+      },
+    };
+  };
+  addRunwaySeries('runway.balance',             'Portfolio balance',            'currency', (s,i) => s.balData[i] || 0);
+  addRunwaySeries('runway.portfolioWithdrawal', 'Portfolio withdrawal · annual', 'currency', (s,i) => s.portWithdrawal[i] || 0);
+  addRunwaySeries('runway.pensionIncome',       'Pension income · annual',       'currency', (s,i) => s.pensionData[i] || 0);
+  addRunwaySeries('runway.shortfall',           'Shortfall vs need',             'currency', (s,i) => s.shortfall?.[i] || 0);
+  addRunwaySeries('runway.needed',              'Gross income needed',           'currency', (s,i) => s.needed?.[i] || 0);
+
+  // Withdrawal rate per year: portfolioWithdrawal / balance * 100. Clamped
+  // to 0 once the portfolio is depleted so the trace doesn't flatline at a
+  // meaningless ratio. Percent unit.
+  addRunwaySeries('runway.withdrawalRate', 'Withdrawal rate · %', 'percent', (s, i) => {
+    const bal = s.balData[i] || 0;
+    const wd  = s.portWithdrawal[i] || 0;
+    if(bal <= 0 || wd <= 0) return 0;
+    return (wd / bal) * 100;
+  });
+
+  // Coverage trajectory: cumulative funded years / years elapsed, as a
+  // percentage. This is the time-series counterpart to the headline
+  // coveragePct used on the Retirement card — it lets the user see exactly
+  // which year coverage starts dropping below 100%.
+  cat['runway.coverage'] = {
+    label: 'Coverage · cumulative %', unit:'percent', xAxis:'age',
+    get(){
+      const sim = getRetirementNumbers()._simResult;
+      if(!sim || !sim.labels) return { xValues:[], values:[] };
+      const out = [];
+      let funded = 0;
+      for(let i = 0; i < sim.labels.length; i++){
+        if((sim.shortfall?.[i] || 0) === 0) funded++;
+        out.push(((funded / (i + 1)) * 100));
+      }
+      return { xValues: sim.labels.slice(), values: out };
+    },
+  };
+
+  // ── CASHFLOW (x = month short label, next 12 months) ──────────────────
+  const addMonthSeries = (key, label, pick) => {
+    cat[key] = {
+      label, unit:'currency', xAxis:'month',
+      get(){
+        const months = get12Months();
+        return {
+          xValues: months.map(m => m.short),
+          values:  months.map(m => pick(m) || 0),
+        };
+      },
+    };
+  };
+  addMonthSeries('cashflow.income',   'Income · monthly',   m => m.income);
+  addMonthSeries('cashflow.expenses', 'Expenses · monthly', m => m.expenses);
+  addMonthSeries('cashflow.surplus',  'Surplus · monthly',  m => m.surplus);
+  // `cashflow.gap` is a semantic alias for surplus — same numbers, but
+  // labelled "gap" so a chart framed around shortfall reads correctly.
+  addMonthSeries('cashflow.gap',      'Monthly gap (surplus or shortfall)', m => m.surplus);
+  addMonthSeries('cashflow.funFund',  'Fun Fund · monthly', m => m.funFund);
+
+  // ── DESTINATIONS (x = destination name) ───────────────────────────────
+  const addDestSeries = (key, label, unit, pick) => {
+    cat[key] = {
+      label, unit, xAxis:'destination',
+      get(){
+        const scored = retirePlaces().map(scoreLocation);
+        return {
+          xValues: scored.map(l => l.name),
+          values:  scored.map(l => pick(l) || 0),
+        };
+      },
+    };
+  };
+  addDestSeries('destinations.income',        'Monthly retirement income', 'currency', () => getRetirementNumbers().totalRetirementIncome);
+  addDestSeries('destinations.costOfLiving',  'Cost of living · monthly',  'currency', l => l.costOfLiving);
+  addDestSeries('destinations.surplus',       'Monthly surplus',           'currency', l => l.surplus);
+  addDestSeries('destinations.taxRate',       'Tax rate · %',              'percent',  l => l.taxRate);
+  addDestSeries('destinations.affordabilityScore', 'Affordability score · %', 'percent', l => (l.affordabilityScore || 0) * 100);
+
+  return cat;
+}
+
+// ─── CUSTOM CHART VALIDATOR ───────────────────────────────────────────────
+// Takes a raw spec (the JSON inside a horizon-chart fenced block with
+// kind:"custom") and the live catalog, returns a validated {datasets,
+// xAxis, unit} object. Throws a readable Error on any failure so
+// _renderAIChartBlocks can surface the message as an inline badge.
+function _validateCustomChartSpec(spec, catalog){
+  if(!spec || typeof spec !== 'object') throw new Error('custom spec missing');
+  const ds = spec.datasets;
+  if(!Array.isArray(ds) || ds.length === 0) throw new Error('datasets[] must be a non-empty array');
+  if(ds.length > 6) throw new Error('too many datasets (max 6)');
+  const resolved = [];
+  let xAxis = null, unit = null;
+  for(let i = 0; i < ds.length; i++){
+    const d = ds[i];
+    if(!d || typeof d !== 'object') throw new Error(`datasets[${i}] must be an object`);
+    const key = d.series;
+    if(typeof key !== 'string') throw new Error(`datasets[${i}].series must be a string`);
+    const entry = catalog[key];
+    if(!entry) throw new Error(`unknown series: "${key}"`);
+    // x-axis must match across all datasets so they align on one axis.
+    if(xAxis === null) xAxis = entry.xAxis;
+    else if(entry.xAxis !== xAxis) throw new Error(`x-axis mismatch: "${key}" is "${entry.xAxis}" but first dataset is "${xAxis}"`);
+    // Unit must match so one y-axis serves every series. Currency cannot
+    // sit on the same axis as percent without a second axis, which we
+    // don't support in Phase 1.
+    if(unit === null) unit = entry.unit;
+    else if(entry.unit !== unit) throw new Error(`unit mismatch: "${key}" is "${entry.unit}" but first dataset is "${unit}"`);
+    // display override (line / bar / area). Default = line.
+    const display = d.display || 'line';
+    if(!['line','bar','area'].includes(display)) throw new Error(`datasets[${i}].display must be line|bar|area`);
+    resolved.push({
+      key,
+      label: typeof d.label === 'string' && d.label.trim() ? d.label.trim() : entry.label,
+      display,
+      color: typeof d.color === 'string' ? d.color : null,
+      entry,
+    });
+  }
+  return { datasets: resolved, xAxis, unit, stacked: spec.stacked === true };
+}
+
+// ─── CUSTOM CHART CONFIG BUILDER ──────────────────────────────────────────
+// Takes a validated spec and assembles a Chart.js config using live data
+// from the catalog. Aligns every dataset to a union x-axis so series with
+// different natural ranges (e.g. runway.* vs nestEgg.*, both on the "age"
+// axis) plot cleanly, using nulls for missing points.
+function _buildCustomChartConfig(validated, catalog, rawSpec){
+  const r = rate();
+  // Palette cycles through the brand colours so consecutive datasets are
+  // visually distinct without the model having to pick colours.
+  const PALETTE = ['#00e8a0','#4d9fff','#f5a623','#ff4d6d','#b388ff','#00d4ff'];
+  // 1. Fetch each series. Each returns {xValues, values}. We capture them
+  //    so we can align to the union x-axis next.
+  const fetched = validated.datasets.map(d => {
+    const res = d.entry.get();
+    return { ...d, xValues: res.xValues || [], values: res.values || [] };
+  });
+  // 2. Compute the union of x-values across all datasets. For age/month,
+  //    sort numerically / by natural order. For destination, preserve the
+  //    order of the first dataset that defined it.
+  let unionX;
+  if(validated.xAxis === 'age'){
+    const all = new Set();
+    fetched.forEach(f => f.xValues.forEach(v => all.add(Number(v))));
+    unionX = Array.from(all).sort((a,b) => a - b);
+  } else {
+    // month / destination — preserve first-seen order
+    const all = [];
+    const seen = new Set();
+    fetched.forEach(f => f.xValues.forEach(v => {
+      const k = String(v);
+      if(!seen.has(k)){ seen.add(k); all.push(v); }
+    }));
+    unionX = all;
+  }
+  if(!unionX.length) throw new Error('no data available for the requested series');
+  // 3. For each dataset, build an aligned value array matching unionX
+  //    index-for-index. Missing x-values become null (Chart.js gap).
+  const rMult = validated.unit === 'currency' ? r : 1;
+  const datasets = fetched.map((f, idx) => {
+    const color = f.color || PALETTE[idx % PALETTE.length];
+    // Map each union-x to its value in this series, or null if absent.
+    const lookup = new Map();
+    f.xValues.forEach((x, i) => lookup.set(String(x), f.values[i]));
+    const aligned = unionX.map(x => {
+      const v = lookup.get(String(x));
+      if(v == null) return null;
+      return v * rMult;
+    });
+    // Chart.js dataset config — display override drives type, with area
+    // = line + fill. Per-dataset `type` overrides the top-level type so
+    // "mixed" charts (bar + line) work without extra ceremony.
+    const base = {
+      label: f.label,
+      data: aligned,
+      borderColor: color,
+      backgroundColor: f.display === 'area'
+        ? (color + '33')
+        : (f.display === 'bar' ? (color + '66') : 'transparent'),
+      borderWidth: f.display === 'bar' ? 1 : 2,
+    };
+    if(f.display === 'bar'){
+      return { ...base, type:'bar', borderRadius: 3, stack: validated.stacked ? 'stack0' : undefined };
+    }
+    // line or area
+    return { ...base, type:'line', tension:.25, pointRadius:0, fill: f.display === 'area' };
+  });
+  // 4. y-axis formatter — currency via fmtC, percent with a suffix.
+  const yTickCallback = validated.unit === 'percent'
+    ? (v => v.toFixed(0) + '%')
+    : (v => fmtC(v));
+  const options = chartPreset({
+    scales: {
+      x: { ticks:{ color:chartDefaults().textColor, font:chartDefaults().tickFont, maxTicksLimit:10 }, grid:{display:false}, stacked: validated.stacked },
+      y: { ticks:{ color:chartDefaults().textColor, callback:yTickCallback, font:chartDefaults().tickFont, maxTicksLimit:6 }, grid:{display:false}, stacked: validated.stacked, beginAtZero: validated.unit === 'percent' },
+    },
+  });
+  // 5. Top-level chart type: bar if any dataset is a bar, else line.
+  //    Individual datasets still override via `type` so mixed charts work.
+  const topType = datasets.some(d => d.type === 'bar') ? 'bar' : 'line';
+  return {
+    _title: (rawSpec && typeof rawSpec.title === 'string' && rawSpec.title) || 'Custom chart',
+    _subtitle: (rawSpec && typeof rawSpec.subtitle === 'string' && rawSpec.subtitle) || `${validated.datasets.length} series · ${validated.xAxis}`,
+    type: topType,
+    data: {
+      labels: unionX.map(String),
+      datasets,
+    },
+    options,
+  };
+}
 
 // Extract every fenced horizon-chart block from a reply and replace each
 // with a plain-text sentinel token. We use a sentinel (not an HTML div)
