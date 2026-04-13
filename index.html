@@ -1850,55 +1850,31 @@ function memoSelect(key, fn){
 }
 function invalidateSelectors(){ _selGen++; }
 
-// ─── FOCUS PRESERVATION ACROSS RE-RENDERS ───────────────────────────────────
-// Renders tear down the input the user is typing into, which kills focus.
-// `withFocusPreservation` runs a render function while keeping focus + caret
-// pinned to the same input. The "same" input is identified by its index
-// among all inputs in the active panel — stable as long as the render
-// doesn't add/remove inputs above the focused one (the typical case for
-// numeric editing). Falls back gracefully when there's nothing to restore.
-function withFocusPreservation(fn){
-  const active = document.activeElement;
-  const tag = active && active.tagName;
-  const isField = tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT';
-  let panel = null, idx = -1, selStart = null, selEnd = null;
-  if(isField){
-    panel = active.closest('.panel') || active.closest('[id^="panel-"]') || document.body;
-    const fields = Array.from(panel.querySelectorAll('input, textarea, select'));
-    idx = fields.indexOf(active);
-    try { selStart = active.selectionStart; selEnd = active.selectionEnd; } catch(e){ /* number inputs throw */ }
-  }
-  fn();
-  if(idx >= 0 && panel){
-    // The panel reference may now be detached if the render replaced the
-    // node. Re-resolve by id.
-    const pid = panel.id;
-    const newPanel = pid ? document.getElementById(pid) : panel;
-    if(newPanel){
-      const newFields = Array.from(newPanel.querySelectorAll('input, textarea, select'));
-      const target = newFields[idx];
-      if(target){
-        try { target.focus({preventScroll:true}); } catch(e){ target.focus(); }
-        if(selStart != null){
-          try { target.setSelectionRange(selStart, selEnd); } catch(e){ /* numeric */ }
-        }
-      }
-    }
-  }
-}
-
 // Generic debounced + focus-preserved render trampoline. Lets inline
 // oninput handlers re-render a panel without losing focus mid-typing:
 //   oninput="state.x=this.value;save();dr('renderFunFund')"
-// All calls share a single timer keyed by function name so rapid keystrokes
-// collapse into one render after the user pauses typing.
+// Captures the focused field's identity SYNCHRONOUSLY at keystroke time
+// (when activeElement is guaranteed to still be the input), then restores
+// after the debounced render runs. Per-name timers so multiple panels
+// can share one trampoline without colliding.
 const _drTimers = {};
+const _drFocus  = {};
 function dr(name, delay){
-  if(delay == null) delay = 300;
+  if(delay == null) delay = 700;
+  // Capture focus key at the keystroke, not 700ms later
+  const fk = (typeof captureFocusKey === 'function') ? captureFocusKey() : null;
+  if(fk) _drFocus[name] = fk;
   clearTimeout(_drTimers[name]);
   _drTimers[name] = setTimeout(() => {
     const fn = window[name];
-    if(typeof fn === 'function') withFocusPreservation(fn);
+    if(typeof fn === 'function') fn();
+    const saved = _drFocus[name];
+    if(saved && typeof restoreFocusKey === 'function'){
+      requestAnimationFrame(() => {
+        restoreFocusKey(saved);
+        _drFocus[name] = null;
+      });
+    }
   }, delay);
 }
 window.dr = dr;
@@ -4108,15 +4084,73 @@ function renderRetirement() {
   if(window.retSecOpen.s1) setTimeout(renderRunwayChart,80);
 }
 
-// Debounce helper so typing doesn't re-render every keystroke
+// ─── FOCUS PRESERVATION ACROSS RE-RENDERS ───────────────────────────────────
+// Renders tear down the input the user is typing into, which kills focus.
+// Strategy: capture the focused field's stable identity (its inline
+// oninput/onchange string — unique per logical field) at the synchronous
+// moment of the keystroke, run the debounced render, then re-query the
+// new DOM for the field with the matching attribute and restore focus +
+// caret position. Attribute-based lookup is robust to conditional
+// sections shifting input indices, and capturing synchronously means we
+// never lose the activeElement to a 400ms gap.
+function captureFocusKey(){
+  const a = document.activeElement;
+  if(!a) return null;
+  const tag = a.tagName;
+  if(tag !== 'INPUT' && tag !== 'TEXTAREA' && tag !== 'SELECT') return null;
+  const key = a.getAttribute('oninput') || a.getAttribute('onchange') || a.id || null;
+  if(!key) return null;
+  let selStart = null, selEnd = null;
+  try { selStart = a.selectionStart; selEnd = a.selectionEnd; } catch(e){ /* number inputs throw */ }
+  return { key, selStart, selEnd };
+}
+function restoreFocusKey(focusKey){
+  if(!focusKey) return;
+  // CSS attribute selectors need the value escaped — instead of building
+  // a complex selector, walk all inputs and match by getAttribute.
+  const fields = document.querySelectorAll('input, textarea, select');
+  for(let i = 0; i < fields.length; i++){
+    const f = fields[i];
+    const k = f.getAttribute('oninput') || f.getAttribute('onchange') || f.id || null;
+    if(k === focusKey.key){
+      try { f.focus({preventScroll:true}); } catch(e){ f.focus(); }
+      if(focusKey.selStart != null){
+        try { f.setSelectionRange(focusKey.selStart, focusKey.selEnd); } catch(e){}
+      }
+      return;
+    }
+  }
+}
+// Legacy index-based wrapper kept for any code that still calls it. Now
+// just delegates to the attribute-based capture/restore which is safer.
+function withFocusPreservation(fn){
+  const fk = captureFocusKey();
+  fn();
+  if(fk) restoreFocusKey(fk);
+}
+
+// Debounce helper so typing doesn't re-render every keystroke. Captures
+// the focus key synchronously at keystroke time (NOT inside the timer)
+// so we have a guaranteed snapshot even if the browser moves focus
+// during the 700ms wait. Restores after the render.
 let _retDebTimer=null;
+let _retDebFocusKey=null;
 function debouncedRenderRetirement(){
-  // Short debounce per runway spec — chart updates smoothly after the
-  // user stops typing rather than flickering on every keystroke. Wrapped
-  // in withFocusPreservation so the input the user is currently typing
-  // into keeps focus + caret position across the re-render.
+  // Snapshot the active field on the keystroke itself
+  const fk = captureFocusKey();
+  if(fk) _retDebFocusKey = fk;
   clearTimeout(_retDebTimer);
-  _retDebTimer=setTimeout(()=>withFocusPreservation(renderRetirement),400);
+  _retDebTimer=setTimeout(()=>{
+    renderRetirement();
+    if(_retDebFocusKey){
+      // requestAnimationFrame so focus restoration happens after the
+      // browser has finished the layout pass from the innerHTML swap
+      requestAnimationFrame(()=>{
+        restoreFocusKey(_retDebFocusKey);
+        _retDebFocusKey = null;
+      });
+    }
+  }, 700);
 }
 
 // ─── LONGEVITY RUNWAY — pure SVG renderer ───────────────────────────────────
