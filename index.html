@@ -363,6 +363,37 @@ input[type="number"] { -moz-appearance:textfield; }
   background:var(--violet); color:#fff;
 }
 
+/* ── LINKED / EXTERNAL-ORIGIN LINE (editable, flagged) ──────────────
+   Rendered when an item was added to a month from somewhere else on
+   the platform (e.g. a Trip from the Fun Fund tab). The row stays
+   editable — changes write back to the source — but the purple /
+   lime treatment tells the user this line did NOT originate in the
+   Monthly Review tab itself and that edits have downstream effects. */
+.line-item-linked {
+  background: linear-gradient(90deg, var(--violet-dim) 0%, rgba(163,230,53,.10) 100%);
+  border:1px dashed var(--violet);
+  border-left:3px solid #a3e635;
+  border-radius:5px;
+  padding:6px 10px;
+  margin-bottom:6px;
+}
+.line-item-linked .line-name { color:var(--text); }
+.line-item-linked .line-linked-pill {
+  display:inline-flex; align-items:center; gap:4px;
+  font-size:9px; font-weight:700; letter-spacing:.08em;
+  padding:2px 7px; border-radius:3px; text-transform:uppercase;
+  background:var(--violet); color:#fff;
+  white-space:nowrap;
+}
+.line-item-linked .line-linked-pill.trip { background:#a3e635; color:#1a2e05; }
+.line-item-linked .line-linked-icon {
+  color:var(--violet); font-size:13px; font-weight:700; line-height:1; flex-shrink:0;
+}
+.line-item-linked .line-linked-src {
+  font-size:9px; color:var(--violet); font-family:var(--fm);
+  letter-spacing:.04em; white-space:nowrap;
+}
+
 /* ── MONTH SELECTOR ──────────────────────────────────── */
 .month-pills { display:flex; gap:4px; overflow-x:auto; padding-bottom:6px; margin-bottom:12px; }
 .month-pill { background:var(--bg2); border:1px solid var(--border); border-radius:4px; padding:5px 10px; color:var(--text2); font-size:11px; cursor:pointer; white-space:nowrap; transition:all .2s; font-family:var(--fm); }
@@ -2194,12 +2225,31 @@ function get12Months() {
       // which never sees the synthetic items.
       const incomeItems  = (v.incomeItems  || []).slice();
       const expenseItems = (v.expenseItems || []).slice();
+      // Inject Fun Fund trips as synthetic expense items on their
+      // scheduled month. These rows are flagged `fromTrip:true` so
+      // renderLineItems styles them as "linked" (purple/lime) and
+      // edits write back to state.trips — keeping the Fun Fund tab
+      // and Monthly Review in lockstep as a single source of truth.
+      (state.trips || []).forEach(t => {
+        const tripKey = (t.date || '').slice(0, 7);
+        if(tripKey !== key) return;
+        if(!(t.budget > 0)) return;
+        expenseItems.push({
+          id: `trip-${t.id}`,
+          name: `✈️ Trip: ${t.name || 'Untitled trip'}`,
+          amount: t.budget,
+          type: 'variable',
+          fromTrip: true,
+          tripId: t.id,
+        });
+      });
       // "Pure" values — Income / Expenses / Fun Fund computed STRICTLY
-      // from the user's baseline + monthly override inputs, with no
-      // cross-month carry-forward applied. These are the numbers that
-      // answer "for this month, what do Income − Expenses − Savings
-      // yield?" — used by the Fun Fund tab so its chart + list always
-      // mirror the Monthly Review inputs one-for-one.
+      // from the user's baseline + monthly override inputs (plus any
+      // synthetic trip items injected above), with no cross-month
+      // carry-forward applied. These are the numbers that answer "for
+      // this month, what do Income − Expenses − Savings yield?" —
+      // used by the Fun Fund tab so its chart + list always mirror
+      // the Monthly Review inputs one-for-one.
       const pureIncome   = sumArr(incomeItems,  'amount');
       const pureExpenses = sumArr(expenseItems, 'amount');
       const pureFunFund  = pureIncome - pureExpenses - v.savings;
@@ -2592,23 +2642,54 @@ function getMonthlyActuals() {
 }
 
 // ─── TRANSACTIONS / BANK ────────────────────────────────────────────────────
-const DEMO_TRANSACTIONS = [
-  {id:genId(),date:'2026-04-01',name:'Lönebetalning Young',category:'Income',amount:98000,type:'credit',icon:'💼'},
-  {id:genId(),date:'2026-04-01',name:'Lönebetalning Guliz',category:'Income',amount:31000,type:'credit',icon:'💼'},
-  {id:genId(),date:'2026-04-02',name:'ICA Maxi',category:'Groceries',amount:-2400,type:'debit',icon:'🛒'},
-  {id:genId(),date:'2026-04-03',name:'SEB Bolån',category:'Mortgage',amount:-27000,type:'debit',icon:'🏠'},
-  {id:genId(),date:'2026-04-04',name:'Hemstädning',category:'Cleaning',amount:-2000,type:'debit',icon:'🧹'},
-  {id:genId(),date:'2026-04-05',name:'Vattenfall El',category:'Utilities',amount:-1200,type:'debit',icon:'⚡'},
-  {id:genId(),date:'2026-04-06',name:'Systembolaget',category:'Dining & Drinks',amount:-890,type:'debit',icon:'🍷'},
-  {id:genId(),date:'2026-04-07',name:'ICA Maxi',category:'Groceries',amount:-2100,type:'debit',icon:'🛒'},
-  {id:genId(),date:'2026-04-08',name:'Spotify',category:'Subscriptions',amount:-149,type:'debit',icon:'🎵'},
-  {id:genId(),date:'2026-04-09',name:'Tre (Mobile)',category:'Utilities',amount:-349,type:'debit',icon:'📱'},
-  {id:genId(),date:'2026-04-10',name:'Dinner Operakällaren',category:'Dining & Drinks',amount:-2800,type:'debit',icon:'🍽️'},
-  {id:genId(),date:'2026-04-10',name:'ICA Maxi',category:'Groceries',amount:-1800,type:'debit',icon:'🛒'},
-  {id:genId(),date:'2026-04-11',name:'H&M',category:'Shopping',amount:-1240,type:'debit',icon:'👗'},
-  {id:genId(),date:'2026-04-12',name:'Apotek Hjärtat',category:'Healthcare',amount:-380,type:'debit',icon:'💊'},
-  {id:genId(),date:'2026-04-12',name:'SL Månadskort',category:'Transport',amount:-1000,type:'debit',icon:'🚇'},
-];
+// 12-month demo transaction history. The current month (April '26)
+// keeps its detailed line items; the preceding 11 months get a small
+// representative set so the Bank & Transactions → Past 12 Months chart
+// (which aggregates live from state.transactions) has realistic
+// historical data to plot instead of a single empty bar.
+const DEMO_TRANSACTIONS = (() => {
+  const out = [];
+  // Current month — detailed
+  out.push(
+    {id:genId(),date:'2026-04-01',name:'Lönebetalning Young',category:'Income',amount:98000,type:'credit',icon:'💼'},
+    {id:genId(),date:'2026-04-01',name:'Lönebetalning Guliz',category:'Income',amount:31000,type:'credit',icon:'💼'},
+    {id:genId(),date:'2026-04-02',name:'ICA Maxi',category:'Groceries',amount:-2400,type:'debit',icon:'🛒'},
+    {id:genId(),date:'2026-04-03',name:'SEB Bolån',category:'Mortgage',amount:-27000,type:'debit',icon:'🏠'},
+    {id:genId(),date:'2026-04-04',name:'Hemstädning',category:'Cleaning',amount:-2000,type:'debit',icon:'🧹'},
+    {id:genId(),date:'2026-04-05',name:'Vattenfall El',category:'Utilities',amount:-1200,type:'debit',icon:'⚡'},
+    {id:genId(),date:'2026-04-06',name:'Systembolaget',category:'Dining & Drinks',amount:-890,type:'debit',icon:'🍷'},
+    {id:genId(),date:'2026-04-07',name:'ICA Maxi',category:'Groceries',amount:-2100,type:'debit',icon:'🛒'},
+    {id:genId(),date:'2026-04-08',name:'Spotify',category:'Subscriptions',amount:-149,type:'debit',icon:'🎵'},
+    {id:genId(),date:'2026-04-09',name:'Tre (Mobile)',category:'Utilities',amount:-349,type:'debit',icon:'📱'},
+    {id:genId(),date:'2026-04-10',name:'Dinner Operakällaren',category:'Dining & Drinks',amount:-2800,type:'debit',icon:'🍽️'},
+    {id:genId(),date:'2026-04-10',name:'ICA Maxi',category:'Groceries',amount:-1800,type:'debit',icon:'🛒'},
+    {id:genId(),date:'2026-04-11',name:'H&M',category:'Shopping',amount:-1240,type:'debit',icon:'👗'},
+    {id:genId(),date:'2026-04-12',name:'Apotek Hjärtat',category:'Healthcare',amount:-380,type:'debit',icon:'💊'},
+    {id:genId(),date:'2026-04-12',name:'SL Månadskort',category:'Transport',amount:-1000,type:'debit',icon:'🚇'},
+  );
+  // Past 11 months — a compact but realistic rollup: two salary
+  // credits, mortgage, groceries, utilities, dining. Variance is
+  // sprinkled in so the bars have shape rather than a flat line.
+  const wiggle = [0.98, 1.05, 1.12, 0.94, 1.03, 0.91, 1.08, 0.97, 1.15, 1.02, 0.88];
+  for(let i = 1; i <= 11; i++){
+    const d = new Date(2026, 3 - i, 1);
+    const y = d.getFullYear();
+    const mo = String(d.getMonth() + 1).padStart(2, '0');
+    const w = wiggle[i - 1] || 1;
+    out.push(
+      {id:genId(),date:`${y}-${mo}-01`,name:'Lönebetalning Young',  category:'Income',          amount: Math.round(98000 * w),  type:'credit',icon:'💼'},
+      {id:genId(),date:`${y}-${mo}-01`,name:'Lönebetalning Guliz',  category:'Income',          amount: Math.round(31000 * w),  type:'credit',icon:'💼'},
+      {id:genId(),date:`${y}-${mo}-03`,name:'SEB Bolån',            category:'Mortgage',        amount:-27000,                   type:'debit', icon:'🏠'},
+      {id:genId(),date:`${y}-${mo}-05`,name:'Vattenfall El',        category:'Utilities',       amount: Math.round(-1200 * w),   type:'debit', icon:'⚡'},
+      {id:genId(),date:`${y}-${mo}-06`,name:'ICA Maxi',             category:'Groceries',       amount: Math.round(-6800 * w),   type:'debit', icon:'🛒'},
+      {id:genId(),date:`${y}-${mo}-10`,name:'Dining & Drinks',      category:'Dining & Drinks', amount: Math.round(-4200 * w),   type:'debit', icon:'🍽️'},
+      {id:genId(),date:`${y}-${mo}-12`,name:'Transport & Shopping', category:'Shopping',        amount: Math.round(-3800 * w),   type:'debit', icon:'🛍️'},
+      {id:genId(),date:`${y}-${mo}-15`,name:'Subscriptions',        category:'Subscriptions',   amount:-650,                     type:'debit', icon:'🎵'},
+      {id:genId(),date:`${y}-${mo}-20`,name:'Healthcare & Other',   category:'Healthcare',      amount: Math.round(-2200 * w),   type:'debit', icon:'💊'},
+    );
+  }
+  return out;
+})();
 
 const CAT_SPENDING_12M = {
   'Groceries':78000,'Mortgage/Rent':324000,'Dining & Drinks':48000,'Transport':22000,
@@ -2759,6 +2840,33 @@ function renderDirtyDots(){
 bus.on('state:changed', (data)=>{
   const active = (data&&data.panel) || state.activePanel || 'dashboard';
   markDirtyExcept(active);
+});
+
+// ── LIVE REACTIVITY ─────────────────────────────────────────────────────────
+// Every save() emits `state:changed`. We debounce briefly so a burst of
+// keystrokes collapses into one render, then re-render the ticker, the
+// sidebar mini-widget, AND the active panel so every table, chart, and
+// summary across the platform reflects the latest input immediately —
+// no refresh, no tab switch. Focus is captured before the re-render and
+// restored on the next frame via restoreFocusKey(), so the input the
+// user is typing into is never stolen.
+let _liveRenderTimer = null;
+bus.on('state:changed', () => {
+  clearTimeout(_liveRenderTimer);
+  _liveRenderTimer = setTimeout(() => {
+    const fk = (typeof captureFocusKey === 'function') ? captureFocusKey() : null;
+    try {
+      if(typeof renderTicker     === 'function') renderTicker();
+      if(typeof updateSidebar    === 'function') updateSidebar();
+      const active = state.activePanel || 'dashboard';
+      if(typeof renderPanel === 'function') renderPanel(active);
+      if(typeof decoratePanel === 'function') decoratePanel(active);
+      if(typeof updateScopeChip === 'function') updateScopeChip();
+    } catch(e) { console.warn('live render failed', e); }
+    if(fk && typeof restoreFocusKey === 'function'){
+      requestAnimationFrame(() => restoreFocusKey(fk));
+    }
+  }, 180);
 });
 bus.on('panel:changed', (data)=>{
   if(data&&data.panel) clearDirty(data.panel);
@@ -3369,20 +3477,13 @@ function chartHtmlTooltip(context){
     const val = Number.isFinite(raw) ? (typeof fmt==='function'?fmt(raw):String(raw)) : String(dp.raw);
     return `<div class="chart-tt-row"><span class="chart-tt-sw" style="background:${sw}"></span><span>${label}</span><span class="chart-tt-val">${val}</span></div>`;
   }).join('');
-  // For stacked bars, show a total row automatically. Charts that mix
-  // unrelated series (Income / Expenses / Savings / Fun Fund) can opt
-  // out by setting `chart._skipTotalRow = true` after construction —
-  // summing those values produces a meaningless figure, so the row
-  // would only confuse the user.
-  let totalRow = '';
-  if((tooltip.dataPoints||[]).length >= 2 && !chart._skipTotalRow){
-    const sum = tooltip.dataPoints.reduce((s,dp) => s + (Number(dp.raw)||0), 0);
-    totalRow = `<div class="chart-tt-total"><span>Total</span><span class="chart-tt-val">${typeof fmt==='function'?fmt(sum):sum}</span></div>`;
-  }
+  // The auto "Total" row was removed across the platform — summing the
+  // individual series (Income + Expenses + Savings + Fun Fund, or
+  // category buckets) almost always yields a figure without a useful
+  // meaning and was misleading users.
   el.innerHTML = `
     ${title ? `<div class="chart-tt-title">${title}</div>` : ''}
     ${rows}
-    ${totalRow}
   `;
   // Position near the cursor relative to the canvas
   const canvasRect = chart.canvas.getBoundingClientRect();
@@ -3412,6 +3513,20 @@ function renderLineItems(containerId, items, stateKey, readOnly, showPaid) {
   const monthKey = typeof showPaid === 'string' ? showPaid : null;
   const paidMap = monthKey ? (state.paidFlags?.[monthKey] || {}) : {};
   el.innerHTML=items.map((it,idx)=>{
+    // Linked rows from elsewhere on the platform (e.g. a Fun Fund
+    // trip scheduled for this month). Editable, but clearly marked
+    // with a purple/lime treatment so the user knows this line did
+    // NOT originate in the Monthly Review tab and that edits have
+    // downstream effects.
+    if(it.fromTrip){
+      return `<div class="line-item line-item-linked" title="Linked from Fun Fund · Trip. Editing the amount updates the trip's budget — open the Fun Fund tab to change the name, date, or status.">
+        <span class="line-linked-icon" aria-hidden="true">✈︎</span>
+        <input class="line-name" value="${esc(it.name)}" disabled>
+        <div class="line-amt-wrap"><span class="line-cur">${s}</span><input class="line-amt" type="number" value="${Math.round(it.amount*r)}" oninput="updateLinkedTripAmount('${it.tripId}',this.value/${r})"></div>
+        <span class="line-linked-src">Fun Fund</span>
+        <span class="line-linked-pill trip">TRIP</span>
+      </div>`;
+    }
     // Carry-forward synthetic rows — produced by get12Months() to chain
     // months together — render as a locked, non-editable variant. Name,
     // amount, type are display-only. No paid checkbox, no delete button.
@@ -3472,6 +3587,17 @@ function updateLineItem(key,id,field,val) {
   item[field]=field==='amount'?+val:val;
   save();
 }
+// Editing the amount on a linked trip row (rendered by
+// renderLineItems) writes straight through to state.trips[].budget.
+// We call renderAll() so the Fun Fund tab's KPIs, trip card, and
+// every other chart/table reflect the change live.
+window.updateLinkedTripAmount = function(tripId, val){
+  const t = (state.trips || []).find(x => x.id === tripId);
+  if(!t) return;
+  t.budget = +val || 0;
+  save();
+  if(typeof renderAll === 'function') renderAll();
+};
 function removeLineItem(key,id) {
   const arr=resolveKey(key); if(!arr) return;
   const idx=arr.findIndex(i=>i.id===id); if(idx>-1) arr.splice(idx,1);
@@ -3746,6 +3872,7 @@ function renderDashboard() {
             // wants to see rollovers explicitly.)
             {label:'Income',data:months.map(m=>m.pureIncome),borderColor:'#00e8a0',backgroundColor:'#00e8a012',fill:true,tension:.35,pointRadius:2,borderWidth:2},
             {label:'Expenses',data:months.map(m=>m.pureExpenses),borderColor:'#ff4d6d',backgroundColor:'#ff4d6d10',fill:true,tension:.35,pointRadius:2,borderWidth:2},
+            {label:'Savings',data:months.map(m=>m.savings),borderColor:'#f5a623',backgroundColor:'transparent',fill:false,tension:.35,pointRadius:2,borderWidth:1.5},
             {label:'Fun Fund',data:months.map(m=>m.pureFunFund),borderColor:'#00d4ff',fill:false,tension:.35,pointRadius:2,borderWidth:1.5,borderDash:[4,3]},
           ]
         },
@@ -3899,7 +4026,7 @@ function renderTransactions() {
     if(ctx){
       const cd=chartDefaults();
       const scope = state.txChartScope || 'past';
-      let months, income, expenses, savings, funFund;
+      let labels, income, expenses, savings, funFund, net;
       if(scope === 'next'){
         // Next 12 Months — pulls live from get12Months() so the chart
         // reflects exactly what the Fun Fund tab, Dashboard, and
@@ -3910,39 +4037,63 @@ function renderTransactions() {
         // per-month numbers one-for-one.
         const all = get12Months();
         const fwd = all.slice(1);
-        months   = fwd.map(m => m.short);
+        labels   = fwd.map(m => m.short);
         income   = fwd.map(m => m.pureIncome);
         expenses = fwd.map(m => m.pureExpenses);
         savings  = fwd.map(m => m.savings);
         funFund  = fwd.map(m => Math.max(0, m.pureFunFund));
       } else {
-        // Past 12 Months — historical demo data (the original chart).
-        months=MONTH_NAMES.slice(4).concat(MONTH_NAMES.slice(0,4));
-        income=[127000,127000,206000,131800,127000,127000,127000,127000,127000,127000,127000,127000];
-        expenses=[132500,178264,88545,91500,103500,91500,108636,63945,81636,91500,56590,107090];
-        // Derive Savings + Fun Fund from the user's current baseline so
-        // the past-scope chart uses the same two overlay lines as the
-        // next-scope variant (styled identically to the Monthly Review
-        // 12-Month chart). Savings is treated as a constant monthly
-        // target; Fun Fund is income − expenses − savings, floored at 0.
-        const baseSav = state.baseSavings || 0;
-        savings = income.map(() => baseSav);
-        funFund = income.map((v,i) => Math.max(0, v - expenses[i] - baseSav));
+        // Past 12 Months — aggregated STRICTLY from the user's actual
+        // bank transactions (state.transactions). Each of the last 12
+        // calendar months gets its own bucket; credits roll up into
+        // Income, debits into Expenses, and Net Flow is the derived
+        // difference. Months with no transaction history show zero —
+        // the chart is an honest view of what actually happened, not
+        // a hardcoded demo array.
+        const buckets = [];
+        for(let i = 11; i >= 0; i--){
+          const d = new Date(CY, CM - i, 1);
+          const key = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+          buckets.push({
+            key,
+            short: `${MONTH_NAMES[d.getMonth()]} '${String(d.getFullYear()).slice(2)}`,
+            income: 0, expenses: 0,
+          });
+        }
+        const byKey = Object.fromEntries(buckets.map(b => [b.key, b]));
+        (state.transactions || []).forEach(tx => {
+          const k = (tx.date || '').slice(0, 7);
+          const b = byKey[k];
+          if(!b) return;
+          if(tx.type === 'credit') b.income   += Math.abs(tx.amount);
+          else                     b.expenses += Math.abs(tx.amount);
+        });
+        labels   = buckets.map(b => b.short);
+        income   = buckets.map(b => b.income);
+        expenses = buckets.map(b => b.expenses);
+        net      = income.map((v, i) => v - expenses[i]);
       }
-      // Focal chart — proportions scale up with the canvas. Bigger axis
-      // fonts, more y-ticks, slightly heavier borders. Net Flow has
-      // been replaced with two overlay lines (Savings + Fun Fund) so
-      // the read-through matches the Monthly Review 12-Month chart.
-      charts['tx']=new Chart(ctx.getContext('2d'),{
-        type:'bar',
-        data:{
-          labels:months,
-          datasets:[
+      // Focal chart — Next scope keeps the four-series forward overlay
+      // (Income / Expenses / Savings / Fun Fund). Past scope narrows to
+      // the three series the actual-transaction data can justify:
+      // Income (bars), Expenses (bars), Net Flow (line).
+      const datasets = (scope === 'next')
+        ? [
             {label:'Income',   data:income,   backgroundColor:'#00e8a028', borderColor:'#00e8a0', borderWidth:2,   borderRadius:5, categoryPercentage:0.7, barPercentage:0.85, order:2},
             {label:'Expenses', data:expenses, backgroundColor:'#ff4d6d22', borderColor:'#ff4d6d', borderWidth:2,   borderRadius:5, categoryPercentage:0.7, barPercentage:0.85, order:2},
             {label:'Savings',  data:savings,  type:'line', borderColor:'#f5a623', backgroundColor:'transparent', fill:false, tension:0.3, pointRadius:3, pointHoverRadius:5, pointBackgroundColor:'#f5a623', borderWidth:2, order:1},
             {label:'Fun Fund', data:funFund,  type:'line', borderColor:'#00d4ff', backgroundColor:'transparent', fill:false, tension:0.3, pointRadius:3, pointHoverRadius:5, pointBackgroundColor:'#00d4ff', borderWidth:2, order:1},
           ]
+        : [
+            {label:'Income',   data:income,   backgroundColor:'#00e8a028', borderColor:'#00e8a0', borderWidth:2, borderRadius:5, categoryPercentage:0.7, barPercentage:0.85, order:2},
+            {label:'Expenses', data:expenses, backgroundColor:'#ff4d6d22', borderColor:'#ff4d6d', borderWidth:2, borderRadius:5, categoryPercentage:0.7, barPercentage:0.85, order:2},
+            {label:'Net Flow', data:net,      type:'line', borderColor:'#4d9fff', backgroundColor:'transparent', fill:false, tension:0.3, pointRadius:3, pointHoverRadius:5, pointBackgroundColor:'#4d9fff', borderWidth:2, order:1},
+          ];
+      charts['tx']=new Chart(ctx.getContext('2d'),{
+        type:'bar',
+        data:{
+          labels,
+          datasets,
         },
         options:chartPreset({
           layout:{ padding:{ top:10, right:10, bottom:4, left:4 } },
@@ -5021,7 +5172,6 @@ function _attachRunwayHover(host, {cdata, pad, pw, ph, xScale, yBal}){
     const pen     = cdata.pensionData[nearest]    || 0;
     const short   = cdata.shortfall?.[nearest]    || 0;
     const needed  = cdata.needed?.[nearest]       || (port + pen);
-    const total   = port + pen;
     const dep     = cdata.depletedFlag?.[nearest] === true;
     // Move the on-SVG indicator
     const cx = xScale(nearest);
@@ -5040,7 +5190,6 @@ function _attachRunwayHover(host, {cdata, pad, pw, ph, xScale, yBal}){
       ${!dep ? `<div class="chart-tt-row"><span class="chart-tt-sw" style="background:#f5a623"></span><span>Portfolio withdrawal</span><span class="chart-tt-val">${fmt(port)}/yr</span></div>` : ''}
       ${pen > 0 ? `<div class="chart-tt-row"><span class="chart-tt-sw" style="background:#4d9fff"></span><span>Pension income</span><span class="chart-tt-val">${fmt(pen)}/yr</span></div>` : ''}
       ${short > 0 ? `<div class="chart-tt-row"><span class="chart-tt-sw" style="background:#ff4d6d"></span><span style="color:#ff4d6d">Shortfall vs need</span><span class="chart-tt-val" style="color:#ff4d6d">−${fmt(short)}/yr</span></div>` : ''}
-      <div class="chart-tt-total"><span>${short > 0 ? 'Actual income/yr' : 'Total income/yr'}</span><span class="chart-tt-val">${fmt(total)}</span></div>
       ${short > 0 ? `<div class="chart-tt-row" style="color:var(--text3);font-size:10px"><span></span><span>Need ${fmt(needed)}/yr</span><span></span></div>` : ''}
     `;
     // Position tooltip near cursor, avoiding right/bottom edge clipping
@@ -5176,31 +5325,42 @@ function renderFunFund() {
 
   const tripCards=state.trips.map((t,idx)=>{
     const spentPct=t.budget>0?Math.round(t.spent/t.budget*100):0;
+    // Normalise to a "YYYY-MM" string for the <input type="month">.
+    const ymDate = (t.date||'').slice(0,7);
+    // Human label used under the trip name.
+    let dateLabel = t.date || '—';
+    if(/^\d{4}-\d{2}$/.test(ymDate)){
+      const [yy,mm] = ymDate.split('-').map(Number);
+      dateLabel = `${MONTH_NAMES[mm-1]} ${yy}`;
+    }
     return `<div class="trip-card">
       <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
         <span style="font-size:24px">${t.icon||'✈️'}</span>
         <div style="flex:1">
-          <div style="font-family:var(--ff);font-size:15px;font-weight:700">${esc(t.name)}</div>
-          <div style="font-size:11px;color:var(--text2)">${esc(t.country)} · ${t.date}</div>
+          <input class="line-name" value="${esc(t.name)}" placeholder="Trip name" style="background:transparent;border:none;color:var(--text);font-family:var(--ff);font-size:15px;font-weight:700;padding:0;outline:none;width:100%" oninput="state.trips[${idx}].name=this.value;save()" onchange="commitRender('renderAll')">
+          <div style="font-size:11px;color:var(--text2)">${esc(t.country||'')} · <span style="color:var(--violet);font-weight:600">${dateLabel}</span></div>
         </div>
         <span class="trip-status ${t.status}">${t.status.toUpperCase()}</span>
-        <button class="line-rm" onclick="state.trips.splice(${idx},1);save();renderFunFund()">×</button>
+        <button class="line-rm" onclick="removeTrip('${t.id}')">×</button>
       </div>
-      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;font-size:11px;margin-bottom:10px">
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:8px;font-size:11px;margin-bottom:10px">
+        <div><div style="color:var(--text3);font-family:var(--fm);font-size:9px;letter-spacing:.08em;margin-bottom:2px">MONTH</div>
+          <input type="month" value="${ymDate}" style="background:var(--bg3);border:1px solid var(--border);border-radius:5px;padding:4px 8px;color:var(--text);font-family:var(--fm);font-size:11px;outline:none;width:100%;color-scheme:dark" onchange="updateTripDate('${t.id}',this.value)" title="Schedule the trip to a month — the budget will auto-appear as a Trip line in that month's Monthly Review tab">
+        </div>
         <div><div style="color:var(--text3);font-family:var(--fm);font-size:9px;letter-spacing:.08em;margin-bottom:2px">BUDGET</div>
           <div style="display:flex;align-items:center;gap:3px;background:var(--bg3);border:1px solid var(--border);border-radius:5px;padding:0 8px">
             <span style="color:var(--text3);font-size:10px">${s}</span>
-            <input type="number" style="background:transparent;border:none;color:var(--text);font-family:var(--fm);font-size:12px;padding:5px 0;outline:none;width:100%" value="${Math.round(t.budget*r)}" oninput="state.trips[${idx}].budget=this.value/${r};save()" onchange="commitRender('renderFunFund')">
+            <input type="number" style="background:transparent;border:none;color:var(--text);font-family:var(--fm);font-size:12px;padding:5px 0;outline:none;width:100%" value="${Math.round(t.budget*r)}" oninput="state.trips[${idx}].budget=this.value/${r};save()" onchange="commitRender('renderAll')">
           </div>
         </div>
         <div><div style="color:var(--text3);font-family:var(--fm);font-size:9px;letter-spacing:.08em;margin-bottom:2px">SPENT</div>
           <div style="display:flex;align-items:center;gap:3px;background:var(--bg3);border:1px solid var(--border);border-radius:5px;padding:0 8px">
             <span style="color:var(--text3);font-size:10px">${s}</span>
-            <input type="number" style="background:transparent;border:none;color:var(--text);font-family:var(--fm);font-size:12px;padding:5px 0;outline:none;width:100%" value="${Math.round(t.spent*r)}" oninput="state.trips[${idx}].spent=this.value/${r};save()" onchange="commitRender('renderFunFund')">
+            <input type="number" style="background:transparent;border:none;color:var(--text);font-family:var(--fm);font-size:12px;padding:5px 0;outline:none;width:100%" value="${Math.round(t.spent*r)}" oninput="state.trips[${idx}].spent=this.value/${r};save()" onchange="commitRender('renderAll')">
           </div>
         </div>
         <div><div style="color:var(--text3);font-family:var(--fm);font-size:9px;letter-spacing:.08em;margin-bottom:2px">STATUS</div>
-          <select style="background:var(--bg3);border:1px solid var(--border);border-radius:5px;padding:5px 8px;color:var(--text2);font-size:11px;outline:none;width:100%" onchange="state.trips[${idx}].status=this.value;save();renderFunFund()">
+          <select style="background:var(--bg3);border:1px solid var(--border);border-radius:5px;padding:5px 8px;color:var(--text2);font-size:11px;outline:none;width:100%" onchange="state.trips[${idx}].status=this.value;save();renderAll()">
             <option value="planning" ${t.status==='planning'?'selected':''}>Planning</option>
             <option value="booked" ${t.status==='booked'?'selected':''}>Booked</option>
             <option value="wishlist" ${t.status==='wishlist'?'selected':''}>Wishlist</option>
@@ -5232,7 +5392,7 @@ function renderFunFund() {
       <div>
         <div style="font-family:var(--ff);font-size:14px;font-weight:700;margin-bottom:10px">Travel Plans</div>
         ${tripCards}
-        <button class="btn-add" onclick="state.trips.push({id:genId(),name:'New Trip',country:'',budget:50000,spent:0,date:'${CY}-06',status:'planning',icon:'✈️'});save();renderFunFund()">+ Add Trip</button>
+        <button class="btn-add" onclick="addTrip()">+ Add Trip</button>
       </div>
       <div>
         <div class="card">
@@ -5265,6 +5425,43 @@ function renderFunFund() {
     }
   },50);
 }
+// Trip lifecycle handlers. New trips default to next month so they
+// fall inside the 12-month window get12Months() uses to inject the
+// synthetic "✈️ Trip" line into the Monthly Review tab. Every
+// mutation finishes with renderAll() so every table, chart, and
+// summary across the platform picks up the change immediately.
+window.addTrip = function(){
+  if(!Array.isArray(state.trips)) state.trips = [];
+  const d = new Date(CY, CM + 1, 1);
+  const y = d.getFullYear();
+  const m = String(d.getMonth()+1).padStart(2,'0');
+  state.trips.push({
+    id: genId(),
+    name: 'New Trip',
+    country: '',
+    budget: 50000,
+    spent: 0,
+    date: `${y}-${m}`,
+    status: 'planning',
+    icon: '✈️',
+  });
+  save();
+  if(typeof renderAll === 'function') renderAll();
+};
+window.updateTripDate = function(tripId, ym){
+  const t = (state.trips || []).find(x => x.id === tripId);
+  if(!t) return;
+  t.date = ym || t.date;
+  save();
+  if(typeof renderAll === 'function') renderAll();
+};
+window.removeTrip = function(tripId){
+  const i = (state.trips || []).findIndex(x => x.id === tripId);
+  if(i < 0) return;
+  state.trips.splice(i, 1);
+  save();
+  if(typeof renderAll === 'function') renderAll();
+};
 
 // ══ RETIRE ANYWHERE ══════════════════════════════════════════════════════════
 let retireMap=null;
