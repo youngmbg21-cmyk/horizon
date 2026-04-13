@@ -756,6 +756,42 @@ body.light .md tbody tr:nth-child(even) { background:rgba(0,0,0,0.015); }
 .ai-msg .md .md-table-wrap { margin:10px 0; }
 .ai-msg .md th, .ai-msg .md td { padding:8px 10px; font-size:11px; }
 
+/* ── IN-CHAT CHARTS ─────────────────────────────────────────────────
+   When the model emits a ```horizon-chart``` fenced block, the chat
+   renderer replaces it with one of these. The canvas inside is a
+   Chart.js instance built from LIVE app data (never model-authored
+   numbers), so the in-chat chart can never drift from the Retirement
+   panel it mirrors. */
+.ai-chart-card {
+  margin:10px 0 6px; padding:10px 12px 8px;
+  background:var(--bg3); border:1px solid var(--border); border-radius:8px;
+}
+.ai-chart-hd {
+  display:flex; align-items:center; justify-content:space-between;
+  gap:8px; margin-bottom:6px;
+}
+.ai-chart-title {
+  font-family:var(--ff); font-size:12px; font-weight:700; color:var(--text);
+  letter-spacing:-.01em;
+}
+.ai-chart-sub {
+  font-family:var(--fm); font-size:9px; color:var(--text3);
+  text-transform:uppercase; letter-spacing:.08em;
+}
+.ai-chart-canvas-wrap {
+  position:relative; width:100%; height:180px;
+}
+.ai-chart-canvas-wrap canvas { display:block; width:100% !important; height:100% !important; }
+.ai-chart-empty {
+  font-size:11px; color:var(--text3); text-align:center;
+  padding:30px 10px; font-family:var(--fm);
+}
+.ai-chart-err {
+  font-size:10px; color:var(--red); font-family:var(--fm);
+  padding:6px 8px; background:rgba(255,77,109,.08);
+  border:1px dashed rgba(255,77,109,.3); border-radius:4px;
+}
+
 /* Typing dots */
 .ai-typing { display:flex; gap:4px; align-items:center; padding:2px 0; }
 .ai-typing span { width:6px; height:6px; border-radius:50%; background:var(--amber); animation:aiTyp 1.2s ease infinite; }
@@ -6269,6 +6305,9 @@ function pushAIHistory(panel, query){
 
 function clearAIChat(){
   aiChatHistory=[];
+  // Destroy any Chart.js instances that in-chat charts registered so their
+  // canvas contexts don't leak when the bubble DOM is replaced below.
+  if(typeof _destroyAIChartInstances === 'function') _destroyAIChartInstances();
   const msgs=document.getElementById('aip-msgs');
   msgs.innerHTML=`<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:200px;text-align:center;padding:20px;color:var(--text3);">
     <div style="font-size:36px;opacity:.4;margin-bottom:10px;">✦</div>
@@ -6337,6 +6376,28 @@ User's financial snapshot (SEK):
 - Planned trips: ${state.trips.map(t=>t.name+' ('+Math.round(t.budget).toLocaleString()+' kr)').join(', ')}
 - Retire Anywhere feasible destinations at current real income: ${scored.filter(l=>l.verdict==='feasible').map(l=>l.name).join(', ')||'none feasible at current income level'}
 
+INLINE CHARTS — OPTIONAL
+When the user asks a question that would genuinely benefit from a visual (e.g. "show me how my retirement fund will last", "visualise my cashflow", "compare my destinations"), you MAY append ONE fenced code block using the exact tag \`horizon-chart\` somewhere in your reply. The client parses these blocks out and renders a real Chart.js chart built from LIVE app state — you MUST NOT include any data points, labels, axis values, or numbers inside the block. You only pick a kind.
+
+Block format:
+\`\`\`horizon-chart
+{ "kind": "<one-of-the-kinds-below>", "title": "optional short title" }
+\`\`\`
+
+Allowed kinds and when to use them:
+- "runway": how long the nest egg lasts (balance line + portfolio/pension/shortfall bars). Use for longevity / depletion / "will my money last" questions. Reflects the active expense scenario (Lean / Baseline / Comfortable).
+- "nestEgg": projected growth of the nest egg from now to retirement age (line chart, today's money). Optional param: {"includeNominal": true} to overlay the nominal future-kr line.
+- "expense12mo": next 12 months of monthly expenses (bar chart). Use for "where is my money going this year" style questions.
+- "cashflow12mo": next 12 months of income vs expenses with a surplus line. Use for "am I saving enough" / budget health questions.
+- "retireAnywhere": top destinations from Retire Anywhere ranked by monthly surplus (horizontal bars, green = feasible, amber = conditional, red = infeasible). Optional param: {"top": 5} to cap the list.
+
+Rules:
+- At most ONE chart per reply. Pick the single most useful one.
+- Do NOT emit a chart block for small talk, definitions, advice-only answers, or questions where a chart would add noise.
+- Do NOT invent kinds. Only the five above are valid — any other value renders as an error.
+- Do NOT put numbers, arrays, labels, or data inside the block. The client owns data.
+- Reference the chart explicitly in your narrative ("See the runway chart below — you deplete at age X") so the user understands what they're looking at.
+
 Be concise, direct, insightful. Reference specific numbers from THIS snapshot — never recompute independently. Give actionable advice.`;
 }
 
@@ -6379,6 +6440,311 @@ async function callClaude(prompt, maxTokens, key) {
   return d.content?.map(c=>c.text||'').join('')||'No response';
 }
 
+// ─── IN-CHAT CHART PIPELINE ─────────────────────────────────────────────────
+// Contract: the model may emit one or more fenced ```horizon-chart``` blocks
+// in its reply. Each block is a small JSON object with a `kind` (one of the
+// recipes below) and optional cosmetic params. The client parses every block
+// out BEFORE markdown rendering, replaces it with a placeholder div, renders
+// the surrounding text via mdParse(), then for each placeholder builds a
+// Chart.js instance from LIVE app state (getRetirementNumbers(),
+// get12Months(), getProjection(), retirePlaces, etc.) — the model never
+// supplies data points, so in-chat charts can never drift from the rest of
+// the UI. All dollar/kr values render through the existing rate()/fmtC()
+// helpers so the user's currency toggle works without any recipe awareness.
+//
+// Every Chart.js instance is registered in the shared `charts` map under a
+// key prefixed `aichart-<msgIdx>-<blockIdx>` so clearAIChat() can destroy
+// them in a single pass without leaking canvas contexts.
+
+let _aiChartMsgCounter = 0;
+
+// The recipe registry. Each entry is a pure function (params) => ChartConfig
+// that reads from app state and returns a full Chart.js config. Returning
+// null means "no data" and the renderer shows a graceful empty state.
+const AI_CHART_RECIPES = {
+  // Longevity runway — mirrors the Retirement panel's runway chart but in a
+  // chat-friendly smaller format. Uses the shared simulation result so the
+  // line + bars match what the user sees on the Retirement page.
+  runway(params){
+    const nums = getRetirementNumbers();
+    const sim  = nums._simResult;
+    if(!sim || !sim.labels || sim.labels.length === 0) return null;
+    const r = rate();
+    const lifeExp = state.lifeExp || 90;
+    const depletes = nums.runoutAge
+      ? `Depletes age ${Math.round(nums.runoutAge)}`
+      : 'Never depletes';
+    return {
+      _title: params?.title || `Longevity Runway · ${({lean:'Lean',baseline:'Baseline',comfortable:'Comfortable'})[state.retirementScenario||'baseline']||'Baseline'}`,
+      _subtitle: `${nums.verdict} · ${nums.coveragePct.toFixed(0)}% funded · ${depletes} · life exp. ${lifeExp}`,
+      type: 'bar',
+      data: {
+        labels: sim.labels,
+        datasets: [
+          {
+            type: 'bar', label: 'Portfolio withdrawal',
+            data: sim.portWithdrawal.map(v => v * r),
+            backgroundColor: '#f5a62399', borderColor: '#f5a623',
+            borderWidth: 1, stack: 'income', order: 3,
+          },
+          {
+            type: 'bar', label: 'Pension',
+            data: sim.pensionData.map(v => v * r),
+            backgroundColor: '#4d9fff99', borderColor: '#4d9fff',
+            borderWidth: 1, stack: 'income', order: 2,
+          },
+          {
+            type: 'bar', label: 'Shortfall',
+            data: (sim.shortfall || []).map(v => v * r),
+            backgroundColor: 'rgba(255,77,109,.35)', borderColor: '#ff4d6d',
+            borderWidth: 1, stack: 'income', order: 1,
+          },
+          {
+            type: 'line', label: 'Portfolio balance',
+            data: sim.balData.map(v => v * r),
+            borderColor: nums.runoutAge ? '#ff4d6d' : '#00e8a0',
+            backgroundColor: 'transparent',
+            borderWidth: 2, tension: .25, pointRadius: 0,
+            yAxisID: 'yBal',
+          },
+        ],
+      },
+      options: chartPreset({
+        scales: {
+          x: { ticks:{ color:chartDefaults().textColor, font:chartDefaults().tickFont, maxTicksLimit:8 }, grid:{display:false}, stacked:true },
+          y: { ticks:{ color:chartDefaults().textColor, callback:v=>fmtC(v), font:chartDefaults().tickFont, maxTicksLimit:5 }, grid:{display:false}, stacked:true, title:{display:false} },
+          yBal: { position:'right', ticks:{ color:chartDefaults().textColor, callback:v=>fmtC(v), font:chartDefaults().tickFont, maxTicksLimit:5 }, grid:{display:false} },
+        },
+      }),
+    };
+  },
+
+  // Nest-egg projection — line from now to retirement, real (today's money)
+  // by default, with optional nominal overlay.
+  nestEgg(params){
+    const proj = getProjection();
+    if(!proj || proj.length === 0) return null;
+    const r = rate();
+    const showNominal = params?.includeNominal === true;
+    const datasets = [{
+      label: 'Nest egg · today\u2019s money',
+      data: proj.map(p => (p.realTotal||0) * r),
+      borderColor: '#00e8a0', backgroundColor: 'rgba(0,232,160,.14)',
+      borderWidth: 2, tension:.3, pointRadius:0, fill:true,
+    }];
+    if(showNominal){
+      datasets.push({
+        label: 'Nominal (future kr)',
+        data: proj.map(p => (p.total||0) * r),
+        borderColor: '#4d9fff', backgroundColor: 'transparent',
+        borderWidth: 1.5, borderDash:[4,3], tension:.3, pointRadius:0,
+      });
+    }
+    return {
+      _title: params?.title || 'Nest egg projection',
+      _subtitle: `${proj.length} years · today\u2019s money`,
+      type: 'line',
+      data: { labels: proj.map(p => p.age || p.year || ''), datasets },
+      options: chartPreset(),
+    };
+  },
+
+  // 12-month expense breakdown — bar chart of monthly expenses. Falls back
+  // to a single aggregate bar if baseExpenses is thin.
+  expense12mo(params){
+    const months = get12Months();
+    if(!months || months.length === 0) return null;
+    const r = rate();
+    return {
+      _title: params?.title || 'Monthly expenses · next 12 months',
+      _subtitle: 'Real (today\u2019s money)',
+      type: 'bar',
+      data: {
+        labels: months.map(m => m.short),
+        datasets: [{
+          label: 'Expenses',
+          data: months.map(m => (m.expenses||0) * r),
+          backgroundColor: 'rgba(245,166,35,.35)',
+          borderColor: '#f5a623', borderWidth: 1.5, borderRadius: 3,
+        }],
+      },
+      options: chartPreset(),
+    };
+  },
+
+  // 12-month cashflow — income vs expenses, stacked/overlaid bars with a
+  // surplus line on top. Answers "am I saving enough this year?".
+  cashflow12mo(params){
+    const months = get12Months();
+    if(!months || months.length === 0) return null;
+    const r = rate();
+    return {
+      _title: params?.title || 'Cashflow · income vs expenses',
+      _subtitle: 'Next 12 months · today\u2019s money',
+      type: 'bar',
+      data: {
+        labels: months.map(m => m.short),
+        datasets: [
+          {
+            label: 'Income',
+            data: months.map(m => (m.income||0) * r),
+            backgroundColor: 'rgba(0,232,160,.3)',
+            borderColor: '#00e8a0', borderWidth: 1.5, borderRadius: 3,
+          },
+          {
+            label: 'Expenses',
+            data: months.map(m => (m.expenses||0) * r),
+            backgroundColor: 'rgba(255,77,109,.25)',
+            borderColor: '#ff4d6d', borderWidth: 1.5, borderRadius: 3,
+          },
+          {
+            type:'line', label: 'Surplus',
+            data: months.map(m => (m.surplus||0) * r),
+            borderColor: '#4d9fff', backgroundColor: 'transparent',
+            borderWidth: 2, tension:.3, pointRadius: 2,
+          },
+        ],
+      },
+      options: chartPreset(),
+    };
+  },
+
+  // Retire-anywhere ranking — top N destinations by affordability score.
+  retireAnywhere(params){
+    const scored = retirePlaces().map(scoreLocation);
+    if(!scored.length) return null;
+    const top = scored
+      .slice()
+      .sort((a,b) => (b.affordabilityScore||0) - (a.affordabilityScore||0))
+      .slice(0, Math.max(3, Math.min(8, params?.top || 6)));
+    const r = rate();
+    return {
+      _title: params?.title || 'Retire Anywhere · top destinations',
+      _subtitle: 'Monthly surplus after cost of living · today\u2019s money',
+      type: 'bar',
+      data: {
+        labels: top.map(l => l.name),
+        datasets: [{
+          label: 'Monthly surplus',
+          data: top.map(l => (l.surplus||0) * r),
+          backgroundColor: top.map(l => l.verdict==='feasible' ? 'rgba(0,232,160,.35)' : l.verdict==='conditional' ? 'rgba(245,166,35,.35)' : 'rgba(255,77,109,.25)'),
+          borderColor:    top.map(l => l.verdict==='feasible' ? '#00e8a0' : l.verdict==='conditional' ? '#f5a623' : '#ff4d6d'),
+          borderWidth: 1.5, borderRadius: 3,
+        }],
+      },
+      options: chartPreset({ indexAxis:'y' }),
+    };
+  },
+};
+
+// Extract every fenced horizon-chart block from a reply and replace each
+// with a plain-text sentinel token. We use a sentinel (not an HTML div)
+// because mdParse() HTML-escapes all text — any raw tags we injected
+// would come out as &lt;div&gt;. The sentinel is a unique, alphanumeric-
+// only string that survives markdown-escaping unchanged. The render step
+// then swaps each sentinel (wrapped by mdParse in its own <p>) for a
+// real Chart.js host card. Returns {text: replyWithSentinels, blocks: []}.
+function _extractAIChartBlocks(reply, msgIdx){
+  const blocks = [];
+  // Match ```horizon-chart\n...\n``` — tolerant of trailing whitespace and
+  // optional language suffix spaces. Non-greedy body.
+  const re = /```horizon-chart\s*\n([\s\S]*?)```/g;
+  const rewritten = reply.replace(re, (_full, body) => {
+    const blockIdx = blocks.length;
+    const chartId = `aichart-${msgIdx}-${blockIdx}`;
+    let payload = null, parseError = null;
+    try { payload = JSON.parse(body.trim()); }
+    catch(e){ parseError = e.message; }
+    blocks.push({ chartId, payload, parseError });
+    // Blank lines around the sentinel force mdParse to treat it as its
+    // own paragraph, so the post-render substitution can safely replace
+    // the whole <p>...</p> wrapper with a block-level chart card.
+    return `\n\nHORIZONCHARTPLACEHOLDER${chartId.replace(/-/g,'X')}\n\n`;
+  });
+  return { text: rewritten, blocks };
+}
+
+// Given a rendered HTML string and the block list, substitute each
+// sentinel paragraph for the chart card DOM. Returns the finalised HTML.
+function _inlineAIChartPlaceholders(html, blocks){
+  for(const blk of blocks){
+    const sentinel = 'HORIZONCHARTPLACEHOLDER' + blk.chartId.replace(/-/g,'X');
+    // Match either the <p>sentinel</p> wrapper that mdParse produces, or
+    // the bare sentinel if something else happened.
+    const wrapped = new RegExp('<p>\\s*' + sentinel + '\\s*</p>', 'g');
+    const bare = new RegExp(sentinel, 'g');
+    const placeholder = `<div class="ai-chart-placeholder" data-chart-id="${blk.chartId}"></div>`;
+    html = html.replace(wrapped, placeholder).replace(bare, placeholder);
+  }
+  return html;
+}
+
+// Given the list of extracted blocks, instantiate a Chart.js instance for
+// each placeholder currently in the DOM. Runs AFTER the bubble's innerHTML
+// has been set, so the placeholder nodes exist.
+function _renderAIChartBlocks(root, blocks){
+  if(!root || !blocks || !blocks.length) return;
+  for(const blk of blocks){
+    const host = root.querySelector(`.ai-chart-placeholder[data-chart-id="${blk.chartId}"]`);
+    if(!host) continue;
+    // Parse failure — inline error, keep the rest of the reply intact.
+    if(blk.parseError){
+      host.outerHTML = `<div class="ai-chart-err">Chart block could not be parsed (${esc(blk.parseError)}).</div>`;
+      continue;
+    }
+    const kind = blk.payload && blk.payload.kind;
+    const recipe = kind && AI_CHART_RECIPES[kind];
+    if(!recipe){
+      host.outerHTML = `<div class="ai-chart-err">Unknown chart kind: ${esc(String(kind||'(missing)'))}.</div>`;
+      continue;
+    }
+    let cfg = null, buildErr = null;
+    try { cfg = recipe(blk.payload || {}); }
+    catch(e){ buildErr = e.message; }
+    if(buildErr){
+      host.outerHTML = `<div class="ai-chart-err">Chart build error: ${esc(buildErr)}.</div>`;
+      continue;
+    }
+    if(!cfg){
+      host.outerHTML = `<div class="ai-chart-card"><div class="ai-chart-hd"><div class="ai-chart-title">${esc(blk.payload?.title || kind)}</div></div><div class="ai-chart-empty">Not enough data to render this chart yet.</div></div>`;
+      continue;
+    }
+    const title = cfg._title || kind;
+    const subtitle = cfg._subtitle || '';
+    delete cfg._title; delete cfg._subtitle;
+    // Replace the placeholder with a card + canvas, then construct the
+    // Chart.js instance against the canvas context. The instance is
+    // registered in the shared charts{} map so clearAIChat() can destroy
+    // every in-chat chart in a single sweep.
+    const cardId = blk.chartId;
+    host.outerHTML = `
+      <div class="ai-chart-card" data-chart-id="${cardId}">
+        <div class="ai-chart-hd">
+          <div class="ai-chart-title">${esc(title)}</div>
+          ${subtitle ? `<div class="ai-chart-sub">${esc(subtitle)}</div>` : ''}
+        </div>
+        <div class="ai-chart-canvas-wrap"><canvas id="${cardId}-canvas"></canvas></div>
+      </div>`;
+    const canvas = document.getElementById(`${cardId}-canvas`);
+    if(!canvas) continue;
+    try {
+      destroyChart(cardId);
+      charts[cardId] = new Chart(canvas.getContext('2d'), cfg);
+    } catch(e){
+      canvas.parentElement.innerHTML = `<div class="ai-chart-err">Chart.js error: ${esc(e.message)}</div>`;
+    }
+  }
+}
+
+// Destroy every in-chat Chart.js instance in one sweep — called from
+// clearAIChat() and before each fresh render to prevent canvas leaks when
+// the chat history is wiped.
+function _destroyAIChartInstances(){
+  Object.keys(charts).forEach(k => {
+    if(k.startsWith('aichart-')) destroyChart(k);
+  });
+}
+
 async function aipSend() {
   const ta=document.getElementById('aip-input'); if(!ta) return;
   const msg=ta.value.trim(); if(!msg||aipTyping) return;
@@ -6404,12 +6770,26 @@ async function aipSend() {
     const res=await fetch('https://api.anthropic.com/v1/messages',{
       method:'POST',
       headers:{'Content-Type':'application/json','x-api-key':key,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
-      body:JSON.stringify({model:'claude-opus-4-6',max_tokens:600,system:buildAIContext(),messages:aiChatHistory.slice(-8)})
+      // Bumped from 600 → 900 to leave headroom for an optional fenced
+      // `horizon-chart` block without squeezing the narrative response.
+      body:JSON.stringify({model:'claude-opus-4-6',max_tokens:900,system:buildAIContext(),messages:aiChatHistory.slice(-8)})
     });
     const d=await res.json();
     const reply=d.content?.map(c=>c.text||'').join('')||'No response';
     aiChatHistory.push({role:'assistant',content:reply});
-    typWrap.querySelector('.ai-msg').innerHTML=mdParse(reply);
+    // Pull any ```horizon-chart``` fenced blocks out of the reply, leaving
+    // sentinels behind. Run mdParse() on the sentinel-embedded text (safe
+    // because sentinels are alphanumeric and untouched by markdown), then
+    // swap each sentinel for a real placeholder div and instantiate
+    // Chart.js into it. Every step is fail-safe: a bad block degrades to
+    // an inline error badge and the rest of the reply renders normally.
+    const msgIdx = _aiChartMsgCounter++;
+    const {text: cleanedText, blocks} = _extractAIChartBlocks(reply, msgIdx);
+    const bubble = typWrap.querySelector('.ai-msg');
+    let rendered = mdParse(cleanedText);
+    if(blocks.length) rendered = _inlineAIChartPlaceholders(rendered, blocks);
+    bubble.innerHTML = rendered;
+    if(blocks.length) _renderAIChartBlocks(bubble, blocks);
   } catch(e){ typWrap.querySelector('.ai-msg').innerHTML=`<span style="color:var(--red);font-size:12px">Error: ${e.message}</span>`; }
   aipTyping=false;
   document.getElementById('aip-msgs').scrollTop=99999;
