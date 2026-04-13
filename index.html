@@ -1438,30 +1438,188 @@ body.light .retire-slideover { box-shadow:-10px 0 32px -10px rgba(60,40,10,0.25)
   font-family:var(--fm); font-size:12px; color:var(--accent-positive);
 }
 
-/* ── VAULT ──────────────────────────────────────────────────────────── */
-.vault-grid { display:grid; grid-template-columns:340px 1fr; gap:14px; align-items:start; }
+/* ── VAULT — library layout ─────────────────────────────────────────── */
+.vault-grid { display:grid; grid-template-columns:380px 1fr; gap:16px; align-items:start; }
 @media (max-width:1000px){ .vault-grid { grid-template-columns:1fr; } }
-.vault-list-wrap { background:var(--bg2); border:1px solid var(--border); border-radius:10px; overflow:hidden; }
-.vault-list-head { padding:12px 14px; font-family:var(--fm); font-size:9px; letter-spacing:.12em; text-transform:uppercase; color:var(--text3); border-bottom:1px solid var(--border); font-weight:700; }
-.vault-list { max-height:540px; overflow-y:auto; padding:6px; }
-.vault-row { display:flex; align-items:center; gap:10px; padding:10px 12px; border-radius:8px; cursor:pointer; transition:background .1s; border:1px solid transparent; }
-.vault-row:hover { background:var(--bg3); }
-.vault-row.active { background:var(--bg3); border-color:var(--border2); box-shadow:inset 3px 0 0 var(--accent-positive); }
-.vault-row-flag { font-size:20px; flex-shrink:0; width:26px; text-align:center; }
-.vault-row-meta { flex:1; min-width:0; }
-.vault-row-title { font-size:13px; font-weight:700; color:var(--text); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-.vault-row-sub { font-family:var(--fm); font-size:10px; color:var(--text3); margin-top:2px; display:flex; align-items:center; gap:6px; }
-.vault-type-badge { display:inline-block; font-family:var(--fm); font-size:8px; font-weight:700; letter-spacing:.08em; padding:2px 6px; border-radius:3px; }
+.vault-list-wrap { background:var(--bg2); border:1px solid var(--border); border-radius:12px; overflow:hidden; }
+.vault-list-head {
+  padding:13px 16px; font-family:var(--fm); font-size:9px;
+  letter-spacing:.12em; text-transform:uppercase; color:var(--text3);
+  border-bottom:1px solid var(--border); font-weight:700;
+  display:flex; align-items:center; gap:10px;
+}
+.vault-list { max-height:620px; overflow-y:auto; padding:10px; display:flex; flex-direction:column; gap:8px; }
+
+/* ── VAULT · document card ───────────────────────────────────────────
+   Polished library-card layout. Left column: selection checkbox +
+   icon. Middle column: kind badge, title, and a category · date ·
+   time meta row. Right column: hover-reveal action buttons. An
+   accent stripe on the left edge colour-codes the kind. */
+.vault-card {
+  position:relative;
+  display:grid;
+  grid-template-columns: 22px 40px 1fr auto;
+  align-items:flex-start;
+  column-gap:12px;
+  padding:14px 16px 14px 18px;
+  background:var(--bg2);
+  border:1px solid var(--border);
+  border-radius:10px;
+  cursor:pointer;
+  transition:border-color .15s, background .15s, transform .15s;
+}
+.vault-card::before {
+  content:'';
+  position:absolute;
+  left:0; top:10px; bottom:10px;
+  width:3px; border-radius:0 3px 3px 0;
+  background:var(--border2);
+  transition:background .15s, top .15s, bottom .15s;
+}
+.vault-card:hover {
+  border-color:var(--border2);
+  background:var(--bg3);
+}
+.vault-card:hover::before { top:6px; bottom:6px; }
+.vault-card.active {
+  border-color:var(--green);
+  background:var(--accent-positive-dim);
+}
+.vault-card.active::before { background:var(--green); top:4px; bottom:4px; }
+.vault-card.selected {
+  border-color:var(--violet);
+  box-shadow:0 0 0 1px var(--violet) inset;
+}
+.vault-card.selected::before { background:var(--violet); }
+
+.vault-card-sel {
+  display:flex; align-items:center; justify-content:center;
+  width:22px; height:22px; margin-top:1px; flex-shrink:0;
+  cursor:pointer;
+}
+.vault-card-sel input[type="checkbox"] {
+  width:16px; height:16px; margin:0;
+  accent-color:var(--violet);
+  cursor:pointer;
+}
+
+.vault-card-icon {
+  font-size:26px; line-height:1;
+  display:flex; align-items:center; justify-content:center;
+  width:40px; height:40px;
+  background:var(--bg3);
+  border:1px solid var(--border);
+  border-radius:8px;
+  flex-shrink:0;
+}
+.vault-card.active .vault-card-icon {
+  background:var(--bg2);
+  border-color:var(--green);
+}
+
+.vault-card-body {
+  min-width:0;
+  display:flex; flex-direction:column; gap:4px;
+  padding-top:1px;
+}
+.vault-card-kind { margin-bottom:2px; }
+.vault-card-title {
+  font-family:var(--ff);
+  font-size:14px;
+  font-weight:700;
+  color:var(--text);
+  line-height:1.35;
+  letter-spacing:-.005em;
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:ellipsis;
+}
+.vault-card-meta {
+  display:flex; align-items:center; gap:6px;
+  font-family:var(--fm);
+  font-size:10px;
+  color:var(--text3);
+  margin-top:2px;
+  flex-wrap:wrap;
+}
+.vault-card-cat {
+  display:inline-flex; align-items:center; gap:4px;
+  color:var(--text2);
+  font-weight:600;
+}
+.vault-card-cat .ic { font-size:11px; }
+.vault-card-dot { opacity:.5; }
+.vault-card-date { color:var(--text2); font-weight:600; }
+.vault-card-time { color:var(--text3); }
+
+.vault-card-actions {
+  display:flex; align-items:center; gap:4px;
+  opacity:0;
+  transition:opacity .15s;
+  flex-shrink:0;
+  padding-top:4px;
+}
+.vault-card:hover .vault-card-actions,
+.vault-card.active .vault-card-actions,
+.vault-card.selected .vault-card-actions { opacity:1; }
+.vault-card-act {
+  width:28px; height:28px;
+  display:flex; align-items:center; justify-content:center;
+  background:transparent;
+  border:1px solid var(--border);
+  border-radius:6px;
+  color:var(--text2);
+  font-size:13px;
+  cursor:pointer;
+  transition:border-color .15s, color .15s, background .15s;
+}
+.vault-card-act:hover {
+  border-color:var(--border2);
+  color:var(--text);
+  background:var(--bg3);
+}
+.vault-card-act.danger:hover {
+  border-color:var(--red);
+  color:var(--red);
+  background:var(--accent-critical-dim);
+}
+
+.vault-type-badge {
+  display:inline-block;
+  font-family:var(--fm); font-size:9px; font-weight:700;
+  letter-spacing:.08em;
+  padding:3px 8px;
+  border-radius:4px;
+}
 .vault-type-badge.piq { background:var(--accent-positive-dim); color:var(--accent-positive); }
 .vault-type-badge.deepdive { background:var(--accent-info-dim); color:var(--accent-info); }
-.vault-row .btn-xs { flex-shrink:0; }
-.vault-row .line-rm { flex-shrink:0; }
-.vault-open-wrap { background:var(--bg2); border:1px solid var(--border); border-radius:10px; padding:18px 22px; min-height:540px; }
+
+.vault-open-wrap { background:var(--bg2); border:1px solid var(--border); border-radius:12px; padding:22px 24px; min-height:620px; }
 .vault-open-head { display:flex; align-items:flex-start; justify-content:space-between; gap:14px; padding-bottom:14px; border-bottom:1px solid var(--border); margin-bottom:14px; flex-wrap:wrap; }
 .vault-open-tag { font-family:var(--fm); font-size:9px; font-weight:700; letter-spacing:.12em; text-transform:uppercase; color:var(--accent-positive); margin-bottom:4px; }
 .vault-open-title { font-family:var(--ff); font-size:22px; font-weight:800; color:var(--text); letter-spacing:-.01em; line-height:1.2; }
 .vault-open-sub { font-family:var(--fm); font-size:10px; color:var(--text3); margin-top:3px; }
-.vault-open-actions { display:flex; gap:6px; flex-shrink:0; }
+.vault-open-actions { display:flex; gap:8px; flex-shrink:0; align-items:center; flex-wrap:wrap; }
+/* Category editor in the detail pane header — replaces the inline
+   dropdown that used to live inside each library card. */
+.vault-cat-editor {
+  display:inline-flex; align-items:center; gap:8px;
+  padding:4px 10px 4px 12px;
+  background:var(--bg3);
+  border:1px solid var(--border);
+  border-radius:6px;
+  cursor:pointer;
+}
+.vault-cat-editor-lbl {
+  font-family:var(--fm); font-size:9px; font-weight:700;
+  letter-spacing:.1em; text-transform:uppercase;
+  color:var(--text3);
+}
+.vault-cat-editor-sel {
+  background:transparent; border:none; outline:none;
+  color:var(--text); font-family:var(--ff); font-size:12px; font-weight:600;
+  padding:4px 0; cursor:pointer;
+}
 .vault-open-body { font-size:13px; line-height:1.65; }
 /* ── VAULT · category chips, multi-select, compare view ─────────── */
 .vault-chips {
@@ -1490,20 +1648,6 @@ body.light .retire-slideover { box-shadow:-10px 0 32px -10px rgba(60,40,10,0.25)
   letter-spacing:.06em; color:var(--violet);
   padding:2px 8px; border-radius:3px;
   background:var(--violet-dim);
-}
-.vault-row-sel {
-  display:flex; align-items:center; justify-content:center;
-  width:18px; height:18px; flex-shrink:0;
-}
-.vault-row-sel input[type="checkbox"] {
-  margin:0; accent-color:var(--violet);
-  cursor:pointer;
-}
-.vault-row-cat {
-  background:var(--bg3); border:1px solid var(--border); border-radius:5px;
-  padding:4px 6px; color:var(--text2); font-family:var(--fm); font-size:10px;
-  outline:none; max-width:140px; flex-shrink:0;
-  cursor:pointer;
 }
 .vault-type-badge.analysis {
   background:var(--violet-dim); color:var(--violet);
@@ -3377,14 +3521,20 @@ function _liveSyncCharts(){
     try { ch.update('none'); } catch(e){}
   };
   // Dashboard — 12-Month Cash Flow (mixed bar + line). Fun Fund
-  // always uses the chained running balance so it matches the
-  // Month Summary + Running Balance table + Fun Fund tab chart.
-  patch('dash-cf', {
-    'Income':   () => months.map(m => m.pureIncome),
-    'Expenses': () => months.map(m => m.pureExpenses),
-    'Savings':  () => months.map(m => m.savings),
-    'Fun Fund': () => months.map(m => m.funFund),
-  });
+  // uses the chained running balance so it matches the Month
+  // Summary + Running Balance table + Fun Fund tab chart. Savings
+  // uses a CUMULATIVE running total so the line grows steadily
+  // across the window.
+  {
+    let savRun = 0;
+    const savingsCumulative = months.map(m => { savRun += (m.savings || 0); return savRun; });
+    patch('dash-cf', {
+      'Income':   () => months.map(m => m.pureIncome),
+      'Expenses': () => months.map(m => m.pureExpenses),
+      'Savings':  () => savingsCumulative,
+      'Fun Fund': () => months.map(m => m.funFund),
+    });
+  }
   // Monthly Review — Income vs Expenses (left chart)
   patch('mo-ie', {
     'Income':   () => months.map(m => m.pureIncome),
@@ -4945,19 +5095,26 @@ function renderDashboard() {
     destroyChart('dash-cf');
     const cf=document.getElementById('dash-cashflow-chart');
     if(cf) {
+      // Savings on the Dashboard chart is a CUMULATIVE running total —
+      // the amount of savings the user has accumulated since the start
+      // of the 12-month window, so the line reads as a continuous
+      // growth curve rather than a flat per-month value. Matches the
+      // running net-flow line on the Monthly Review chart.
+      let savRun = 0;
+      const savingsCumulative = months.map(m => { savRun += (m.savings || 0); return savRun; });
       charts['dash-cf']=new Chart(cf.getContext('2d'),{
         type:'bar',
         data:{
           labels:months.map(m=>m.short),
           datasets:[
             // Dashboard cash flow — pure per-month values so the
-            // Income / Expenses / Savings / Fun Fund series agree
-            // one-for-one with the Fun Fund tab and the Monthly
-            // Review inputs. Income + Expenses as bars, Savings +
-            // Fun Fund as overlay lines for the mixed-chart read.
+            // Income / Expenses / Fun Fund series agree one-for-one
+            // with the Fun Fund tab and the Monthly Review inputs.
+            // Income + Expenses as bars, Savings + Fun Fund as
+            // overlay lines for the mixed-chart read.
             {label:'Income',  data:months.map(m=>m.pureIncome),  backgroundColor:'#00e8a022',borderColor:'#00e8a0',borderWidth:1.5,borderRadius:4,order:2,categoryPercentage:0.7,barPercentage:0.85},
             {label:'Expenses',data:months.map(m=>m.pureExpenses),backgroundColor:'#ff4d6d1c',borderColor:'#ff4d6d',borderWidth:1.5,borderRadius:4,order:2,categoryPercentage:0.7,barPercentage:0.85},
-            {label:'Savings', data:months.map(m=>m.savings),     type:'line',borderColor:'#f5a623',backgroundColor:'transparent',fill:false,tension:.35,pointRadius:2,pointHoverRadius:4,pointBackgroundColor:'#f5a623',borderWidth:1.75,order:1},
+            {label:'Savings', data:savingsCumulative,            type:'line',borderColor:'#f5a623',backgroundColor:'#f5a62312',fill:true,tension:.35,pointRadius:2,pointHoverRadius:4,pointBackgroundColor:'#f5a623',borderWidth:1.75,order:1},
             // Fun Fund line plots the chained/running balance so it
             // matches the Month Summary bar (which now shows the
             // same running total) and the Running Balance column
@@ -8215,29 +8372,35 @@ function renderVault(){
       ? `<div class="state state-empty" style="margin-top:14px"><div class="state-sub">No reports in this category yet.</div></div>`
       : visible.map(e => {
           const d = new Date(e.when || Date.now());
-          const when = d.toLocaleDateString(undefined, {day:'numeric',month:'short',year:'numeric'}) + ' · ' + d.toLocaleTimeString(undefined, {hour:'2-digit',minute:'2-digit'});
+          const dateLabel = d.toLocaleDateString(undefined, {day:'numeric',month:'short',year:'numeric'});
+          const timeLabel = d.toLocaleTimeString(undefined, {hour:'2-digit',minute:'2-digit'});
           const active = e.id === openId ? ' active' : '';
           const isSel = selectedIds.includes(e.id);
           const selAttr = isSel ? ' checked' : '';
           const kindBadgeLabel = e.kind === 'analysis' ? 'ANALYSIS' : e.kind === 'piq' ? 'PROPERTY IQ' : e.kind === 'deepdive' ? 'DEEP DIVE' : 'REPORT';
           const kindBadgeCls = e.kind === 'analysis' ? 'analysis' : e.kind === 'piq' ? 'piq' : 'deepdive';
-          const catOptions = VAULT_CATEGORIES.filter(c => c.key !== 'all')
-            .map(c => `<option value="${c.key}" ${c.key===e.category?'selected':''}>${c.icon} ${c.label}</option>`).join('');
-          return `<div class="vault-row${active}" onclick="openVaultEntry('${e.id}')">
-            <label class="vault-row-sel" onclick="event.stopPropagation()" title="Select for compare">
+          const catMeta = VAULT_CATEGORIES.find(c => c.key === e.category) || { label: e.category || 'Other', icon: '🔖' };
+          return `<div class="vault-card${active}${isSel?' selected':''}" onclick="openVaultEntry('${e.id}')">
+            <label class="vault-card-sel" onclick="event.stopPropagation()" title="Tick to select for compare">
               <input type="checkbox" ${selAttr} onchange="toggleVaultSelect('${e.id}',this.checked)">
+              <span aria-hidden="true"></span>
             </label>
-            <div class="vault-row-flag">${e.icon}</div>
-            <div class="vault-row-meta">
-              <div class="vault-row-title">${esc2(e.title)}</div>
-              <div class="vault-row-sub">
-                <span class="vault-type-badge ${kindBadgeCls}">${kindBadgeLabel}</span>
-                ${esc2(when)}
+            <div class="vault-card-icon">${e.icon}</div>
+            <div class="vault-card-body">
+              <div class="vault-card-kind"><span class="vault-type-badge ${kindBadgeCls}">${kindBadgeLabel}</span></div>
+              <div class="vault-card-title">${esc2(e.title)}</div>
+              <div class="vault-card-meta">
+                <span class="vault-card-cat"><span class="ic">${catMeta.icon}</span>${esc2(catMeta.label)}</span>
+                <span class="vault-card-dot" aria-hidden="true">·</span>
+                <span class="vault-card-date">${esc2(dateLabel)}</span>
+                <span class="vault-card-dot" aria-hidden="true">·</span>
+                <span class="vault-card-time">${esc2(timeLabel)}</span>
               </div>
             </div>
-            <select class="vault-row-cat" onclick="event.stopPropagation()" onchange="setVaultEntryCategory('${e.id}',this.value)" title="Change category">${catOptions}</select>
-            ${e.markdown ? `<button class="btn btn-o btn-xs" onclick="event.stopPropagation();exportVaultEntryPdf('${e.id}')" title="Download as PDF">📄 PDF</button>` : ''}
-            <button class="line-rm" onclick="event.stopPropagation();deleteVaultEntry('${e.id}')" title="Delete">×</button>
+            <div class="vault-card-actions" onclick="event.stopPropagation()">
+              ${e.markdown ? `<button class="vault-card-act" onclick="exportVaultEntryPdf('${e.id}')" title="Download as PDF">📄</button>` : ''}
+              <button class="vault-card-act danger" onclick="deleteVaultEntry('${e.id}')" title="Delete">✕</button>
+            </div>
           </div>`;
         }).join(''));
 
@@ -8319,14 +8482,20 @@ function renderVault(){
           </div>
         `).join('')
       : mdParse(open.markdown || '');
+    const catEditorOptions = VAULT_CATEGORIES.filter(c => c.key !== 'all')
+      .map(c => `<option value="${c.key}" ${c.key===open.category?'selected':''}>${c.icon} ${c.label}</option>`).join('');
     rightPane = `<div class="vault-open">
       <div class="vault-open-head">
         <div>
-          <div class="vault-open-tag">${openTag} · ${esc2(catLabel)}</div>
+          <div class="vault-open-tag">${openTag}</div>
           <div class="vault-open-title">${esc2(open.title)}</div>
           <div class="vault-open-sub">${esc2(_fmtWhen(open.when))}${tailored}</div>
         </div>
         <div class="vault-open-actions">
+          <label class="vault-cat-editor" title="Recategorise this report">
+            <span class="vault-cat-editor-lbl">Category</span>
+            <select class="vault-cat-editor-sel" onchange="setVaultEntryCategory('${open.id}',this.value)">${catEditorOptions}</select>
+          </label>
           ${open.markdown ? `<button class="btn btn-g btn-sm" onclick="exportVaultEntryPdf('${open.id}')">📄 Download PDF</button>` : ''}
         </div>
       </div>
