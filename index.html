@@ -522,7 +522,8 @@ input[type="number"] { -moz-appearance:textfield; }
 .runway-legend-gap  { display:inline-flex; align-items:center; gap:4px; color:var(--accent-premium); font-weight:600; margin-left:auto; padding:3px 8px; background:var(--accent-premium-dim); border-radius:4px; }
 
 /* ── SVG CHART (pure SVG, replaces Chart.js runway) ───────────────── */
-.runway-svg-host { width:100%; background:var(--bg2); border:1px solid var(--border); border-radius:10px; padding:10px 12px 8px; }
+.runway-svg-host { width:100%; background:var(--bg2); border:1px solid var(--border); border-radius:10px; padding:8px 6px 6px; }
+.runway-wrap > .runway-svg-host { margin-left:-6px; margin-right:-6px; }
 body.light .runway-svg-host { background:var(--bg3); }
 .runway-svg { display:block; width:100%; height:auto; max-height:320px; }
 .runway-empty { min-height:220px; display:flex; align-items:center; justify-content:center; color:var(--text3); font-size:13px; font-family:var(--fm); }
@@ -2193,6 +2194,15 @@ function get12Months() {
       // which never sees the synthetic items.
       const incomeItems  = (v.incomeItems  || []).slice();
       const expenseItems = (v.expenseItems || []).slice();
+      // "Pure" values — Income / Expenses / Fun Fund computed STRICTLY
+      // from the user's baseline + monthly override inputs, with no
+      // cross-month carry-forward applied. These are the numbers that
+      // answer "for this month, what do Income − Expenses − Savings
+      // yield?" — used by the Fun Fund tab so its chart + list always
+      // mirror the Monthly Review inputs one-for-one.
+      const pureIncome   = sumArr(incomeItems,  'amount');
+      const pureExpenses = sumArr(expenseItems, 'amount');
+      const pureFunFund  = pureIncome - pureExpenses - v.savings;
       months.push({
         key,
         label: `${MONTH_NAMES[month]} ${year}`,
@@ -2203,6 +2213,10 @@ function get12Months() {
         // after the carry-forward is applied. They are not getters this
         // time because the synthetic items mutate the arrays in pass 2.
         income: 0, expenses: 0, surplus: 0, funFund: 0,
+        // Raw per-month values kept alongside the chained ones so any
+        // view that wants the un-chained "pure" Income − Expenses −
+        // Savings figure (e.g. the Fun Fund tab) can read it directly.
+        pureIncome, pureExpenses, pureFunFund,
         isCurrent: i===0, hasOverride: v.hasOverride,
       });
     }
@@ -2518,8 +2532,15 @@ function getRetirementNumbers() {
 }
 
 function getMonthlyFunFundBalance() {
+  // Sum the "pure" per-month Fun Fund (Income − Expenses − Savings for
+  // that month, with no cross-month carry-forward) across the current
+  // 12-month window. Using the pure figure means every summary tile
+  // that surfaces a "12-month Fun Fund" headline — Dashboard KPI,
+  // Monthly Review total, Fun Fund tab — shows the same number, which
+  // also matches what the user would compute by hand from their
+  // Monthly Review inputs.
   const m = get12Months();
-  return m.reduce((s,mo)=>s+mo.funFund,0);
+  return m.slice(0,12).reduce((s,mo)=>s+mo.pureFunFund,0);
 }
 
 // ─── TRANSACTIONS → BUDGET MAPPING ──────────────────────────────────────────
@@ -3212,25 +3233,34 @@ function updateSidebar() {
   const cm = months[0];
   const sb = document.getElementById('sb-surplus');
   const ff = document.getElementById('sb-funfund');
-  if(sb) sb.textContent = fmt(cm.surplus);
-  if(ff) ff.textContent = `Fun Fund: ${fmt(cm.funFund)}`;
+  // Sidebar mini-widget shows the current month's PURE surplus/Fun
+  // Fund — matching the Monthly Review "Month Summary" bar, so the
+  // two never disagree about the headline numbers for this month.
+  if(sb) sb.textContent = fmt(cm.pureIncome - cm.pureExpenses);
+  if(ff) ff.textContent = `Fun Fund: ${fmt(cm.pureFunFund)}`;
 }
 
 // ─── TICKER ─────────────────────────────────────────────────────────────────
 function renderTicker() {
   const el = document.getElementById('ticker-track');
   if(!el) return;
-  const ti=sumArr(state.baseIncome,'amount');
-  const te=sumArr(state.baseExpenses,'amount');
-  const savRate=ti>0?((state.baseSavings/ti)*100).toFixed(1):0;
+  // Pull the ticker numbers from the current month's effective values
+  // (same source the Dashboard + Monthly Review show), not the bare
+  // baseline, so the ticker at the top of every tab never drifts from
+  // what the user sees inside the app.
+  const cm=get12Months()[0];
+  const ti=cm.pureIncome;
+  const te=cm.pureExpenses;
+  const curSavings=cm.savings;
+  const savRate=ti>0?((curSavings/ti)*100).toFixed(1):0;
   const proj=getProjection(); const nestEgg=proj.length?proj[proj.length-1].total:0;
   const ytr=Math.max(0,state.retirementAge-state.currentAge);
   const extBal=state.externalAssets.filter(a=>(a.assetType||'investment')==='investment').reduce((s,a)=>s+a.balance,0);
   const items=[
     {sym:'INCOME',val:fmtC(ti),chg:'+'+savRate+'%',up:true},
     {sym:'EXPENSES',val:fmtC(te),chg:ti>0?(te/ti*100).toFixed(0)+'%':'-',up:false},
-    {sym:'SAVINGS',val:fmtC(state.baseSavings),chg:'+'+fmtC(state.baseSavings*12)+'/yr',up:true},
-    {sym:'SURPLUS',val:fmtC(ti-te-state.baseSavings),chg:ti>0?((ti-te-state.baseSavings)/ti*100).toFixed(0)+'%':'-',up:(ti-te-state.baseSavings)>=0},
+    {sym:'SAVINGS',val:fmtC(curSavings),chg:'+'+fmtC(curSavings*12)+'/yr',up:true},
+    {sym:'SURPLUS',val:fmtC(cm.pureFunFund),chg:ti>0?(cm.pureFunFund/ti*100).toFixed(0)+'%':'-',up:cm.pureFunFund>=0},
     {sym:'PORTFOLIO',val:fmtC(extBal),chg:'excl ITP',up:true},
     {sym:'NEST EGG',val:fmtC(nestEgg),chg:'at '+state.retirementAge,up:true},
     {sym:'RETIRE IN',val:ytr+'Y',chg:'age '+state.retirementAge,up:true},
@@ -3635,8 +3665,18 @@ function renderDashboard() {
   const realNestEgg=retNums.nestEgg; // shared real-value source of truth
   const realRetirementIncome=retNums.totalRetirementIncome;
   const ytr=Math.max(0,state.retirementAge-state.currentAge);
-  const ti=sumArr(state.baseIncome,'amount');
-  const te=sumArr(state.baseExpenses,'amount');
+  // Use the CURRENT month's effective income/expenses/savings — i.e.
+  // the same numbers the Monthly Review tab shows for this month,
+  // including any overrides — instead of the bare baseline. Before
+  // this fix the Dashboard KPI row showed baseIncome/baseExpenses
+  // while the Fun Fund KPI beside it read from get12Months(), so a
+  // user with a current-month override would see the two tiles
+  // disagree with each other and with Monthly Review. Everything now
+  // flows from the same per-month source.
+  const ti = cm.pureIncome;
+  const te = cm.pureExpenses;
+  const curSavings = cm.savings;
+  const curIncomeStreams = (cm.incomeItems||[]).filter(it => !it.carryForward).length;
   const funFundTotal=getMonthlyFunFundBalance();
   const extBal=state.externalAssets.filter(a=>(a.assetType||'investment')==='investment').reduce((s,a)=>s+a.balance,0);
 
@@ -3647,9 +3687,9 @@ function renderDashboard() {
 
     <!-- KPI Row 1: Cash Flow (each KPI drills into its owning panel) -->
     ${ui.kpiRow([
-      {icon:'💰', label:'MONTHLY INCOME',   value:fmt(ti),               tone:'pos', sub:`${state.baseIncome.length} income streams`,       link:'monthly'},
-      {icon:'📤', label:'MONTHLY EXPENSES', value:fmt(te),               tone:'neg', sub:`${ti>0?Math.round(te/ti*100):0}% of income`,      link:'monthly'},
-      {icon:'🏦', label:'MONTHLY SAVINGS',  value:`<span class="amb">${fmt(state.baseSavings)}</span>`, sub:`${ti>0?Math.round(state.baseSavings/ti*100):0}% savings rate`, link:'monthly'},
+      {icon:'💰', label:'MONTHLY INCOME',   value:fmt(ti),               tone:'pos', sub:`${curIncomeStreams} income streams`,               link:'monthly'},
+      {icon:'📤', label:'MONTHLY EXPENSES', value:fmt(te),               tone:'neg', sub:`${ti>0?Math.round(te/ti*100):0}% of income`,        link:'monthly'},
+      {icon:'🏦', label:'MONTHLY SAVINGS',  value:`<span class="amb">${fmt(curSavings)}</span>`, sub:`${ti>0?Math.round(curSavings/ti*100):0}% savings rate`, link:'monthly'},
       {icon:'✦', label:'FUN FUND (12MO)',  value:`<span style="color:var(--cyan)">${fmt(funFundTotal)}</span>`, sub:`${fmt(funFundTotal/12)}/mo average`, link:'funfund'},
     ])}
 
@@ -3698,9 +3738,15 @@ function renderDashboard() {
         data:{
           labels:months.map(m=>m.short),
           datasets:[
-            {label:'Income',data:months.map(m=>m.income),borderColor:'#00e8a0',backgroundColor:'#00e8a012',fill:true,tension:.35,pointRadius:2,borderWidth:2},
-            {label:'Expenses',data:months.map(m=>m.expenses),borderColor:'#ff4d6d',backgroundColor:'#ff4d6d10',fill:true,tension:.35,pointRadius:2,borderWidth:2},
-            {label:'Fun Fund',data:months.map(m=>m.funFund),borderColor:'#00d4ff',fill:false,tension:.35,pointRadius:2,borderWidth:1.5,borderDash:[4,3]},
+            // Dashboard cash flow — pure per-month values so the
+            // Income / Expenses / Fun Fund lines plotted here agree
+            // one-for-one with the Fun Fund tab and the Monthly
+            // Review inputs. (The carry-forward chain remains available
+            // in the Forecast & Review → Monthly tab when the user
+            // wants to see rollovers explicitly.)
+            {label:'Income',data:months.map(m=>m.pureIncome),borderColor:'#00e8a0',backgroundColor:'#00e8a012',fill:true,tension:.35,pointRadius:2,borderWidth:2},
+            {label:'Expenses',data:months.map(m=>m.pureExpenses),borderColor:'#ff4d6d',backgroundColor:'#ff4d6d10',fill:true,tension:.35,pointRadius:2,borderWidth:2},
+            {label:'Fun Fund',data:months.map(m=>m.pureFunFund),borderColor:'#00d4ff',fill:false,tension:.35,pointRadius:2,borderWidth:1.5,borderDash:[4,3]},
           ]
         },
         options:chartPreset()
@@ -3843,7 +3889,7 @@ function renderTransactions() {
       <div style="font-size:12px;color:var(--text2);margin-bottom:10px">Detected from the last 12 months of transaction data</div>
       <div>${patterns.map(p=>`<span class="pattern-chip ${p.dir}">${p.dir==='up'?'↑':p.dir==='dn'?'↓':'→'} ${p.text}</span>`).join('')}</div>
       <div style="margin-top:14px;padding:12px;background:var(--bg3);border-radius:var(--r);font-size:12px;color:var(--text2);line-height:1.6">
-        💡 <strong style="color:var(--text)">AI Insight:</strong> Your monthly expenses of ${fmt(sumArr(state.baseExpenses,'amount'))} leave you with ${fmt(sumArr(state.baseIncome,'amount')-sumArr(state.baseExpenses,'amount')-state.baseSavings)}/month in Fun Fund after savings. Your biggest opportunity is the <strong>Chase: ${fmt(55000)}</strong> line — this loan repayment, once cleared, would boost your monthly surplus by ~${fmt(55000)}/mo. Connect your AI advisor to get personalised recommendations.
+        💡 <strong style="color:var(--text)">AI Insight:</strong> ${(()=>{const cm=get12Months()[0];return `Your monthly expenses of ${fmt(cm.pureExpenses)} leave you with ${fmt(cm.pureFunFund)}/month in Fun Fund after savings.`;})()} Your biggest opportunity is the <strong>Chase: ${fmt(55000)}</strong> line — this loan repayment, once cleared, would boost your monthly surplus by ~${fmt(55000)}/mo. Connect your AI advisor to get personalised recommendations.
       </div>
     </div>`;
 
@@ -3853,29 +3899,40 @@ function renderTransactions() {
     if(ctx){
       const cd=chartDefaults();
       const scope = state.txChartScope || 'past';
-      let months, income, expenses, net;
+      let months, income, expenses, savings, funFund;
       if(scope === 'next'){
         // Next 12 Months — pulls live from get12Months() so the chart
-        // reflects exactly what the Forecast & Review / Monthly tab
-        // shows, including the cross-month carry-forward chain. We
-        // use the 12 forward months (skipping the current month at
-        // index 0) so "Next" means strictly future.
+        // reflects exactly what the Fun Fund tab, Dashboard, and
+        // Monthly Review tab show. We use the 12 forward months
+        // (skipping the current month at index 0) so "Next" means
+        // strictly future, and we read pureIncome/pureExpenses/
+        // pureFunFund so this chart mirrors the Fun Fund tab's
+        // per-month numbers one-for-one.
         const all = get12Months();
         const fwd = all.slice(1);
         months   = fwd.map(m => m.short);
-        income   = fwd.map(m => m.income);
-        expenses = fwd.map(m => m.expenses);
-        net      = fwd.map(m => m.surplus);
+        income   = fwd.map(m => m.pureIncome);
+        expenses = fwd.map(m => m.pureExpenses);
+        savings  = fwd.map(m => m.savings);
+        funFund  = fwd.map(m => Math.max(0, m.pureFunFund));
       } else {
         // Past 12 Months — historical demo data (the original chart).
         months=MONTH_NAMES.slice(4).concat(MONTH_NAMES.slice(0,4));
         income=[127000,127000,206000,131800,127000,127000,127000,127000,127000,127000,127000,127000];
         expenses=[132500,178264,88545,91500,103500,91500,108636,63945,81636,91500,56590,107090];
-        net=income.map((v,i)=>v-expenses[i]);
+        // Derive Savings + Fun Fund from the user's current baseline so
+        // the past-scope chart uses the same two overlay lines as the
+        // next-scope variant (styled identically to the Monthly Review
+        // 12-Month chart). Savings is treated as a constant monthly
+        // target; Fun Fund is income − expenses − savings, floored at 0.
+        const baseSav = state.baseSavings || 0;
+        savings = income.map(() => baseSav);
+        funFund = income.map((v,i) => Math.max(0, v - expenses[i] - baseSav));
       }
       // Focal chart — proportions scale up with the canvas. Bigger axis
-      // fonts, more y-ticks, slightly heavier borders, added net-flow
-      // overlay line for a second read on the trend.
+      // fonts, more y-ticks, slightly heavier borders. Net Flow has
+      // been replaced with two overlay lines (Savings + Fun Fund) so
+      // the read-through matches the Monthly Review 12-Month chart.
       charts['tx']=new Chart(ctx.getContext('2d'),{
         type:'bar',
         data:{
@@ -3883,7 +3940,8 @@ function renderTransactions() {
           datasets:[
             {label:'Income',   data:income,   backgroundColor:'#00e8a028', borderColor:'#00e8a0', borderWidth:2,   borderRadius:5, categoryPercentage:0.7, barPercentage:0.85, order:2},
             {label:'Expenses', data:expenses, backgroundColor:'#ff4d6d22', borderColor:'#ff4d6d', borderWidth:2,   borderRadius:5, categoryPercentage:0.7, barPercentage:0.85, order:2},
-            {label:'Net Flow', data:net,      type:'line', borderColor:'#4d9fff', backgroundColor:'#4d9fff18', fill:false, tension:0.35, pointRadius:4, pointHoverRadius:6, pointBackgroundColor:'#4d9fff', borderWidth:2.5, order:1},
+            {label:'Savings',  data:savings,  type:'line', borderColor:'#f5a623', backgroundColor:'transparent', fill:false, tension:0.3, pointRadius:3, pointHoverRadius:5, pointBackgroundColor:'#f5a623', borderWidth:2, order:1},
+            {label:'Fun Fund', data:funFund,  type:'line', borderColor:'#00d4ff', backgroundColor:'transparent', fill:false, tension:0.3, pointRadius:3, pointHoverRadius:5, pointBackgroundColor:'#00d4ff', borderWidth:2, order:1},
           ]
         },
         options:chartPreset({
@@ -4000,7 +4058,7 @@ function renderMonthly() {
     <!-- 12-month spending/income trend chart — promoted to the top of
          the Monthly Review tab per UX feedback. Sits above the month
          pills, summary, and Income Streams / Expenses cards. -->
-    <div class="card"><div class="card-title">12-Month Forward Overview</div><div class="chart-wrap md"><canvas id="mo-chart"></canvas></div></div>
+    <div class="card"><div class="card-title">12-Month Forward Overview</div><div class="chart-wrap xl"><canvas id="mo-chart"></canvas></div></div>
 
     <div class="month-pills">${months.map(m=>`<button class="month-pill ${m.key===selKey?'active':''} ${m.isCurrent?'current':''} ${m.hasOverride?'has-override':''}" onclick="state.selectedMonth='${m.key}';renderMonthly()">${m.short}${m.hasOverride?' ✎':''}</button>`).join('')}</div>
     ${sel.hasOverride?`<div style="display:inline-flex;align-items:center;gap:8px;margin-bottom:12px"><span style="background:var(--violet-dim);color:var(--violet);padding:3px 9px;border-radius:5px;font-size:11px;font-weight:700;font-family:var(--fm)">✎ CUSTOM OVERRIDE ACTIVE</span><button style="background:none;border:1px solid var(--border);color:var(--text2);padding:3px 9px;border-radius:5px;font-size:11px;cursor:pointer" onclick="delete state.monthlyOverrides['${selKey}'];save();renderMonthly()">Reset</button></div>`:'<div style="margin-bottom:12px;font-size:12px;color:var(--text3)">Showing inherited baseline — edit any field to create an override</div>'}
@@ -4062,11 +4120,15 @@ function renderMonthly() {
       // are rendered as lines to distinguish "plan/derived targets" from
       // the raw monthly flows. Colours match the Month Summary pills
       // and the SAVINGS colour used across the rest of the app.
+      // 12-Month Forward Overview — pure per-month values (no cross-
+      // month carry-forward chain) so this chart, the Fun Fund tab
+      // chart, and the Dashboard cash flow chart all plot the same
+      // Income / Expenses / Savings / Fun Fund for each month.
       charts['mo']=new Chart(ctx.getContext('2d'),{type:'bar',data:{labels:all.map(m=>m.short),datasets:[
-        {label:'Income',data:all.map(m=>m.income),backgroundColor:'#00e8a018',borderColor:'#00e8a0',borderWidth:1.5,borderRadius:3},
-        {label:'Expenses',data:all.map(m=>m.expenses),backgroundColor:'#ff4d6d14',borderColor:'#ff4d6d',borderWidth:1.5,borderRadius:3},
+        {label:'Income',data:all.map(m=>m.pureIncome),backgroundColor:'#00e8a018',borderColor:'#00e8a0',borderWidth:1.5,borderRadius:3},
+        {label:'Expenses',data:all.map(m=>m.pureExpenses),backgroundColor:'#ff4d6d14',borderColor:'#ff4d6d',borderWidth:1.5,borderRadius:3},
         {label:'Savings',data:all.map(m=>m.savings),type:'line',borderColor:'#f5a623',backgroundColor:'transparent',fill:false,tension:.3,pointRadius:2,borderWidth:1.5,yAxisID:'y'},
-        {label:'Fun Fund',data:all.map(m=>Math.max(0,m.funFund)),type:'line',borderColor:'#00d4ff',backgroundColor:'transparent',fill:false,tension:.3,pointRadius:2,borderWidth:1.5,yAxisID:'y'},
+        {label:'Fun Fund',data:all.map(m=>Math.max(0,m.pureFunFund)),type:'line',borderColor:'#00d4ff',backgroundColor:'transparent',fill:false,tension:.3,pointRadius:2,borderWidth:1.5,yAxisID:'y'},
       ]},options:chartPreset()});
       // Summing Income + Expenses + Savings + Fun Fund is meaningless,
       // so suppress the tooltip's auto "Total" row on this chart.
@@ -4139,10 +4201,10 @@ function liveSyncMonthlyReview(selKey){
   const ch = charts['mo'];
   if(ch && ch.data && Array.isArray(ch.data.datasets)){
     ch.data.datasets.forEach(ds => {
-      if(ds.label === 'Income')        ds.data = months.map(m => m.income);
-      else if(ds.label === 'Expenses') ds.data = months.map(m => m.expenses);
+      if(ds.label === 'Income')        ds.data = months.map(m => m.pureIncome);
+      else if(ds.label === 'Expenses') ds.data = months.map(m => m.pureExpenses);
       else if(ds.label === 'Savings')  ds.data = months.map(m => m.savings);
-      else if(ds.label === 'Fun Fund') ds.data = months.map(m => Math.max(0, m.funFund));
+      else if(ds.label === 'Fun Fund') ds.data = months.map(m => Math.max(0, m.pureFunFund));
     });
     ch.update('none');
   }
@@ -4695,8 +4757,11 @@ function renderRunwayChart(){
   }
 
   // ── DIMENSIONS ───────────────────────────────────────────────────────────
-  const W = 680, H = 240;
-  const pad = { t: 28, r: 56, b: 30, l: 62 };
+  // Widened plot: smaller left/right padding so the chart stretches closer
+  // to both edges of its card, leaving just enough room for the two
+  // (balance + income) y-axis labels.
+  const W = 760, H = 240;
+  const pad = { t: 28, r: 48, b: 30, l: 54 };
   const pw = W - pad.l - pad.r;       // plot width
   const ph = H - pad.t - pad.b;       // plot height
   const n  = cdata.labels.length;
@@ -4825,37 +4890,51 @@ function renderRunwayChart(){
   parts.push(`<text x="${pad.l + pw + 8}" y="${pad.t - 10}" class="runway-axis-title">Income/yr</text>`);
 
   // Layer 6: annotations — life exp, runout OR surplus
+  //
+  // Label collision handling: when Life Exp and Runout lines fall on
+  // (or near) the same x-column, their text labels would stack on top
+  // of each other. We detect the horizontal overlap (<= 90px apart)
+  // and shift one label's y-slot down so they never collide. Each
+  // annotation uses its own y-slot (life → top, runout → lower) and
+  // flips to the opposite side of its line if that side would clip
+  // against the plot edge.
   const leIdx = cdata.labels.indexOf(lifeExp);
+  const leX = leIdx >= 0 ? xScale(leIdx) : null;
+  const roX = hasRunout ? xScale(runoutIdx) : null;
+  const horizCollision = (leX !== null && roX !== null && Math.abs(leX - roX) < 90);
+
+  // Flip helper — keeps a label inside the plot area by anchoring
+  // to the opposite side when it would overflow on the right.
+  const sideFor = (x) => {
+    const nearRight = (pad.l + pw) - x < 80;
+    return {
+      lx: nearRight ? x - 6 : x + 6,
+      anchor: nearRight ? 'end' : 'start',
+    };
+  };
+
   if(leIdx >= 0){
-    const x = xScale(leIdx);
-    parts.push(`<line x1="${x}" y1="${pad.t}" x2="${x}" y2="${pad.t + ph}" class="runway-annot-line life"/>`);
-    // Flip label to the left if it would overflow the right edge.
-    const atEnd = leIdx >= n - 2;
-    const lx = atEnd ? x - 6 : x + 6;
-    const anchor = atEnd ? 'end' : 'start';
+    parts.push(`<line x1="${leX}" y1="${pad.t}" x2="${leX}" y2="${pad.t + ph}" class="runway-annot-line life"/>`);
+    const { lx, anchor } = sideFor(leX);
     parts.push(`<text x="${lx}" y="${pad.t + 10}" text-anchor="${anchor}" class="runway-annot-label life">Life exp. ${lifeExp}</text>`);
   }
   if(hasRunout){
-    const x = xScale(runoutIdx);
-    // Use the shared sim's runoutAge (not cdata.labels[runoutIdx]) so the
-    // chart label and the "Depletion Age" card always show the same
-    // number — Math.round is applied inside _simulateRetirementYears.
+    // When life-exp and runout share the same column, push the runout
+    // label into its own vertical slot below the life-exp label so they
+    // don't overlap. Shortfall sub-label sits below the primary line.
     const runoutAge = cdata.runoutAge;
-    parts.push(`<line x1="${x}" y1="${pad.t}" x2="${x}" y2="${pad.t + ph}" class="runway-annot-line runout"/>`);
-    const atEnd = runoutIdx >= n - 2;
-    const lx = atEnd ? x - 6 : x + 6;
-    const anchor = atEnd ? 'end' : 'start';
+    parts.push(`<line x1="${roX}" y1="${pad.t}" x2="${roX}" y2="${pad.t + ph}" class="runway-annot-line runout"/>`);
+    const { lx, anchor } = sideFor(roX);
+    const primaryY = horizCollision ? pad.t + 26 : pad.t + 10;
     const primary = hasAnyShortfall
       ? `Depleted ~age ${runoutAge} · pension only`
       : `Depleted ~age ${runoutAge}`;
-    parts.push(`<text x="${lx}" y="${pad.t + 24}" text-anchor="${anchor}" class="runway-annot-label runout">${primary}</text>`);
+    parts.push(`<text x="${lx}" y="${primaryY}" text-anchor="${anchor}" class="runway-annot-label runout">${primary}</text>`);
     if(hasAnyShortfall){
-      // Sum the per-year shortfall and translate to an avg monthly figure
-      // so the label directly answers "how much is missing per month".
       const totalShortfall = (cdata.shortfall || []).reduce((a,b) => a + b, 0);
       const shortYears = (cdata.shortfall || []).filter(v => v > 0).length;
       const avgMonthlyShort = shortYears > 0 ? (totalShortfall / shortYears / 12) : 0;
-      parts.push(`<text x="${lx}" y="${pad.t + 38}" text-anchor="${anchor}" class="runway-annot-label runout" style="font-size:9px;font-weight:600">Shortfall: ${_svgEsc(fmtC(avgMonthlyShort))}/mo × ${shortYears}yr</text>`);
+      parts.push(`<text x="${lx}" y="${primaryY + 14}" text-anchor="${anchor}" class="runway-annot-label runout" style="font-size:9px;font-weight:600">Shortfall: ${_svgEsc(fmtC(avgMonthlyShort))}/mo × ${shortYears}yr</text>`);
     }
   } else {
     parts.push(`<text x="${pad.l + pw - 4}" y="${pad.t + 12}" text-anchor="end" class="runway-annot-label surplus">Surplus at age ${lifeExp}+</text>`);
@@ -5078,8 +5157,17 @@ function _runwayUpdateChrome(cdata, nums, lifeExp, lineColor){
 
 // ══ FUN FUND ═════════════════════════════════════════════════════════════════
 function renderFunFund() {
-  const months=get12Months();
-  const totalFF=getMonthlyFunFundBalance();
+  // The Fun Fund tab is strictly driven by the Monthly Review inputs:
+  // each month's Fun Fund = its own Income − Expenses − Savings (the
+  // "pure" figure computed in get12Months()). We deliberately skip the
+  // cross-month carry-forward chain here so the chart, the per-month
+  // list, and the headline KPIs all mirror exactly what the user typed
+  // into each Monthly Review row — a single source of truth.
+  const allMonths=get12Months();
+  // 12 forward months, starting at the current month (same window the
+  // Forecast & Review → Monthly tab shows).
+  const months=allMonths.slice(0,12);
+  const totalFF=months.reduce((s,m)=>s+m.pureFunFund,0);
   const totalTrips=state.trips.reduce((s,t)=>s+t.budget,0);
   const totalSpent=state.trips.reduce((s,t)=>s+t.spent,0);
   const remaining=totalFF-totalTrips;
@@ -5155,7 +5243,7 @@ function renderFunFund() {
           <div class="card-title">Monthly Fun Fund Settings</div>
           <p style="font-size:12px;color:var(--text2);margin-bottom:10px">Fun Fund = Income − Expenses − Savings (set in Baseline). It auto-calculates each month based on your overrides.</p>
           <div style="display:flex;flex-direction:column;gap:6px;font-size:12px">
-            ${months.slice(0,6).map(m=>`<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--bg3)"><span style="color:var(--text2)">${m.label}</span><span style="font-family:var(--fm);font-weight:600;color:${m.funFund>=0?'var(--cyan)':'var(--red)'}">${fmt(m.funFund)}</span></div>`).join('')}
+            ${months.map(m=>`<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--bg3)"><span style="color:var(--text2)">${m.label}</span><span style="font-family:var(--fm);font-weight:600;color:${m.pureFunFund>=0?'var(--cyan)':'var(--red)'}">${fmt(m.pureFunFund)}</span></div>`).join('')}
           </div>
         </div>
       </div>
@@ -5168,7 +5256,10 @@ function renderFunFund() {
       const tripByMonth={};
       state.trips.forEach(t=>{ const key=t.date.slice(0,7); tripByMonth[key]=(tripByMonth[key]||0)+t.budget; });
       charts['ff']=new Chart(ctx.getContext('2d'),{type:'bar',data:{labels:months.map(m=>m.short),datasets:[
-        {label:'Fun Fund',data:months.map(m=>Math.max(0,m.funFund)),backgroundColor:'#00d4ff18',borderColor:'#00d4ff',borderWidth:1.5,borderRadius:3},
+        // Fun Fund bar uses the "pure" per-month value so the chart is
+        // byte-for-byte consistent with the Monthly Fun Fund list below
+        // it, and both strictly reflect the Monthly Review inputs.
+        {label:'Fun Fund',data:months.map(m=>Math.max(0,m.pureFunFund)),backgroundColor:'#00d4ff18',borderColor:'#00d4ff',borderWidth:1.5,borderRadius:3},
         {label:'Trip Budget',data:months.map(m=>tripByMonth[m.key]||0),backgroundColor:'#f5a62325',borderColor:'#f5a623',borderWidth:1.5,borderRadius:3},
       ]},options:chartPreset()});
     }
@@ -6824,7 +6915,9 @@ function _catalogDynamicListing(){
 function buildAIContext() {
   const nums=getRetirementNumbers();
   const months=get12Months(); const cm=months[0];
-  const ti=sumArr(state.baseIncome,'amount'); const te=sumArr(state.baseExpenses,'amount');
+  // Source income/expenses from the current month so the AI context
+  // stays in lockstep with what the Dashboard / Monthly Review show.
+  const ti=cm.pureIncome; const te=cm.pureExpenses;
   const scored=retirePlaces().map(scoreLocation);
   const panel=state.activePanel||'dashboard';
   const viewLabel=(PANEL_META[panel]&&PANEL_META[panel].label)||panel;
@@ -6896,8 +6989,8 @@ User's financial snapshot (SEK):
 (A) TODAY'S HOUSEHOLD BUDGET — Monthly Review baseline · today's money
 - Current monthly income: ${Math.round(ti).toLocaleString()} kr
 - Current monthly expenses: ${Math.round(te).toLocaleString()} kr  ← household budget total, NOT a retirement figure
-- Current monthly savings rate: ${Math.round(state.baseSavings).toLocaleString()} kr
-- Current month surplus (income − expenses − savings): ${Math.round(cm.surplus).toLocaleString()} kr · Fun Fund: ${Math.round(cm.funFund).toLocaleString()} kr/mo
+- Current monthly savings rate: ${Math.round(cm.savings).toLocaleString()} kr
+- Current month surplus (income − expenses − savings): ${Math.round(cm.pureFunFund).toLocaleString()} kr · Fun Fund: ${Math.round(cm.pureFunFund).toLocaleString()} kr/mo
 
 (B) RETIREMENT EXPENSES — Retire tab · today's money · ${state.retirementExpenses?.length || 0} line items
   Raw line-item total (no scenario applied): ${Math.round(retExpRaw).toLocaleString()} kr/mo
