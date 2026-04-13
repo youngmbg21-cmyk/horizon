@@ -2108,16 +2108,23 @@ function getProjection() {
       if(y===0) appAcc=ms*months;
       else appAcc=appAcc*Math.pow(1+rApp,12)+ms*((Math.pow(1+rApp,12)-1)/(rApp||1));
       let ext=0;
+      // Per-account balance snapshot for year y, keyed by account id so
+      // downstream consumers (series catalog, chart builder) can plot each
+      // account independently without re-running the same compounding
+      // math. Purely additive — the existing .total / .realTotal /
+      // .external fields are unchanged.
+      const perAccount = {};
       investments.forEach((a,idx) => {
         const ra=(a.growthRate??state.growthRate)/100/12;
         if(y===0) assetBals[idx]=a.balance*Math.pow(1+ra,months)+a.monthlyContribution*((Math.pow(1+ra,months)-1)/(ra||1));
         else assetBals[idx]=assetBals[idx]*Math.pow(1+ra,12)+a.monthlyContribution*((Math.pow(1+ra,12)-1)/(ra||1));
         ext+=assetBals[idx];
+        perAccount[a.id] = Math.round(assetBals[idx]);
       });
       const total=Math.round(appAcc+ext);
       const realTotal=Math.round(total/Math.pow(1+state.inflationRate/100,y));
       const yearlyContrib=Math.round(ms*months+investments.reduce((s,a)=>s+a.monthlyContribution*months,0));
-      data.push({ year, age:state.currentAge+y, appSavings:Math.round(appAcc), external:Math.round(ext), total, realTotal, yearlyContrib });
+      data.push({ year, age:state.currentAge+y, appSavings:Math.round(appAcc), external:Math.round(ext), total, realTotal, yearlyContrib, perAccount });
     }
     return data;
   });
