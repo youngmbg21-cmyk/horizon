@@ -343,6 +343,32 @@ input[type="number"] { -moz-appearance:textfield; }
   color:var(--text2);
 }
 .line-item-carry.line-item-carry-override { border-style:solid; }
+/* Deleted / zeroed-out carry-forward — soft red banding so the user
+   immediately sees this rollover has been nuked but the data isn't
+   actually lost. Prominent "↩ Restore X" button brings it back. */
+.line-item-carry.line-item-carry-zeroed {
+  background:var(--accent-critical-dim);
+  border:1px dashed var(--red);
+  opacity:.92;
+}
+.line-item-carry.line-item-carry-zeroed .line-carry-icon { color:var(--red); }
+.line-item-carry.line-item-carry-zeroed .line-carry-name { color:var(--text3); text-decoration:line-through; }
+.line-item-carry .line-carry-name-sub {
+  text-decoration:none;
+  color:var(--red);
+  font-size:10px; font-weight:600;
+  letter-spacing:.02em;
+  margin-left:4px;
+}
+.line-item-carry .line-carry-restore {
+  background:var(--red); border:1px solid var(--red);
+  color:#fff; font-family:var(--fm); font-size:10px; font-weight:700;
+  letter-spacing:.04em; padding:4px 10px; border-radius:4px; cursor:pointer;
+  white-space:nowrap;
+  transition:filter .15s;
+}
+.line-item-carry .line-carry-restore:hover { filter:brightness(1.12); }
+.line-item-carry .line-carry-pill.deleted { background:var(--red); color:#fff; }
 .line-item-carry .line-carry-icon {
   color:var(--violet); font-size:13px; font-weight:700; line-height:1;
 }
@@ -2673,34 +2699,49 @@ function get12Months() {
       const m = months[i];
       if(i > 0){
         const prev = months[i-1];
-        // If the user has manually overridden this month's carry-forward
-        // value (by editing the row in the Monthly Review tab), honour
-        // that figure. Otherwise fall back to the computed chain.
+        // Natural carry — what the chain WOULD produce from the
+        // previous month's funFund. The user's manual override (if
+        // any) supersedes this as the displayed value, but we keep
+        // the natural figure alongside so the UI can offer a
+        // "Restore computed value" path when the user has zeroed
+        // the row out (see the carry-forward branch in
+        // renderLineItems + the resetCarryOverride handler).
+        const naturalCarry = prev.funFund;
         const ovRaw = carryOverrides[m.key];
         const hasOverride = (ovRaw != null && ovRaw !== '');
-        const carry = hasOverride ? Number(ovRaw) : prev.funFund;
-        if(Math.round(carry) !== 0){
-          if(carry > 0){
-            m.incomeItems.push({
-              id: `carry-${m.key}`,
-              name: `Carry-forward from ${prev.short}`,
-              amount: Math.round(carry),
-              type: 'fixed',
-              carryForward: true,
-              fromKey: prev.key,
-              overridden: hasOverride,
-            });
-          } else {
-            m.expenseItems.push({
-              id: `carry-${m.key}`,
-              name: `Deficit from ${prev.short}`,
-              amount: Math.round(Math.abs(carry)),
-              type: 'fixed',
-              carryForward: true,
-              fromKey: prev.key,
-              overridden: hasOverride,
-            });
-          }
+        const displayCarry = hasOverride ? Number(ovRaw) : naturalCarry;
+        // Render the row if EITHER the displayed value or the
+        // underlying computed value is non-zero. That means a user
+        // who has "deleted" the rollover by overriding it to 0
+        // still sees the row (with a RESTORE DEFICIT chip + reset
+        // button) so the carry-forward data is never lost — just
+        // suppressed — and is always recoverable with one click.
+        const showRow = Math.round(displayCarry) !== 0 || Math.round(naturalCarry) !== 0;
+        if(showRow){
+          // Pick which side (income vs expense) the row sits on. Use
+          // the displayed value's sign if it's non-zero; otherwise
+          // fall back to the natural carry's sign so a zeroed-out
+          // deficit still renders on the expense side.
+          const sideBy = displayCarry !== 0 ? displayCarry : naturalCarry;
+          const onIncome = sideBy > 0;
+          const target = onIncome ? m.incomeItems : m.expenseItems;
+          target.push({
+            id: `carry-${m.key}`,
+            name: onIncome ? `Carry-forward from ${prev.short}` : `Deficit from ${prev.short}`,
+            amount: Math.round(Math.abs(displayCarry)),
+            type: 'fixed',
+            carryForward: true,
+            fromKey: prev.key,
+            overridden: hasOverride,
+            // Snapshot the natural computed carry so the renderer
+            // can show a "restore" button labelled with the real
+            // amount the user would be restoring to.
+            computed: Math.round(naturalCarry),
+            // Flag rows that have been overridden to zero — the UI
+            // treats them differently (red "deleted" state, prominent
+            // restore CTA) to make accidental deletions recoverable.
+            zeroed: hasOverride && Math.round(displayCarry) === 0,
+          });
         }
       }
       // Now compute totals for THIS month with the synthetic item baked in.
@@ -3258,26 +3299,28 @@ function _liveSyncCharts(){
     });
     try { ch.update('none'); } catch(e){}
   };
-  // Dashboard — 12-Month Cash Flow (mixed bar + line)
+  // Dashboard — 12-Month Cash Flow (mixed bar + line). Fun Fund
+  // always uses the chained running balance so it matches the
+  // Month Summary + Running Balance table + Fun Fund tab chart.
   patch('dash-cf', {
     'Income':   () => months.map(m => m.pureIncome),
     'Expenses': () => months.map(m => m.pureExpenses),
     'Savings':  () => months.map(m => m.savings),
-    'Fun Fund': () => months.map(m => m.pureFunFund),
+    'Fun Fund': () => months.map(m => m.funFund),
   });
   // Monthly Review — 12-Month Forward Overview
   patch('mo', {
     'Income':   () => months.map(m => m.pureIncome),
     'Expenses': () => months.map(m => m.pureExpenses),
     'Savings':  () => months.map(m => m.savings),
-    'Fun Fund': () => months.map(m => Math.max(0, m.pureFunFund)),
+    'Fun Fund': () => months.map(m => m.funFund),
   });
   // Transactions — Next 12 Months spending chart (next scope only)
   patch('tx', {
     'Income':   () => fwd.map(m => m.pureIncome),
     'Expenses': () => fwd.map(m => m.pureExpenses),
     'Savings':  () => fwd.map(m => m.savings),
-    'Fun Fund': () => fwd.map(m => Math.max(0, m.pureFunFund)),
+    'Fun Fund': () => fwd.map(m => m.funFund),
   });
   // Fun Fund vs Travel Budget by Month
   const tripByMonth = {};
@@ -3286,7 +3329,7 @@ function _liveSyncCharts(){
     if(k) tripByMonth[k] = (tripByMonth[k] || 0) + (Number(ex.amount) || 0);
   }));
   patch('ff', {
-    'Fun Fund':    () => first12.map(m => Math.max(0, m.pureFunFund)),
+    'Fun Fund':    () => first12.map(m => Math.max(0, m.funFund)),
     'Trip Budget': () => first12.map(m => tripByMonth[m.key] || 0),
   });
 }
@@ -4100,16 +4143,29 @@ function renderLineItems(containerId, items, stateKey, readOnly, showPaid) {
       // monthKey is the month the rolled-in value lands in — encoded
       // into the synthetic item's id as `carry-<YYYY-MM>`.
       const monthKey = (it.id || '').replace(/^carry-/, '');
-      const resetBtn = it.overridden
+      // "Zeroed" rows are carry-forward items the user has
+      // overridden to 0 — effectively deleted. The computed chain
+      // still has a real non-zero value, so we surface a prominent
+      // RESTORE button that pipes the original amount back in.
+      const isZeroed = !!it.zeroed;
+      const computedAbs = Math.abs(Number(it.computed) || 0);
+      const restoreBtn = isZeroed && computedAbs > 0
+        ? `<button class="line-carry-restore" onclick="resetCarryOverride('${monthKey}')" title="Restore the deleted rollover to its computed ${fmt(computedAbs)} value">↩ Restore ${fmt(computedAbs)}</button>`
+        : '';
+      const resetBtn = !isZeroed && it.overridden
         ? `<button class="line-carry-reset" onclick="resetCarryOverride('${monthKey}')" title="Reset to the auto-computed rollover">reset</button>`
         : '';
-      const pillText = it.overridden ? 'OVERRIDDEN' : 'ROLLOVER';
-      return `<div class="line-item line-item-carry${it.overridden?' line-item-carry-override':''}" title="Auto-generated rollover from ${esc((it.name||'').replace(/^[A-Za-z\- ]+from /, ''))}. Edit the amount to override, or click reset to restore the computed chain.">
-        <span class="line-carry-icon" aria-hidden="true">⇡</span>
-        <span class="line-carry-name">${esc(it.name)}</span>
+      const pillText = isZeroed ? 'DELETED' : it.overridden ? 'OVERRIDDEN' : 'ROLLOVER';
+      const wrapCls = isZeroed
+        ? ' line-item-carry-zeroed'
+        : (it.overridden ? ' line-item-carry-override' : '');
+      return `<div class="line-item line-item-carry${wrapCls}" title="${isZeroed ? 'You deleted this '+(isInc?'carry-forward':'deficit rollover')+'. Click Restore to recover it, or keep typing a new amount to replace it.' : 'Auto-generated rollover from '+esc((it.name||'').replace(/^[A-Za-z\- ]+from /, ''))+'. Edit the amount to override, or click reset to restore the computed chain.'}">
+        <span class="line-carry-icon" aria-hidden="true">${isZeroed ? '✖' : '⇡'}</span>
+        <span class="line-carry-name">${esc(it.name)}${isZeroed ? ' <span class="line-carry-name-sub">· deleted, click restore to recover</span>' : ''}</span>
         <div class="line-carry-amt-wrap"><span class="line-carry-cur">${s}</span><input class="line-carry-amt-input" type="number" value="${Math.round(it.amount*r)}" oninput="setCarryOverride('${monthKey}',${signed}*this.value/${r})"></div>
+        ${restoreBtn}
         ${resetBtn}
-        <span class="line-carry-pill">${pillText}</span>
+        <span class="line-carry-pill${isZeroed?' deleted':''}">${pillText}</span>
       </div>`;
     }
     const variance = actuals[it.id];
@@ -4691,7 +4747,12 @@ function renderDashboard() {
             {label:'Income',  data:months.map(m=>m.pureIncome),  backgroundColor:'#00e8a022',borderColor:'#00e8a0',borderWidth:1.5,borderRadius:4,order:2,categoryPercentage:0.7,barPercentage:0.85},
             {label:'Expenses',data:months.map(m=>m.pureExpenses),backgroundColor:'#ff4d6d1c',borderColor:'#ff4d6d',borderWidth:1.5,borderRadius:4,order:2,categoryPercentage:0.7,barPercentage:0.85},
             {label:'Savings', data:months.map(m=>m.savings),     type:'line',borderColor:'#f5a623',backgroundColor:'transparent',fill:false,tension:.35,pointRadius:2,pointHoverRadius:4,pointBackgroundColor:'#f5a623',borderWidth:1.75,order:1},
-            {label:'Fun Fund',data:months.map(m=>m.pureFunFund), type:'line',borderColor:'#00d4ff',backgroundColor:'transparent',fill:false,tension:.35,pointRadius:2,pointHoverRadius:4,pointBackgroundColor:'#00d4ff',borderWidth:1.75,borderDash:[4,3],order:1},
+            // Fun Fund line plots the chained/running balance so it
+            // matches the Month Summary bar (which now shows the
+            // same running total) and the Running Balance column
+            // in the Fun Fund tab table — one Fun Fund value per
+            // month, everywhere.
+            {label:'Fun Fund',data:months.map(m=>m.funFund), type:'line',borderColor:'#00d4ff',backgroundColor:'transparent',fill:false,tension:.35,pointRadius:2,pointHoverRadius:4,pointBackgroundColor:'#00d4ff',borderWidth:1.75,borderDash:[4,3],order:1},
           ]
         },
         options:chartPreset()
@@ -4886,10 +4947,14 @@ function renderTransactions() {
         const all = get12Months();
         const fwd = all.slice(1);
         labels   = fwd.map(m => m.short);
+        // Income + Expenses use pure per-month values so the bars
+        // represent actual monthly inflow/outflow. Fun Fund uses the
+        // chained running balance so it matches the Month Summary and
+        // Running Balance table.
         income   = fwd.map(m => m.pureIncome);
         expenses = fwd.map(m => m.pureExpenses);
         savings  = fwd.map(m => m.savings);
-        funFund  = fwd.map(m => Math.max(0, m.pureFunFund));
+        funFund  = fwd.map(m => m.funFund);
       } else {
         // Past 12 Months — demo bank history. This view is a rolling
         // 12-month retrospective driven by the canonical demo arrays
@@ -5051,26 +5116,28 @@ function renderMonthly() {
          re-render (which would tear down the focused Savings Target
          input mid-keystroke). The keys are stable: exp/sav/fun for the
          bar segments, income/expenses/savings/funFund for the numeric
-         readouts. All four read from the *pure* per-month values so
-         they match the Fun Fund tab running balance, the 12-Month
-         chart's Fun Fund line, and the Dashboard — one consistent
-         Income − Expenses − Savings story everywhere. -->
+         readouts. These are the *chained* totals so the numbers
+         always match the sum of the line items displayed below —
+         including any deficit rollover / surplus carry-in rows. Fun
+         Fund here equals the running balance for this month, so it
+         agrees with the Running Balance column in the Fun Fund tab
+         and the Fun Fund line on the monthly charts. -->
     <div class="card" style="padding:14px 16px;margin-bottom:12px">
       <div style="display:flex;flex-wrap:wrap;gap:20px;align-items:center">
         <div style="flex:1;min-width:180px">
           <div style="font-size:10px;color:var(--text3);font-family:var(--fm);letter-spacing:.1em;margin-bottom:6px">MONTH SUMMARY — ${sel.label}</div>
           <div class="cf-bar">
-            <div class="cf-bar-exp" data-mo-bar="exp" style="width:${sel.pureIncome>0?Math.min(sel.pureExpenses/sel.pureIncome*100,100):0}%"></div>
-            <div class="cf-bar-sav" data-mo-bar="sav" style="width:${sel.pureIncome>0?Math.min(sel.savings/sel.pureIncome*100,100):0}%"></div>
-            <div class="cf-bar-fun" data-mo-bar="fun" style="width:${sel.pureIncome>0?Math.max(sel.pureFunFund/sel.pureIncome*100,0):0}%"></div>
+            <div class="cf-bar-exp" data-mo-bar="exp" style="width:${sel.income>0?Math.min(sel.expenses/sel.income*100,100):0}%"></div>
+            <div class="cf-bar-sav" data-mo-bar="sav" style="width:${sel.income>0?Math.min(sel.savings/sel.income*100,100):0}%"></div>
+            <div class="cf-bar-fun" data-mo-bar="fun" style="width:${sel.income>0?Math.max(sel.funFund/sel.income*100,0):0}%"></div>
           </div>
-          <div class="cf-bar-labels" data-mo-bar-labels><span>Exp ${sel.pureIncome>0?Math.round(sel.pureExpenses/sel.pureIncome*100):0}%</span><span>Sav ${sel.pureIncome>0?Math.round(sel.savings/sel.pureIncome*100):0}%</span><span>Fun ${sel.pureIncome>0?Math.max(Math.round(sel.pureFunFund/sel.pureIncome*100),0):0}%</span></div>
+          <div class="cf-bar-labels" data-mo-bar-labels><span>Exp ${sel.income>0?Math.round(sel.expenses/sel.income*100):0}%</span><span>Sav ${sel.income>0?Math.round(sel.savings/sel.income*100):0}%</span><span>Fun ${sel.income>0?Math.max(Math.round(sel.funFund/sel.income*100),0):0}%</span></div>
         </div>
         <div style="display:flex;gap:20px;flex-wrap:wrap">
-          <div style="text-align:center"><div style="font-size:9px;color:var(--text3);font-family:var(--fm);letter-spacing:.08em">INCOME</div><div data-mo-num="income" style="font-family:var(--fm);font-size:16px;font-weight:700;color:var(--green)">${fmt(sel.pureIncome)}</div></div>
-          <div style="text-align:center"><div style="font-size:9px;color:var(--text3);font-family:var(--fm);letter-spacing:.08em">EXPENSES</div><div data-mo-num="expenses" style="font-family:var(--fm);font-size:16px;font-weight:700;color:var(--red)">${fmt(sel.pureExpenses)}</div></div>
+          <div style="text-align:center"><div style="font-size:9px;color:var(--text3);font-family:var(--fm);letter-spacing:.08em">INCOME</div><div data-mo-num="income" style="font-family:var(--fm);font-size:16px;font-weight:700;color:var(--green)">${fmt(sel.income)}</div></div>
+          <div style="text-align:center"><div style="font-size:9px;color:var(--text3);font-family:var(--fm);letter-spacing:.08em">EXPENSES</div><div data-mo-num="expenses" style="font-family:var(--fm);font-size:16px;font-weight:700;color:var(--red)">${fmt(sel.expenses)}</div></div>
           <div style="text-align:center"><div style="font-size:9px;color:var(--text3);font-family:var(--fm);letter-spacing:.08em">SAVINGS</div><div data-mo-num="savings" style="font-family:var(--fm);font-size:16px;font-weight:700;color:var(--amber)">${fmt(sel.savings)}</div></div>
-          <div style="text-align:center"><div style="font-size:9px;color:var(--text3);font-family:var(--fm);letter-spacing:.08em">FUN FUND</div><div data-mo-num="funFund" style="font-family:var(--fm);font-size:16px;font-weight:700;color:var(--cyan)">${fmt(sel.pureFunFund)}</div></div>
+          <div style="text-align:center"><div style="font-size:9px;color:var(--text3);font-family:var(--fm);letter-spacing:.08em">FUN FUND</div><div data-mo-num="funFund" style="font-family:var(--fm);font-size:16px;font-weight:700;color:var(--cyan)">${fmt(sel.funFund)}</div></div>
         </div>
       </div>
     </div>
@@ -5114,7 +5181,7 @@ function renderMonthly() {
         {label:'Income',data:all.map(m=>m.pureIncome),backgroundColor:'#00e8a018',borderColor:'#00e8a0',borderWidth:1.5,borderRadius:3},
         {label:'Expenses',data:all.map(m=>m.pureExpenses),backgroundColor:'#ff4d6d14',borderColor:'#ff4d6d',borderWidth:1.5,borderRadius:3},
         {label:'Savings',data:all.map(m=>m.savings),type:'line',borderColor:'#f5a623',backgroundColor:'transparent',fill:false,tension:.3,pointRadius:2,borderWidth:1.5,yAxisID:'y'},
-        {label:'Fun Fund',data:all.map(m=>Math.max(0,m.pureFunFund)),type:'line',borderColor:'#00d4ff',backgroundColor:'transparent',fill:false,tension:.3,pointRadius:2,borderWidth:1.5,yAxisID:'y'},
+        {label:'Fun Fund',data:all.map(m=>m.funFund),type:'line',borderColor:'#00d4ff',backgroundColor:'transparent',fill:false,tension:.3,pointRadius:2,borderWidth:1.5,yAxisID:'y'},
       ]},options:chartPreset()});
       // Summing Income + Expenses + Savings + Fun Fund is meaningless,
       // so suppress the tooltip's auto "Total" row on this chart.
@@ -5159,11 +5226,14 @@ function liveSyncMonthlyReview(selKey){
   const sel = months.find(m => m.key === key);
   if(!sel) return;
   // Summary bar segment widths + headline numbers — every field is
-  // the *pure* per-month value so this matches the Fun Fund tab
-  // running-balance table and the Fun Fund chart line one-for-one.
-  const pctExp = sel.pureIncome > 0 ? Math.min(sel.pureExpenses / sel.pureIncome * 100, 100) : 0;
-  const pctSav = sel.pureIncome > 0 ? Math.min(sel.savings      / sel.pureIncome * 100, 100) : 0;
-  const pctFun = sel.pureIncome > 0 ? Math.max(sel.pureFunFund  / sel.pureIncome * 100, 0)   : 0;
+  // the CHAINED per-month total so the Expenses figure always
+  // includes any deficit rollover row, the Income figure always
+  // includes any surplus carry-in row, and the Fun Fund figure
+  // matches the running balance at this month (which is the same
+  // value the Fun Fund tab and monthly charts show).
+  const pctExp = sel.income > 0 ? Math.min(sel.expenses / sel.income * 100, 100) : 0;
+  const pctSav = sel.income > 0 ? Math.min(sel.savings  / sel.income * 100, 100) : 0;
+  const pctFun = sel.income > 0 ? Math.max(sel.funFund  / sel.income * 100, 0)   : 0;
   const barExp = host.querySelector('[data-mo-bar="exp"]');
   const barSav = host.querySelector('[data-mo-bar="sav"]');
   const barFun = host.querySelector('[data-mo-bar="fun"]');
@@ -5179,10 +5249,10 @@ function liveSyncMonthlyReview(selKey){
   const numExp     = host.querySelector('[data-mo-num="expenses"]');
   const numSavings = host.querySelector('[data-mo-num="savings"]');
   const numFunFund = host.querySelector('[data-mo-num="funFund"]');
-  if(numIncome)  numIncome.textContent  = fmt(sel.pureIncome);
-  if(numExp)     numExp.textContent     = fmt(sel.pureExpenses);
+  if(numIncome)  numIncome.textContent  = fmt(sel.income);
+  if(numExp)     numExp.textContent     = fmt(sel.expenses);
   if(numSavings) numSavings.textContent = fmt(sel.savings);
-  if(numFunFund) numFunFund.textContent = fmt(sel.pureFunFund);
+  if(numFunFund) numFunFund.textContent = fmt(sel.funFund);
   // Chart datasets — mutate the existing Chart.js instance's data
   // arrays and call update('none') for a zero-animation live refresh.
   // No canvas teardown, no destroyChart, no focus loss.
@@ -5192,7 +5262,7 @@ function liveSyncMonthlyReview(selKey){
       if(ds.label === 'Income')        ds.data = months.map(m => m.pureIncome);
       else if(ds.label === 'Expenses') ds.data = months.map(m => m.pureExpenses);
       else if(ds.label === 'Savings')  ds.data = months.map(m => m.savings);
-      else if(ds.label === 'Fun Fund') ds.data = months.map(m => Math.max(0, m.pureFunFund));
+      else if(ds.label === 'Fun Fund') ds.data = months.map(m => m.funFund);
     });
     ch.update('none');
   }
@@ -6325,16 +6395,18 @@ function renderFunFund() {
               <span class="ff-run-h-status">Status</span>
             </div>
             ${(()=>{
-              // Build a running Fun Fund balance across the 12-month
-              // window. Each row shows: the month, that month's pure
-              // allocation (delta), and the cumulative balance after
-              // applying the delta. A negative delta pulls the running
-              // balance down; subsequent positive deltas pay off the
-              // deficit until the balance flips positive again.
-              let running = 0;
-              return months.map(m => {
-                const delta = m.pureFunFund || 0;
-                running += delta;
+              // Build the running Fun Fund balance across the 12-month
+              // window. The Running Balance column reads m.funFund
+              // (the CHAINED per-month figure) directly, so it always
+              // equals the Fun Fund value shown in the Forecast &
+              // Review Month Summary bar and on the monthly charts.
+              // The Monthly Allocation column is the month-over-month
+              // delta — how much the running balance moved that month.
+              let prev = 0;
+              return months.map((m, i) => {
+                const running = m.funFund || 0;
+                const delta = running - prev;
+                prev = running;
                 const deltaCls = delta >= 0 ? 'pos' : 'neg';
                 const deltaSign = delta >= 0 ? '+' : '−';
                 const runCls = running >= 0 ? 'pos' : 'neg';
@@ -6374,10 +6446,11 @@ function renderFunFund() {
         });
       });
       charts['ff']=new Chart(ctx.getContext('2d'),{type:'bar',data:{labels:months.map(m=>m.short),datasets:[
-        // Fun Fund bar uses the "pure" per-month value so the chart is
-        // byte-for-byte consistent with the Monthly Fun Fund list below
-        // it, and both strictly reflect the Monthly Review inputs.
-        {label:'Fun Fund',data:months.map(m=>Math.max(0,m.pureFunFund)),backgroundColor:'#00d4ff18',borderColor:'#00d4ff',borderWidth:1.5,borderRadius:3},
+        // Fun Fund bar uses the chained running balance — same value
+        // shown in the Running Balance column below, the Month
+        // Summary bar on Forecast & Review, and the Fun Fund line on
+        // the monthly charts. One Fun Fund number, everywhere.
+        {label:'Fun Fund',data:months.map(m=>Math.max(0,m.funFund)),backgroundColor:'#00d4ff18',borderColor:'#00d4ff',borderWidth:1.5,borderRadius:3},
         {label:'Trip Budget',data:months.map(m=>tripByMonth[m.key]||0),backgroundColor:'#f5a62325',borderColor:'#f5a623',borderWidth:1.5,borderRadius:3},
       ]},options:chartPreset()});
     }
