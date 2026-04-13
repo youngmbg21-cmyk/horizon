@@ -3218,9 +3218,14 @@ function mdParse(raw){
 function renderDashboard() {
   const months=get12Months(); const cm=months[0];
   const proj=getProjection();
-  const nestEgg=proj.length?proj[proj.length-1].total:0;
-  const realNestEgg=proj.length?proj[proj.length-1].realTotal:0;
+  // Keep the nominal value around so we can show it as secondary context,
+  // but every PRIMARY display now reads from retNums (the shared real-value
+  // source of truth) so the Dashboard, Retirement Plan, Retire Anywhere,
+  // and AI prompts can never disagree.
+  const nominalNestEgg=proj.length?proj[proj.length-1].total:0;
   const retNums=getRetirementNumbers();
+  const realNestEgg=retNums.nestEgg; // shared real-value source of truth
+  const realRetirementIncome=retNums.sustainableAfterTax+retNums.pension;
   const ytr=Math.max(0,state.retirementAge-state.currentAge);
   const ti=sumArr(state.baseIncome,'amount');
   const te=sumArr(state.baseExpenses,'amount');
@@ -3240,12 +3245,12 @@ function renderDashboard() {
       {icon:'✦', label:'FUN FUND (12MO)',  value:`<span style="color:var(--cyan)">${fmt(funFundTotal)}</span>`, sub:`${fmt(funFundTotal/12)}/mo average`, link:'funfund'},
     ])}
 
-    <!-- KPI Row 2: Retirement -->
+    <!-- KPI Row 2: Retirement (all values are TODAY'S MONEY / real value) -->
     ${ui.kpiRow([
-      {icon:'◈', label:'NEST EGG (NOMINAL)',      value:fmt(nestEgg),     tone:'pos', sub:`At age ${state.retirementAge} · ${state.growthRate}% growth`, link:'retirement', section:'runway'},
-      {icon:'◈', label:"NEST EGG (TODAY'S MONEY)", value:`<span style="color:var(--cyan)">${fmt(realNestEgg)}</span>`, sub:`Inflation-adjusted · ${(state.growthRate-state.inflationRate).toFixed(1)}% real`, link:'retirement'},
+      {icon:'◈', label:'NEST EGG · TODAY&rsquo;S MONEY', value:fmt(realNestEgg), tone:'pos', sub:`At age ${state.retirementAge} · nominal ${fmt(nominalNestEgg)} (future kr)`, link:'retirement', section:'runway'},
+      {icon:'💰', label:'MONTHLY RETIREMENT INCOME · TODAY&rsquo;S MONEY', value:fmt(realRetirementIncome), tone:'pos', sub:`Portfolio ${fmt(retNums.sustainableAfterTax)} + pension ${fmt(retNums.pension)} (real)`, link:'retirement', section:'runway'},
       {icon:'⏱', label:'YEARS TO RETIRE',         value:ytr,              sub:`Age ${state.currentAge} → ${state.retirementAge}`, link:'retirement'},
-      {icon:retNums.verdictIcon, label:'RETIREMENT STATUS', value:`<span class="${retNums.verdictClass==='overfunded'?'pos':retNums.verdictClass==='ontarget'?'amb':'neg'}">${retNums.verdict}</span>`, sub:`${retNums.coveragePct.toFixed(0)}% funded · ${fmt(retNums.sustainableAfterTax)}/mo after tax`, link:'retirement', section:'runway'},
+      {icon:retNums.verdictIcon, label:'RETIREMENT STATUS', value:`<span class="${retNums.verdictClass==='overfunded'?'pos':retNums.verdictClass==='ontarget'?'amb':'neg'}">${retNums.verdict}</span>`, sub:`${retNums.coveragePct.toFixed(0)}% funded · ${fmt(retNums.sustainableAfterTax)}/mo real`, link:'retirement', section:'runway'},
     ])}
 
     <!-- Bank status -->
@@ -3795,10 +3800,10 @@ function renderRetirement() {
         <span>0%</span><span style="color:${nums.coveragePct>=100?'var(--green)':'var(--amber)'}">Coverage: ${nums.coveragePct.toFixed(0)}%</span><span>100%</span>
       </div>
       <div class="sust-nums" style="margin-bottom:14px">
-        <div class="sust-num"><div class="sust-num-lbl">REAL NEST EGG</div><div class="sust-num-val">${fmt(nums.nestEgg)}</div></div>
-        <div class="sust-num"><div class="sust-num-lbl">PORTFOLIO SUSTAINS</div><div class="sust-num-val pos">${fmt(nums.sustainableAfterTax)}/mo</div></div>
-        <div class="sust-num"><div class="sust-num-lbl">YOU NEED</div><div class="sust-num-val">${fmt(nums.totalExp)}/mo</div></div>
-        <div class="sust-num"><div class="sust-num-lbl">DEPLETION AGE</div><div class="sust-num-val ${nums.runoutAge?'neg':'pos'}">${nums.runoutAge?`Age ${Math.round(nums.runoutAge)}`:'Never'}</div></div>
+        <div class="sust-num"><div class="sust-num-lbl">Nest Egg · today&rsquo;s money</div><div class="sust-num-val">${fmt(nums.nestEgg)}</div></div>
+        <div class="sust-num"><div class="sust-num-lbl">Portfolio sustains · today&rsquo;s money</div><div class="sust-num-val pos">${fmt(nums.sustainableAfterTax)}/mo</div></div>
+        <div class="sust-num"><div class="sust-num-lbl">You need · today&rsquo;s money</div><div class="sust-num-val">${fmt(nums.totalExp)}/mo</div></div>
+        <div class="sust-num"><div class="sust-num-lbl">Depletion age</div><div class="sust-num-val ${nums.runoutAge?'neg':'pos'}">${nums.runoutAge?`Age ${Math.round(nums.runoutAge)}`:'Never'}</div></div>
       </div>
       <!-- Runway Chart.js (feature #4) -->
       <div class="runway-wrap" data-section="runway">
@@ -3815,7 +3820,7 @@ function renderRetirement() {
         <div class="runway-svg-host" id="runway-svg-host"></div>
         <div class="runway-legend" id="runway-legend"></div>
         <div class="runway-milestones-wrap">
-          <div class="runway-ms-hd">Age snapshots</div>
+          <div class="runway-ms-hd">Age snapshots · today&rsquo;s money</div>
           <div class="runway-milestones" id="runway-milestones"></div>
         </div>
       </div>
@@ -3925,31 +3930,31 @@ function renderRetirement() {
     <div class="card ireq-card">
       <div class="ireq-head">
         <div class="ireq-title">Income Requirements</div>
-        <div class="ireq-sub">What your retirement expenses demand from your portfolio (${esc(scenLabels[sc]||'Baseline')})</div>
+        <div class="ireq-sub">What your retirement expenses demand from your portfolio (${esc(scenLabels[sc]||'Baseline')}) · all values in <strong>today&rsquo;s money</strong></div>
       </div>
       <div class="ireq-kpi-row">
         <div class="ireq-kpi">
-          <div class="ireq-kpi-lbl">EXPENSES (AFTER TAX)</div>
+          <div class="ireq-kpi-lbl">Expenses (after tax)</div>
           <div class="ireq-kpi-val">${fmt(expensesMonthly)}</div>
-          <div class="ireq-kpi-sub">${fmt(expensesAnnual)}/yr</div>
+          <div class="ireq-kpi-sub">${fmt(expensesAnnual)}/yr · today&rsquo;s money</div>
         </div>
         <div class="ireq-kpi">
-          <div class="ireq-kpi-lbl">TOTAL GROSS INCOME NEEDED</div>
+          <div class="ireq-kpi-lbl">Total gross income needed</div>
           <div class="ireq-kpi-val">${fmt(grossMonthly)}</div>
-          <div class="ireq-kpi-sub">${fmt(grossAnnual)}/yr · ÷(1−${taxPct}% tax)</div>
+          <div class="ireq-kpi-sub">${fmt(grossAnnual)}/yr · ÷(1−${taxPct}% tax) · today&rsquo;s money</div>
         </div>
         <div class="ireq-kpi">
-          <div class="ireq-kpi-lbl">AVG PORTFOLIO WITHDRAWAL</div>
+          <div class="ireq-kpi-lbl">Avg portfolio withdrawal</div>
           <div class="ireq-kpi-val ireq-amber">${fmt(avgPortMonthly)}</div>
-          <div class="ireq-kpi-sub">${fmt(avgPortAnnual)}/yr · weighted across phases</div>
+          <div class="ireq-kpi-sub">${fmt(avgPortAnnual)}/yr · weighted across phases · today&rsquo;s money</div>
         </div>
         <div class="ireq-kpi">
-          <div class="ireq-kpi-lbl">AVG WITHDRAWAL RATE</div>
+          <div class="ireq-kpi-lbl">Avg withdrawal rate</div>
           <div class="ireq-kpi-val ${avgWithdrawalRate>4?'ireq-red':'ireq-green'}">${avgWithdrawalRate.toFixed(1)}%</div>
           <div class="ireq-kpi-sub">${avgWithdrawalRate>4?'Above':'Within'} the 4% safe rate</div>
         </div>
         <div class="ireq-kpi">
-          <div class="ireq-kpi-lbl">FUND DEPLETION</div>
+          <div class="ireq-kpi-lbl">Fund depletion</div>
           <div class="ireq-kpi-val ${fundDepletionTone==='neg'?'ireq-red':'ireq-green'}">${fundDepletionLabel}</div>
           <div class="ireq-kpi-sub">${fundDepletionSub}</div>
         </div>
@@ -4245,13 +4250,13 @@ function _attachRunwayHover(host, {cdata, pad, pw, ph, xScale, yBal}){
     hoverLine.style.display = '';
     hoverDot.setAttribute('cx', cx); hoverDot.setAttribute('cy', cy);
     hoverDot.style.display = '';
-    // Render the floating HTML tooltip
+    // Render the floating HTML tooltip — every value is in today's money.
     tooltip.innerHTML = `
-      <div class="chart-tt-title">Age ${age}</div>
+      <div class="chart-tt-title">Age ${age} <span style="color:var(--text3);font-weight:500">· today&rsquo;s money</span></div>
       <div class="chart-tt-row"><span class="chart-tt-sw" style="background:${dep?'#ff4d6d':'#00e8a0'}"></span><span>Portfolio balance</span><span class="chart-tt-val">${fmt(balance)}</span></div>
       <div class="chart-tt-row"><span class="chart-tt-sw" style="background:#f5a623"></span><span>Portfolio withdrawal</span><span class="chart-tt-val">${fmt(port)}/yr</span></div>
       ${pen > 0 ? `<div class="chart-tt-row"><span class="chart-tt-sw" style="background:#4d9fff"></span><span>Pension income</span><span class="chart-tt-val">${fmt(pen)}/yr</span></div>` : ''}
-      <div class="chart-tt-total"><span>Total income</span><span class="chart-tt-val">${fmt(total)}/yr</span></div>
+      <div class="chart-tt-total"><span>Total income/yr</span><span class="chart-tt-val">${fmt(total)}</span></div>
     `;
     // Position tooltip near cursor, avoiding right/bottom edge clipping
     const margin = 14;
@@ -4284,9 +4289,9 @@ function _runwayUpdateChrome(cdata, nums, lifeExp, lineColor){
     const realRate = Math.max(0, (state.retirementPostGrowth || 4) - state.inflationRate);
     const hasPenGap = pensions.length > 0 && cdata.earliestPension !== null && cdata.earliestPension > state.retirementAge;
     if(hasPenGap){
-      sub.textContent = `How long your real nest egg lasts — Phase 1: ${fmt(nums.grossNeeded)}/mo (age ${state.retirementAge}–${cdata.earliestPension - 1}), Phase 2: reduced withdrawal + pension (age ${cdata.earliestPension}+) at ${realRate.toFixed(1)}% real growth`;
+      sub.textContent = `How long your nest egg lasts — Phase 1: ${fmt(nums.grossNeeded)}/mo (age ${state.retirementAge}–${cdata.earliestPension - 1}), Phase 2: reduced withdrawal + pension (age ${cdata.earliestPension}+) at ${realRate.toFixed(1)}% real growth · all values in today's money`;
     } else {
-      sub.textContent = `How long your real nest egg lasts — withdrawing ${fmt(nums.grossNeeded)}/mo gross at ${realRate.toFixed(1)}% real growth`;
+      sub.textContent = `How long your nest egg lasts — withdrawing ${fmt(nums.grossNeeded)}/mo gross at ${realRate.toFixed(1)}% real growth · all values in today's money`;
     }
   }
 
@@ -4335,9 +4340,9 @@ function _runwayUpdateChrome(cdata, nums, lifeExp, lineColor){
       ? `<span class="runway-legend-gap">⚡ Pension starts at age ${cdata.earliestPension} (${cdata.earliestPension - state.retirementAge}yr gap)</span>`
       : '';
     legEl.innerHTML = `
-      <span class="runway-legend-item"><span class="runway-legend-line" style="background:${color}"></span>Portfolio balance (left axis)</span>
-      <span class="runway-legend-item"><span class="runway-legend-sq" style="background:#f5a623"></span>Portfolio withdrawal</span>
-      <span class="runway-legend-item"><span class="runway-legend-sq" style="background:#4d9fff"></span>Pension income</span>
+      <span class="runway-legend-item"><span class="runway-legend-line" style="background:${color}"></span>Portfolio balance · today&rsquo;s money (left axis)</span>
+      <span class="runway-legend-item"><span class="runway-legend-sq" style="background:#f5a623"></span>Portfolio withdrawal · today&rsquo;s money/yr</span>
+      <span class="runway-legend-item"><span class="runway-legend-sq" style="background:#4d9fff"></span>Pension income · today&rsquo;s money/yr</span>
       ${gap}
     `;
   }
@@ -4471,8 +4476,8 @@ function renderRetireAnywhere() {
       <div class="loc-affordability-bar"><div class="loc-affordability-fill" style="width:${Math.round(loc.affordabilityScore*100)}%;background:${loc.verdict==='feasible'?'var(--green)':loc.verdict==='conditional'?'var(--amber)':'var(--red)'}"></div></div>
       <div style="font-size:10px;color:var(--text3);font-family:var(--fm);margin-bottom:10px">${Math.round(loc.affordabilityScore*100)}% affordable</div>
       <div class="loc-stat"><span class="loc-stat-lbl">Monthly cost of living</span><span class="loc-stat-val">${fmt(loc.costOfLiving)}</span></div>
-      <div class="loc-stat"><span class="loc-stat-lbl">Your monthly income</span><span class="loc-stat-val pos">${fmt(monthlyIncome)}</span></div>
-      <div class="loc-stat"><span class="loc-stat-lbl">Monthly surplus</span><span class="loc-stat-val ${loc.surplus>=0?'pos':'neg'}">${fmt(loc.surplus)}</span></div>
+      <div class="loc-stat"><span class="loc-stat-lbl">Your retirement income · today&rsquo;s money</span><span class="loc-stat-val pos">${fmt(monthlyIncome)}</span></div>
+      <div class="loc-stat"><span class="loc-stat-lbl">Monthly surplus · today&rsquo;s money</span><span class="loc-stat-val ${loc.surplus>=0?'pos':'neg'}">${fmt(loc.surplus)}</span></div>
       <div class="loc-stat"><span class="loc-stat-lbl">Local tax rate</span><span class="loc-stat-val">${loc.taxRate}%</span></div>
       <div class="loc-stat"><span class="loc-stat-lbl">Climate</span><span class="loc-stat-val muted">${loc.climate}</span></div>
       <div class="loc-card-actions">
@@ -4483,18 +4488,18 @@ function renderRetireAnywhere() {
   }).join('');
 
   document.getElementById('panel-retireanywhere').innerHTML=`
-    <div class="ph"><div class="ph-tag">RETIRE ANYWHERE</div><div class="ph-title">Where Can You Retire?</div><div class="ph-sub">AI-powered analysis — your ${fmt(monthlyIncome)}/mo retirement income vs. global cost of living</div></div>
+    <div class="ph"><div class="ph-tag">RETIRE ANYWHERE</div><div class="ph-title">Where Can You Retire?</div><div class="ph-sub">AI-powered analysis — your <strong>${fmt(monthlyIncome)}/mo</strong> retirement income (today&rsquo;s money) vs. global cost of living</div></div>
 
     <div class="callout">
       <span>💡</span>
-      <div><strong>Your Retirement Income: ${fmt(monthlyIncome)}/mo</strong> (${fmt(nums.sustainableAfterTax)}/mo from portfolio + ${fmt(nums.pension)}/mo pension)
-      <br>Destinations are rated by whether your income can comfortably cover local cost of living, after accounting for local tax.</div>
+      <div><strong>Your Retirement Income: ${fmt(monthlyIncome)}/mo</strong> (${fmt(nums.sustainableAfterTax)}/mo from portfolio + ${fmt(nums.pension)}/mo pension) — all values in <strong>today&rsquo;s money</strong>, the inflation-adjusted real purchasing power your nest egg can sustain.
+      <br>Destinations are rated by whether your real income can comfortably cover local cost of living, after accounting for local tax.</div>
     </div>
 
     ${ui.kpiRow([
       {icon:'✅', label:'FEASIBLE DESTINATIONS', value:scored.filter(l=>l.verdict==='feasible').length, tone:'pos', sub:'Income > 100% of costs'},
       {icon:'🎯', label:'CONDITIONAL',           value:`<span class="amb">${scored.filter(l=>l.verdict==='conditional').length}</span>`, sub:'Income 80–100% of costs'},
-      {icon:'💰', label:'YOUR MONTHLY INCOME',   value:fmt(monthlyIncome), sub:`At retirement age ${state.retirementAge}`, link:'retirement', section:'runway'},
+      {icon:'💰', label:"YOUR MONTHLY INCOME · TODAY&rsquo;S MONEY",   value:fmt(monthlyIncome), sub:`At retirement age ${state.retirementAge} · real value`, link:'retirement', section:'runway'},
     ])}
 
     <div id="retire-map" data-section="map"></div>
@@ -4542,8 +4547,8 @@ window.showLocDetail=function(id){
     <div class="loc-affordability-bar" style="height:10px"><div class="loc-affordability-fill" style="width:${Math.round(loc.affordabilityScore*100)}%;background:${loc.verdict==='feasible'?'var(--green)':loc.verdict==='conditional'?'var(--amber)':'var(--red)'}"></div></div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:14px 0;font-size:13px">
       <div><span style="color:var(--text2)">Monthly cost of living</span><div style="font-family:var(--fm);font-weight:700;margin-top:2px">${fmt(loc.costOfLiving)}</div></div>
-      <div><span style="color:var(--text2)">Your income at retirement</span><div style="font-family:var(--fm);font-weight:700;color:var(--green);margin-top:2px">${fmt(monthlyIncome)}</div></div>
-      <div><span style="color:var(--text2)">Monthly surplus/deficit</span><div style="font-family:var(--fm);font-weight:700;color:${loc.surplus>=0?'var(--green)':'var(--red)'};margin-top:2px">${fmt(loc.surplus)}</div></div>
+      <div><span style="color:var(--text2)">Your income at retirement <span style="font-size:9px">(today&rsquo;s money)</span></span><div style="font-family:var(--fm);font-weight:700;color:var(--green);margin-top:2px">${fmt(monthlyIncome)}</div></div>
+      <div><span style="color:var(--text2)">Monthly surplus/deficit <span style="font-size:9px">(today&rsquo;s money)</span></span><div style="font-family:var(--fm);font-weight:700;color:${loc.surplus>=0?'var(--green)':'var(--red)'};margin-top:2px">${fmt(loc.surplus)}</div></div>
       <div><span style="color:var(--text2)">Local income tax</span><div style="font-family:var(--fm);font-weight:700;margin-top:2px">${loc.taxRate}%</div></div>
       <div><span style="color:var(--text2)">Climate</span><div style="font-weight:600;margin-top:2px">${loc.climate}</div></div>
       <div><span style="color:var(--text2)">Healthcare</span><div style="font-weight:600;margin-top:2px">${loc.healthcare}</div></div>
@@ -4622,10 +4627,10 @@ function renderLocAnalysisSlideover(opts){
   const body = document.getElementById('retire-so-body');
   const factsHtml = `
     <div class="retire-so-section">
-      <div class="retire-so-section-hd">Quick Facts</div>
+      <div class="retire-so-section-hd">Quick Facts · all monetary figures in today&rsquo;s money</div>
       <div class="retire-so-fact-grid">
         <div class="retire-so-fact"><div class="retire-so-fact-lbl">Monthly cost of living</div><div class="retire-so-fact-val">${fmt(loc.costOfLiving)}</div></div>
-        <div class="retire-so-fact"><div class="retire-so-fact-lbl">Your income at retirement</div><div class="retire-so-fact-val pos">${fmt(monthlyIncome)}</div></div>
+        <div class="retire-so-fact"><div class="retire-so-fact-lbl">Your retirement income</div><div class="retire-so-fact-val pos">${fmt(monthlyIncome)}</div></div>
         <div class="retire-so-fact"><div class="retire-so-fact-lbl">Monthly surplus</div><div class="retire-so-fact-val ${loc.surplus>=0?'pos':'neg'}">${fmt(loc.surplus)}</div></div>
         <div class="retire-so-fact"><div class="retire-so-fact-lbl">Local income tax</div><div class="retire-so-fact-val">${loc.taxRate}%</div></div>
         <div class="retire-so-fact"><div class="retire-so-fact-lbl">Climate</div><div class="retire-so-fact-val" style="font-size:12px">${esc(loc.climate||'—')}</div></div>
@@ -4726,6 +4731,9 @@ CONTEXT
 - Projected monthly retirement income: ${fmt(income)} (in today's money), sourced from portfolio draw-down and any pensions.
 - Target monthly cost of living at destination: ${fmt(loc.costOfLiving)}.
 - Destination headline income tax rate: ${loc.taxRate}%.
+
+VALUE BASIS
+Every monetary figure provided in this CONTEXT block is in TODAY'S MONEY (real value, inflation-adjusted purchasing power). Treat all the user's income, surplus, and cost numbers as real values throughout your analysis. When you quote any figure for the destination — cost of living, healthcare costs, real estate, rental yields — quote it in today's money too. If you ever need to mention a nominal/future figure, label it explicitly as "nominal" or "future kr". Never present a nominal figure as the headline.
 
 REQUIREMENTS
 Return a single markdown document (no JSON, no preamble, no wrapping). Use H2 headings for each section and markdown tables where numbers help. Every section must be grounded in 2024–2025 reality and the user's specific personal context (citizenship, home base). Be honest — flag red flags, visa traps, and tax gotchas.
@@ -5393,7 +5401,8 @@ window.aiAnalyzeLocations=function(){
   if(!key){toggleAIPanel();return;}
   const nums=getRetirementNumbers();
   const income=nums.sustainableAfterTax+nums.pension;
-  const prompt=`The user is planning to retire with a monthly income of ${fmt(income)} (today's money). They want AI to recommend the BEST retirement destinations globally based on this income. Consider: cost of living, healthcare quality, climate, expat communities, visa/residency requirements, and lifestyle. They have a strong connection to Nairobi, Kenya and are also interested in European options. Give 5 specific recommendations with monthly cost estimates and a viability score. Format as a structured list.`;
+  const ctx = (typeof buildPersonalContext==='function') ? buildPersonalContext() : '';
+  const prompt=`${ctx}\n\nThe user is planning to retire with a monthly income of ${fmt(income)} (this is TODAY'S MONEY — real, inflation-adjusted purchasing power, not nominal future kr). Recommend the BEST retirement destinations globally based on this real income. Consider: cost of living, healthcare quality, climate, expat communities, visa/residency requirements, and lifestyle. Tailor visa and tax-treaty advice to the user's citizenship and home base. Give 5 specific recommendations with monthly cost estimates (also in today's money / local-currency-equivalent) and a viability score. Format as a structured list.`;
   // Kick off in the background (fire-and-forget); the UI is driven by the
   // bgtask:* event subscription below.
   runBgTask(RETIRE_AI_KEY, () => callClaude(prompt, 1200, key)).catch(()=>{/* rendered via event */});
@@ -5446,6 +5455,9 @@ CONTEXT
 - Projected monthly retirement income: ${fmt(income)} (in today's money), sourced from portfolio draw-down and any pensions.
 - Target monthly cost of living at destination: ${fmt(loc.costOfLiving)}.
 - Destination headline income tax rate: ${loc.taxRate}%.
+
+VALUE BASIS
+Every monetary figure provided in this CONTEXT block is in TODAY'S MONEY (real value, inflation-adjusted purchasing power). Treat all the user's income, surplus, and cost numbers as real values throughout your analysis. When you quote any figure for the destination — cost of living, healthcare costs, real estate, rental yields — quote it in today's money too. If you ever need to mention a nominal/future figure, label it explicitly as "nominal" or "future kr". Never present a nominal figure as the headline.
 
 REQUIREMENTS
 Return a single markdown document (no JSON, no preamble, no wrapping). Use H2 headings for each section and markdown tables where numbers help. Every section must be grounded in 2024–2025 reality and the user's specific personal context (citizenship, home base). Be honest — flag red flags, visa traps, and tax gotchas.
@@ -6060,6 +6072,15 @@ function buildAIContext() {
     ? `RESPONSE STYLE: SIMPLE. Explain like you're talking to a smart friend who is new to personal finance. Avoid jargon (or define it in 4–6 words when unavoidable). Short sentences. No bullet soup; write in plain paragraphs. Skip hedging. Use at most one number per idea and round generously. If the user asks something technical, answer it in everyday language first, then add ONE optional sentence of detail at the end.`
     : `RESPONSE STYLE: EXPERT. The user is financially literate. Use domain vocabulary (sequence-of-returns risk, real vs nominal, withdrawal rate, tax drag, basis points) without over-explaining. Be direct, reference specific numbers from their snapshot, and quote percentages to one decimal. Prefer a short narrative plus a bulleted breakdown. Call out assumptions you're making.`;
   const ctx = buildPersonalContext();
+  // Pull every retirement number from the shared getRetirementNumbers() so
+  // the AI can never quote a different figure than the UI shows. All
+  // monetary values below are in TODAY'S MONEY (real, inflation-adjusted)
+  // — the nominal equivalent is provided as secondary reference only.
+  const proj = getProjection().slice(-1)[0] || {};
+  const realNestEgg = nums.nestEgg;
+  const nominalNestEgg = proj.total || 0;
+  const realRetirementIncome = nums.sustainableAfterTax + nums.pension;
+  const realRate = Math.max(0, (state.retirementPostGrowth || 4) - state.inflationRate);
   return `You are HORIZON AI — a personal finance and life planning assistant embedded in Horizon Finance OS.
 
 ${ctx}
@@ -6068,17 +6089,23 @@ CURRENT VIEW: The user is looking at the "${viewLabel}" panel${section}. Tailor 
 
 ${modeInstruction}
 
-User's financial snapshot (SEK):
-- Monthly income: ${Math.round(ti).toLocaleString()} kr | Expenses: ${Math.round(te).toLocaleString()} kr | Savings: ${Math.round(state.baseSavings).toLocaleString()} kr/mo
-- Monthly surplus: ${Math.round(cm.surplus).toLocaleString()} kr | Fun Fund: ${Math.round(cm.funFund).toLocaleString()} kr/mo
-- Age: ${state.currentAge} | Retiring at: ${state.retirementAge} (${Math.max(0,state.retirementAge-state.currentAge)} years away)
-- Nest egg at retirement: ${Math.round(getProjection().slice(-1)[0]?.total||0).toLocaleString()} kr nominal | ${Math.round(getProjection().slice(-1)[0]?.realTotal||0).toLocaleString()} kr real
-- Retirement sustainability: ${nums.verdict} · ${nums.coveragePct.toFixed(0)}% funded · ${Math.round(nums.sustainableAfterTax).toLocaleString()} kr/mo sustainable after tax
-- External portfolio: ${Math.round(state.externalAssets.filter(a=>(a.assetType||'investment')==='investment').reduce((s,a)=>s+a.balance,0)).toLocaleString()} kr across ${state.externalAssets.length} accounts
-- Planned trips: ${state.trips.map(t=>t.name+' ('+Math.round(t.budget).toLocaleString()+' kr)').join(', ')}
-- Retire Anywhere: ${scored.filter(l=>l.verdict==='feasible').map(l=>l.name).join(', ')||'none feasible at current income level'}
+VALUE BASIS — IMPORTANT
+Every monetary retirement figure below is in TODAY'S MONEY (real, inflation-adjusted). When you quote retirement income, portfolio balance, withdrawals, or pension payouts in your response, use these real figures as the headline value. If you want to mention nominal/future kr for context, label it explicitly as "nominal" or "future value". Never present a nominal figure as the headline.
 
-Be concise, direct, insightful. Reference specific numbers. Give actionable advice.`;
+User's financial snapshot (SEK):
+- Current monthly income: ${Math.round(ti).toLocaleString()} kr | Expenses: ${Math.round(te).toLocaleString()} kr | Savings: ${Math.round(state.baseSavings).toLocaleString()} kr/mo
+- Monthly surplus: ${Math.round(cm.surplus).toLocaleString()} kr | Fun Fund: ${Math.round(cm.funFund).toLocaleString()} kr/mo
+- Age: ${state.currentAge} | Retiring at: ${state.retirementAge} (${Math.max(0,state.retirementAge-state.currentAge)} years away) | Life expectancy: ${state.lifeExp || 90}
+- Nest egg at retirement: ${Math.round(realNestEgg).toLocaleString()} kr (today's money) — equivalent to ${Math.round(nominalNestEgg).toLocaleString()} kr nominal/future kr at retirement
+- Sustainable monthly retirement income: ${Math.round(realRetirementIncome).toLocaleString()} kr/mo (today's money) — ${Math.round(nums.sustainableAfterTax).toLocaleString()} kr from portfolio + ${Math.round(nums.pension).toLocaleString()} kr from pension, all real
+- Monthly expenses needed in retirement: ${Math.round(nums.totalExp).toLocaleString()} kr (today's money) — coverage ${nums.coveragePct.toFixed(0)}% — verdict: ${nums.verdict}
+- Real growth rate assumption: ${realRate.toFixed(1)}% (post-retirement growth ${state.retirementPostGrowth||4}% minus ${state.inflationRate}% inflation)
+- Portfolio depletion age (from shared simulation): ${nums.runoutAge ? 'Age ' + nums.runoutAge : 'never depletes'}
+- External portfolio (current balance, today's kr): ${Math.round(state.externalAssets.filter(a=>(a.assetType||'investment')==='investment').reduce((s,a)=>s+a.balance,0)).toLocaleString()} kr across ${state.externalAssets.length} accounts
+- Planned trips: ${state.trips.map(t=>t.name+' ('+Math.round(t.budget).toLocaleString()+' kr)').join(', ')}
+- Retire Anywhere feasible destinations at current real income: ${scored.filter(l=>l.verdict==='feasible').map(l=>l.name).join(', ')||'none feasible at current income level'}
+
+Be concise, direct, insightful. Reference specific numbers from THIS snapshot — never recompute independently. Give actionable advice.`;
 }
 
 // ─── CHAT MODE + EXPAND (Simple / Expert, widen leftwards) ──────────────────
@@ -7033,6 +7060,9 @@ INVESTMENT THESIS (from earlier analysis): ${thesis}
 SIGNALS: ${signals || 'none'}
 PIPELINE: ${pipeline || 'none'}
 TITLE RISKS: ${risks || 'none'}
+
+VALUE BASIS
+The user's retirement income, nest egg, and surplus figures (visible elsewhere in the app) are tracked in TODAY'S MONEY (real value, inflation-adjusted purchasing power). Property prices and yields above are local market values in the destination currency, not adjusted for the user's home currency or inflation. When you weave personal financial context into the narrative, use the user's REAL retirement income figures (not nominal). If you ever quote a figure in the user's home currency for comparison, call it "today's money" or "real" so the user knows the basis.
 
 REQUIREMENTS
 - Produce 4–6 flowing paragraphs. No headings inside the narrative (the "## AI Narrative" heading is already added externally).
