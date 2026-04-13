@@ -5357,10 +5357,39 @@ function renderRetirement() {
   const pensions=getPensionAssets();
   const ytr=Math.max(0,state.retirementAge-state.currentAge);
   const infl=state.inflationRate; const inflF=Math.pow(1+infl/100,ytr);
-  const tBal=sumArr(investments,'balance');
-  const tContrib=sumArr(investments,'monthlyContribution');
-  const projNom=investments.reduce((ss,a)=>ss+futureValue(a.balance,a.monthlyContribution,a.growthRate??state.growthRate,ytr),0);
-  const projReal=projNom/inflF;
+  // PORTFOLIO KPIs — everything here reads from the single
+  // getProjection() source used by getRetirementNumbers() and the
+  // Dashboard Nest Egg chart so every view agrees on one projected
+  // value for the nest egg in today's money.
+  //
+  //   tBal    → Total current investment balance (external accounts).
+  //   savNow  → Accumulated in-app savings so far this year, taken
+  //             from proj year 0's appSavings. At the very start of a
+  //             year this rounds to the month's savings target; it
+  //             climbs as the year progresses.
+  //   tContrib → Monthly contributions into investment accounts PLUS
+  //             the user's current in-app monthly savings target, so
+  //             the card reflects every stream feeding the nest egg.
+  //   projNom / projReal → proj[last].total / .realTotal. These
+  //             INCLUDE both the external-investment compounding AND
+  //             the in-app savings stream (proj.appSavings), so the
+  //             number matches the Longevity Runway nestEgg
+  //             exactly (both are now proj[last].realTotal).
+  const proj = getProjection();
+  const projLast = proj.length ? proj[proj.length - 1] : null;
+  const savNow = proj.length ? (proj[0].appSavings || 0) : 0;
+  const tBal = sumArr(investments,'balance') + savNow;
+  const monthlySavingsNow = (get12Months()[0]?.savings) || state.baseSavings || 0;
+  const tContrib = sumArr(investments,'monthlyContribution') + monthlySavingsNow;
+  const projNom  = projLast ? projLast.total     : sumArr(investments,'balance');
+  const projReal = projLast ? projLast.realTotal : sumArr(investments,'balance');
+  // Split the projection into its two component streams — still
+  // reading from the same proj object so the sum always equals the
+  // headline projNom / projReal shown in the KPI card.
+  const investmentsProjNom = projLast ? projLast.external  : sumArr(investments,'balance');
+  const savingsProjNom     = projLast ? projLast.appSavings : 0;
+  const savingsProjReal    = savingsProjNom / (inflF || 1);
+  const investmentsProjReal = investmentsProjNom / (inflF || 1);
   // Earliest pension start age across all pension assets — used for the
   // pension card subtitle and the Phase 1 / Phase 2 split.
   const earliestPension = pensions.length > 0
@@ -5504,8 +5533,13 @@ function renderRetirement() {
   const assetRows = savingsProjRow + state.externalAssets.map((a,idx)=>{
     const isInv=(a.assetType||'investment')==='investment';
     const gr=a.growthRate??state.growthRate;
-    const projV=isInv?futureValue(a.balance,a.monthlyContribution,gr,ytr):0;
-    const projR=isInv?projV/inflF:0;
+    // Per-account projection is read straight from the same
+    // getProjection() result the headline KPIs use, so the row-
+    // level number always matches the Total Projected and the
+    // Longevity Runway nest egg. projLast.perAccount is populated
+    // by getProjection() per investment account id.
+    const perAccountNom = (projLast && projLast.perAccount) ? (projLast.perAccount[a.id] || 0) : 0;
+    const projR = isInv ? perAccountNom / (inflF || 1) : 0;
     const accentColor=isInv?'var(--green)':'var(--amber)';
     // inp follows the Monthly Review pattern: oninput only updates state +
     // saves; onchange (fires on commit — blur, Tab, Enter) re-renders.
@@ -5540,9 +5574,9 @@ function renderRetirement() {
   const s2 = `
     <div style="padding:0 14px 14px">
       <div class="kpi-row" style="margin-bottom:10px;margin-top:10px">
-        <div class="kpi"><div class="kpi-icon">◈</div><div class="kpi-lbl">TOTAL INVESTMENT BALANCE</div><div class="kpi-val pos">${fmt(tBal)}</div><div class="kpi-sub">${investments.length} investment account${investments.length!==1?'s':''}</div></div>
-        <div class="kpi"><div class="kpi-icon">▲</div><div class="kpi-lbl">MONTHLY CONTRIBUTIONS</div><div class="kpi-val" style="color:var(--amber)">${fmt(tContrib)}</div><div class="kpi-sub">Into investment accounts</div></div>
-        <div class="kpi"><div class="kpi-icon">☀</div><div class="kpi-lbl">PROJECTED (TODAY'S MONEY)</div><div class="kpi-val" style="color:var(--cyan)">${fmt(projReal)}</div><div class="kpi-sub">${ytr} yrs · ${(investments.length>0?(investments.reduce((ss,a)=>ss+(a.growthRate??state.growthRate)*(a.balance||1),0)/Math.max(1,tBal)-infl):state.growthRate-infl).toFixed(1)}% real avg</div></div>
+        <div class="kpi"><div class="kpi-icon">◈</div><div class="kpi-lbl">TOTAL INVESTMENT BALANCE</div><div class="kpi-val pos">${fmt(tBal)}</div><div class="kpi-sub">${investments.length} investment account${investments.length!==1?'s':''} · incl. ${fmt(savNow)} savings YTD</div></div>
+        <div class="kpi"><div class="kpi-icon">▲</div><div class="kpi-lbl">MONTHLY CONTRIBUTIONS</div><div class="kpi-val" style="color:var(--amber)">${fmt(tContrib)}</div><div class="kpi-sub">Investments + savings stream</div></div>
+        <div class="kpi"><div class="kpi-icon">☀</div><div class="kpi-lbl">PROJECTED (TODAY&rsquo;S MONEY)</div><div class="kpi-val" style="color:var(--cyan)">${fmt(projReal)}</div><div class="kpi-sub">${ytr} yrs · investments ${fmt(investmentsProjReal)} + savings ${fmt(savingsProjReal)}</div></div>
         ${pensions.length>0?`<div class="kpi"><div class="kpi-icon">🏛</div><div class="kpi-lbl">TOTAL PENSION INCOME</div><div class="kpi-val" style="color:var(--amber)">${fmt(getAllPensionIncome())}/mo</div><div class="kpi-sub">${pensions.length} pension plan${pensions.length!==1?'s':''} · ${earliestPension>state.retirementAge?`starts age ${earliestPension}`:'active at retirement'}</div></div>`:''}
       </div>
       ${assetRows}
