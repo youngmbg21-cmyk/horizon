@@ -332,6 +332,37 @@ input[type="number"] { -moz-appearance:textfield; }
 .line-item.line-item-paid .line-paid-box { opacity:1; }
 .line-item.line-item-paid .line-variance { opacity:.5; }
 
+/* ── CARRY-FORWARD LINE (auto-rolled cashflow chain) ────────────────
+   Rendered when get12Months() chains a month's leftover net flow into
+   the next month. Locked, non-editable, distinct violet border so the
+   user immediately sees this is a derived row driven by the previous
+   month — not something they can edit here. To change it, they edit
+   the source month upstream. */
+.line-item-carry {
+  display:flex; align-items:center; gap:8px;
+  padding:6px 10px; margin-bottom:6px;
+  background:var(--violet-dim); border:1px dashed var(--violet);
+  border-radius:5px; font-family:var(--fm); font-size:11px;
+  color:var(--text2); cursor:help;
+}
+.line-item-carry .line-carry-icon {
+  color:var(--violet); font-size:13px; font-weight:700; line-height:1;
+}
+.line-item-carry .line-carry-name {
+  flex:1; min-width:0; color:var(--text); font-weight:600;
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+}
+.line-item-carry .line-carry-amt {
+  font-weight:700; letter-spacing:.01em;
+}
+.line-item-carry .line-carry-amt.pos { color:var(--green); }
+.line-item-carry .line-carry-amt.neg { color:var(--red); }
+.line-item-carry .line-carry-pill {
+  font-size:9px; font-weight:700; letter-spacing:.08em;
+  padding:2px 7px; border-radius:3px; text-transform:uppercase;
+  background:var(--violet); color:#fff;
+}
+
 /* ── MONTH SELECTOR ──────────────────────────────────── */
 .month-pills { display:flex; gap:4px; overflow-x:auto; padding-bottom:6px; margin-bottom:12px; }
 .month-pill { background:var(--bg2); border:1px solid var(--border); border-radius:4px; padding:5px 10px; color:var(--text2); font-size:11px; cursor:pointer; white-space:nowrap; transition:all .2s; font-family:var(--fm); }
@@ -2147,16 +2178,77 @@ function getEffective(year, month) {
 function get12Months() {
   return memoSelect('12mo', () => {
     const months = [];
+    // Pass 1: build the 13-month window (current + 12 forward) from the
+    // raw effective values. carryForward is computed in pass 2 so each
+    // month's totals INCLUDE the rollover from the previous month.
     for (let i=0; i<=12; i++) {
       const d = new Date(CY, CM+i, 1);
       const year=d.getFullYear(), month=d.getMonth();
       const key=`${year}-${String(month+1).padStart(2,'0')}`;
       const v = getEffective(year, month);
-      months.push({ key, label:`${MONTH_NAMES[month]} ${year}`, short:`${MONTH_NAMES[month]} '${String(year).slice(2)}`,
-        income:v.income, expenses:v.expenses, savings:v.savings,
-        incomeItems:v.incomeItems, expenseItems:v.expenseItems,
-        surplus:v.income-v.expenses, funFund:v.income-v.expenses-v.savings,
-        isCurrent:i===0, hasOverride:v.hasOverride });
+      // CLONE the item arrays so the carry-forward synthetic items we
+      // append below cannot accidentally bleed back into state. The
+      // raw arrays in state.monthlyOverrides / yearlyBases / baseExpenses
+      // stay 100% user-authored — addMonthlyItem reads from getEffective
+      // which never sees the synthetic items.
+      const incomeItems  = (v.incomeItems  || []).slice();
+      const expenseItems = (v.expenseItems || []).slice();
+      months.push({
+        key,
+        label: `${MONTH_NAMES[month]} ${year}`,
+        short: `${MONTH_NAMES[month]} '${String(year).slice(2)}`,
+        savings: v.savings,
+        incomeItems, expenseItems,
+        // Income / expenses / surplus / funFund are filled in pass 2
+        // after the carry-forward is applied. They are not getters this
+        // time because the synthetic items mutate the arrays in pass 2.
+        income: 0, expenses: 0, surplus: 0, funFund: 0,
+        isCurrent: i===0, hasOverride: v.hasOverride,
+      });
+    }
+    // Pass 2: chain the months. For each month >= 1, look at the previous
+    // month's funFund (income − expenses − savings, INCLUDING any earlier
+    // carry-forward). A positive previous funFund becomes a synthetic
+    // income line in this month; a negative one becomes a synthetic
+    // expense line. The chain accumulates so a string of small surpluses
+    // or shortfalls reflects realistically across the 12-month window.
+    //
+    // Month 0 (the current month) starts the chain with no carry-in by
+    // design — the 12-month forward window is the conceptual scope of the
+    // app, and looking further back would require historical bank data
+    // we don't necessarily have.
+    for(let i = 0; i < months.length; i++){
+      const m = months[i];
+      if(i > 0){
+        const prev = months[i-1];
+        const carry = prev.funFund; // can be positive or negative
+        if(Math.round(carry) !== 0){
+          if(carry > 0){
+            m.incomeItems.push({
+              id: `carry-${m.key}`,
+              name: `Carry-forward from ${prev.short}`,
+              amount: Math.round(carry),
+              type: 'fixed',
+              carryForward: true,
+              fromKey: prev.key,
+            });
+          } else {
+            m.expenseItems.push({
+              id: `carry-${m.key}`,
+              name: `Deficit from ${prev.short}`,
+              amount: Math.round(Math.abs(carry)),
+              type: 'fixed',
+              carryForward: true,
+              fromKey: prev.key,
+            });
+          }
+        }
+      }
+      // Now compute totals for THIS month with the synthetic item baked in.
+      m.income   = sumArr(m.incomeItems,  'amount');
+      m.expenses = sumArr(m.expenseItems, 'amount');
+      m.surplus  = m.income - m.expenses;
+      m.funFund  = m.income - m.expenses - m.savings;
     }
     return months;
   });
@@ -3290,6 +3382,21 @@ function renderLineItems(containerId, items, stateKey, readOnly, showPaid) {
   const monthKey = typeof showPaid === 'string' ? showPaid : null;
   const paidMap = monthKey ? (state.paidFlags?.[monthKey] || {}) : {};
   el.innerHTML=items.map((it,idx)=>{
+    // Carry-forward synthetic rows — produced by get12Months() to chain
+    // months together — render as a locked, non-editable variant. Name,
+    // amount, type are display-only. No paid checkbox, no delete button.
+    // Visual treatment via .line-item-carry below.
+    if(it.carryForward){
+      const isInc = stateKey === 'baseIncome' || stateKey.startsWith('mo-inc') || stateKey.startsWith('yr-inc');
+      const arrow = isInc ? '↗' : '↘';
+      const tint  = isInc ? 'pos' : 'neg';
+      return `<div class="line-item line-item-carry" title="Auto-generated rollover from ${esc(it.name.replace(/^[A-Za-z\- ]+from /, ''))}. Edit the source month to change this value.">
+        <span class="line-carry-icon" aria-hidden="true">⇡</span>
+        <span class="line-carry-name">${esc(it.name)}</span>
+        <span class="line-carry-amt ${tint}">${arrow} ${fmt(it.amount)}</span>
+        <span class="line-carry-pill">ROLLOVER</span>
+      </div>`;
+    }
     const variance = actuals[it.id];
     let variancePill = '';
     if(variance && it.amount > 0) {
@@ -3713,9 +3820,20 @@ function renderTransactions() {
       </div>
     </div>
 
-    <!-- Spending chart — focal (hero) chart, takes the newly freed vertical space -->
+    <!-- Spending chart — focal (hero) chart, takes the newly freed vertical space.
+         Past/Next toggle: Past pulls from historical demo data; Next
+         pulls live from get12Months() so it reflects the user's current
+         Monthly Review state, including the cross-month carry-forward
+         chain. The toggle styling matches .scen-tabs / .ret-scen-bar
+         used on the Retire and Forecast & Review tabs. -->
     <div class="card">
-      <div class="card-title">📊 12-Month Spending vs Income Trend</div>
+      <div class="card-title" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px">
+        <span>📊 12-Month Spending vs Income Trend</span>
+        <div class="scen-tabs" style="margin:0">
+          <button class="scen-btn ${(state.txChartScope||'past')==='past'?'active':''}" onclick="setTxChartScope('past')">Past 12 Months</button>
+          <button class="scen-btn ${(state.txChartScope||'past')==='next'?'active':''}" onclick="setTxChartScope('next')">Next 12 Months</button>
+        </div>
+      </div>
       <div class="chart-wrap focal"><canvas id="tx-chart"></canvas></div>
     </div>
 
@@ -3734,10 +3852,27 @@ function renderTransactions() {
     const ctx=document.getElementById('tx-chart');
     if(ctx){
       const cd=chartDefaults();
-      const months=MONTH_NAMES.slice(4).concat(MONTH_NAMES.slice(0,4));
-      const income=[127000,127000,206000,131800,127000,127000,127000,127000,127000,127000,127000,127000];
-      const expenses=[132500,178264,88545,91500,103500,91500,108636,63945,81636,91500,56590,107090];
-      const net=income.map((v,i)=>v-expenses[i]);
+      const scope = state.txChartScope || 'past';
+      let months, income, expenses, net;
+      if(scope === 'next'){
+        // Next 12 Months — pulls live from get12Months() so the chart
+        // reflects exactly what the Forecast & Review / Monthly tab
+        // shows, including the cross-month carry-forward chain. We
+        // use the 12 forward months (skipping the current month at
+        // index 0) so "Next" means strictly future.
+        const all = get12Months();
+        const fwd = all.slice(1);
+        months   = fwd.map(m => m.short);
+        income   = fwd.map(m => m.income);
+        expenses = fwd.map(m => m.expenses);
+        net      = fwd.map(m => m.surplus);
+      } else {
+        // Past 12 Months — historical demo data (the original chart).
+        months=MONTH_NAMES.slice(4).concat(MONTH_NAMES.slice(0,4));
+        income=[127000,127000,206000,131800,127000,127000,127000,127000,127000,127000,127000,127000];
+        expenses=[132500,178264,88545,91500,103500,91500,108636,63945,81636,91500,56590,107090];
+        net=income.map((v,i)=>v-expenses[i]);
+      }
       // Focal chart — proportions scale up with the canvas. Bigger axis
       // fonts, more y-ticks, slightly heavier borders, added net-flow
       // overlay line for a second read on the trend.
@@ -3776,6 +3911,15 @@ function renderTransactions() {
     }
   },50);
 }
+window.setTxChartScope = function(scope){
+  if(scope !== 'past' && scope !== 'next') return;
+  state.txChartScope = scope;
+  save();
+  // Full re-render of the panel so the toggle's active-state and the
+  // chart datasource swap atomically. The scen-tabs styling already
+  // handles the visual update on the buttons themselves.
+  renderTransactions();
+};
 
 // ══ MONTHLY ══════════════════════════════════════════════════════════════════
 // ══ FORECAST & REVIEW — unified host for Monthly + Yearly ════════════════════
