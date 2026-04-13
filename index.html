@@ -343,8 +343,9 @@ input[type="number"] { -moz-appearance:textfield; }
   padding:6px 10px; margin-bottom:6px;
   background:var(--violet-dim); border:1px dashed var(--violet);
   border-radius:5px; font-family:var(--fm); font-size:11px;
-  color:var(--text2); cursor:help;
+  color:var(--text2);
 }
+.line-item-carry.line-item-carry-override { border-style:solid; }
 .line-item-carry .line-carry-icon {
   color:var(--violet); font-size:13px; font-weight:700; line-height:1;
 }
@@ -352,15 +353,30 @@ input[type="number"] { -moz-appearance:textfield; }
   flex:1; min-width:0; color:var(--text); font-weight:600;
   white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
 }
-.line-item-carry .line-carry-amt {
-  font-weight:700; letter-spacing:.01em;
+.line-item-carry .line-carry-amt-wrap {
+  display:flex; align-items:center; gap:3px;
+  background:var(--bg3); border:1px solid var(--violet);
+  border-radius:4px; padding:0 8px;
+  min-width:110px;
 }
-.line-item-carry .line-carry-amt.pos { color:var(--green); }
-.line-item-carry .line-carry-amt.neg { color:var(--red); }
+.line-item-carry .line-carry-cur { color:var(--text3); font-size:10px; }
+.line-item-carry .line-carry-amt-input {
+  background:transparent; border:none; color:var(--text);
+  font-family:var(--fm); font-size:12px; font-weight:700;
+  padding:4px 0; outline:none; width:100%; min-width:0;
+}
+.line-item-carry .line-carry-reset {
+  background:transparent; border:1px solid var(--violet);
+  color:var(--violet); font-family:var(--fm); font-size:9px; font-weight:700;
+  letter-spacing:.06em; text-transform:uppercase;
+  padding:3px 7px; border-radius:3px; cursor:pointer;
+  transition:background .15s, color .15s;
+}
+.line-item-carry .line-carry-reset:hover { background:var(--violet); color:#fff; }
 .line-item-carry .line-carry-pill {
   font-size:9px; font-weight:700; letter-spacing:.08em;
   padding:2px 7px; border-radius:3px; text-transform:uppercase;
-  background:var(--violet); color:#fff;
+  background:var(--violet); color:#fff; white-space:nowrap;
 }
 
 /* ── LINKED / EXTERNAL-ORIGIN LINE (editable, flagged) ──────────────
@@ -652,9 +668,38 @@ body.light .loc-card:hover { box-shadow:0 5px 14px -8px rgba(60,40,10,0.18); }
 @media (max-width:900px){ #retire-map { height:260px; } }
 
 /* ── FUN FUND ────────────────────────────────────────── */
-.trip-card { background:var(--bg2); border:1px solid var(--border); border-radius:10px; padding:12px; margin-bottom:8px; transition:all .2s; }
+.trip-card { background:var(--bg2); border:1px solid var(--border); border-radius:10px; padding:12px; margin-bottom:10px; transition:border-color .2s; }
 .trip-card:hover { border-color:var(--border2); }
-.trip-status { display:inline-block; font-size:9px; font-weight:700; letter-spacing:.1em; padding:2px 6px; border-radius:3px; font-family:var(--fm); }
+.trip-card-head { display:flex; align-items:flex-start; gap:10px; margin-bottom:10px; }
+.trip-card-icon { font-size:24px; line-height:1; padding-top:2px; }
+.trip-card-hd-body { flex:1; min-width:0; display:flex; flex-direction:column; gap:2px; }
+.trip-card-name { background:transparent; border:none; color:var(--text); font-family:var(--ff); font-size:15px; font-weight:700; padding:0; outline:none; width:100%; }
+.trip-card-country { background:transparent; border:none; color:var(--text2); font-family:var(--ff); font-size:11px; padding:0; outline:none; width:100%; }
+.trip-card-meta { display:grid; grid-template-columns: 1fr 1fr 1fr; gap:8px; margin-bottom:10px; }
+.trip-meta-field { display:flex; flex-direction:column; gap:3px; }
+.trip-meta-lbl { color:var(--text3); font-family:var(--fm); font-size:9px; letter-spacing:.08em; }
+.trip-meta-val { font-family:var(--fm); font-size:13px; font-weight:700; padding:5px 8px; background:var(--bg3); border:1px solid var(--border); border-radius:5px; }
+.trip-meta-val-wrap { display:flex; align-items:center; gap:3px; background:var(--bg3); border:1px solid var(--border); border-radius:5px; padding:0 8px; }
+.trip-meta-cur { color:var(--text3); font-size:10px; }
+.trip-meta-amt { background:transparent; border:none; color:var(--text); font-family:var(--fm); font-size:12px; padding:5px 0; outline:none; width:100%; }
+.trip-meta-sel { background:var(--bg3); border:1px solid var(--border); border-radius:5px; padding:5px 8px; color:var(--text2); font-size:11px; outline:none; width:100%; }
+.trip-exp-list { background:var(--bg3); border:1px dashed var(--border); border-radius:8px; padding:8px; margin-bottom:10px; }
+.trip-exp-hd { display:flex; align-items:center; justify-content:space-between; margin-bottom:6px; }
+.trip-exp-hd-lbl { color:var(--text3); font-family:var(--fm); font-size:9px; letter-spacing:.1em; font-weight:700; }
+.trip-exp-add { background:transparent; border:1px dashed var(--border2); color:var(--text2); font-family:var(--fm); font-size:10px; font-weight:600; padding:3px 8px; border-radius:4px; cursor:pointer; transition:border-color .2s, color .2s; }
+.trip-exp-add:hover { border-color:var(--violet); color:var(--violet); }
+.trip-exp-row { display:grid; grid-template-columns: 1.4fr .9fr .9fr 22px; gap:6px; align-items:center; padding:4px 0; }
+.trip-exp-row + .trip-exp-row { border-top:1px solid var(--border); }
+.trip-exp-name { background:var(--bg2); border:1px solid var(--border); border-radius:4px; padding:5px 8px; color:var(--text); font-family:var(--ff); font-size:12px; outline:none; min-width:0; }
+.trip-exp-date { background:var(--bg2); border:1px solid var(--border); border-radius:4px; padding:5px 8px; color:var(--text); font-family:var(--fm); font-size:11px; outline:none; color-scheme:dark; min-width:0; }
+.trip-exp-amt-wrap { display:flex; align-items:center; gap:3px; background:var(--bg2); border:1px solid var(--border); border-radius:4px; padding:0 8px; min-width:0; }
+.trip-exp-cur { color:var(--text3); font-size:10px; }
+.trip-exp-amt { background:transparent; border:none; color:var(--text); font-family:var(--fm); font-size:12px; padding:5px 0; outline:none; width:100%; min-width:0; }
+.trip-exp-empty { color:var(--text3); font-size:11px; font-style:italic; padding:6px 4px; }
+.trip-progress { height:5px; background:var(--bg3); border-radius:3px; overflow:hidden; }
+.trip-progress-bar { height:100%; border-radius:3px; transition:width .25s; }
+.trip-progress-meta { display:flex; justify-content:space-between; font-size:10px; color:var(--text3); margin-top:4px; font-family:var(--fm); }
+.trip-status { display:inline-block; font-size:9px; font-weight:700; letter-spacing:.1em; padding:2px 6px; border-radius:3px; font-family:var(--fm); white-space:nowrap; flex-shrink:0; }
 .trip-status.planning { background:var(--blue-dim); color:var(--blue); }
 .trip-status.booked { background:var(--green-dim); color:var(--green); }
 .trip-status.wishlist { background:var(--violet-dim); color:var(--violet); }
@@ -1892,9 +1937,23 @@ function defaultState() {
     // Fun Fund & Trips
     funFundMonthly:27000,
     trips:[
-      {id:genId(),name:'Paris',country:'France',budget:50000,spent:0,date:'2026-05',status:'planning',icon:'🗼'},
-      {id:genId(),name:'Chicago',country:'USA',budget:80000,spent:0,date:'2026-07',status:'booked',icon:'🌆'},
-      {id:genId(),name:'Cape Town & Nairobi',country:'South Africa / Kenya',budget:130000,spent:0,date:'2026-12',status:'planning',icon:'🦁'},
+      // Each trip carries an `expenses` array — every entry has its
+      // own month + amount so a single trip can spread costs across
+      // several months (e.g. flights booked in May, hotel + on-trip
+      // spend in August). get12Months() injects each expense as a
+      // synthetic Monthly Review row on its scheduled month.
+      {id:genId(),name:'Paris',country:'France',spent:0,status:'planning',icon:'🗼',expenses:[
+        {id:genId(),name:'Flights',         date:'2026-05',amount:18000},
+        {id:genId(),name:'Hotel & on-trip', date:'2026-08',amount:32000},
+      ]},
+      {id:genId(),name:'Chicago',country:'USA',spent:0,status:'booked',icon:'🌆',expenses:[
+        {id:genId(),name:'Flights',         date:'2026-06',amount:22000},
+        {id:genId(),name:'Hotel & on-trip', date:'2026-07',amount:58000},
+      ]},
+      {id:genId(),name:'Cape Town & Nairobi',country:'South Africa / Kenya',spent:0,status:'planning',icon:'🦁',expenses:[
+        {id:genId(),name:'Flights',         date:'2026-10',amount:42000},
+        {id:genId(),name:'Hotel & on-trip', date:'2026-12',amount:88000},
+      ]},
     ],
 
     // Bank connection
@@ -2065,7 +2124,7 @@ window.dr = function(name){ return window.commitRender(name); };
 // ─── PERSISTENCE ────────────────────────────────────────────────────────────
 // State schema version. Bump this and add a branch to migrate() whenever the
 // shape of `state` changes in a backwards-incompatible way.
-const STATE_VERSION = 8;
+const STATE_VERSION = 9;
 function migrate(s) {
   const from = s.version || 1;
   if(from >= STATE_VERSION) { s.version = STATE_VERSION; return s; }
@@ -2127,6 +2186,21 @@ function migrate(s) {
     if(s.citizenship === undefined) s.citizenship = null;
     if(s.homeBase === undefined)    s.homeBase = null;
     if(!Array.isArray(s.vault))     s.vault = [];
+  }
+  // v8 → v9: trips carry multiple expense entries. Legacy trips had a
+  // single `budget` + `date` pair; collapse that into a one-item
+  // `expenses` array so the new code has a uniform shape to read.
+  if(from < 9) {
+    (s.trips || []).forEach(t => {
+      if(Array.isArray(t.expenses)) return;
+      const amount = Number(t.budget) || 0;
+      const date = t.date || `${CY}-06`;
+      t.expenses = amount > 0 || t.budget != null
+        ? [{ id: genId(), name: 'Budget', date, amount }]
+        : [];
+      delete t.budget;
+      delete t.date;
+    });
   }
   s.version = STATE_VERSION;
   return s;
@@ -2225,22 +2299,28 @@ function get12Months() {
       // which never sees the synthetic items.
       const incomeItems  = (v.incomeItems  || []).slice();
       const expenseItems = (v.expenseItems || []).slice();
-      // Inject Fun Fund trips as synthetic expense items on their
-      // scheduled month. These rows are flagged `fromTrip:true` so
-      // renderLineItems styles them as "linked" (purple/lime) and
-      // edits write back to state.trips — keeping the Fun Fund tab
-      // and Monthly Review in lockstep as a single source of truth.
+      // Inject Fun Fund trip expenses as synthetic expense items on
+      // their scheduled month. A single trip may carry multiple
+      // expense entries (e.g. flights in May + hotel in August); each
+      // one lands in its own month. Rows are flagged `fromTrip:true`
+      // so renderLineItems styles them as "linked" (purple/lime) and
+      // edits write back to state.trips[].expenses — keeping the Fun
+      // Fund tab and Monthly Review in lockstep.
       (state.trips || []).forEach(t => {
-        const tripKey = (t.date || '').slice(0, 7);
-        if(tripKey !== key) return;
-        if(!(t.budget > 0)) return;
-        expenseItems.push({
-          id: `trip-${t.id}`,
-          name: `✈️ Trip: ${t.name || 'Untitled trip'}`,
-          amount: t.budget,
-          type: 'variable',
-          fromTrip: true,
-          tripId: t.id,
+        const icon = t.icon || '✈️';
+        (t.expenses || []).forEach(ex => {
+          const k = (ex.date || '').slice(0, 7);
+          if(k !== key) return;
+          if(!(Number(ex.amount) > 0)) return;
+          expenseItems.push({
+            id: `trip-${t.id}-${ex.id}`,
+            name: `${icon} ${t.name || 'Trip'} · ${ex.name || 'Expense'}`,
+            amount: Number(ex.amount) || 0,
+            type: 'variable',
+            fromTrip: true,
+            tripId: t.id,
+            tripExpenseId: ex.id,
+          });
         });
       });
       // "Pure" values — Income / Expenses / Fun Fund computed STRICTLY
@@ -2281,11 +2361,17 @@ function get12Months() {
     // design — the 12-month forward window is the conceptual scope of the
     // app, and looking further back would require historical bank data
     // we don't necessarily have.
+    const carryOverrides = state.carryOverrides || {};
     for(let i = 0; i < months.length; i++){
       const m = months[i];
       if(i > 0){
         const prev = months[i-1];
-        const carry = prev.funFund; // can be positive or negative
+        // If the user has manually overridden this month's carry-forward
+        // value (by editing the row in the Monthly Review tab), honour
+        // that figure. Otherwise fall back to the computed chain.
+        const ovRaw = carryOverrides[m.key];
+        const hasOverride = (ovRaw != null && ovRaw !== '');
+        const carry = hasOverride ? Number(ovRaw) : prev.funFund;
         if(Math.round(carry) !== 0){
           if(carry > 0){
             m.incomeItems.push({
@@ -2295,6 +2381,7 @@ function get12Months() {
               type: 'fixed',
               carryForward: true,
               fromKey: prev.key,
+              overridden: hasOverride,
             });
           } else {
             m.expenseItems.push({
@@ -2304,6 +2391,7 @@ function get12Months() {
               type: 'fixed',
               carryForward: true,
               fromKey: prev.key,
+              overridden: hasOverride,
             });
           }
         }
@@ -2842,32 +2930,128 @@ bus.on('state:changed', (data)=>{
   markDirtyExcept(active);
 });
 
+// ── TARGETED LIVE-SYNC CHART PATCHING ───────────────────────────────────────
+// Subscribed from the main state:changed listener below. For every
+// chart that has a stable key in `charts`, we rebuild its dataset
+// arrays from the latest get12Months() result and call
+// chart.update('none') — zero-animation, no canvas teardown — so the
+// visible chart reflects the edit without any visual flash or layout
+// shift. This replaces the old "rebuild the entire panel" path.
+function _liveSyncCharts(){
+  if(typeof get12Months !== 'function') return;
+  const months = get12Months();
+  const fwd = months.slice(1);
+  const first12 = months.slice(0, 12);
+  const patch = (id, map) => {
+    const ch = charts && charts[id];
+    if(!ch || !ch.data || !Array.isArray(ch.data.datasets)) return;
+    ch.data.datasets.forEach(ds => {
+      const fn = map[ds.label];
+      if(fn) ds.data = fn();
+    });
+    try { ch.update('none'); } catch(e){}
+  };
+  // Dashboard — 12-Month Cash Flow (mixed bar + line)
+  patch('dash-cf', {
+    'Income':   () => months.map(m => m.pureIncome),
+    'Expenses': () => months.map(m => m.pureExpenses),
+    'Savings':  () => months.map(m => m.savings),
+    'Fun Fund': () => months.map(m => m.pureFunFund),
+  });
+  // Monthly Review — 12-Month Forward Overview
+  patch('mo', {
+    'Income':   () => months.map(m => m.pureIncome),
+    'Expenses': () => months.map(m => m.pureExpenses),
+    'Savings':  () => months.map(m => m.savings),
+    'Fun Fund': () => months.map(m => Math.max(0, m.pureFunFund)),
+  });
+  // Transactions — Next 12 Months spending chart (next scope only)
+  patch('tx', {
+    'Income':   () => fwd.map(m => m.pureIncome),
+    'Expenses': () => fwd.map(m => m.pureExpenses),
+    'Savings':  () => fwd.map(m => m.savings),
+    'Fun Fund': () => fwd.map(m => Math.max(0, m.pureFunFund)),
+  });
+  // Fun Fund vs Travel Budget by Month
+  const tripByMonth = {};
+  (state.trips || []).forEach(t => (t.expenses || []).forEach(ex => {
+    const k = (ex.date || '').slice(0, 7);
+    if(k) tripByMonth[k] = (tripByMonth[k] || 0) + (Number(ex.amount) || 0);
+  }));
+  patch('ff', {
+    'Fun Fund':    () => first12.map(m => Math.max(0, m.pureFunFund)),
+    'Trip Budget': () => first12.map(m => tripByMonth[m.key] || 0),
+  });
+}
+if(typeof bus !== 'undefined'){
+  bus.on('state:liveSync', _liveSyncCharts);
+  // Monthly Review: patch the Month Summary bar + four numeric
+  // readouts in place too, so typing into any line item live-updates
+  // the visible per-month totals without rebuilding the panel.
+  bus.on('state:liveSync', () => {
+    if(state.activePanel === 'review' && state.reviewScope !== 'yearly'){
+      if(typeof liveSyncMonthlyReview === 'function'){
+        try { liveSyncMonthlyReview(); } catch(e){}
+      }
+    }
+  });
+}
+
 // ── LIVE REACTIVITY ─────────────────────────────────────────────────────────
-// Every save() emits `state:changed`. We debounce briefly so a burst of
-// keystrokes collapses into one render, then re-render the ticker, the
-// sidebar mini-widget, AND the active panel so every table, chart, and
-// summary across the platform reflects the latest input immediately —
-// no refresh, no tab switch. Focus is captured before the re-render and
-// restored on the next frame via restoreFocusKey(), so the input the
-// user is typing into is never stolen.
+// Every save() emits `state:changed`. The pipeline below eliminates the
+// old "rebuild the whole panel on every keystroke" shake while keeping
+// the platform reactive:
+//
+//   Step 1 (~200 ms after the last change):
+//     · renderTicker + updateSidebar          — lightweight chrome
+//     · bus.emit('state:liveSync')             — per-chart in-place
+//                                                patch via _liveSyncCharts
+//     These paths never replace innerHTML or steal focus, so they
+//     can safely run while the user is still editing an input.
+//
+//   Step 2 (deferred full rebuild):
+//     · If the user is NOT currently focused in an input, the active
+//       panel is re-rendered right after step 1.
+//     · If they ARE editing, the rebuild is marked pending and flushed
+//       as soon as focus leaves an editable field (see focusout hook
+//       below). This stops the typing-shake completely — we never
+//       destroy the DOM the user is typing into.
 let _liveRenderTimer = null;
+let _pendingFullRender = false;
+function _isEditingNow(){
+  const ae = document.activeElement;
+  return !!(ae && (ae.tagName === 'INPUT' || ae.tagName === 'TEXTAREA' || ae.tagName === 'SELECT') && !ae.disabled);
+}
+function _flushFullRender(){
+  if(!_pendingFullRender) return;
+  if(_isEditingNow()) return;
+  _pendingFullRender = false;
+  try {
+    const active = state.activePanel || 'dashboard';
+    if(typeof renderPanel   === 'function') renderPanel(active);
+    if(typeof decoratePanel === 'function') decoratePanel(active);
+    if(typeof updateScopeChip === 'function') updateScopeChip();
+  } catch(e){ console.warn('live render failed', e); }
+}
 bus.on('state:changed', () => {
   clearTimeout(_liveRenderTimer);
   _liveRenderTimer = setTimeout(() => {
-    const fk = (typeof captureFocusKey === 'function') ? captureFocusKey() : null;
     try {
-      if(typeof renderTicker     === 'function') renderTicker();
-      if(typeof updateSidebar    === 'function') updateSidebar();
-      const active = state.activePanel || 'dashboard';
-      if(typeof renderPanel === 'function') renderPanel(active);
-      if(typeof decoratePanel === 'function') decoratePanel(active);
-      if(typeof updateScopeChip === 'function') updateScopeChip();
-    } catch(e) { console.warn('live render failed', e); }
-    if(fk && typeof restoreFocusKey === 'function'){
-      requestAnimationFrame(() => restoreFocusKey(fk));
-    }
-  }, 180);
+      if(typeof renderTicker  === 'function') renderTicker();
+      if(typeof updateSidebar === 'function') updateSidebar();
+      if(typeof bus !== 'undefined') bus.emit('state:liveSync', { panel: state.activePanel });
+    } catch(e){ console.warn('live sync failed', e); }
+    _pendingFullRender = true;
+    _flushFullRender();
+  }, 200);
 });
+// Flush the pending full rebuild the moment the user leaves an
+// input — the 60 ms delay lets focus settle on the next field (Tab
+// between fields in the same table) before we decide whether they
+// are still editing.
+document.addEventListener('focusout', () => {
+  setTimeout(_flushFullRender, 60);
+}, true);
 bus.on('panel:changed', (data)=>{
   if(data&&data.panel) clearDirty(data.panel);
 });
@@ -3061,6 +3245,15 @@ function createWorldMap(containerId, points, opts){
 function decoratePanel(panel){
   const meta = PANEL_META[panel]; if(!meta) return;
   const panelEl = document.getElementById('panel-'+panel); if(!panelEl) return;
+  // Clear any previously-appended chrome before re-rendering. Some
+  // panels (notably Forecast & Review) mount their body into a nested
+  // host — .ph / .related-row from a prior visit sit on the outer
+  // panel element and would otherwise accumulate each time the panel
+  // is re-rendered, producing duplicate "Next ↗" link rows and
+  // stacked breadcrumbs. Removing them first makes decoratePanel
+  // idempotent regardless of how many times it's called per panel.
+  panelEl.querySelectorAll(':scope > .related-row').forEach(n => n.remove());
+  panelEl.querySelectorAll('.breadcrumb').forEach(n => n.remove());
   // 1) Breadcrumb: prepend inside the .ph header (or before first child).
   const ph = panelEl.querySelector('.ph');
   const crumb = document.createElement('div');
@@ -3386,7 +3579,11 @@ function renderTicker() {
 function renderCurrencyToggle() {
   const el = document.getElementById('cur-toggle');
   if(!el) return;
-  el.innerHTML = Object.keys(CURRENCY_SYMBOLS).map(c=>`<button class="cur-btn ${c===state.currency?'active':''}" onclick="state.currency='${c}';save();renderAll()">${c}</button>`).join('');
+  // Currency toggle: write state and fire save(). The live listener
+  // takes care of the follow-up render once the click handler returns
+  // — avoiding a double render (and the associated layout flash) that
+  // an explicit renderAll() here would cause.
+  el.innerHTML = Object.keys(CURRENCY_SYMBOLS).map(c=>`<button class="cur-btn ${c===state.currency?'active':''}" onclick="state.currency='${c}';save()">${c}</button>`).join('');
 }
 
 // ─── THEME ─────────────────────────────────────────────────────────────────
@@ -3519,27 +3716,36 @@ function renderLineItems(containerId, items, stateKey, readOnly, showPaid) {
     // NOT originate in the Monthly Review tab and that edits have
     // downstream effects.
     if(it.fromTrip){
-      return `<div class="line-item line-item-linked" title="Linked from Fun Fund · Trip. Editing the amount updates the trip's budget — open the Fun Fund tab to change the name, date, or status.">
+      return `<div class="line-item line-item-linked" title="Linked from Fun Fund · Trip. Editing the amount updates the trip expense — open the Fun Fund tab to change the name, date, or add/remove lines.">
         <span class="line-linked-icon" aria-hidden="true">✈︎</span>
         <input class="line-name" value="${esc(it.name)}" disabled>
-        <div class="line-amt-wrap"><span class="line-cur">${s}</span><input class="line-amt" type="number" value="${Math.round(it.amount*r)}" oninput="updateLinkedTripAmount('${it.tripId}',this.value/${r})"></div>
+        <div class="line-amt-wrap"><span class="line-cur">${s}</span><input class="line-amt" type="number" value="${Math.round(it.amount*r)}" oninput="updateLinkedTripAmount('${it.tripId}','${it.tripExpenseId}',this.value/${r})"></div>
         <span class="line-linked-src">Fun Fund</span>
         <span class="line-linked-pill trip">TRIP</span>
       </div>`;
     }
     // Carry-forward synthetic rows — produced by get12Months() to chain
-    // months together — render as a locked, non-editable variant. Name,
-    // amount, type are display-only. No paid checkbox, no delete button.
-    // Visual treatment via .line-item-carry below.
+    // months together. The row is editable in place: typing a new
+    // value writes to state.carryOverrides[monthKey], which the next
+    // get12Months() call reads back instead of the computed chain.
+    // An override badge + "reset" button let the user clear their
+    // manual value and fall back to the auto figure.
     if(it.carryForward){
       const isInc = stateKey === 'baseIncome' || stateKey.startsWith('mo-inc') || stateKey.startsWith('yr-inc');
-      const arrow = isInc ? '↗' : '↘';
-      const tint  = isInc ? 'pos' : 'neg';
-      return `<div class="line-item line-item-carry" title="Auto-generated rollover from ${esc(it.name.replace(/^[A-Za-z\- ]+from /, ''))}. Edit the source month to change this value.">
+      const signed = isInc ? 1 : -1; // rolled-in surplus is positive, deficit negative
+      // monthKey is the month the rolled-in value lands in — encoded
+      // into the synthetic item's id as `carry-<YYYY-MM>`.
+      const monthKey = (it.id || '').replace(/^carry-/, '');
+      const resetBtn = it.overridden
+        ? `<button class="line-carry-reset" onclick="resetCarryOverride('${monthKey}')" title="Reset to the auto-computed rollover">reset</button>`
+        : '';
+      const pillText = it.overridden ? 'OVERRIDDEN' : 'ROLLOVER';
+      return `<div class="line-item line-item-carry${it.overridden?' line-item-carry-override':''}" title="Auto-generated rollover from ${esc((it.name||'').replace(/^[A-Za-z\- ]+from /, ''))}. Edit the amount to override, or click reset to restore the computed chain.">
         <span class="line-carry-icon" aria-hidden="true">⇡</span>
         <span class="line-carry-name">${esc(it.name)}</span>
-        <span class="line-carry-amt ${tint}">${arrow} ${fmt(it.amount)}</span>
-        <span class="line-carry-pill">ROLLOVER</span>
+        <div class="line-carry-amt-wrap"><span class="line-carry-cur">${s}</span><input class="line-carry-amt-input" type="number" value="${Math.round(it.amount*r)}" oninput="setCarryOverride('${monthKey}',${signed}*this.value/${r})"></div>
+        ${resetBtn}
+        <span class="line-carry-pill">${pillText}</span>
       </div>`;
     }
     const variance = actuals[it.id];
@@ -3587,16 +3793,32 @@ function updateLineItem(key,id,field,val) {
   item[field]=field==='amount'?+val:val;
   save();
 }
+// Rollover carry-forward overrides. state.carryOverrides is a map of
+// `YYYY-MM` → signed amount (positive = income rolled in, negative =
+// deficit rolled in). get12Months() reads this and short-circuits
+// the computed chain when a key is present.
+window.setCarryOverride = function(monthKey, amt){
+  if(!state.carryOverrides) state.carryOverrides = {};
+  state.carryOverrides[monthKey] = Number(amt) || 0;
+  save();
+};
+window.resetCarryOverride = function(monthKey){
+  if(state.carryOverrides && monthKey in state.carryOverrides){
+    delete state.carryOverrides[monthKey];
+    save();
+  }
+};
 // Editing the amount on a linked trip row (rendered by
-// renderLineItems) writes straight through to state.trips[].budget.
-// We call renderAll() so the Fun Fund tab's KPIs, trip card, and
-// every other chart/table reflect the change live.
-window.updateLinkedTripAmount = function(tripId, val){
+// renderLineItems) writes straight through to the matching entry in
+// state.trips[].expenses. We call renderAll() so the Fun Fund tab's
+// KPIs, trip card, and every other chart/table reflect the change live.
+window.updateLinkedTripAmount = function(tripId, expenseId, val){
   const t = (state.trips || []).find(x => x.id === tripId);
   if(!t) return;
-  t.budget = +val || 0;
+  const ex = (t.expenses || []).find(e => e.id === expenseId);
+  if(!ex) return;
+  ex.amount = +val || 0;
   save();
-  if(typeof renderAll === 'function') renderAll();
 };
 function removeLineItem(key,id) {
   const arr=resolveKey(key); if(!arr) return;
@@ -3860,20 +4082,19 @@ function renderDashboard() {
     const cf=document.getElementById('dash-cashflow-chart');
     if(cf) {
       charts['dash-cf']=new Chart(cf.getContext('2d'),{
-        type:'line',
+        type:'bar',
         data:{
           labels:months.map(m=>m.short),
           datasets:[
             // Dashboard cash flow — pure per-month values so the
-            // Income / Expenses / Fun Fund lines plotted here agree
+            // Income / Expenses / Savings / Fun Fund series agree
             // one-for-one with the Fun Fund tab and the Monthly
-            // Review inputs. (The carry-forward chain remains available
-            // in the Forecast & Review → Monthly tab when the user
-            // wants to see rollovers explicitly.)
-            {label:'Income',data:months.map(m=>m.pureIncome),borderColor:'#00e8a0',backgroundColor:'#00e8a012',fill:true,tension:.35,pointRadius:2,borderWidth:2},
-            {label:'Expenses',data:months.map(m=>m.pureExpenses),borderColor:'#ff4d6d',backgroundColor:'#ff4d6d10',fill:true,tension:.35,pointRadius:2,borderWidth:2},
-            {label:'Savings',data:months.map(m=>m.savings),borderColor:'#f5a623',backgroundColor:'transparent',fill:false,tension:.35,pointRadius:2,borderWidth:1.5},
-            {label:'Fun Fund',data:months.map(m=>m.pureFunFund),borderColor:'#00d4ff',fill:false,tension:.35,pointRadius:2,borderWidth:1.5,borderDash:[4,3]},
+            // Review inputs. Income + Expenses as bars, Savings +
+            // Fun Fund as overlay lines for the mixed-chart read.
+            {label:'Income',  data:months.map(m=>m.pureIncome),  backgroundColor:'#00e8a022',borderColor:'#00e8a0',borderWidth:1.5,borderRadius:4,order:2,categoryPercentage:0.7,barPercentage:0.85},
+            {label:'Expenses',data:months.map(m=>m.pureExpenses),backgroundColor:'#ff4d6d1c',borderColor:'#ff4d6d',borderWidth:1.5,borderRadius:4,order:2,categoryPercentage:0.7,barPercentage:0.85},
+            {label:'Savings', data:months.map(m=>m.savings),     type:'line',borderColor:'#f5a623',backgroundColor:'transparent',fill:false,tension:.35,pointRadius:2,pointHoverRadius:4,pointBackgroundColor:'#f5a623',borderWidth:1.75,order:1},
+            {label:'Fun Fund',data:months.map(m=>m.pureFunFund), type:'line',borderColor:'#00d4ff',backgroundColor:'transparent',fill:false,tension:.35,pointRadius:2,pointHoverRadius:4,pointBackgroundColor:'#00d4ff',borderWidth:1.75,borderDash:[4,3],order:1},
           ]
         },
         options:chartPreset()
@@ -4043,35 +4264,19 @@ function renderTransactions() {
         savings  = fwd.map(m => m.savings);
         funFund  = fwd.map(m => Math.max(0, m.pureFunFund));
       } else {
-        // Past 12 Months — aggregated STRICTLY from the user's actual
-        // bank transactions (state.transactions). Each of the last 12
-        // calendar months gets its own bucket; credits roll up into
-        // Income, debits into Expenses, and Net Flow is the derived
-        // difference. Months with no transaction history show zero —
-        // the chart is an honest view of what actually happened, not
-        // a hardcoded demo array.
-        const buckets = [];
+        // Past 12 Months — demo bank history. This view is a rolling
+        // 12-month retrospective driven by the canonical demo arrays
+        // so the chart always has a full, realistic shape regardless
+        // of how much live transaction data is loaded.
+        const dMonths = [];
         for(let i = 11; i >= 0; i--){
           const d = new Date(CY, CM - i, 1);
-          const key = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
-          buckets.push({
-            key,
-            short: `${MONTH_NAMES[d.getMonth()]} '${String(d.getFullYear()).slice(2)}`,
-            income: 0, expenses: 0,
-          });
+          dMonths.push(`${MONTH_NAMES[d.getMonth()]} '${String(d.getFullYear()).slice(2)}`);
         }
-        const byKey = Object.fromEntries(buckets.map(b => [b.key, b]));
-        (state.transactions || []).forEach(tx => {
-          const k = (tx.date || '').slice(0, 7);
-          const b = byKey[k];
-          if(!b) return;
-          if(tx.type === 'credit') b.income   += Math.abs(tx.amount);
-          else                     b.expenses += Math.abs(tx.amount);
-        });
-        labels   = buckets.map(b => b.short);
-        income   = buckets.map(b => b.income);
-        expenses = buckets.map(b => b.expenses);
-        net      = income.map((v, i) => v - expenses[i]);
+        labels   = dMonths;
+        income   = [127000,127000,206000,131800,127000,127000,127000,127000,127000,127000,127000,127000];
+        expenses = [132500,178264,88545,91500,103500,91500,108636,63945,81636,91500,56590,107090];
+        net      = income.map((v,i) => v - expenses[i]);
       }
       // Focal chart — Next scope keeps the four-series forward overlay
       // (Income / Expenses / Savings / Fun Fund). Past scope narrows to
@@ -5317,62 +5522,71 @@ function renderFunFund() {
   // Forecast & Review → Monthly tab shows).
   const months=allMonths.slice(0,12);
   const totalFF=months.reduce((s,m)=>s+m.pureFunFund,0);
-  const totalTrips=state.trips.reduce((s,t)=>s+t.budget,0);
-  const totalSpent=state.trips.reduce((s,t)=>s+t.spent,0);
+  const tripBudget = (t) => (t.expenses || []).reduce((s,ex)=>s + (Number(ex.amount)||0), 0);
+  const totalTrips=state.trips.reduce((s,t)=>s+tripBudget(t),0);
+  const totalSpent=state.trips.reduce((s,t)=>s+(Number(t.spent)||0),0);
   const remaining=totalFF-totalTrips;
   const r=rate(); const s=sym();
-  const statusColors={planning:'var(--blue)',booked:'var(--green)',wishlist:'var(--violet)',completed:'var(--text3)'};
 
-  const tripCards=state.trips.map((t,idx)=>{
-    const spentPct=t.budget>0?Math.round(t.spent/t.budget*100):0;
-    // Normalise to a "YYYY-MM" string for the <input type="month">.
-    const ymDate = (t.date||'').slice(0,7);
-    // Human label used under the trip name.
-    let dateLabel = t.date || '—';
-    if(/^\d{4}-\d{2}$/.test(ymDate)){
-      const [yy,mm] = ymDate.split('-').map(Number);
-      dateLabel = `${MONTH_NAMES[mm-1]} ${yy}`;
-    }
+  const tripCards=state.trips.map((t)=>{
+    const budget = tripBudget(t);
+    const spentPct = budget > 0 ? Math.round((Number(t.spent)||0) / budget * 100) : 0;
+    // Per-expense rows — each carries its own month + amount so a
+    // single trip can spread costs across several months (e.g.
+    // flights in May, hotel in August). Each row is wired straight
+    // back to state.trips[].expenses via handler helpers, and
+    // get12Months() mirrors them into the Monthly Review tab as
+    // purple/lime "linked" lines.
+    const expenseRows = (t.expenses || []).map((ex, exIdx) => {
+      const ym = (ex.date || '').slice(0,7);
+      return `<div class="trip-exp-row">
+        <input class="trip-exp-name" value="${esc(ex.name || '')}" placeholder="e.g. Flights, hotel, shopping…" oninput="updateTripExpense('${t.id}','${ex.id}','name',this.value)">
+        <input type="month" class="trip-exp-date" value="${ym}" onchange="updateTripExpense('${t.id}','${ex.id}','date',this.value)" title="Month this cost lands in the Monthly Review tab">
+        <div class="trip-exp-amt-wrap"><span class="trip-exp-cur">${s}</span><input class="trip-exp-amt" type="number" value="${Math.round((Number(ex.amount)||0)*r)}" oninput="updateTripExpense('${t.id}','${ex.id}','amount',this.value/${r})"></div>
+        <button class="line-rm" onclick="removeTripExpense('${t.id}','${ex.id}')" title="Remove this expense">×</button>
+      </div>`;
+    }).join('');
     return `<div class="trip-card">
-      <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
-        <span style="font-size:24px">${t.icon||'✈️'}</span>
-        <div style="flex:1">
-          <input class="line-name" value="${esc(t.name)}" placeholder="Trip name" style="background:transparent;border:none;color:var(--text);font-family:var(--ff);font-size:15px;font-weight:700;padding:0;outline:none;width:100%" oninput="state.trips[${idx}].name=this.value;save()" onchange="commitRender('renderAll')">
-          <div style="font-size:11px;color:var(--text2)">${esc(t.country||'')} · <span style="color:var(--violet);font-weight:600">${dateLabel}</span></div>
+      <div class="trip-card-head">
+        <span class="trip-card-icon">${t.icon||'✈️'}</span>
+        <div class="trip-card-hd-body">
+          <input class="trip-card-name" value="${esc(t.name)}" placeholder="Trip name" oninput="updateTripField('${t.id}','name',this.value)">
+          <input class="trip-card-country" value="${esc(t.country||'')}" placeholder="Country / region" oninput="updateTripField('${t.id}','country',this.value)">
         </div>
         <span class="trip-status ${t.status}">${t.status.toUpperCase()}</span>
-        <button class="line-rm" onclick="removeTrip('${t.id}')">×</button>
+        <button class="line-rm" onclick="removeTrip('${t.id}')" title="Remove trip">×</button>
       </div>
-      <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:8px;font-size:11px;margin-bottom:10px">
-        <div><div style="color:var(--text3);font-family:var(--fm);font-size:9px;letter-spacing:.08em;margin-bottom:2px">MONTH</div>
-          <input type="month" value="${ymDate}" style="background:var(--bg3);border:1px solid var(--border);border-radius:5px;padding:4px 8px;color:var(--text);font-family:var(--fm);font-size:11px;outline:none;width:100%;color-scheme:dark" onchange="updateTripDate('${t.id}',this.value)" title="Schedule the trip to a month — the budget will auto-appear as a Trip line in that month's Monthly Review tab">
-        </div>
-        <div><div style="color:var(--text3);font-family:var(--fm);font-size:9px;letter-spacing:.08em;margin-bottom:2px">BUDGET</div>
-          <div style="display:flex;align-items:center;gap:3px;background:var(--bg3);border:1px solid var(--border);border-radius:5px;padding:0 8px">
-            <span style="color:var(--text3);font-size:10px">${s}</span>
-            <input type="number" style="background:transparent;border:none;color:var(--text);font-family:var(--fm);font-size:12px;padding:5px 0;outline:none;width:100%" value="${Math.round(t.budget*r)}" oninput="state.trips[${idx}].budget=this.value/${r};save()" onchange="commitRender('renderAll')">
-          </div>
-        </div>
-        <div><div style="color:var(--text3);font-family:var(--fm);font-size:9px;letter-spacing:.08em;margin-bottom:2px">SPENT</div>
-          <div style="display:flex;align-items:center;gap:3px;background:var(--bg3);border:1px solid var(--border);border-radius:5px;padding:0 8px">
-            <span style="color:var(--text3);font-size:10px">${s}</span>
-            <input type="number" style="background:transparent;border:none;color:var(--text);font-family:var(--fm);font-size:12px;padding:5px 0;outline:none;width:100%" value="${Math.round(t.spent*r)}" oninput="state.trips[${idx}].spent=this.value/${r};save()" onchange="commitRender('renderAll')">
-          </div>
-        </div>
-        <div><div style="color:var(--text3);font-family:var(--fm);font-size:9px;letter-spacing:.08em;margin-bottom:2px">STATUS</div>
-          <select style="background:var(--bg3);border:1px solid var(--border);border-radius:5px;padding:5px 8px;color:var(--text2);font-size:11px;outline:none;width:100%" onchange="state.trips[${idx}].status=this.value;save();renderAll()">
+      <div class="trip-card-meta">
+        <div class="trip-meta-field">
+          <div class="trip-meta-lbl">STATUS</div>
+          <select class="trip-meta-sel" onchange="updateTripField('${t.id}','status',this.value)">
             <option value="planning" ${t.status==='planning'?'selected':''}>Planning</option>
             <option value="booked" ${t.status==='booked'?'selected':''}>Booked</option>
             <option value="wishlist" ${t.status==='wishlist'?'selected':''}>Wishlist</option>
             <option value="completed" ${t.status==='completed'?'selected':''}>Completed</option>
           </select>
         </div>
+        <div class="trip-meta-field">
+          <div class="trip-meta-lbl">BUDGET</div>
+          <div class="trip-meta-val" style="color:var(--amber)">${fmt(budget)}</div>
+        </div>
+        <div class="trip-meta-field">
+          <div class="trip-meta-lbl">SPENT</div>
+          <div class="trip-meta-val-wrap"><span class="trip-meta-cur">${s}</span><input class="trip-meta-amt" type="number" value="${Math.round((Number(t.spent)||0)*r)}" oninput="updateTripField('${t.id}','spent',this.value/${r})"></div>
+        </div>
       </div>
-      <div style="height:5px;background:var(--bg3);border-radius:3px;overflow:hidden">
-        <div style="width:${spentPct}%;height:100%;background:${spentPct<75?'var(--green)':spentPct<100?'var(--amber)':'var(--red)'};border-radius:3px;transition:width .4s"></div>
+      <div class="trip-exp-list">
+        <div class="trip-exp-hd">
+          <span class="trip-exp-hd-lbl">EXPENSES BY MONTH</span>
+          <button class="trip-exp-add" onclick="addTripExpense('${t.id}')">+ Add expense</button>
+        </div>
+        ${expenseRows || '<div class="trip-exp-empty">No expenses yet — add one to allocate costs to specific months.</div>'}
       </div>
-      <div style="display:flex;justify-content:space-between;font-size:10px;color:var(--text3);margin-top:4px;font-family:var(--fm)">
-        <span>${spentPct}% spent</span><span>${fmt(t.budget-t.spent)} remaining</span>
+      <div class="trip-progress">
+        <div class="trip-progress-bar" style="width:${Math.min(100,spentPct)}%;background:${spentPct<75?'var(--green)':spentPct<100?'var(--amber)':'var(--red)'}"></div>
+      </div>
+      <div class="trip-progress-meta">
+        <span>${spentPct}% spent</span><span>${fmt(budget-(Number(t.spent)||0))} remaining</span>
       </div>
     </div>`;
   }).join('');
@@ -5414,7 +5628,15 @@ function renderFunFund() {
     const ctx=document.getElementById('ff-chart');
     if(ctx){
       const tripByMonth={};
-      state.trips.forEach(t=>{ const key=t.date.slice(0,7); tripByMonth[key]=(tripByMonth[key]||0)+t.budget; });
+      // Roll every trip expense into its own month so the chart bar
+      // matches what the Monthly Review tab shows.
+      state.trips.forEach(t => {
+        (t.expenses || []).forEach(ex => {
+          const key = (ex.date || '').slice(0, 7);
+          if(!key) return;
+          tripByMonth[key] = (tripByMonth[key] || 0) + (Number(ex.amount) || 0);
+        });
+      });
       charts['ff']=new Chart(ctx.getContext('2d'),{type:'bar',data:{labels:months.map(m=>m.short),datasets:[
         // Fun Fund bar uses the "pure" per-month value so the chart is
         // byte-for-byte consistent with the Monthly Fun Fund list below
@@ -5425,42 +5647,74 @@ function renderFunFund() {
     }
   },50);
 }
-// Trip lifecycle handlers. New trips default to next month so they
-// fall inside the 12-month window get12Months() uses to inject the
-// synthetic "✈️ Trip" line into the Monthly Review tab. Every
-// mutation finishes with renderAll() so every table, chart, and
-// summary across the platform picks up the change immediately.
+// Trip lifecycle handlers. Trips carry an `expenses` array so a
+// single trip can spread costs across multiple months (e.g. flights
+// in May, hotel in August). get12Months() mirrors every expense into
+// its scheduled month so the Monthly Review tab and the Fun Fund tab
+// stay in lockstep. Each mutation ends in save() — the live-render
+// listener then patches every table, chart, and summary without
+// stealing focus.
 window.addTrip = function(){
   if(!Array.isArray(state.trips)) state.trips = [];
   const d = new Date(CY, CM + 1, 1);
   const y = d.getFullYear();
-  const m = String(d.getMonth()+1).padStart(2,'0');
+  const mo = String(d.getMonth()+1).padStart(2,'0');
   state.trips.push({
     id: genId(),
     name: 'New Trip',
     country: '',
-    budget: 50000,
     spent: 0,
-    date: `${y}-${m}`,
     status: 'planning',
     icon: '✈️',
+    expenses: [
+      { id: genId(), name: 'Budget', date: `${y}-${mo}`, amount: 20000 },
+    ],
   });
   save();
-  if(typeof renderAll === 'function') renderAll();
-};
-window.updateTripDate = function(tripId, ym){
-  const t = (state.trips || []).find(x => x.id === tripId);
-  if(!t) return;
-  t.date = ym || t.date;
-  save();
-  if(typeof renderAll === 'function') renderAll();
 };
 window.removeTrip = function(tripId){
   const i = (state.trips || []).findIndex(x => x.id === tripId);
   if(i < 0) return;
   state.trips.splice(i, 1);
   save();
-  if(typeof renderAll === 'function') renderAll();
+};
+// Generic top-level field mutator (name, country, status, spent, icon).
+window.updateTripField = function(tripId, field, val){
+  const t = (state.trips || []).find(x => x.id === tripId);
+  if(!t) return;
+  t[field] = (field === 'spent') ? (+val || 0) : val;
+  save();
+};
+// Per-expense mutators — every row in the Monthly Review "linked"
+// view and every row on the trip card edits through these so the two
+// sides of the app never diverge.
+window.addTripExpense = function(tripId){
+  const t = (state.trips || []).find(x => x.id === tripId);
+  if(!t) return;
+  if(!Array.isArray(t.expenses)) t.expenses = [];
+  // Default new line to next month so it immediately lands inside
+  // the 12-month Monthly Review window.
+  const d = new Date(CY, CM + 1, 1);
+  const y = d.getFullYear();
+  const mo = String(d.getMonth()+1).padStart(2,'0');
+  t.expenses.push({ id: genId(), name: '', date: `${y}-${mo}`, amount: 0 });
+  save();
+};
+window.removeTripExpense = function(tripId, expenseId){
+  const t = (state.trips || []).find(x => x.id === tripId);
+  if(!t) return;
+  const i = (t.expenses || []).findIndex(e => e.id === expenseId);
+  if(i < 0) return;
+  t.expenses.splice(i, 1);
+  save();
+};
+window.updateTripExpense = function(tripId, expenseId, field, val){
+  const t = (state.trips || []).find(x => x.id === tripId);
+  if(!t) return;
+  const ex = (t.expenses || []).find(e => e.id === expenseId);
+  if(!ex) return;
+  ex[field] = (field === 'amount') ? (+val || 0) : val;
+  save();
 };
 
 // ══ RETIRE ANYWHERE ══════════════════════════════════════════════════════════
@@ -7207,7 +7461,7 @@ Retirement plan figures — computed under the ACTIVE ${scenLabelMap[activeScen]
 - Real growth rate assumption: ${realRate.toFixed(1)}% (post-retirement growth ${state.retirementPostGrowth||4}% minus ${state.inflationRate}% inflation)
 - Portfolio depletion age (from shared simulation): ${nums.runoutAge ? 'Age ' + nums.runoutAge : 'never depletes'}
 - External portfolio (current balance, today's kr): ${Math.round(state.externalAssets.filter(a=>(a.assetType||'investment')==='investment').reduce((s,a)=>s+a.balance,0)).toLocaleString()} kr across ${state.externalAssets.length} accounts
-- Planned trips: ${state.trips.map(t=>t.name+' ('+Math.round(t.budget).toLocaleString()+' kr)').join(', ')}
+- Planned trips: ${state.trips.map(t=>{const b=(t.expenses||[]).reduce((s,ex)=>s+(Number(ex.amount)||0),0);return t.name+' ('+Math.round(b).toLocaleString()+' kr)';}).join(', ')}
 - Retire Anywhere feasible destinations at current real income: ${scored.filter(l=>l.verdict==='feasible').map(l=>l.name).join(', ')||'none feasible at current income level'}
 
 INLINE CHARTS — OPTIONAL
@@ -7903,9 +8157,11 @@ function buildSeriesCatalog(){
       const months = get12Months();
       const tripByMonth = {};
       (state.trips || []).forEach(t => {
-        const key = (t.date || '').slice(0, 7);
-        if(!key) return;
-        tripByMonth[key] = (tripByMonth[key] || 0) + (t.budget || 0);
+        (t.expenses || []).forEach(ex => {
+          const key = (ex.date || '').slice(0, 7);
+          if(!key) return;
+          tripByMonth[key] = (tripByMonth[key] || 0) + (Number(ex.amount) || 0);
+        });
       });
       return {
         xValues: months.map(m => m.short),
@@ -7930,8 +8186,9 @@ function buildSeriesCatalog(){
       },
     };
   };
-  addTripSeries('travel.budget',    'Trip budget',    t => t.budget);
-  addTripSeries('travel.remaining', 'Trip remaining', t => (t.budget || 0) - (t.spent || 0));
+  const _tripBudget = t => (t.expenses || []).reduce((s,ex)=>s + (Number(ex.amount)||0), 0);
+  addTripSeries('travel.budget',    'Trip budget',    t => _tripBudget(t));
+  addTripSeries('travel.remaining', 'Trip remaining', t => _tripBudget(t) - (Number(t.spent)||0));
 
   // ── PROPERTY IQ HISTORY (x = property / query label) ─────────────────
   // Reads from the existing piq_history array (the same store the
