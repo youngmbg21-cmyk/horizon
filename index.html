@@ -1850,34 +1850,37 @@ function memoSelect(key, fn){
 }
 function invalidateSelectors(){ _selGen++; }
 
-// Generic debounced + focus-preserved render trampoline. Lets inline
-// oninput handlers re-render a panel without losing focus mid-typing:
-//   oninput="state.x=this.value;save();dr('renderFunFund')"
-// Captures the focused field's identity SYNCHRONOUSLY at keystroke time
-// (when activeElement is guaranteed to still be the input), then restores
-// after the debounced render runs. Per-name timers so multiple panels
-// can share one trampoline without colliding.
-const _drTimers = {};
-const _drFocus  = {};
-function dr(name, delay){
-  if(delay == null) delay = 700;
-  // Capture focus key at the keystroke, not 700ms later
+// ─── COMMIT-RENDER PATTERN ──────────────────────────────────────────────────
+// The universal app-wide pattern for input fields, ported from the working
+// Monthly Review tab:
+//
+//   oninput  → update state + save() ONLY. NEVER re-render.
+//   onchange → commitRender('panelRenderFn') runs once on commit
+//              (commit = blur, Tab, Enter — the same triggers the user
+//              already expects to "finalise" a value).
+//
+// Because oninput never re-renders, the input the user is typing into is
+// never destroyed mid-keystroke, so focus is held indefinitely until the
+// user explicitly leaves the field. The change event fires when the user
+// commits, by which time activeElement has already moved (Tab → next
+// field, click → wherever they clicked), so the new render naturally
+// lands focus on the right place.
+window.commitRender = function(name){
+  const fn = window[name];
+  if(typeof fn !== 'function') return;
+  // Capture whatever has focus NOW (after the change event has propagated
+  // — for Tab, this is already the next field). Re-render. Then restore
+  // focus to the matching field by its stable attribute identity so Tab
+  // navigation lands on the right place.
   const fk = (typeof captureFocusKey === 'function') ? captureFocusKey() : null;
-  if(fk) _drFocus[name] = fk;
-  clearTimeout(_drTimers[name]);
-  _drTimers[name] = setTimeout(() => {
-    const fn = window[name];
-    if(typeof fn === 'function') fn();
-    const saved = _drFocus[name];
-    if(saved && typeof restoreFocusKey === 'function'){
-      requestAnimationFrame(() => {
-        restoreFocusKey(saved);
-        _drFocus[name] = null;
-      });
-    }
-  }, delay);
-}
-window.dr = dr;
+  fn();
+  if(fk && typeof restoreFocusKey === 'function'){
+    requestAnimationFrame(() => restoreFocusKey(fk));
+  }
+};
+// Back-compat shim — older inline handlers may still call dr(). Forward
+// to commitRender so behaviour is unified.
+window.dr = function(name){ return window.commitRender(name); };
 
 // ─── PERSISTENCE ────────────────────────────────────────────────────────────
 // State schema version. Bump this and add a branch to migrate() whenever the
@@ -3918,27 +3921,29 @@ function renderRetirement() {
     const projV=isInv?futureValue(a.balance,a.monthlyContribution,gr,ytr):0;
     const projR=isInv?projV/inflF:0;
     const accentColor=isInv?'var(--green)':'var(--amber)';
-    const inp=(val,handler,w='90px')=>`<input type="number" value="${val}" oninput="${handler}" style="background:var(--bg3);border:1px solid var(--border);border-radius:4px;padding:5px 7px;color:var(--text);font-family:var(--fm);font-size:12px;outline:none;width:${w};text-align:right">`;
+    // inp follows the Monthly Review pattern: oninput only updates state +
+    // saves; onchange (fires on commit — blur, Tab, Enter) re-renders.
+    const inp=(val,handler,w='90px')=>`<input type="number" value="${val}" oninput="${handler}" onchange="commitRender('renderRetirement')" style="background:var(--bg3);border:1px solid var(--border);border-radius:4px;padding:5px 7px;color:var(--text);font-family:var(--fm);font-size:12px;outline:none;width:${w};text-align:right">`;
     return `<div style="display:grid;grid-template-columns:1fr auto;align-items:center;gap:6px;padding:8px 10px;background:var(--bg2);border:1px solid var(--border);border-left:3px solid ${accentColor};border-radius:8px;margin-bottom:6px">
       <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
-        <input value="${esc(a.name)}" oninput="state.externalAssets[${idx}].name=this.value;save()" style="font-size:12px;font-weight:700;background:transparent;border:none;border-bottom:1px solid var(--border);color:var(--text);padding-bottom:1px;width:130px;outline:none">
+        <input value="${esc(a.name)}" oninput="state.externalAssets[${idx}].name=this.value;save()" onchange="commitRender('renderRetirement')" style="font-size:12px;font-weight:700;background:transparent;border:none;border-bottom:1px solid var(--border);color:var(--text);padding-bottom:1px;width:130px;outline:none">
         <select onchange="state.externalAssets[${idx}].assetType=this.value;save();renderRetirement()" style="background:var(--bg3);border:1px solid var(--border);border-radius:4px;padding:4px 6px;color:var(--text2);font-size:10px;outline:none">
           <option value="investment" ${isInv?'selected':''}>Investment</option>
           <option value="pension" ${!isInv?'selected':''}>Pension</option>
         </select>
         ${isInv?`
           <span style="font-size:10px;color:var(--text3);font-family:var(--fm)">Bal:</span>
-          ${inp(Math.round(a.balance*r),`state.externalAssets[${idx}].balance=this.value/${r};save();debouncedRenderRetirement()`,'100px')}
+          ${inp(Math.round(a.balance*r),`state.externalAssets[${idx}].balance=this.value/${r};save()`,'100px')}
           <span style="font-size:10px;color:var(--text3);font-family:var(--fm)">Contrib:</span>
-          ${inp(Math.round(a.monthlyContribution*r),`state.externalAssets[${idx}].monthlyContribution=this.value/${r};save();debouncedRenderRetirement()`,'80px')}
+          ${inp(Math.round(a.monthlyContribution*r),`state.externalAssets[${idx}].monthlyContribution=this.value/${r};save()`,'80px')}
           <span style="font-size:10px;color:var(--text3);font-family:var(--fm)">Rate:</span>
-          ${inp(gr,`state.externalAssets[${idx}].growthRate=+this.value;save();debouncedRenderRetirement()`,'50px')}%
+          ${inp(gr,`state.externalAssets[${idx}].growthRate=+this.value;save()`,'50px')}%
           <span style="font-size:11px;color:var(--text3);margin-left:6px">→ <span style="color:var(--green);font-family:var(--fm);font-weight:700;font-size:13px">${fmt(projR)}</span> <span style="font-size:10px">today's kr</span></span>
         `:`
           <span style="font-size:10px;color:var(--text3);font-family:var(--fm)">Payout/mo:</span>
-          ${inp(Math.round((a.monthlyPayout||0)*r),`state.externalAssets[${idx}].monthlyPayout=this.value/${r};save();debouncedRenderRetirement()`,'80px')}
+          ${inp(Math.round((a.monthlyPayout||0)*r),`state.externalAssets[${idx}].monthlyPayout=this.value/${r};save()`,'80px')}
           <span style="font-size:10px;color:var(--text3);font-family:var(--fm)">From age:</span>
-          ${inp(a.startAge||state.retirementAge,`state.externalAssets[${idx}].startAge=+this.value;save();debouncedRenderRetirement()`,'52px')}
+          ${inp(a.startAge||state.retirementAge,`state.externalAssets[${idx}].startAge=+this.value;save()`,'52px')}
           <span style="font-size:11px;color:var(--text3);margin-left:6px">→ <span style="color:var(--amber);font-family:var(--fm);font-weight:700;font-size:13px">${fmt((a.monthlyPayout||0))}</span> <span style="font-size:10px">/mo pension · today's kr</span></span>
         `}
       </div>
@@ -3965,8 +3970,8 @@ function renderRetirement() {
   const expRows = retExp.map((e,idx)=>`
     <div class="line-item">
       <span style="font-size:14px;width:20px;text-align:center;flex-shrink:0">${e.icon||'💸'}</span>
-      <input class="line-name" value="${esc(e.name)}" oninput="state.retirementExpenses[${idx}].name=this.value;save();debouncedRenderRetirement()">
-      <div class="line-amt-wrap"><span class="line-cur">${s}</span><input class="line-amt" type="number" value="${Math.round(e.amount*r)}" oninput="state.retirementExpenses[${idx}].amount=this.value/${r};save();debouncedRenderRetirement()"></div>
+      <input class="line-name" value="${esc(e.name)}" oninput="state.retirementExpenses[${idx}].name=this.value;save()" onchange="commitRender('renderRetirement')">
+      <div class="line-amt-wrap"><span class="line-cur">${s}</span><input class="line-amt" type="number" value="${Math.round(e.amount*r)}" oninput="state.retirementExpenses[${idx}].amount=this.value/${r};save()" onchange="commitRender('renderRetirement')"></div>
       <select class="line-type" onchange="state.retirementExpenses[${idx}].type=this.value;save()"><option value="fixed" ${e.type==='fixed'?'selected':''}>Fixed</option><option value="variable" ${e.type==='variable'?'selected':''}>Variable</option></select>
       <button class="line-rm" onclick="state.retirementExpenses.splice(${idx},1);save();renderRetirement()">×</button>
     </div>`).join('');
@@ -3987,13 +3992,13 @@ function renderRetirement() {
           <div class="card">
             <div class="card-title">All Parameters</div>
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:7px">
-              <div class="field"><label>Current Age</label><input type="number" value="${state.currentAge}" oninput="state.currentAge=+this.value;save();debouncedRenderRetirement()"></div>
-              <div class="field"><label>Retirement Age</label><input type="number" value="${state.retirementAge}" oninput="state.retirementAge=+this.value;save();debouncedRenderRetirement()"></div>
-              <div class="field"><label>Growth Rate %</label><input type="number" value="${state.growthRate}" oninput="state.growthRate=+this.value;save();debouncedRenderRetirement()"></div>
-              <div class="field"><label>Inflation %</label><input type="number" value="${state.inflationRate}" oninput="state.inflationRate=+this.value;save();debouncedRenderRetirement()"></div>
-              <div class="field"><label>Post-Ret Growth %</label><input type="number" value="${state.retirementPostGrowth||4}" oninput="state.retirementPostGrowth=+this.value;save();debouncedRenderRetirement()"></div>
-              <div class="field"><label>Withdrawal Tax %</label><input type="number" value="${state.withdrawTaxRate||30}" oninput="state.withdrawTaxRate=+this.value;save();debouncedRenderRetirement()"></div>
-              <div class="field" style="grid-column:1/-1"><label>Life Expectancy</label><input type="number" value="${state.lifeExp||90}" oninput="state.lifeExp=+this.value;save();debouncedRenderRetirement()"></div>
+              <div class="field"><label>Current Age</label><input type="number" value="${state.currentAge}" oninput="state.currentAge=+this.value;save()" onchange="commitRender('renderRetirement')"></div>
+              <div class="field"><label>Retirement Age</label><input type="number" value="${state.retirementAge}" oninput="state.retirementAge=+this.value;save()" onchange="commitRender('renderRetirement')"></div>
+              <div class="field"><label>Growth Rate %</label><input type="number" value="${state.growthRate}" oninput="state.growthRate=+this.value;save()" onchange="commitRender('renderRetirement')"></div>
+              <div class="field"><label>Inflation %</label><input type="number" value="${state.inflationRate}" oninput="state.inflationRate=+this.value;save()" onchange="commitRender('renderRetirement')"></div>
+              <div class="field"><label>Post-Ret Growth %</label><input type="number" value="${state.retirementPostGrowth||4}" oninput="state.retirementPostGrowth=+this.value;save()" onchange="commitRender('renderRetirement')"></div>
+              <div class="field"><label>Withdrawal Tax %</label><input type="number" value="${state.withdrawTaxRate||30}" oninput="state.withdrawTaxRate=+this.value;save()" onchange="commitRender('renderRetirement')"></div>
+              <div class="field" style="grid-column:1/-1"><label>Life Expectancy</label><input type="number" value="${state.lifeExp||90}" oninput="state.lifeExp=+this.value;save()" onchange="commitRender('renderRetirement')"></div>
             </div>
           </div>
           <div class="card">
@@ -4129,29 +4134,10 @@ function withFocusPreservation(fn){
   if(fk) restoreFocusKey(fk);
 }
 
-// Debounce helper so typing doesn't re-render every keystroke. Captures
-// the focus key synchronously at keystroke time (NOT inside the timer)
-// so we have a guaranteed snapshot even if the browser moves focus
-// during the 700ms wait. Restores after the render.
-let _retDebTimer=null;
-let _retDebFocusKey=null;
-function debouncedRenderRetirement(){
-  // Snapshot the active field on the keystroke itself
-  const fk = captureFocusKey();
-  if(fk) _retDebFocusKey = fk;
-  clearTimeout(_retDebTimer);
-  _retDebTimer=setTimeout(()=>{
-    renderRetirement();
-    if(_retDebFocusKey){
-      // requestAnimationFrame so focus restoration happens after the
-      // browser has finished the layout pass from the innerHTML swap
-      requestAnimationFrame(()=>{
-        restoreFocusKey(_retDebFocusKey);
-        _retDebFocusKey = null;
-      });
-    }
-  }, 700);
-}
+// debouncedRenderRetirement intentionally removed — replaced by the
+// commit-render pattern (oninput → save only; onchange → commitRender)
+// which mirrors the always-working Monthly Review tab and never destroys
+// a focused input mid-keystroke.
 
 // ─── LONGEVITY RUNWAY — pure SVG renderer ───────────────────────────────────
 // Rebuilt from scratch per spec (no Chart.js). Recomputes from state on
@@ -4519,13 +4505,13 @@ function renderFunFund() {
         <div><div style="color:var(--text3);font-family:var(--fm);font-size:9px;letter-spacing:.08em;margin-bottom:2px">BUDGET</div>
           <div style="display:flex;align-items:center;gap:3px;background:var(--bg3);border:1px solid var(--border);border-radius:5px;padding:0 8px">
             <span style="color:var(--text3);font-size:10px">${s}</span>
-            <input type="number" style="background:transparent;border:none;color:var(--text);font-family:var(--fm);font-size:12px;padding:5px 0;outline:none;width:100%" value="${Math.round(t.budget*r)}" oninput="state.trips[${idx}].budget=this.value/${r};save();dr('renderFunFund')">
+            <input type="number" style="background:transparent;border:none;color:var(--text);font-family:var(--fm);font-size:12px;padding:5px 0;outline:none;width:100%" value="${Math.round(t.budget*r)}" oninput="state.trips[${idx}].budget=this.value/${r};save()" onchange="commitRender('renderFunFund')">
           </div>
         </div>
         <div><div style="color:var(--text3);font-family:var(--fm);font-size:9px;letter-spacing:.08em;margin-bottom:2px">SPENT</div>
           <div style="display:flex;align-items:center;gap:3px;background:var(--bg3);border:1px solid var(--border);border-radius:5px;padding:0 8px">
             <span style="color:var(--text3);font-size:10px">${s}</span>
-            <input type="number" style="background:transparent;border:none;color:var(--text);font-family:var(--fm);font-size:12px;padding:5px 0;outline:none;width:100%" value="${Math.round(t.spent*r)}" oninput="state.trips[${idx}].spent=this.value/${r};save();dr('renderFunFund')">
+            <input type="number" style="background:transparent;border:none;color:var(--text);font-family:var(--fm);font-size:12px;padding:5px 0;outline:none;width:100%" value="${Math.round(t.spent*r)}" oninput="state.trips[${idx}].spent=this.value/${r};save()" onchange="commitRender('renderFunFund')">
           </div>
         </div>
         <div><div style="color:var(--text3);font-family:var(--fm);font-size:9px;letter-spacing:.08em;margin-bottom:2px">STATUS</div>
@@ -4786,8 +4772,8 @@ function renderLocAnalysisSlideover(opts){
     <div class="retire-so-section">
       <div class="retire-so-section-hd">Editable Details</div>
       <div class="retire-so-edit-row">
-        <div class="field"><label>Monthly Cost of Living (${s})</label><input type="number" value="${Math.round(loc.costOfLiving*r)}" oninput="updateLocCost('${loc.id}',this.value/${r});dr('renderLocAnalysisSlideover')"></div>
-        <div class="field"><label>Local Tax Rate (%)</label><input type="number" value="${loc.taxRate}" oninput="updateLocTax('${loc.id}',+this.value);dr('renderLocAnalysisSlideover')"></div>
+        <div class="field"><label>Monthly Cost of Living (${s})</label><input type="number" value="${Math.round(loc.costOfLiving*r)}" oninput="updateLocCost('${loc.id}',this.value/${r})" onchange="commitRender('renderLocAnalysisSlideover')"></div>
+        <div class="field"><label>Local Tax Rate (%)</label><input type="number" value="${loc.taxRate}" oninput="updateLocTax('${loc.id}',+this.value)" onchange="commitRender('renderLocAnalysisSlideover')"></div>
         <div class="field retire-so-notes"><label>Notes</label><input value="${esc(loc.notes||'')}" oninput="updateLocNotes('${loc.id}',this.value)"></div>
       </div>
       <div style="margin-top:10px;display:flex;gap:8px">
@@ -5736,7 +5722,7 @@ function renderSettings() {
       <div class="card">
         <div class="card-title">💱 Exchange Rates (vs SEK)</div>
         <div style="display:flex;flex-direction:column;gap:8px;font-size:13px">
-          ${['USD','EUR','KES'].map(cur=>`<div style="display:flex;align-items:center;gap:10px"><span style="font-family:var(--fm);min-width:50px;font-weight:600">${CURRENCY_SYMBOLS[cur]} ${cur}</span><span style="color:var(--text2)">1 SEK =</span><div style="display:flex;align-items:center;gap:3px;background:var(--bg3);border:1px solid var(--border);border-radius:6px;padding:0 10px;flex:1;max-width:140px"><input type="number" style="background:transparent;border:none;color:var(--text);font-family:var(--fm);font-size:13px;padding:6px 0;outline:none;width:100%" value="${state.exchangeRates[cur]||DEFAULT_RATES[cur]}" oninput="state.exchangeRates['${cur}']=+this.value;save();dr('renderAll',500)"></div><span style="font-size:11px;color:var(--text3)">≈ ${Math.round(1/(state.exchangeRates[cur]||DEFAULT_RATES[cur]))} SEK/${cur==='KES'?'KSh':cur==='EUR'?'€':'$'}</span></div>`).join('')}
+          ${['USD','EUR','KES'].map(cur=>`<div style="display:flex;align-items:center;gap:10px"><span style="font-family:var(--fm);min-width:50px;font-weight:600">${CURRENCY_SYMBOLS[cur]} ${cur}</span><span style="color:var(--text2)">1 SEK =</span><div style="display:flex;align-items:center;gap:3px;background:var(--bg3);border:1px solid var(--border);border-radius:6px;padding:0 10px;flex:1;max-width:140px"><input type="number" style="background:transparent;border:none;color:var(--text);font-family:var(--fm);font-size:13px;padding:6px 0;outline:none;width:100%" value="${state.exchangeRates[cur]||DEFAULT_RATES[cur]}" oninput="state.exchangeRates['${cur}']=+this.value;save()" onchange="commitRender('renderAll')"></div><span style="font-size:11px;color:var(--text3)">≈ ${Math.round(1/(state.exchangeRates[cur]||DEFAULT_RATES[cur]))} SEK/${cur==='KES'?'KSh':cur==='EUR'?'€':'$'}</span></div>`).join('')}
         </div>
       </div>
       <!-- AI Keys -->
@@ -5750,7 +5736,7 @@ function renderSettings() {
       <!-- Ticker quote -->
       <div class="card">
         <div class="card-title">✦ Ticker Quote & Appearance</div>
-        <div class="field"><label>Personal quote / mantra</label><input value="${esc(state.tickerQuote||'')}" oninput="state.tickerQuote=this.value;save();dr('renderTicker',500)"></div>
+        <div class="field"><label>Personal quote / mantra</label><input value="${esc(state.tickerQuote||'')}" oninput="state.tickerQuote=this.value;save()" onchange="commitRender('renderTicker')"></div>
         <div style="margin-top:6px">
           <label class="toggle-wrap">
             <input type="checkbox" ${state.darkMode?'checked':''} onchange="state.darkMode=this.checked;save();applyTheme()">
