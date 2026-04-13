@@ -3247,9 +3247,13 @@ function chartHtmlTooltip(context){
     const val = Number.isFinite(raw) ? (typeof fmt==='function'?fmt(raw):String(raw)) : String(dp.raw);
     return `<div class="chart-tt-row"><span class="chart-tt-sw" style="background:${sw}"></span><span>${label}</span><span class="chart-tt-val">${val}</span></div>`;
   }).join('');
-  // For stacked bars, show a total row automatically.
+  // For stacked bars, show a total row automatically. Charts that mix
+  // unrelated series (Income / Expenses / Savings / Fun Fund) can opt
+  // out by setting `chart._skipTotalRow = true` after construction —
+  // summing those values produces a meaningless figure, so the row
+  // would only confuse the user.
   let totalRow = '';
-  if((tooltip.dataPoints||[]).length >= 2){
+  if((tooltip.dataPoints||[]).length >= 2 && !chart._skipTotalRow){
     const sum = tooltip.dataPoints.reduce((s,dp) => s + (Number(dp.raw)||0), 0);
     totalRow = `<div class="chart-tt-total"><span>Total</span><span class="chart-tt-val">${typeof fmt==='function'?fmt(sum):sum}</span></div>`;
   }
@@ -3857,23 +3861,28 @@ function renderMonthly() {
     <div class="month-pills">${months.map(m=>`<button class="month-pill ${m.key===selKey?'active':''} ${m.isCurrent?'current':''} ${m.hasOverride?'has-override':''}" onclick="state.selectedMonth='${m.key}';renderMonthly()">${m.short}${m.hasOverride?' ✎':''}</button>`).join('')}</div>
     ${sel.hasOverride?`<div style="display:inline-flex;align-items:center;gap:8px;margin-bottom:12px"><span style="background:var(--violet-dim);color:var(--violet);padding:3px 9px;border-radius:5px;font-size:11px;font-weight:700;font-family:var(--fm)">✎ CUSTOM OVERRIDE ACTIVE</span><button style="background:none;border:1px solid var(--border);color:var(--text2);padding:3px 9px;border-radius:5px;font-size:11px;cursor:pointer" onclick="delete state.monthlyOverrides['${selKey}'];save();renderMonthly()">Reset</button></div>`:'<div style="margin-bottom:12px;font-size:12px;color:var(--text3)">Showing inherited baseline — edit any field to create an override</div>'}
 
-    <!-- Summary bar -->
+    <!-- Summary bar. Every live-updating element carries a data-mo-* hook
+         so liveSyncMonthlyReview() can patch it in place without a full
+         re-render (which would tear down the focused Savings Target
+         input mid-keystroke). The keys are stable: exp/sav/fun for the
+         bar segments, income/expenses/savings/funFund for the numeric
+         readouts. -->
     <div class="card" style="padding:14px 16px;margin-bottom:12px">
       <div style="display:flex;flex-wrap:wrap;gap:20px;align-items:center">
         <div style="flex:1;min-width:180px">
           <div style="font-size:10px;color:var(--text3);font-family:var(--fm);letter-spacing:.1em;margin-bottom:6px">MONTH SUMMARY — ${sel.label}</div>
           <div class="cf-bar">
-            <div class="cf-bar-exp" style="width:${sel.income>0?Math.min(sel.expenses/sel.income*100,100):0}%"></div>
-            <div class="cf-bar-sav" style="width:${sel.income>0?Math.min(sel.savings/sel.income*100,100):0}%"></div>
-            <div class="cf-bar-fun" style="width:${sel.income>0?Math.max(sel.funFund/sel.income*100,0):0}%"></div>
+            <div class="cf-bar-exp" data-mo-bar="exp" style="width:${sel.income>0?Math.min(sel.expenses/sel.income*100,100):0}%"></div>
+            <div class="cf-bar-sav" data-mo-bar="sav" style="width:${sel.income>0?Math.min(sel.savings/sel.income*100,100):0}%"></div>
+            <div class="cf-bar-fun" data-mo-bar="fun" style="width:${sel.income>0?Math.max(sel.funFund/sel.income*100,0):0}%"></div>
           </div>
-          <div class="cf-bar-labels"><span>Exp ${sel.income>0?Math.round(sel.expenses/sel.income*100):0}%</span><span>Sav ${sel.income>0?Math.round(sel.savings/sel.income*100):0}%</span><span>Fun ${sel.income>0?Math.max(Math.round(sel.funFund/sel.income*100),0):0}%</span></div>
+          <div class="cf-bar-labels" data-mo-bar-labels><span>Exp ${sel.income>0?Math.round(sel.expenses/sel.income*100):0}%</span><span>Sav ${sel.income>0?Math.round(sel.savings/sel.income*100):0}%</span><span>Fun ${sel.income>0?Math.max(Math.round(sel.funFund/sel.income*100),0):0}%</span></div>
         </div>
         <div style="display:flex;gap:20px;flex-wrap:wrap">
-          <div style="text-align:center"><div style="font-size:9px;color:var(--text3);font-family:var(--fm);letter-spacing:.08em">INCOME</div><div style="font-family:var(--fm);font-size:16px;font-weight:700;color:var(--green)">${fmt(sel.income)}</div></div>
-          <div style="text-align:center"><div style="font-size:9px;color:var(--text3);font-family:var(--fm);letter-spacing:.08em">EXPENSES</div><div style="font-family:var(--fm);font-size:16px;font-weight:700;color:var(--red)">${fmt(sel.expenses)}</div></div>
-          <div style="text-align:center"><div style="font-size:9px;color:var(--text3);font-family:var(--fm);letter-spacing:.08em">SAVINGS</div><div style="font-family:var(--fm);font-size:16px;font-weight:700;color:var(--amber)">${fmt(sel.savings)}</div></div>
-          <div style="text-align:center"><div style="font-size:9px;color:var(--text3);font-family:var(--fm);letter-spacing:.08em">FUN FUND</div><div style="font-family:var(--fm);font-size:16px;font-weight:700;color:var(--cyan)">${fmt(sel.funFund)}</div></div>
+          <div style="text-align:center"><div style="font-size:9px;color:var(--text3);font-family:var(--fm);letter-spacing:.08em">INCOME</div><div data-mo-num="income" style="font-family:var(--fm);font-size:16px;font-weight:700;color:var(--green)">${fmt(sel.income)}</div></div>
+          <div style="text-align:center"><div style="font-size:9px;color:var(--text3);font-family:var(--fm);letter-spacing:.08em">EXPENSES</div><div data-mo-num="expenses" style="font-family:var(--fm);font-size:16px;font-weight:700;color:var(--red)">${fmt(sel.expenses)}</div></div>
+          <div style="text-align:center"><div style="font-size:9px;color:var(--text3);font-family:var(--fm);letter-spacing:.08em">SAVINGS</div><div data-mo-num="savings" style="font-family:var(--fm);font-size:16px;font-weight:700;color:var(--amber)">${fmt(sel.savings)}</div></div>
+          <div style="text-align:center"><div style="font-size:9px;color:var(--text3);font-family:var(--fm);letter-spacing:.08em">FUN FUND</div><div data-mo-num="funFund" style="font-family:var(--fm);font-size:16px;font-weight:700;color:var(--cyan)">${fmt(sel.funFund)}</div></div>
         </div>
       </div>
     </div>
@@ -3903,11 +3912,21 @@ function renderMonthly() {
     const ctx=document.getElementById('mo-chart');
     if(ctx){
       const all=get12Months();
+      // Four datasets — exactly the four values shown in the Month
+      // Summary bar below: Income (bars, green), Expenses (bars, red),
+      // Savings (line, amber), Fun Fund (line, cyan). Savings + Fun Fund
+      // are rendered as lines to distinguish "plan/derived targets" from
+      // the raw monthly flows. Colours match the Month Summary pills
+      // and the SAVINGS colour used across the rest of the app.
       charts['mo']=new Chart(ctx.getContext('2d'),{type:'bar',data:{labels:all.map(m=>m.short),datasets:[
         {label:'Income',data:all.map(m=>m.income),backgroundColor:'#00e8a018',borderColor:'#00e8a0',borderWidth:1.5,borderRadius:3},
         {label:'Expenses',data:all.map(m=>m.expenses),backgroundColor:'#ff4d6d14',borderColor:'#ff4d6d',borderWidth:1.5,borderRadius:3},
-        {label:'Fun Fund',data:all.map(m=>Math.max(0,m.funFund)),type:'line',borderColor:'#00d4ff',fill:false,tension:.3,pointRadius:2,borderWidth:1.5,yAxisID:'y'},
+        {label:'Savings',data:all.map(m=>m.savings),type:'line',borderColor:'#f5a623',backgroundColor:'transparent',fill:false,tension:.3,pointRadius:2,borderWidth:1.5,yAxisID:'y'},
+        {label:'Fun Fund',data:all.map(m=>Math.max(0,m.funFund)),type:'line',borderColor:'#00d4ff',backgroundColor:'transparent',fill:false,tension:.3,pointRadius:2,borderWidth:1.5,yAxisID:'y'},
       ]},options:chartPreset()});
+      // Summing Income + Expenses + Savings + Fun Fund is meaningless,
+      // so suppress the tooltip's auto "Total" row on this chart.
+      charts['mo']._skipTotalRow = true;
     }
   },50);
   if(typeof updateScopeChip==='function') updateScopeChip();
@@ -3923,8 +3942,67 @@ window.addMonthlyItem=function(key,field){
 };
 window.setMonthSavings=function(key,val){
   if(!state.monthlyOverrides[key]) state.monthlyOverrides[key]={};
-  state.monthlyOverrides[key].savings=+val; save();
+  state.monthlyOverrides[key].savings=+val;
+  save();
+  // Live-patch the Month Summary bar + chart from the fresh
+  // get12Months() result so the user sees the Income / Expenses /
+  // Savings / Fun Fund values update on every keystroke, without a
+  // full re-render tearing down the focused input. A full render is
+  // still queued via the input's onchange → commitRender on blur,
+  // as a clean safety net.
+  liveSyncMonthlyReview(key);
 };
+
+// Patch every live-updating element in the Monthly scope (summary bar
+// segments, summary-bar label %s, the four numeric readouts, and every
+// Chart.js dataset on the 12-Month Forward Overview chart) from the
+// current get12Months() result. Called from setMonthSavings on every
+// keystroke. Because save() has already invalidated the 12mo memo,
+// the next get12Months() call returns fresh values.
+function liveSyncMonthlyReview(selKey){
+  const host = document.getElementById('panel-monthly');
+  if(!host) return;
+  const months = get12Months();
+  const key = selKey || state.selectedMonth || months[0]?.key;
+  const sel = months.find(m => m.key === key);
+  if(!sel) return;
+  // Summary bar segment widths (same math as the initial render).
+  const pctExp = sel.income > 0 ? Math.min(sel.expenses / sel.income * 100, 100) : 0;
+  const pctSav = sel.income > 0 ? Math.min(sel.savings  / sel.income * 100, 100) : 0;
+  const pctFun = sel.income > 0 ? Math.max(sel.funFund  / sel.income * 100, 0)   : 0;
+  const barExp = host.querySelector('[data-mo-bar="exp"]');
+  const barSav = host.querySelector('[data-mo-bar="sav"]');
+  const barFun = host.querySelector('[data-mo-bar="fun"]');
+  if(barExp) barExp.style.width = pctExp + '%';
+  if(barSav) barSav.style.width = pctSav + '%';
+  if(barFun) barFun.style.width = pctFun + '%';
+  // Summary bar label row (Exp X% · Sav Y% · Fun Z%).
+  const lbl = host.querySelector('[data-mo-bar-labels]');
+  if(lbl) lbl.innerHTML = `<span>Exp ${Math.round(pctExp)}%</span><span>Sav ${Math.round(pctSav)}%</span><span>Fun ${Math.round(pctFun)}%</span>`;
+  // Four numeric readouts — textContent only so the surrounding inline
+  // styling (colour, font) is preserved untouched.
+  const numIncome  = host.querySelector('[data-mo-num="income"]');
+  const numExp     = host.querySelector('[data-mo-num="expenses"]');
+  const numSavings = host.querySelector('[data-mo-num="savings"]');
+  const numFunFund = host.querySelector('[data-mo-num="funFund"]');
+  if(numIncome)  numIncome.textContent  = fmt(sel.income);
+  if(numExp)     numExp.textContent     = fmt(sel.expenses);
+  if(numSavings) numSavings.textContent = fmt(sel.savings);
+  if(numFunFund) numFunFund.textContent = fmt(sel.funFund);
+  // Chart datasets — mutate the existing Chart.js instance's data
+  // arrays and call update('none') for a zero-animation live refresh.
+  // No canvas teardown, no destroyChart, no focus loss.
+  const ch = charts['mo'];
+  if(ch && ch.data && Array.isArray(ch.data.datasets)){
+    ch.data.datasets.forEach(ds => {
+      if(ds.label === 'Income')        ds.data = months.map(m => m.income);
+      else if(ds.label === 'Expenses') ds.data = months.map(m => m.expenses);
+      else if(ds.label === 'Savings')  ds.data = months.map(m => m.savings);
+      else if(ds.label === 'Fun Fund') ds.data = months.map(m => Math.max(0, m.funFund));
+    });
+    ch.update('none');
+  }
+}
 
 // ══ YEARLY ═══════════════════════════════════════════════════════════════════
 function renderYearly() {
