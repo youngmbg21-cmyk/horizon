@@ -8951,12 +8951,13 @@ function openAIPanel(){
   if(fab) fab.style.display='none';
   if(minTab) minTab.style.display='none';
   _seedChatThreads();
-  // Opening the panel clears the active thread's unread count and
-  // bumps its lastReadAt timestamp.
-  const t = _activeThread();
-  if(t){ t.unread = 0; t.lastReadAt = Date.now(); save(); }
   renderAipThreads();
-  aipRenderActiveThread();
+  // switchChatThread runs the full "active thread changed" cascade
+  // (title, sub, placeholder, mode toggle visibility, pills, chips,
+  // message list) so opening the panel lands on the correct header
+  // state whichever thread was last active.
+  const activeId = state.activeChatThreadId || AI_THREAD_ID;
+  switchChatThread(activeId);
   updateAIPPills();
   renderAIPChips();
   syncAIModeUI();
@@ -8996,11 +8997,24 @@ window.switchChatThread = function(id){
   // Update placeholder text on the input to match the context.
   const ta = document.getElementById('aip-input');
   if(ta) ta.placeholder = t.kind === 'friend' ? `Message ${t.title}…` : 'Ask about your finances…';
-  // Header sub-title flips to reflect the active thread.
+  // Header title + sub-title flip per thread. On a friend thread we
+  // show the friend's name as the title; on the AI thread we keep
+  // the product brand.
+  const titleEl = document.querySelector('#ai-panel .aip-title');
+  if(titleEl) titleEl.textContent = t.kind === 'friend' ? t.title : 'Horizon AI Advisor';
+  const logoEl = document.querySelector('#ai-panel .aip-logo');
+  if(logoEl) logoEl.textContent = t.kind === 'friend' ? (t.avatar || '👤') : '✦';
   const sub = document.getElementById('aip-sub');
   if(sub) sub.textContent = t.kind === 'friend'
     ? (`${(state.contacts||[]).find(c=>c.id===t.contactId)?.bio || ''}` || 'Direct message')
     : 'Aware of your financial context';
+  // Simple/Expert + pills belong to the AI advisor, not a friend
+  // chat. Hide them entirely on friend threads so the header reads
+  // cleanly as a messaging UI.
+  const modeWrap = document.querySelector('#ai-panel .aip-mode-wrap');
+  if(modeWrap) modeWrap.style.display = t.kind === 'friend' ? 'none' : '';
+  const pillsEl = document.getElementById('aip-pills');
+  if(pillsEl) pillsEl.style.display = t.kind === 'friend' ? 'none' : '';
 };
 // Re-paint the message list from the active thread's messages array.
 // Used when switching threads OR when opening the panel. Individual
@@ -10419,71 +10433,131 @@ async function sendToAI(thread, msg){
 }
 
 // ── FRIEND CHAT ─────────────────────────────────────────────────────────
-// Entirely client-side for the demo. We render the user's message
-// instantly, stash it on the thread, then enqueue a scripted reply from
-// the matching persona after a short typing delay. This deliberately
-// NEVER calls buildAIContext() or the LLM, so the user's financial
-// snapshot can never leak into a friend conversation.
+// Friend threads are powered by Claude using a per-contact persona
+// system prompt. The model NEVER sees buildAIContext() — only the
+// persona system prompt + the friend thread's own message history —
+// so the user's financial snapshot can't leak into a friend
+// conversation. The full thread history is passed on every call so
+// the friend stays contextually aware across the whole conversation.
+
+// Persona system prompts by persona key. The contact record's
+// `persona` field selects which prompt to inject. Each prompt is a
+// self-contained character brief — tone, backstory, constraints,
+// reply shape — and explicitly forbids any meta-reference to being
+// an AI / bot / model.
+const FRIEND_PERSONA_PROMPTS = {
+  sara: `You are Sara. A warm, casual, naturally witty woman in her early thirties, based in Stockholm. You have been close friends with the user for years — the tone between you is relaxed, familiar, and occasionally joking. You text each other frequently about life, trips, relationships, work, and day-to-day stuff.
+
+Right now you and the user are co-planning a trip to Paris together in August. You're excited about it. Some rough context you both know:
+- Target dates: roughly Aug 8–15, though nothing is locked in
+- Hotel: you've been scouting a two-bedroom Airbnb in Montmartre, around 1 400 kr/night
+- Flights: you were looking at SAS from Arlanda, around 3 200 kr return, planning to book your own ticket this week
+- Costs: you're comfortable splitting everything 50/50 and settling up at the end of the trip
+- Other: you live in Stockholm, love food, enjoy long walks and good coffee, and have a dry sense of humour
+
+HOW YOU TALK:
+- Text like a real friend on WhatsApp — short to medium replies, never paragraph essays
+- Warm, casual, occasionally playful. Use contractions. Drop the odd emoji where it fits (not every message).
+- Ask follow-up questions. Stay curious about what the user says. Build on earlier messages in the conversation.
+- React with personality — surprise, excitement, sympathy, a tease, a gentle push-back when something doesn't make sense. Not always agreeable.
+- If the user changes the subject entirely (work, food, their day, whatever), roll with it naturally — you're not here only to plan Paris.
+- Reference specific earlier details when relevant so the conversation feels continuous.
+
+HARD RULES — NEVER BREAK:
+- Never refer to yourself as an AI, a bot, a language model, an assistant, or anything similar. You are Sara, a human friend.
+- Never say "As Sara" or break character in any way. Just be Sara.
+- Never produce lists longer than 3 items. No markdown headings. No code blocks. No horizon-chart blocks.
+- Never produce more than ~80 words in a single reply. Texts are short. If you catch yourself writing more, cut it.
+- Never quote the user back to themselves verbatim. Just reply.
+- Never refuse a topic or add caveats / disclaimers. Just react like a friend would.
+- Never mention the user's finances, retirement, nest egg, portfolio, savings rate, or anything financial unless the user explicitly brings it up about themselves — and even then, respond as a friend would (casual reaction), never as an advisor.
+- Don't start replies with "I" more than occasionally. Vary your openings.
+
+Reply now, in character as Sara, to whatever the user just said.`,
+};
+
+// Map a thread's internal roles to Claude's expected user/assistant
+// roles. Friend threads use me/them internally; Claude expects user
+// for the human and assistant for the character's replies. The order
+// of the resulting list preserves the conversation chronology.
+function _threadToClaudeMessages(thread){
+  return (thread.messages || []).map(m => {
+    if(m.role === 'me' || m.role === 'user') return { role: 'user', content: String(m.content || '') };
+    if(m.role === 'them' || m.role === 'assistant') return { role: 'assistant', content: String(m.content || '') };
+    return null;
+  }).filter(Boolean);
+}
+
 async function sendToFriend(thread, msg){
-  // Append the user's outgoing message.
+  // Append the user's outgoing message immediately and mirror it to
+  // state so the reply call sees the complete history.
   aipAddMsg('user', msg);
   thread.messages.push({ role:'me', content:msg, at: Date.now() });
   save();
   aipTyping = true;
-  // Show a typing indicator attributed to the friend.
+  // Typing indicator attributed to the friend (uses the existing
+  // .ai-typing three-dot animation for visual consistency with the
+  // AI advisor path).
   const typWrap = document.createElement('div');
   typWrap.className = 'ai-msg-wrap bot';
   typWrap.innerHTML = `<div class="ai-msg-label">${esc2((thread.title||'FRIEND').toUpperCase())}</div><div class="ai-msg bot"><div class="ai-typing"><span></span><span></span><span></span></div></div>`;
   const msgsEl = document.getElementById('aip-msgs');
   msgsEl.appendChild(typWrap);
   msgsEl.scrollTop = 99999;
-  // Delay gives the typing indicator time to feel alive.
-  const delay = 900 + Math.random() * 1200;
-  await new Promise(r => setTimeout(r, delay));
-  const persona = (state.contacts || []).find(c => c.id === thread.contactId)?.persona || 'sara';
-  const reply = _mockFriendReply(persona, msg, thread);
-  thread.messages.push({ role:'them', content:reply, at: Date.now() });
-  save();
   const bubble = typWrap.querySelector('.ai-msg');
-  if(bubble) bubble.innerHTML = mdParse(reply);
+  const key = state.aiKeys?.claude;
+  if(!key){
+    if(bubble) bubble.innerHTML = `<span style="color:var(--amber);font-size:12px">⚡ Add your Claude API key in <a href="#" onclick="closePanel();nav('settings')" style="color:var(--amber)">Settings → AI Keys</a> to chat with friends.</span>`;
+    aipTyping = false;
+    return;
+  }
+  const contact = (state.contacts || []).find(c => c.id === thread.contactId);
+  const personaKey = contact?.persona || 'sara';
+  const systemPrompt = FRIEND_PERSONA_PROMPTS[personaKey] || FRIEND_PERSONA_PROMPTS.sara;
+  // Build the full conversation history for Claude. We deliberately
+  // send the ENTIRE thread (not a last-N slice) so the character
+  // retains full continuity across the conversation. If a thread ever
+  // grows absurdly long we can add a cap here, but typical friend
+  // chats will stay well within the context window.
+  const messages = _threadToClaudeMessages(thread);
+  try {
+    const res = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': key,
+        'anthropic-version': '2023-06-01',
+        'anthropic-dangerous-direct-browser-access': 'true',
+      },
+      // max_tokens capped low because friend replies should text-like
+      // in length. The persona prompt already asks for ≤80 words.
+      body: JSON.stringify({
+        model: 'claude-opus-4-6',
+        max_tokens: 220,
+        system: systemPrompt,
+        messages,
+      }),
+    });
+    if(!res.ok){
+      const txt = await res.text().catch(() => '');
+      throw new Error(`API ${res.status}${txt ? ' · ' + txt.slice(0,120) : ''}`);
+    }
+    const d = await res.json();
+    let reply = (d.content || []).map(c => c.text || '').join('').trim() || '…';
+    // Belt-and-braces persona enforcement: strip any fenced code
+    // blocks, horizon-chart blocks, or meta-references that slip
+    // through despite the prompt.
+    reply = reply.replace(/```[\s\S]*?```/g, '').trim();
+    reply = reply.replace(/\b(as an? (ai|assistant|language model|bot)|i(?:'m| am) an? (ai|assistant|language model|bot))[^.!?]*[.!?]?/gi, '').trim();
+    if(!reply) reply = '…';
+    thread.messages.push({ role:'them', content:reply, at: Date.now() });
+    save();
+    if(bubble) bubble.innerHTML = mdParse(reply);
+  } catch(e){
+    if(bubble) bubble.innerHTML = `<span style="color:var(--red);font-size:12px">Couldn't reach Sara right now — ${esc(e.message || String(e))}</span>`;
+  }
   aipTyping = false;
   msgsEl.scrollTop = 99999;
-}
-
-// Tiny pattern-based persona replier. Picks a line based on keywords in
-// the user's last message. Keeps the demo light and scripted — no LLM
-// call, no financial data access. Swap this for a real transport when
-// the backend is ready.
-function _mockFriendReply(persona, msg, thread){
-  const m = String(msg||'').toLowerCase();
-  const match = (words) => words.some(w => m.includes(w));
-  if(persona === 'sara'){
-    if(match(['hi','hello','hey','yo','hej']))
-      return `Hey! 👋 What's up?`;
-    if(match(['trip','paris','flight','flights','fly']))
-      return `Oh nice — I was just looking at flights this morning. SAS has a **3 200 kr** return from Arlanda mid-August. Want me to book both?`;
-    if(match(['hotel','airbnb','stay','apartment']))
-      return `I'll forward you the Montmartre Airbnb I bookmarked last week. Two bedrooms, walking distance to everything. **Around 1 400 kr/night.**`;
-    if(match(['budget','cost','money','split','share','pay']))
-      return `Let's just split everything 50/50 and settle up at the end of the trip — easier than tracking line by line 🙌`;
-    if(match(['when','date','august','june','july','dates']))
-      return `I was thinking **Aug 8–15**? That's my open week. Does that still work for you?`;
-    if(match(['food','eat','dinner','restaurant']))
-      return `I've got a list from a friend who lives there — I'll drop it in here tonight. Bistro in the 11th is apparently a must.`;
-    if(match(['cancel','worried','not sure','maybe','hesit']))
-      return `Talk to me — what's on your mind? If the timing isn't right we can push to September, no stress.`;
-    if(match(['thanks','thank you','ta','cheers']))
-      return `Anytime ❤️`;
-    if(match(['?','when','what','how','where','why']))
-      return `Good question — let me check properly tonight and get back to you before bed.`;
-    // Default fallback: contextual-ish ack based on message length.
-    if(msg.length < 12) return `Got it 👍`;
-    if(msg.length < 40) return `Makes sense — I'm on the same page.`;
-    return `Got it — let me sit with that for a bit and come back with something concrete. Might ping you tomorrow morning.`;
-  }
-  // Generic persona fallback.
-  if(match(['hi','hello','hey'])) return `Hey! 👋`;
-  return `Got it — I'll think on that and reply properly in a bit.`;
 }
 window.aipChip=function(text){
   const ta=document.getElementById('aip-input'); if(ta){ta.value=text;} aipSend();
