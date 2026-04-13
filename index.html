@@ -114,10 +114,7 @@ input[type="number"] { -moz-appearance:textfield; }
 .cur-toggle { display:flex; gap:2px; background:var(--bg0); border-radius:6px; padding:2px; }
 .cur-btn { background:transparent; border:none; color:var(--text3); padding:4px 8px; border-radius:5px; font-family:var(--fm); font-size:10px; cursor:pointer; transition:all .15s; }
 .cur-btn.active { background:var(--green); color:#000; font-weight:700; }
-.save-badge { font-family:var(--fm); font-size:10px; padding:3px 8px; border-radius:4px; border:1px solid var(--border); color:var(--text3); transition:all .3s; }
-.save-badge.synced { border-color:var(--blue); color:var(--blue); background:var(--blue-dim); }
-.save-badge.saving { color:var(--amber); }
-.save-badge.saved { color:var(--green); background:var(--green-dim); }
+/* .save-badge removed — auto-save is silent across the app. */
 
 .main-row { display:flex; flex:1; overflow:hidden; }
 
@@ -1892,7 +1889,6 @@ body.light .piq-country-menu { box-shadow:0 12px 28px -10px rgba(60,40,10,0.22);
         <button class="sc-arrow" onclick="event.stopPropagation();scopeShift(1)" title="Next">▶</button>
       </div>
       <div class="cur-toggle" id="cur-toggle"></div>
-      <span class="save-badge" id="save-badge" style="display:none"></span>
       <button class="iBtn" id="theme-btn" onclick="toggleTheme()" title="Toggle theme">☀</button>
       <button class="iBtn" onclick="toggleAIPanel()" title="AI Advisor">✦</button>
     </div>
@@ -2490,7 +2486,6 @@ function loadState() {
 }
 function save() {
   clearTimeout(saveTimer);
-  showSave('saving');
   state.version = STATE_VERSION;
   // Invalidate selector memo cache — any save could change computed values.
   _selGen++;
@@ -2498,18 +2493,12 @@ function save() {
   if(typeof bus!=='undefined') bus.emit('state:changed', {panel: state.activePanel});
   saveTimer = setTimeout(() => {
     try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch(e) {}
-    showSave('saved');
-    setTimeout(() => showSave(''), 2000);
   }, 400);
 }
-function showSave(status) {
-  const el = document.getElementById('save-badge');
-  if (!el) return;
-  if (!status) { el.style.display='none'; return; }
-  el.style.display='block';
-  el.className = 'save-badge ' + status;
-  el.textContent = status==='saving'?'⟳ Saving…':status==='saved'?'✓ Saved':'Synced';
-}
+// Save confirmation badge removed — auto-save is now silent. This
+// no-op stub is kept so any stale call sites (including the
+// applyCurrency helper and third-party inline handlers) don't throw.
+function showSave() {}
 
 // ─── CURRENCY / FORMAT ───────────────────────────────────────────────────────
 function rate(cur) { cur=cur||state.currency; return (state.exchangeRates&&state.exchangeRates[cur])||DEFAULT_RATES[cur]||1; }
@@ -3909,10 +3898,6 @@ window.applyCurrency = function(c){
   try {
     state.version = STATE_VERSION;
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-    if(typeof showSave === 'function'){
-      showSave('saved');
-      setTimeout(() => showSave(''), 1200);
-    }
   } catch(_e){}
 };
 
