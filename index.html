@@ -3454,6 +3454,41 @@ const STRINGS = {
   'dash.report.concern':    { en:'Areas of concern',            sv:'Områden att hålla koll på' },
   'dash.report.recs':       { en:'Recommendations',             sv:'Rekommendationer' },
 
+  // ── Shared line-item branches (trip / carry-forward / paid / variance) ──
+  // Trip rows (read-only, linked from the Fun Fund tab)
+  'li.trip.hint':           { en:'Trip expenses are managed in the Fun Fund tab — click there to edit the name, month, or amount.',
+                              sv:'Reseutgifter hanteras i Fun Fund-fliken — klicka där för att redigera namn, månad eller belopp.' },
+  'li.trip.editJump':       { en:'Edit in Fun Fund ↗',   sv:'Redigera i Fun Fund ↗' },
+  'li.trip.jumpTitle':      { en:'Open the Fun Fund tab to edit this trip',
+                              sv:'Öppna Fun Fund-fliken för att redigera resan' },
+  'li.trip.pill':           { en:'TRIP',                  sv:'RESA' },
+  // Carry-forward rows (rolled-in surplus / deficit)
+  'li.carry.deletedTip':    { en:'You deleted this {kind}. Click Restore to recover it, or keep typing a new amount to replace it.',
+                              sv:'Du tog bort denna {kind}. Klicka Återställ för att få tillbaka den, eller fortsätt skriva ett nytt belopp för att ersätta den.' },
+  'li.carry.kind.income':   { en:'carry-forward',         sv:'överföring' },
+  'li.carry.kind.deficit':  { en:'deficit rollover',      sv:'underskottsöverföring' },
+  'li.carry.tip':           { en:'Auto-generated rollover from {month}. Edit the amount to override, or click reset to restore the computed chain.',
+                              sv:'Automatiskt genererad överföring från {month}. Redigera beloppet för att överskriva, eller klicka återställ för att återgå till den beräknade kedjan.' },
+  'li.carry.deletedSub':    { en:' <span class="line-carry-name-sub">· deleted, click restore to recover</span>',
+                              sv:' <span class="line-carry-name-sub">· borttagen, klicka återställ för att få tillbaka</span>' },
+  'li.carry.restore':       { en:'↩ Restore {amt}',       sv:'↩ Återställ {amt}' },
+  'li.carry.restoreTitle':  { en:'Restore the deleted rollover to its computed {amt} value',
+                              sv:'Återställ den borttagna överföringen till dess beräknade {amt}-värde' },
+  'li.carry.reset':         { en:'reset',                 sv:'återställ' },
+  'li.carry.resetTitle':    { en:'Reset to the auto-computed rollover',
+                              sv:'Återgå till den auto-beräknade överföringen' },
+  'li.carry.pill.deleted':  { en:'DELETED',               sv:'BORTTAGEN' },
+  'li.carry.pill.overridden':{en:'OVERRIDDEN',            sv:'ÖVERSKRIVEN' },
+  'li.carry.pill.rollover': { en:'ROLLOVER',              sv:'ÖVERFÖRING' },
+  // Variance pill (bank actuals vs budget)
+  'li.variance.title':      { en:'Actual spend this month from bank data: {actual} ({categories})',
+                              sv:'Faktisk utgift denna månad från bankdata: {actual} ({categories})' },
+  // Paid checkbox
+  'li.paid.unmark':         { en:'Paid — click to unmark',
+                              sv:'Betald — klicka för att avmarkera' },
+  'li.paid.mark':           { en:'Mark as paid for this month',
+                              sv:'Markera som betald för denna månad' },
+
   // ── Monthly Review body ────────────────────────────────
   'monthly.chart.ie':       { en:'12-Month Income vs Expenses',
                               sv:'12-månaders inkomst mot utgifter' },
@@ -6760,13 +6795,13 @@ function renderLineItems(containerId, items, stateKey, readOnly, showPaid) {
       // row automatically via get12Months(). A click on the locked
       // amount input surfaces an inline hint so the user knows
       // exactly where to go.
-      const hint = `Trip expenses are managed in the Fun Fund tab — click there to edit the name, month, or amount.`;
+      const hint = t('li.trip.hint');
       return `<div class="line-item line-item-linked line-item-linked-ro" title="${esc(hint)}">
         <span class="line-linked-icon" aria-hidden="true">✈︎</span>
         <input class="line-name" value="${esc(it.name)}" disabled title="${esc(hint)}">
         <div class="line-amt-wrap line-amt-wrap-ro" title="${esc(hint)}"><span class="line-cur">${s}</span><input class="line-amt" type="number" value="${Math.round(it.amount*r)}" disabled readonly title="${esc(hint)}"><span class="line-lock" aria-hidden="true" title="${esc(hint)}">🔒</span></div>
-        <button class="line-linked-jump" onclick="nav('funfund')" title="Open the Fun Fund tab to edit this trip">Edit in Fun Fund ↗</button>
-        <span class="line-linked-pill trip">TRIP</span>
+        <button class="line-linked-jump" onclick="nav('funfund')" title="${esc2(t('li.trip.jumpTitle'))}">${esc2(t('li.trip.editJump'))}</button>
+        <span class="line-linked-pill trip">${esc2(t('li.trip.pill'))}</span>
       </div>`;
     }
     // Carry-forward synthetic rows — produced by get12Months() to chain
@@ -6788,22 +6823,33 @@ function renderLineItems(containerId, items, stateKey, readOnly, showPaid) {
       const isZeroed = !!it.zeroed;
       const computedAbs = Math.abs(Number(it.computed) || 0);
       const restoreBtn = isZeroed && computedAbs > 0
-        ? `<button class="line-carry-restore" onclick="resetCarryOverride('${monthKey}')" title="Restore the deleted rollover to its computed ${fmt(computedAbs)} value">↩ Restore ${fmt(computedAbs)}</button>`
+        ? `<button class="line-carry-restore" onclick="resetCarryOverride('${monthKey}')" title="${esc2(t('li.carry.restoreTitle', { amt: fmt(computedAbs) }))}">${esc2(t('li.carry.restore', { amt: fmt(computedAbs) }))}</button>`
         : '';
       const resetBtn = !isZeroed && it.overridden
-        ? `<button class="line-carry-reset" onclick="resetCarryOverride('${monthKey}')" title="Reset to the auto-computed rollover">reset</button>`
+        ? `<button class="line-carry-reset" onclick="resetCarryOverride('${monthKey}')" title="${esc2(t('li.carry.resetTitle'))}">${esc2(t('li.carry.reset'))}</button>`
         : '';
-      const pillText = isZeroed ? 'DELETED' : it.overridden ? 'OVERRIDDEN' : 'ROLLOVER';
+      const pillText = isZeroed
+        ? t('li.carry.pill.deleted')
+        : it.overridden ? t('li.carry.pill.overridden') : t('li.carry.pill.rollover');
       const wrapCls = isZeroed
         ? ' line-item-carry-zeroed'
         : (it.overridden ? ' line-item-carry-override' : '');
-      return `<div class="line-item line-item-carry${wrapCls}" title="${isZeroed ? 'You deleted this '+(isInc?'carry-forward':'deficit rollover')+'. Click Restore to recover it, or keep typing a new amount to replace it.' : 'Auto-generated rollover from '+esc((it.name||'').replace(/^[A-Za-z\- ]+from /, ''))+'. Edit the amount to override, or click reset to restore the computed chain.'}">
+      // Tooltip text — translated. The "from {month}" fragment in
+      // the auto-generated path is sourced from the row's own
+      // name field where the upstream label has already been
+      // stripped of the localised "from " prefix; we inject the
+      // remaining month name into the t() template.
+      const carryMonth = esc((it.name || '').replace(/^[A-Za-z\u00c0-\u017f\- ]+ /, ''));
+      const carryTitle = isZeroed
+        ? t('li.carry.deletedTip', { kind: t(isInc ? 'li.carry.kind.income' : 'li.carry.kind.deficit') })
+        : t('li.carry.tip', { month: carryMonth });
+      return `<div class="line-item line-item-carry${wrapCls}" title="${esc2(carryTitle)}">
         <span class="line-carry-icon" aria-hidden="true">${isZeroed ? '✖' : '⇡'}</span>
-        <span class="line-carry-name">${esc(it.name)}${isZeroed ? ' <span class="line-carry-name-sub">· deleted, click restore to recover</span>' : ''}</span>
+        <span class="line-carry-name">${esc(it.name)}${isZeroed ? t('li.carry.deletedSub') : ''}</span>
         <div class="line-carry-amt-wrap"><span class="line-carry-cur">${s}</span><input class="line-carry-amt-input" type="number" value="${Math.round(it.amount*r)}" oninput="setCarryOverride('${monthKey}',${signed}*this.value/${r})"></div>
         ${restoreBtn}
         ${resetBtn}
-        <span class="line-carry-pill${isZeroed?' deleted':''}">${pillText}</span>
+        <span class="line-carry-pill${isZeroed?' deleted':''}">${esc2(pillText)}</span>
       </div>`;
     }
     const variance = actuals[it.id];
@@ -6813,10 +6859,10 @@ function renderLineItems(containerId, items, stateKey, readOnly, showPaid) {
       const overBudget = variance.actual > it.amount;
       const tone = overBudget ? 'neg' : 'pos';
       const arrow = overBudget ? '↑' : '↓';
-      variancePill = `<span class="line-variance ${tone}" title="Actual spend this month from bank data: ${fmt(variance.actual)} (${variance.categories.join(', ')})">${arrow} ${Math.abs(deltaPct)}% · ${fmt(variance.actual)}</span>`;
+      variancePill = `<span class="line-variance ${tone}" title="${esc2(t('li.variance.title', { actual: fmt(variance.actual), categories: variance.categories.join(', ') }))}">${arrow} ${Math.abs(deltaPct)}% · ${fmt(variance.actual)}</span>`;
     }
     const isPaid = !!paidMap[it.id];
-    const paidBox = monthKey ? `<label class="line-paid" title="${isPaid?'Paid — click to unmark':'Mark as paid for this month'}">
+    const paidBox = monthKey ? `<label class="line-paid" title="${esc2(isPaid?t('li.paid.unmark'):t('li.paid.mark'))}">
       <input type="checkbox" ${isPaid?'checked':''} onchange="togglePaid('${monthKey}','${it.id}',this.checked)">
       <span class="line-paid-box" aria-hidden="true">${isPaid?'✓':''}</span>
     </label>` : '';
