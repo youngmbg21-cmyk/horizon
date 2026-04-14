@@ -578,6 +578,37 @@ input[type="number"] { -moz-appearance:textfield; }
 
 /* ── RETIREMENT RUNWAY ───────────────────────────────── */
 .runway-card { background:var(--bg2); border:1px solid var(--border); border-radius:10px; padding:14px; margin-bottom:10px; }
+/* ── Seeded-from banner in Retirement Plan expenses card ──────────
+   Surfaces when the user has clicked "Copy from current budget".
+   Same violet/lime linked-row vocabulary used elsewhere in the app
+   for derived / seeded state — visually cousins with
+   .line-item-linked and .asset-row-derived. */
+.ret-seed-banner {
+  display:flex; align-items:center; gap:12px;
+  padding:10px 14px;
+  margin-bottom:10px;
+  background: linear-gradient(90deg, var(--violet-dim) 0%, rgba(163,230,53,.08) 100%);
+  border:1px dashed var(--violet);
+  border-left:3px solid #a3e635;
+  border-radius:6px;
+}
+.ret-seed-banner .ret-seed-icon { font-size:18px; line-height:1; flex-shrink:0; }
+.ret-seed-banner .ret-seed-body { flex:1; min-width:0; }
+.ret-seed-banner .ret-seed-title {
+  font-family:var(--fm); font-size:11px; font-weight:700;
+  color:var(--text); letter-spacing:.02em;
+}
+.ret-seed-banner .ret-seed-title strong { color:var(--violet); }
+.ret-seed-banner .ret-seed-sub {
+  font-size:10px; color:var(--text2); margin-top:2px; line-height:1.5;
+}
+.ret-seed-banner .ret-seed-x {
+  background:transparent; border:none;
+  color:var(--text3); font-size:18px; line-height:1;
+  cursor:pointer; padding:2px 6px; border-radius:4px;
+  transition:color .15s, background .15s;
+}
+.ret-seed-banner .ret-seed-x:hover { color:var(--red); background:var(--accent-critical-dim); }
 /* Longevity Runway — feature #4 reference-aligned styling */
 /* ── INCOME REQUIREMENTS (top of Retirement Plan tab) ──────────────── */
 .ireq-card { padding:18px 20px; margin-bottom:14px; }
@@ -3384,6 +3415,26 @@ const FinancialEngine = (() => {
     // Sum of per-month pure Fun Fund allocations over the 12-month
     // window. Used as the headline "12-month Fun Fund" KPI.
     funFundTwelveMoTotal: () => getMonthlyFunFundBalance(),
+    // Deep-clone the current month's expense line items with FRESH
+    // ids and every "synthetic" row stripped (carry-forward rollovers,
+    // Fun Fund trip expenses). Used by the Retirement Plan tab's
+    // "Copy from current budget" button to seed the user's retirement
+    // expense model from their actual monthly expenses — a one-shot
+    // snapshot, not a live sync, so later tweaks to either side stay
+    // independent.
+    currentExpensesSnapshot: () => {
+      const cm = get12Months()[0];
+      if(!cm) return [];
+      return (cm.expenseItems || [])
+        .filter(it => !it.carryForward && !it.fromTrip)
+        .map(it => ({
+          id: genId(),
+          name: String(it.name || ''),
+          amount: Number(it.amount) || 0,
+          type: it.type || 'variable',
+          icon: it.icon || '💸',
+        }));
+    },
   };
   // ── projection · yearly compounding (today → retirement age) ────────
   const projection = {
@@ -6090,6 +6141,33 @@ function sectionWrap(n, icon, title, subtitle, content) {
   </div>`;
 }
 
+// One-shot copy of the user's current monthly expenses into the
+// Retirement Plan expense model. NOT a live sync — the snapshot
+// gets fresh ids so later edits on either side stay independent.
+// If the retirement expense list already has anything in it, we
+// confirm before overwriting so users can't accidentally clobber a
+// retirement plan they've already tuned.
+window.copyBaselineToRetirementExpenses = function(){
+  const snapshot = FE.months.currentExpensesSnapshot();
+  if(!snapshot.length){
+    alert('No monthly expenses to copy yet — add at least one line item on the Monthly Review tab first.');
+    return;
+  }
+  const existing = (state.retirementExpenses || []).length;
+  if(existing > 0){
+    const proceed = confirm(`This will replace your ${existing} existing retirement expense${existing===1?'':'s'} with a snapshot of your current monthly budget.\n\nThis is a one-shot copy — you can adjust the retirement list afterwards without affecting your Monthly Review. Continue?`);
+    if(!proceed) return;
+  }
+  state.retirementExpenses = snapshot;
+  const cm = FE.months.current();
+  state.retirementExpensesSeededFrom = {
+    month: cm ? cm.label : '',
+    at: Date.now(),
+  };
+  save();
+  renderRetirement();
+};
+
 function renderRetirement() {
   const nums=getRetirementNumbers();
   const retExp=state.retirementExpenses||[];
@@ -6322,11 +6400,31 @@ function renderRetirement() {
       <button class="line-rm" onclick="state.retirementExpenses.splice(${idx},1);save();renderRetirement()">×</button>
     </div>`).join('');
 
+  // "Seeded from current budget" banner data. If the user has
+  // clicked the Copy button, state.retirementExpensesSeededFrom holds
+  // { month, at } so the card header can surface a dismissable
+  // reminder that the expenses started as a snapshot of the monthly
+  // baseline — they're free to diverge from here.
+  const seededFrom = state.retirementExpensesSeededFrom || null;
+  const seededBanner = seededFrom ? `
+    <div class="ret-seed-banner">
+      <span class="ret-seed-icon">📋</span>
+      <div class="ret-seed-body">
+        <div class="ret-seed-title">Seeded from <strong>${esc2(seededFrom.month || 'current budget')}</strong></div>
+        <div class="ret-seed-sub">One-shot snapshot — adjust anything you expect to change in retirement. Future edits to Monthly Review stay independent.</div>
+      </div>
+      <button class="ret-seed-x" onclick="delete state.retirementExpensesSeededFrom;save();renderRetirement()" title="Dismiss">×</button>
+    </div>
+  ` : '';
   const s3 = `
     <div style="padding:0 14px 14px">
       <div class="two-col">
         <div class="card">
-          <div class="card-title">Monthly Retirement Expenses <span style="font-size:9px;color:var(--text2);font-weight:400;text-transform:none">(today's money)</span></div>
+          <div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap">
+            <span>Monthly Retirement Expenses <span style="font-size:9px;color:var(--text2);font-weight:400;text-transform:none">(today's money)</span></span>
+            <button class="btn btn-o btn-xs" onclick="copyBaselineToRetirementExpenses()" title="Replace this list with a snapshot of your current monthly expenses">📋 Copy from current budget</button>
+          </div>
+          ${seededBanner}
           ${expRows}
           <button class="btn-add" onclick="state.retirementExpenses.push({id:genId(),name:'New Expense',amount:0,type:'variable',icon:'💸'});save();renderRetirement()">+ Add Expense</button>
           <div style="margin-top:10px;padding:8px 10px;background:var(--bg3);border-radius:6px;font-size:10px;color:var(--text2);line-height:1.5">
