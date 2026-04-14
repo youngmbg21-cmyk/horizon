@@ -112,6 +112,12 @@ input[type="number"] { -moz-appearance:textfield; }
 .iBtn { width:32px; height:32px; border-radius:7px; border:1px solid var(--border); background:var(--bg3); color:var(--text2); display:flex; align-items:center; justify-content:center; cursor:pointer; font-size:13px; transition:all .2s; }
 .iBtn:hover { border-color:var(--green); color:var(--green); }
 .cur-toggle { display:flex; gap:2px; background:var(--bg0); border-radius:6px; padding:2px; }
+/* Language toggle (Settings → Appearance). Flat two-button pill that
+   mirrors the currency toggle vocabulary so the control feels native. */
+.lang-toggle { display:inline-flex; gap:2px; background:var(--bg0); border:1px solid var(--border); border-radius:8px; padding:3px; }
+.lang-btn { background:transparent; border:none; color:var(--text2); font-family:var(--fm); font-size:11px; font-weight:600; letter-spacing:.02em; padding:6px 12px; border-radius:5px; cursor:pointer; transition:background .15s, color .15s; }
+.lang-btn:hover { color:var(--text); }
+.lang-btn.active { background:var(--bg3); color:var(--text); }
 .cur-btn { background:transparent; border:none; color:var(--text3); padding:4px 8px; border-radius:5px; font-family:var(--fm); font-size:10px; cursor:pointer; transition:all .15s; }
 .cur-btn.active { background:var(--green); color:#000; font-weight:700; }
 /* .save-badge removed — auto-save is silent across the app. */
@@ -3149,6 +3155,116 @@ const STORAGE_KEY = 'horizon-finance-os-v1';
 // migration replace just this slice without touching anything else.
 const VAULT_STORAGE_KEY = STORAGE_KEY + ':vault';
 const MONTH_NAMES = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+
+// ─── I18N (Phase 1 scaffolding) ─────────────────────────────────────────────
+// Single flat translation table. Each entry is { en, sv }. Missing
+// keys fall back through t() to English or the key itself, so the
+// app stays functional through a phased migration. Keys use dot
+// notation grouped by surface: "common.*", "settings.*", "nav.*".
+// Phase 1 ships only the strings needed by the language toggle itself
+// + a short demo section in Settings — everything else continues to
+// render English literals until Phase 2 touches each panel.
+const LANGS = ['en','sv'];
+const STRINGS = {
+  // Language toggle card (Settings → Ticker Quote & Appearance)
+  'settings.lang.title':    { en:'🌐 Language',       sv:'🌐 Språk' },
+  'settings.lang.blurb':    { en:'Interface language. Swedish support is rolling out panel by panel — untranslated text falls back to English.',
+                              sv:'Gränssnittsspråk. Svenskt stöd införs panel för panel — otranslaterade texter faller tillbaka till engelska.' },
+  'settings.lang.en':       { en:'English',           sv:'Engelska' },
+  'settings.lang.sv':       { en:'Swedish',           sv:'Svenska' },
+  // Dark mode label lives in the same card — migrate as a demo.
+  'settings.darkMode':      { en:'Dark Mode',         sv:'Mörkt läge' },
+  // Common actions reused by Phase 2 — seeded now so the table has
+  // real content from day one.
+  'common.save':            { en:'Save',              sv:'Spara' },
+  'common.cancel':          { en:'Cancel',            sv:'Avbryt' },
+  'common.add':             { en:'Add',               sv:'Lägg till' },
+  'common.remove':          { en:'Remove',            sv:'Ta bort' },
+  'common.edit':            { en:'Edit',              sv:'Redigera' },
+  'common.reset':           { en:'Reset',             sv:'Återställ' },
+  'common.close':           { en:'Close',             sv:'Stäng' },
+  'common.yes':             { en:'Yes',               sv:'Ja' },
+  'common.no':              { en:'No',                sv:'Nej' },
+  'common.today':           { en:"Today's money",     sv:'Dagens penningvärde' },
+};
+// Resolve a translation. `vars` supplies values for {placeholder}
+// tokens. Falls through to English, then to the key itself, so a
+// missing string is visible but non-fatal.
+function t(key, vars){
+  const entry = STRINGS[key];
+  let out = (entry && (entry[state.lang] || entry.en)) || key;
+  if(vars){
+    for(const k in vars){
+      out = out.split('{'+k+'}').join(vars[k]);
+    }
+  }
+  return out;
+}
+window.t = t;
+
+// Flip the active language, persist, and trigger a full re-render.
+// Piggybacks on the same renderAll() machinery the currency and
+// theme toggles already use, so no new lifecycle is introduced.
+function setLang(lang){
+  if(!LANGS.includes(lang)) return;
+  if(state.lang === lang) return;
+  state.lang = lang;
+  try { document.documentElement.lang = lang; } catch(_){}
+  save();
+  renderAll();
+}
+window.setLang = setLang;
+
+// ─── NUMERIC PARSING (Swedish comma safety) ─────────────────────────────────
+// Robust number parser used by Phase 2+ oninput handlers on any input
+// marked with inputmode="decimal" or data-lang-num="1". Accepts either
+// "1234.5" or "1234,5" or "1 234,50" or "1'234.50". Returns 0 on
+// empty/invalid so it behaves like the existing (+value||0) pattern.
+function parseNum(v){
+  if(v == null) return 0;
+  if(typeof v === 'number') return isFinite(v) ? v : 0;
+  let s = String(v).trim();
+  if(!s) return 0;
+  // Strip thousand separators (regular space, non-breaking space,
+  // narrow no-break space, apostrophe) and currency noise letters.
+  s = s.replace(/[\s\u00a0\u202f']/g, '');
+  // Normalise the Swedish comma to a period. If both are present
+  // (e.g. "1,234.56"), assume period is the decimal and drop commas.
+  const hasDot = s.indexOf('.') !== -1;
+  const hasComma = s.indexOf(',') !== -1;
+  if(hasDot && hasComma){
+    // Period dominates — treat comma as a thousand separator.
+    s = s.replace(/,/g, '');
+  } else if(hasComma){
+    // Pure Swedish-style decimal — swap comma to period.
+    s = s.replace(/,/g, '.');
+  }
+  const n = parseFloat(s);
+  return isFinite(n) ? n : 0;
+}
+window.parseNum = parseNum;
+
+// One document-level listener that makes any input marked
+// inputmode="decimal" or data-lang-num tolerant of a typed comma.
+// Phase 1 does NOT convert any existing inputs — this is
+// infrastructure Phase 2+ migrates call sites into. Runs in the
+// capture phase so it fires before inline oninput handlers.
+document.addEventListener('beforeinput', function(e){
+  const el = e.target;
+  if(!el || el.tagName !== 'INPUT') return;
+  if(el.type !== 'text' && el.type !== 'tel') return;
+  const wantsDecimal = el.inputMode === 'decimal' || el.hasAttribute('data-lang-num');
+  if(!wantsDecimal) return;
+  if(e.inputType !== 'insertText' || e.data !== ',') return;
+  try {
+    e.preventDefault();
+    const start = el.selectionStart ?? el.value.length;
+    const end   = el.selectionEnd   ?? el.value.length;
+    el.setRangeText('.', start, end, 'end');
+    el.dispatchEvent(new Event('input', { bubbles: true }));
+  } catch(_){}
+}, true);
+
 const CURRENCY_SYMBOLS = { SEK:'kr', USD:'$', EUR:'€', KES:'KSh' };
 const DEFAULT_RATES = { SEK:1, USD:0.11, EUR:0.09, KES:14.27 };
 const CAT_COLORS = ['#00e8a0','#4d9fff','#f5a623','#8b5cf6','#ec4899','#00d4ff','#ff4d6d','#10b981'];
@@ -3180,7 +3296,7 @@ let genId = () => Math.random().toString(36).substr(2,9);
 // ─── DEFAULT STATE ─────────────────────────────────────────────────────────
 function defaultState() {
   return {
-    currency:'SEK', darkMode:true, activePanel:'dashboard',
+    currency:'SEK', darkMode:true, lang:'en', activePanel:'dashboard',
     currentAge:44, retirementAge:69, growthRate:7, inflationRate:2,
     retirementPostGrowth:4, lifeExp:90, withdrawTaxRate:30,
     retirementScenario:'baseline',
@@ -9837,8 +9953,20 @@ function renderSettings() {
           <label class="toggle-wrap">
             <input type="checkbox" ${state.darkMode?'checked':''} onchange="state.darkMode=this.checked;save();applyTheme()">
             <div class="toggle-slider"></div>
-            Dark Mode
+            ${t('settings.darkMode')}
           </label>
+        </div>
+        <!-- Language toggle (Phase 1 — scaffolding).
+             Mirrors the currency toggle UX. Swedish support is
+             rolling out panel-by-panel; untranslated strings fall
+             back to English via t(). -->
+        <div class="lang-toggle-block" style="margin-top:12px;padding-top:12px;border-top:1px solid var(--border)">
+          <div style="font-size:11px;font-weight:700;color:var(--text);margin-bottom:4px">${t('settings.lang.title')}</div>
+          <p style="font-size:10px;color:var(--text2);margin:0 0 8px;line-height:1.5">${t('settings.lang.blurb')}</p>
+          <div class="lang-toggle" role="group" aria-label="${t('settings.lang.title')}">
+            <button type="button" class="lang-btn ${state.lang==='en'?'active':''}" onclick="setLang('en')" aria-pressed="${state.lang==='en'}">EN · ${t('settings.lang.en')}</button>
+            <button type="button" class="lang-btn ${state.lang==='sv'?'active':''}" onclick="setLang('sv')" aria-pressed="${state.lang==='sv'}">SV · ${t('settings.lang.sv')}</button>
+          </div>
         </div>
       </div>
       <!-- Data management -->
@@ -12344,6 +12472,12 @@ renderAIPChips();
 
 // ══ INIT ═════════════════════════════════════════════════════════════════════
 loadState();
+// Safety net for installs that predate the lang field — defaultState()
+// now seeds 'en', but a state restored from a pre-Phase-1 snapshot
+// won't have the key. Fall back explicitly rather than trusting the
+// default.
+if(!LANGS.includes(state.lang)) state.lang = 'en';
+try { document.documentElement.lang = state.lang; } catch(_){}
 applyTheme();
 // Honor deep-link hash on first load (#retirement or #retirement/runway).
 (()=>{
