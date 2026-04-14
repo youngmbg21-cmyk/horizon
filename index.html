@@ -3336,6 +3336,124 @@ const STRINGS = {
   'settings.data.resetConfirm': { en:'Reset all data? This cannot be undone.',
                                   sv:'Återställ all data? Detta kan inte ångras.' },
 
+  // ── Dashboard · page header ────────────────────────────
+  'dash.page.tag':          { en:'HORIZON FINANCE OS',    sv:'HORIZON FINANCE OS' },
+  'dash.page.title':        { en:'Your Financial Dashboard',
+                              sv:'Din ekonomiska översikt' },
+  'dash.page.sub':          { en:'360° view — cash flow, portfolio, retirement health, and lifestyle planning',
+                              sv:'360° vy — kassaflöde, portfölj, pensionshälsa och livsstilsplanering' },
+
+  // ── Dashboard · welcome greeting ───────────────────────
+  'dash.greet.lateNight':   { en:'Up late',                    sv:'Sent uppe' },
+  'dash.greet.morning':     { en:'Good morning',               sv:'God morgon' },
+  'dash.greet.afternoon':   { en:'Good afternoon',             sv:'God eftermiddag' },
+  'dash.greet.evening':     { en:'Good evening',               sv:'God kväll' },
+  'dash.greet.midnight':    { en:'Burning the midnight oil',   sv:'Nattugglan är vaken' },
+  'dash.greet.fallbackName':{ en:'there',                      sv:'du där' },
+
+  // ── Dashboard · welcome verdict fragments ──────────────
+  // Parameterised via t(key, {amount, pct, age, income}) so the
+  // numeric values stay outside the string.
+  'dash.verdict.cashGreen': { en:'your cash flow is green — this month you have <strong>{amount}</strong> of Fun Fund to play with',
+                              sv:'ditt kassaflöde är på plus — den här månaden har du <strong>{amount}</strong> av Fun Fund att leka med' },
+  'dash.verdict.cashRed':   { en:'this month is running <strong>{amount}</strong> short — Expenses + Savings are outpacing Income',
+                              sv:'den här månaden går <strong>{amount}</strong> i minus — utgifter + sparande överskrider inkomsten' },
+  'dash.verdict.retireAhead':   { en:'and your retirement plan is ahead of target at {pct}% funded',
+                                  sv:'och din pensionsplan ligger över målet vid {pct}% täckning' },
+  'dash.verdict.retireOnTrack': { en:'and your retirement plan is on track at {pct}% funded',
+                                  sv:'och din pensionsplan är i linje vid {pct}% täckning' },
+  'dash.verdict.retireLight':   { en:'and retirement coverage is light at {pct}% — worth a closer look',
+                                  sv:'och pensionstäckningen är låg vid {pct}% — värt att titta närmare på' },
+  'dash.ctxLine':           { en:"You're saving <strong>{pct}%</strong> of income ({amount}/mo), on track to retire at <strong>age {age}</strong> with <strong>{income}/mo</strong> of real retirement income.",
+                              sv:'Du sparar <strong>{pct}%</strong> av inkomsten ({amount}/mån), på väg att gå i pension vid <strong>ålder {age}</strong> med <strong>{income}/mån</strong> i reell pensionsinkomst.' },
+
+  // ── Dashboard · welcome CTA button states ──────────────
+  'dash.cta.analysing':     { en:'⏳ Analysing…',               sv:'⏳ Analyserar…' },
+  'dash.cta.rerun':         { en:'🔄 Re-run full analysis',    sv:'🔄 Kör analys igen' },
+  'dash.cta.run':           { en:'🤖 Run full financial analysis',
+                              sv:'🤖 Kör fullständig ekonomisk analys' },
+
+  // ── Dashboard · KPI row 1 (cash flow, 12-month) ────────
+  'dash.kpi.income12':      { en:'INCOME · NEXT 12 MONTHS',   sv:'INKOMST · NÄSTA 12 MÅNADER' },
+  'dash.kpi.expenses12':    { en:'EXPENSES · NEXT 12 MONTHS', sv:'UTGIFTER · NÄSTA 12 MÅNADER' },
+  'dash.kpi.savings12':     { en:'SAVINGS · NEXT 12 MONTHS',  sv:'SPARANDE · NÄSTA 12 MÅNADER' },
+  'dash.kpi.funFund12':     { en:'FUN FUND · NEXT 12 MONTHS', sv:'FUN FUND · NÄSTA 12 MÅNADER' },
+  'dash.kpi.sub.incomeStreams': { en:'{mo}/mo average · {n} income streams',
+                                  sv:'{mo}/mån snitt · {n} inkomstkällor' },
+  'dash.kpi.sub.pctOfIncome':   { en:'{mo}/mo average · {pct}% of income',
+                                  sv:'{mo}/mån snitt · {pct}% av inkomst' },
+  'dash.kpi.sub.savingsRate':   { en:'{mo}/mo average · {pct}% savings rate',
+                                  sv:'{mo}/mån snitt · {pct}% sparkvot' },
+  'dash.kpi.sub.avgPerMo':      { en:'{mo}/mo average',       sv:'{mo}/mån snitt' },
+
+  // ── Dashboard · KPI row 2 (retirement, today's money) ──
+  'dash.kpi.nestEgg':           { en:'NEST EGG · TODAY&rsquo;S MONEY',
+                                  sv:'PENSIONSKAPITAL · DAGENS PENNINGVÄRDE' },
+  'dash.kpi.monthlyIncomeReal': { en:'MONTHLY RETIREMENT INCOME · TODAY&rsquo;S MONEY',
+                                  sv:'MÅNATLIG PENSIONSINKOMST · DAGENS PENNINGVÄRDE' },
+  'dash.kpi.yearsToRetire':     { en:'YEARS TO RETIRE',       sv:'ÅR TILL PENSION' },
+  'dash.kpi.retireStatus':      { en:'RETIREMENT STATUS',     sv:'PENSIONSSTATUS' },
+  'dash.kpi.nestEggSub':        { en:'At age {age} · nominal {amt} (future kr)',
+                                  sv:'Vid ålder {age} · nominellt {amt} (framtida kr)' },
+  'dash.kpi.incomeSub':         { en:'Portfolio {p} + pension {pen} (real avg)',
+                                  sv:'Portfölj {p} + pension {pen} (reellt snitt)' },
+  'dash.kpi.ageSub':            { en:'Age {cur} → {ret}',     sv:'Ålder {cur} → {ret}' },
+  'dash.kpi.statusSub':         { en:'{pct}% funded · {amt}/mo real',
+                                  sv:'{pct}% täckning · {amt}/mån reellt' },
+
+  // ── Dashboard · bank connected callout ─────────────────
+  'dash.bank.connected':    { en:'Bank connected ({mode} mode)',
+                              sv:'Bank ansluten ({mode}-läge)' },
+  'dash.bank.mode.demo':    { en:'Demo',                      sv:'Demo' },
+  'dash.bank.mode.live':    { en:'Live',                      sv:'Live' },
+  'dash.bank.showing':      { en:'Showing {n} transactions.', sv:'Visar {n} transaktioner.' },
+  'dash.bank.view':         { en:'View transactions →',       sv:'Visa transaktioner →' },
+  'dash.bank.none':         { en:'No bank connected.',        sv:'Ingen bank ansluten.' },
+  'dash.bank.nonePrompt':   { en:'Connect your bank account to see real spending patterns and automate category tracking.',
+                              sv:'Anslut ditt bankkonto för att se faktiska utgiftsmönster och automatisera kategoriindelning.' },
+  'dash.bank.connectBtn':   { en:'+ Connect Bank',            sv:'+ Anslut bank' },
+
+  // ── Dashboard · chart cards ────────────────────────────
+  'dash.chart.cashflow.title':{ en:'📈 12-Month Cash Flow',   sv:'📈 12-månaders kassaflöde' },
+  'dash.chart.projection':  { en:'PROJECTION',                sv:'PROGNOS' },
+  'dash.chart.nestegg.title':{ en:'🎯 Nest Egg Growth Curve', sv:'🎯 Tillväxtkurva för pensionskapital' },
+  'dash.chart.toggle.real': { en:'Today&rsquo;s Money',       sv:'Dagens penningvärde' },
+  'dash.chart.toggle.nominal':{ en:'Nominal',                 sv:'Nominellt' },
+
+  // ── Chart.js series / legend labels ────────────────────
+  'dash.series.income':     { en:'Income',                    sv:'Inkomst' },
+  'dash.series.expenses':   { en:'Expenses',                  sv:'Utgifter' },
+  'dash.series.savings':    { en:'Savings',                   sv:'Sparande' },
+  'dash.series.funFund':    { en:'Fun Fund',                  sv:'Fun Fund' },
+  'dash.series.total':      { en:'Total',                     sv:'Totalt' },
+  'dash.series.investmentGrowth': { en:'Investment Growth',   sv:'Investeringstillväxt' },
+  'dash.series.savingsGrowth':    { en:'Savings Growth',      sv:'Spartillväxt' },
+  'dash.axis.age':          { en:'Age {n}',                   sv:'Ålder {n}' },
+
+  // ── Dashboard · AI Report card ─────────────────────────
+  'dash.ai.title':          { en:'🤖 AI Financial Analysis',  sv:'🤖 AI-ekonomianalys' },
+  'dash.ai.generated':      { en:'· generated {when}',        sv:'· genererad {when}' },
+  'dash.ai.running':        { en:'Running end-to-end financial analysis…',
+                              sv:'Kör fullständig ekonomisk analys…' },
+  'dash.ai.tryAgain':       { en:'Try again',                 sv:'Försök igen' },
+  'dash.ai.empty':          { en:'Ready when you are. Click <strong>Run full financial analysis</strong> above to generate a polished, end-to-end review of where you stand, what\'s going well, what needs attention, and what to do next.',
+                              sv:'Redo när du är. Klicka på <strong>Kör fullständig ekonomisk analys</strong> ovan för att generera en skarp, heltäckande genomgång av var du står, vad som går bra, vad som behöver uppmärksamhet och vad du bör göra härnäst.' },
+  'dash.ai.saveToVault':    { en:'💾 Save to Vault',          sv:'💾 Spara till arkiv' },
+  'dash.ai.rerun':          { en:'🔄 Re-run',                 sv:'🔄 Kör igen' },
+  'dash.ai.emptyNotes':     { en:'No notes for this section.', sv:'Inga anteckningar för detta avsnitt.' },
+  'dash.ai.savedToast':     { en:'✓ Saved to Vault',          sv:'✓ Sparat till arkiv' },
+  'dash.ai.noReport':       { en:'No report to save yet — run the analysis first.',
+                              sv:'Ingen rapport att spara ännu — kör analysen först.' },
+
+  // ── Dashboard · report section display titles ──────────
+  // These label the cards in the UI. The AI prompt + parser still
+  // use English headings; Phase 4 will migrate the AI layer so the
+  // model responds in the active language.
+  'dash.report.position':   { en:'Current financial position',  sv:'Nuvarande ekonomisk position' },
+  'dash.report.good':       { en:'What is going well',          sv:'Vad som går bra' },
+  'dash.report.concern':    { en:'Areas of concern',            sv:'Områden att hålla koll på' },
+  'dash.report.recs':       { en:'Recommendations',             sv:'Rekommendationer' },
+
   // ── Export slices (data management rows) ───────────────
   'slice.baseline.label':   { en:'Baseline',          sv:'Grunddata' },
   'slice.baseline.sub':     { en:'Income, expenses, savings target',
@@ -6555,6 +6673,9 @@ function mdParse(raw){
 // it survives panel re-renders, and exposes a tiny render helper the
 // dashboard template calls to draw the card body. The live-sync bus
 // patches just the card body when the status changes — no full rebuild.
+// Canonical section definitions. `title` is the English source of
+// truth (used by the AI prompt + parser until Phase 4 migrates the
+// AI layer); the UI reads display text via t('dash.report.<key>').
 const DASH_REPORT_SECTIONS = [
   { key:'position', title:'Current financial position', icon:'📍', cls:'sec-position' },
   { key:'good',     title:'What is going well',         icon:'✅', cls:'sec-good' },
@@ -6674,30 +6795,31 @@ function renderDashboardAIReportBody(){
   const err = state.dashboardReportError;
   const head = (extraActions='') => `
     <div class="dash-ai-hd">
-      <div class="dash-ai-title">🤖 AI Financial Analysis ${r && r.generatedAt ? `<span class="dash-ai-stamp">· generated ${_fmtWhen(r.generatedAt)}</span>`:''}</div>
+      <div class="dash-ai-title">${t('dash.ai.title')} ${r && r.generatedAt ? `<span class="dash-ai-stamp">${t('dash.ai.generated', { when: _fmtWhen(r.generatedAt) })}</span>`:''}</div>
       <div class="dash-ai-actions">${extraActions}</div>
     </div>`;
   if(running){
-    return head('') + `<div class="dash-ai-running"><div class="spinner"></div><span>Running end-to-end financial analysis…</span></div>`;
+    return head('') + `<div class="dash-ai-running"><div class="spinner"></div><span>${t('dash.ai.running')}</span></div>`;
   }
   if(err){
-    return head(`<button class="btn btn-sm btn-o" onclick="runDashboardAIReport()">Try again</button>`)
+    return head(`<button class="btn btn-sm btn-o" onclick="runDashboardAIReport()">${t('dash.ai.tryAgain')}</button>`)
       + `<div class="dash-ai-err">${esc(err)}</div>`;
   }
   if(!r){
     return `<div class="dash-ai-empty">
       <span class="big">🤖</span>
-      Ready when you are. Click <strong>Run full financial analysis</strong> above to generate a polished, end-to-end review of where you stand, what's going well, what needs attention, and what to do next.
+      ${t('dash.ai.empty')}
     </div>`;
   }
   const actions = `
-    <button class="btn btn-sm btn-o" onclick="saveDashboardReportToVault()">💾 Save to Vault</button>
-    <button class="btn btn-sm btn-o" onclick="runDashboardAIReport()">🔄 Re-run</button>`;
+    <button class="btn btn-sm btn-o" onclick="saveDashboardReportToVault()">${t('dash.ai.saveToVault')}</button>
+    <button class="btn btn-sm btn-o" onclick="runDashboardAIReport()">${t('dash.ai.rerun')}</button>`;
   const sections = DASH_REPORT_SECTIONS.map(sec => {
     const body = (r.sections && r.sections[sec.key]) || '';
+    const title = t('dash.report.'+sec.key);
     return `<div class="dash-ai-sec ${sec.cls}">
-      <div class="dash-ai-sec-hd"><span class="ic">${sec.icon}</span><span>${sec.title}</span></div>
-      ${body ? _renderAISectionBody(body) : '<div class="md" style="color:var(--text3);font-style:italic">No notes for this section.</div>'}
+      <div class="dash-ai-sec-hd"><span class="ic">${sec.icon}</span><span>${esc2(title)}</span></div>
+      ${body ? _renderAISectionBody(body) : `<div class="md" style="color:var(--text3);font-style:italic">${t('dash.ai.emptyNotes')}</div>`}
     </div>`;
   }).join('');
   return head(actions) + `<div class="dash-ai-sections">${sections}</div>`;
@@ -6727,7 +6849,7 @@ window.runDashboardAIReport = async function(){
   // Flip the welcome-card CTA label inline (no full re-render).
   try {
     const btn = document.querySelector('.dash-welcome-cta .btn');
-    if(btn){ btn.disabled = true; btn.innerHTML = '⏳ Analysing…'; }
+    if(btn){ btn.disabled = true; btn.innerHTML = t('dash.cta.analysing'); }
   } catch(_e){}
   try {
     const cm = FE.months.current();
@@ -6799,14 +6921,14 @@ Return plain markdown only — no preamble, no sign-off, no JSON.`;
       const btn = document.querySelector('.dash-welcome-cta .btn');
       if(btn){
         btn.disabled = false;
-        btn.innerHTML = state.dashboardReport ? '🔄 Re-run full analysis' : '🤖 Run full financial analysis';
+        btn.innerHTML = state.dashboardReport ? t('dash.cta.rerun') : t('dash.cta.run');
       }
     } catch(_e){}
   }
 };
 window.saveDashboardReportToVault = function(){
   const r = state.dashboardReport;
-  if(!r){ alert('No report to save yet — run the analysis first.'); return; }
+  if(!r){ alert(t('dash.ai.noReport')); return; }
   if(!Array.isArray(state.vault)) state.vault = [];
   const entry = {
     id: genId(),
@@ -6825,7 +6947,7 @@ window.saveDashboardReportToVault = function(){
   // Tiny inline toast on the button
   try {
     const btn = document.querySelector('#dash-ai-report .dash-ai-actions .btn');
-    if(btn){ btn.textContent = '✓ Saved to Vault'; setTimeout(() => _syncDashboardReportBody(), 1400); }
+    if(btn){ btn.textContent = t('dash.ai.savedToast'); setTimeout(() => _syncDashboardReportBody(), 1400); }
   } catch(_e){}
 };
 
@@ -6861,78 +6983,88 @@ function renderDashboard() {
   // the same `cm` + `retNums` source of truth every KPI uses, so
   // the greeting can never disagree with the tiles beside it.
   const hour = new Date().getHours();
-  const greet = hour < 5 ? 'Up late' : hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : hour < 22 ? 'Good evening' : 'Burning the midnight oil';
+  const greet = hour < 5  ? t('dash.greet.lateNight')
+              : hour < 12 ? t('dash.greet.morning')
+              : hour < 17 ? t('dash.greet.afternoon')
+              : hour < 22 ? t('dash.greet.evening')
+              : t('dash.greet.midnight');
   const funFlow = cm.pureFunFund;
   const savePct = ti > 0 ? Math.round(curSavings / ti * 100) : 0;
   let verdictTone = 'pos';
   let verdictBits = [];
-  if(funFlow >= 0) verdictBits.push(`your cash flow is green — this month you have <strong>${fmt(funFlow)}</strong> of Fun Fund to play with`);
-  else { verdictTone = 'neg'; verdictBits.push(`this month is running <strong>${fmt(Math.abs(funFlow))}</strong> short — Expenses + Savings are outpacing Income`); }
-  if(retNums.verdictClass === 'overfunded') verdictBits.push(`and your retirement plan is ahead of target at ${retNums.coveragePct.toFixed(0)}% funded`);
-  else if(retNums.verdictClass === 'ontarget') verdictBits.push(`and your retirement plan is on track at ${retNums.coveragePct.toFixed(0)}% funded`);
-  else { verdictBits.push(`and retirement coverage is light at ${retNums.coveragePct.toFixed(0)}% — worth a closer look`); if(verdictTone === 'pos') verdictTone = 'amb'; }
+  if(funFlow >= 0) verdictBits.push(t('dash.verdict.cashGreen', { amount: fmt(funFlow) }));
+  else { verdictTone = 'neg'; verdictBits.push(t('dash.verdict.cashRed', { amount: fmt(Math.abs(funFlow)) })); }
+  const covPct = retNums.coveragePct.toFixed(0);
+  if(retNums.verdictClass === 'overfunded') verdictBits.push(t('dash.verdict.retireAhead',  { pct: covPct }));
+  else if(retNums.verdictClass === 'ontarget') verdictBits.push(t('dash.verdict.retireOnTrack', { pct: covPct }));
+  else { verdictBits.push(t('dash.verdict.retireLight', { pct: covPct })); if(verdictTone === 'pos') verdictTone = 'amb'; }
   const welcomeLine = `${verdictBits.join(', ')}.`;
-  const ctxLine = `You're saving <strong>${savePct}%</strong> of income (${fmt(curSavings)}/mo), on track to retire at <strong>age ${state.retirementAge}</strong> with <strong>${fmt(realRetirementIncome)}/mo</strong> of real retirement income.`;
+  const ctxLine = t('dash.ctxLine', {
+    pct: savePct,
+    amount: fmt(curSavings),
+    age: state.retirementAge,
+    income: fmt(realRetirementIncome),
+  });
   const hasReport = !!state.dashboardReport;
   const reportRunning = _dashReportRunning;
 
   el.innerHTML=`
-    ${ui.ph({tag:'HORIZON FINANCE OS', title:'Your Financial Dashboard', sub:'360° view — cash flow, portfolio, retirement health, and lifestyle planning'})}
+    ${ui.ph({tag:t('dash.page.tag'), title:t('dash.page.title'), sub:t('dash.page.sub')})}
 
     <!-- Welcoming AI summary — short, personal snapshot + CTA to run a full analysis. -->
     <div class="dash-welcome ${verdictTone}">
       <div class="dash-welcome-icon">${verdictTone==='pos'?'✨':verdictTone==='amb'?'🧭':'⚠️'}</div>
       <div class="dash-welcome-body">
-        <div class="dash-welcome-hd">${greet}, ${esc(state.userName || 'there')} — ${welcomeLine}</div>
+        <div class="dash-welcome-hd">${greet}, ${esc(state.userName || t('dash.greet.fallbackName'))} — ${welcomeLine}</div>
         <div class="dash-welcome-sub">${ctxLine}</div>
       </div>
       <div class="dash-welcome-cta">
         <button class="btn btn-g" onclick="runDashboardAIReport()" ${reportRunning?'disabled':''}>
-          ${reportRunning ? '⏳ Analysing…' : (hasReport ? '🔄 Re-run full analysis' : '🤖 Run full financial analysis')}
+          ${reportRunning ? t('dash.cta.analysing') : (hasReport ? t('dash.cta.rerun') : t('dash.cta.run'))}
         </button>
       </div>
     </div>
 
     <!-- KPI Row 1: Cash Flow — all four cards span the NEXT 12 MONTHS -->
     ${ui.kpiRow([
-      {icon:'💰', label:'INCOME · NEXT 12 MONTHS',   value:fmt(ti12),      tone:'pos', sub:`${fmt(ti12/12)}/mo average · ${curIncomeStreams} income streams`, link:'monthly'},
-      {icon:'📤', label:'EXPENSES · NEXT 12 MONTHS', value:fmt(te12),      tone:'neg', sub:`${fmt(te12/12)}/mo average · ${ti12>0?Math.round(te12/ti12*100):0}% of income`, link:'monthly'},
-      {icon:'🏦', label:'SAVINGS · NEXT 12 MONTHS',  value:`<span class="amb">${fmt(savings12)}</span>`, sub:`${fmt(savings12/12)}/mo average · ${ti12>0?Math.round(savings12/ti12*100):0}% savings rate`, link:'monthly'},
-      {icon:'✦', label:'FUN FUND · NEXT 12 MONTHS', value:`<span style="color:var(--cyan)">${fmt(funFundTotal)}</span>`, sub:`${fmt(funFundTotal/12)}/mo average`, link:'funfund'},
+      {icon:'💰', label:t('dash.kpi.income12'),   value:fmt(ti12),      tone:'pos', sub:t('dash.kpi.sub.incomeStreams', { mo: fmt(ti12/12), n: curIncomeStreams }), link:'monthly'},
+      {icon:'📤', label:t('dash.kpi.expenses12'), value:fmt(te12),      tone:'neg', sub:t('dash.kpi.sub.pctOfIncome',  { mo: fmt(te12/12), pct: ti12>0?Math.round(te12/ti12*100):0 }), link:'monthly'},
+      {icon:'🏦', label:t('dash.kpi.savings12'),  value:`<span class="amb">${fmt(savings12)}</span>`, sub:t('dash.kpi.sub.savingsRate', { mo: fmt(savings12/12), pct: ti12>0?Math.round(savings12/ti12*100):0 }), link:'monthly'},
+      {icon:'✦', label:t('dash.kpi.funFund12'),  value:`<span style="color:var(--cyan)">${fmt(funFundTotal)}</span>`, sub:t('dash.kpi.sub.avgPerMo', { mo: fmt(funFundTotal/12) }), link:'funfund'},
     ])}
 
     <!-- KPI Row 2: Retirement (all values are TODAY'S MONEY / real value) -->
     ${ui.kpiRow([
-      {icon:'◈', label:'NEST EGG · TODAY&rsquo;S MONEY', value:fmt(realNestEgg), tone:'pos', sub:`At age ${state.retirementAge} · nominal ${fmt(nominalNestEgg)} (future kr)`, link:'retirement', section:'runway'},
-      {icon:'💰', label:'MONTHLY RETIREMENT INCOME · TODAY&rsquo;S MONEY', value:fmt(realRetirementIncome), tone:'pos', sub:`Portfolio ${fmt(retNums.sustainableAfterTax)} + pension ${fmt(retNums.pensionAvgMonthly)} (real avg)`, link:'retirement', section:'runway'},
-      {icon:'⏱', label:'YEARS TO RETIRE',         value:ytr,              sub:`Age ${state.currentAge} → ${state.retirementAge}`, link:'retirement'},
-      {icon:retNums.verdictIcon, label:'RETIREMENT STATUS', value:`<span class="${retNums.verdictClass==='overfunded'?'pos':retNums.verdictClass==='ontarget'?'amb':'neg'}">${retNums.verdict}</span>`, sub:`${retNums.coveragePct.toFixed(0)}% funded · ${fmt(retNums.sustainableAfterTax)}/mo real`, link:'retirement', section:'runway'},
+      {icon:'◈', label:t('dash.kpi.nestEgg'), value:fmt(realNestEgg), tone:'pos', sub:t('dash.kpi.nestEggSub', { age: state.retirementAge, amt: fmt(nominalNestEgg) }), link:'retirement', section:'runway'},
+      {icon:'💰', label:t('dash.kpi.monthlyIncomeReal'), value:fmt(realRetirementIncome), tone:'pos', sub:t('dash.kpi.incomeSub', { p: fmt(retNums.sustainableAfterTax), pen: fmt(retNums.pensionAvgMonthly) }), link:'retirement', section:'runway'},
+      {icon:'⏱', label:t('dash.kpi.yearsToRetire'), value:ytr,              sub:t('dash.kpi.ageSub', { cur: state.currentAge, ret: state.retirementAge }), link:'retirement'},
+      {icon:retNums.verdictIcon, label:t('dash.kpi.retireStatus'), value:`<span class="${retNums.verdictClass==='overfunded'?'pos':retNums.verdictClass==='ontarget'?'amb':'neg'}">${retNums.verdict}</span>`, sub:t('dash.kpi.statusSub', { pct: covPct, amt: fmt(retNums.sustainableAfterTax) }), link:'retirement', section:'runway'},
     ])}
 
     <!-- Bank status -->
     <div class="callout ${state.bankConnected?'':'callout-warn'}">
       <span>${state.bankConnected?'🏦':'⚠️'}</span>
       <div>${state.bankConnected
-        ? `<strong>Bank connected (${state.bankMode==='demo'?'Demo':'Live'} mode)</strong> — Showing ${state.transactions.length} transactions. <a href="#" onclick="nav('transactions');return false" style="color:var(--green)">View transactions →</a>`
-        : `<strong>No bank connected.</strong> Connect your bank account to see real spending patterns and automate category tracking. <button class="btn btn-sm btn-g" style="margin-left:8px" onclick="openModal('bank-modal')">+ Connect Bank</button>`}
+        ? `<strong>${t('dash.bank.connected', { mode: state.bankMode==='demo' ? t('dash.bank.mode.demo') : t('dash.bank.mode.live') })}</strong> — ${t('dash.bank.showing', { n: state.transactions.length })} <a href="#" onclick="nav('transactions');return false" style="color:var(--green)">${t('dash.bank.view')}</a>`
+        : `<strong>${t('dash.bank.none')}</strong> ${t('dash.bank.nonePrompt')} <button class="btn btn-sm btn-g" style="margin-left:8px" onclick="openModal('bank-modal')">${t('dash.bank.connectBtn')}</button>`}
       </div>
     </div>
 
     <div class="two-col">
       <!-- 12-month cash flow chart -->
       <div class="card" data-section="cashflow">
-        <div class="card-title">📈 12-Month Cash Flow
-          <div class="ct-actions"><span class="conn-badge demo">PROJECTION</span></div>
+        <div class="card-title">${t('dash.chart.cashflow.title')}
+          <div class="ct-actions"><span class="conn-badge demo">${t('dash.chart.projection')}</span></div>
         </div>
         <div class="chart-wrap lg"><canvas id="dash-cashflow-chart"></canvas></div>
       </div>
       <!-- Nest Egg Projection -->
       <div class="card" data-section="nestegg">
         <div class="card-title" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px">
-          <span>🎯 Nest Egg Growth Curve</span>
+          <span>${t('dash.chart.nestegg.title')}</span>
           <div class="scen-tabs" style="margin:0">
-            <button class="scen-btn ${(state.dashNestEggMode||'real')==='real'?'active':''}" onclick="setDashNestEggMode('real')">Today&rsquo;s Money</button>
-            <button class="scen-btn ${(state.dashNestEggMode||'real')==='nominal'?'active':''}" onclick="setDashNestEggMode('nominal')">Nominal</button>
+            <button class="scen-btn ${(state.dashNestEggMode||'real')==='real'?'active':''}" onclick="setDashNestEggMode('real')">${t('dash.chart.toggle.real')}</button>
+            <button class="scen-btn ${(state.dashNestEggMode||'real')==='nominal'?'active':''}" onclick="setDashNestEggMode('nominal')">${t('dash.chart.toggle.nominal')}</button>
           </div>
         </div>
         <div class="chart-wrap lg"><canvas id="dash-nestegg-chart"></canvas></div>
@@ -6968,15 +7100,15 @@ function renderDashboard() {
             // with the Fun Fund tab and the Monthly Review inputs.
             // Income + Expenses as bars, Savings + Fun Fund as
             // overlay lines for the mixed-chart read.
-            {label:'Income',  data:months.map(m=>m.pureIncome),  backgroundColor:'#00e8a022',borderColor:'#00e8a0',borderWidth:1.5,borderRadius:4,order:2,categoryPercentage:0.7,barPercentage:0.85},
-            {label:'Expenses',data:months.map(m=>m.pureExpenses),backgroundColor:'#ff4d6d1c',borderColor:'#ff4d6d',borderWidth:1.5,borderRadius:4,order:2,categoryPercentage:0.7,barPercentage:0.85},
-            {label:'Savings', data:savingsCumulative,            type:'line',borderColor:'#f5a623',backgroundColor:'#f5a62312',fill:true,tension:.35,pointRadius:2,pointHoverRadius:4,pointBackgroundColor:'#f5a623',borderWidth:1.75,order:1},
+            {label:t('dash.series.income'),  data:months.map(m=>m.pureIncome),  backgroundColor:'#00e8a022',borderColor:'#00e8a0',borderWidth:1.5,borderRadius:4,order:2,categoryPercentage:0.7,barPercentage:0.85},
+            {label:t('dash.series.expenses'),data:months.map(m=>m.pureExpenses),backgroundColor:'#ff4d6d1c',borderColor:'#ff4d6d',borderWidth:1.5,borderRadius:4,order:2,categoryPercentage:0.7,barPercentage:0.85},
+            {label:t('dash.series.savings'), data:savingsCumulative,            type:'line',borderColor:'#f5a623',backgroundColor:'#f5a62312',fill:true,tension:.35,pointRadius:2,pointHoverRadius:4,pointBackgroundColor:'#f5a623',borderWidth:1.75,order:1},
             // Fun Fund line plots the chained/running balance so it
             // matches the Month Summary bar (which now shows the
             // same running total) and the Running Balance column
             // in the Fun Fund tab table — one Fun Fund value per
             // month, everywhere.
-            {label:'Fun Fund',data:months.map(m=>m.funFund), type:'line',borderColor:'#00d4ff',backgroundColor:'transparent',fill:false,tension:.35,pointRadius:2,pointHoverRadius:4,pointBackgroundColor:'#00d4ff',borderWidth:1.75,borderDash:[4,3],order:1},
+            {label:t('dash.series.funFund'),data:months.map(m=>m.funFund), type:'line',borderColor:'#00d4ff',backgroundColor:'transparent',fill:false,tension:.35,pointRadius:2,pointHoverRadius:4,pointBackgroundColor:'#00d4ff',borderWidth:1.75,borderDash:[4,3],order:1},
           ]
         },
         options:chartPreset()
@@ -7008,18 +7140,18 @@ function renderDashboard() {
       charts['dash-ne']=new Chart(ne.getContext('2d'),{
         type:'line',
         data:{
-          labels:proj.map(p=>'Age '+p.age),
+          labels:proj.map(p=>t('dash.axis.age', { n: p.age })),
           datasets:[
             // Total — combined nest egg. Solid green line with a
             // faint area fill so it reads as the headline series.
-            {label:'Total',             data: total,      borderColor:'#00e8a0', backgroundColor:'#00e8a012', fill:true,  tension:.3, pointRadius:0, borderWidth:2.5, order:1},
+            {label:t('dash.series.total'),            data: total,      borderColor:'#00e8a0', backgroundColor:'#00e8a012', fill:true,  tension:.3, pointRadius:0, borderWidth:2.5, order:1},
             // Investment Growth — external accounts only. Dashed
             // blue line so it's visually distinct from the total.
-            {label:'Investment Growth', data: investment, borderColor:'#4d9fff', backgroundColor:'transparent', fill:false, tension:.3, pointRadius:0, borderWidth:2,   borderDash:[6,4], order:2},
+            {label:t('dash.series.investmentGrowth'), data: investment, borderColor:'#4d9fff', backgroundColor:'transparent', fill:false, tension:.3, pointRadius:0, borderWidth:2,   borderDash:[6,4], order:2},
             // Savings Growth — the in-app monthly/yearly savings
             // stream only. Dashed amber line matching the Retirement
             // Plan's derived Savings line item colour treatment.
-            {label:'Savings Growth',    data: savings,    borderColor:'#f5a623', backgroundColor:'transparent', fill:false, tension:.3, pointRadius:0, borderWidth:2,   borderDash:[2,4], order:3},
+            {label:t('dash.series.savingsGrowth'),    data: savings,    borderColor:'#f5a623', backgroundColor:'transparent', fill:false, tension:.3, pointRadius:0, borderWidth:2,   borderDash:[2,4], order:3},
           ]
         },
         options:chartPreset({scales:{
