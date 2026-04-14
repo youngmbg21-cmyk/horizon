@@ -3603,6 +3603,97 @@ const STRINGS = {
                               sv:'Genererar investeringstes' },
   'piq.step.legal':         { en:'Scoring legal risks',
                               sv:'Bedömer juridiska risker' },
+  // ── Property IQ · results pane ─────────────────────────
+  'piq.compareBtn':         { en:'Compare ({n})',         sv:'Jämför ({n})' },
+  // KPI row
+  'piq.kpi.avgPrice':       { en:'Avg Price',             sv:'Snittpris' },
+  'piq.kpi.pricePerSqm':    { en:'Price/m²',              sv:'Pris/m²' },
+  'piq.kpi.pricePerSqm.sub':{ en:'{cur}/sqm',             sv:'{cur}/m²' },
+  'piq.kpi.yield':          { en:'Rental Yield',          sv:'Hyresavkastning' },
+  'piq.kpi.yield.sub':      { en:'Gross annual',          sv:'Brutto årligen' },
+  'piq.kpi.appreciation':   { en:'Appreciation',          sv:'Värdeökning' },
+  'piq.kpi.appreciation.sub':{ en:'Annual est.',          sv:'Årlig uppskattning' },
+  'piq.kpi.liquidity':      { en:'Liquidity',             sv:'Likviditet' },
+  'piq.kpi.liquidity.sub':  { en:'Market depth',          sv:'Marknadsdjup' },
+  // Tabs
+  'piq.tab.investment':     { en:'Investment',            sv:'Investering' },
+  'piq.tab.mortgage':       { en:'Mortgage',              sv:'Bolån' },
+  'piq.tab.pipeline':       { en:'Pipeline',              sv:'Pipeline' },
+  'piq.tab.signals':        { en:'Signals',               sv:'Signaler' },
+  'piq.tab.legal':          { en:'Legal Risk',            sv:'Juridisk risk' },
+  'piq.tab.currency':       { en:'Currency',              sv:'Valuta' },
+  'piq.tab.report':         { en:'📋 Full Report',        sv:'📋 Fullständig rapport' },
+  'piq.tab.share':          { en:'Share',                 sv:'Dela' },
+  // Investment pane
+  'piq.inv.title':          { en:'AI Investment Analysis',
+                              sv:'AI-investeringsanalys' },
+  'piq.inv.sub':            { en:'Claude · Live signals · {flag} {country}',
+                              sv:'Claude · Livesignaler · {flag} {country}' },
+  'piq.inv.summaryLbl':     { en:'Executive Summary',     sv:'Sammanfattning' },
+  'piq.inv.thesisLbl':      { en:'Investment Thesis',     sv:'Investeringstes' },
+  'piq.inv.priceRange':     { en:'Price Range',           sv:'Prisintervall' },
+  'piq.inv.verdict':        { en:'Verdict',               sv:'Utlåtande' },
+  'piq.inv.rationale':      { en:'Rationale',             sv:'Motivering' },
+  // Mortgage pane
+  'piq.mc.title':           { en:'Mortgage Calculator',   sv:'Bolånekalkylator' },
+  'piq.mc.sub':             { en:'{cur} · {flag} {country} market rates',
+                              sv:'{cur} · {flag} {country} marknadsräntor' },
+  'piq.mc.priceLbl':        { en:'Property price ({cur})',
+                              sv:'Fastighetspris ({cur})' },
+  'piq.mc.depositLbl':      { en:'Deposit (%)',           sv:'Handpenning (%)' },
+  'piq.mc.rateLbl':         { en:'Interest rate',         sv:'Ränta' },
+  'piq.mc.termLbl':         { en:'Loan term',             sv:'Lånelöptid' },
+  'piq.mc.placeholder':     { en:'Enter a property price above to calculate payments',
+                              sv:'Ange ett fastighetspris ovan för att räkna ut betalningar' },
+  // Pipeline pane
+  'piq.pipe.title':         { en:'Development Pipeline',  sv:'Utvecklingspipeline' },
+  'piq.pipe.sub.sek':       { en:'Nyproduktion & byggprojekt',
+                              sv:'Nyproduktion & byggprojekt' },
+  'piq.pipe.sub.default':   { en:'Active and planned developments',
+                              sv:'Aktiva och planerade projekt' },
+  'piq.pipe.col.project':   { en:'Project',               sv:'Projekt' },
+  'piq.pipe.col.developer': { en:'Developer',             sv:'Byggherre' },
+  'piq.pipe.col.units':     { en:'Units',                 sv:'Enheter' },
+  'piq.pipe.col.status':    { en:'Status',                sv:'Status' },
+  'piq.pipe.col.completion':{ en:'Completion',            sv:'Färdigställande' },
+  'piq.pipe.col.priceFrom': { en:'Price from',            sv:'Pris från' },
+  'piq.pipe.empty':         { en:'No pipeline data returned',
+                              sv:'Ingen pipeline-data returnerad' },
+  // Signals pane
+  'piq.sig.title':          { en:'Market Signals',        sv:'Marknadssignaler' },
+  'piq.sig.sub':            { en:'Live intelligence · {flag} {country}',
+                              sv:'Liveunderrättelser · {flag} {country}' },
+  'piq.sig.empty':          { en:'No signals returned',   sv:'Inga signaler returnerade' },
+  'piq.sig.defaultSource':  { en:'Market data',           sv:'Marknadsdata' },
+  // Legal risk pane
+  'piq.legal.title.sek':    { en:'Legal & Title Risk',    sv:'Juridisk & lagfartsrisk' },
+  'piq.legal.title.default':{ en:'Title Risk Assessment', sv:'Lagfartsriskbedömning' },
+  // Currency pane
+  'piq.fx.title':           { en:'Currency Converter',    sv:'Valutaomvandlare' },
+  'piq.fx.sub':             { en:'KES · SEK · USD · EUR · Indicative rates',
+                              sv:'KES · SEK · USD · EUR · Indikativa kurser' },
+  'piq.fx.amount':          { en:'Amount',                sv:'Belopp' },
+  'piq.fx.amountPlaceholder':{ en:'Enter amount',         sv:'Ange belopp' },
+  'piq.fx.converted':       { en:'Converted',             sv:'Omvandlat' },
+  'piq.fx.resultPlaceholder':{ en:'Result',               sv:'Resultat' },
+  'piq.fx.rateLabel':       { en:'Select currencies and enter an amount',
+                              sv:'Välj valutor och ange ett belopp' },
+  'piq.fx.quickRef':        { en:'Quick reference: KES 1M ≈ USD 7,700 ≈ SEK 120,000 · KES 10M ≈ USD 77,000 ≈ SEK 1.2M · Rates indicative only',
+                              sv:'Snabbreferens: KES 1M ≈ USD 7 700 ≈ SEK 120 000 · KES 10M ≈ USD 77 000 ≈ SEK 1,2M · Endast indikativa kurser' },
+  // Share pane
+  'piq.share.title':        { en:'Share & Export',        sv:'Dela & exportera' },
+  'piq.share.sub':          { en:'Share this analysis with your agent, lawyer, or family',
+                              sv:'Dela analysen med din mäklare, jurist eller familj' },
+  'piq.share.copy':         { en:'Copy report',           sv:'Kopiera rapport' },
+  'piq.share.copy.sub':     { en:'Full text',             sv:'Fullständig text' },
+  'piq.share.whatsapp':     { en:'WhatsApp',              sv:'WhatsApp' },
+  'piq.share.whatsapp.sub': { en:'Share summary',         sv:'Dela sammanfattning' },
+  'piq.share.print':        { en:'Print / PDF',           sv:'Skriv ut / PDF' },
+  'piq.share.print.sub':    { en:'Save as PDF',           sv:'Spara som PDF' },
+  'piq.share.summary':      { en:'Verdict:',              sv:'Utlåtande:' },
+  'piq.share.summary.price':{ en:'Price:',                sv:'Pris:' },
+  'piq.share.summary.yield':{ en:'Yield:',                sv:'Avkastning:' },
+  'piq.share.summary.appreciation':{ en:'Appreciation:',  sv:'Värdeökning:' },
 
   // ── Bank & Transactions ────────────────────────────────
   'tx.page.title':          { en:'Bank & Transactions',   sv:'Bank & transaktioner' },
@@ -14845,48 +14936,51 @@ function piq_sbClass(s){ const m={'planning':'piq-b-plan','approved':'piq-b-appr
 function piq_renderResults(query,a,cfg){
   const pipeRows=(a.pipeline||[]).map(p=>`<tr><td style="font-weight:600;color:var(--text)">${p.name}</td><td style="color:var(--text2)">${p.developer}</td><td style="color:var(--text2)">${p.units}</td><td><span class="piq-badge ${piq_sbClass(p.status)}">${p.status}</span></td><td style="color:var(--text2);font-family:var(--fm);font-size:10px">${p.completion}</td><td style="color:var(--green);font-family:var(--fm);font-size:10px">${p.priceFrom}</td></tr>`).join('');
   const flagsHtml=(a.titleRisks||[]).map(f=>`<div class="piq-flag ${f.level}"><div class="piq-flag-dot"></div><div><div class="piq-flag-t">${f.title}</div><div class="piq-flag-txt">${f.detail}</div></div></div>`).join('');
-  const signalsHtml=(a.signals||[]).map(s=>`<div class="piq-signal"><div class="piq-signal-dot" style="background:${s.sentiment==='positive'?'var(--green)':s.sentiment==='negative'?'var(--red)':'var(--amber)'}"></div><div><div class="piq-signal-txt">${s.text}</div><div class="piq-signal-src">${s.source||'Market data'}</div></div></div>`).join('');
+  const signalsHtml=(a.signals||[]).map(s=>`<div class="piq-signal"><div class="piq-signal-dot" style="background:${s.sentiment==='positive'?'var(--green)':s.sentiment==='negative'?'var(--red)':'var(--amber)'}"></div><div><div class="piq-signal-txt">${s.text}</div><div class="piq-signal-src">${s.source||t('piq.sig.defaultSource')}</div></div></div>`).join('');
   const vCls=a.verdict==='BUY'?'piq-v-buy':a.verdict==='AVOID'?'piq-v-avoid':'piq-v-hold';
   const vIcon=a.verdict==='BUY'?'▲':a.verdict==='AVOID'?'▼':'►';
   const rateOpts=cfg.mortgageRates.map(r=>`<option value="${r.v}">${r.l}</option>`).join('');
-  const termOpts=cfg.mortgageTerm.map(t=>`<option value="${t.v}">${t.l}</option>`).join('');
-  const compareBtn=piq_history.length>=2?`<button class="piq-compare-btn" onclick="piq_compareSearches()">Compare (${Math.min(piq_history.length,4)})</button>`:'';
+  const termOpts=cfg.mortgageTerm.map(tm=>`<option value="${tm.v}">${tm.l}</option>`).join('');
+  const compareBtn=piq_history.length>=2?`<button class="piq-compare-btn" onclick="piq_compareSearches()">${esc2(t('piq.compareBtn', { n: Math.min(piq_history.length,4) }))}</button>`:'';
+  // Locale-aware date for the comparison bar — sv-SE in SV mode,
+  // otherwise fall back to the country's native locale.
+  const dateLocale = state.lang === 'sv' ? 'sv-SE' : (cfg.locale || undefined);
 
   document.getElementById('piq-results').innerHTML=`
     <div class="piq-compare-bar">
-      <span>${cfg.flag} ${query} · ${new Date().toLocaleDateString(cfg.locale,{day:'numeric',month:'short',year:'numeric'})}</span>
+      <span>${cfg.flag} ${query} · ${new Date().toLocaleDateString(dateLocale,{day:'numeric',month:'short',year:'numeric'})}</span>
       ${compareBtn}
     </div>
 
     <div class="piq-kpi-row">
-      <div class="piq-kpi"><div class="piq-kpi-lbl">Avg Price</div><div class="piq-kpi-val" style="font-size:13px;color:var(--text)">${piq_cleanKpi(a.kpis?.avgPrice||a.priceRange)}</div><div class="piq-kpi-sub">${esc2(query)}</div></div>
-      <div class="piq-kpi"><div class="piq-kpi-lbl">Price/m²</div><div class="piq-kpi-val" style="font-size:12px;color:var(--text2)">${piq_cleanKpi(a.pricePerSqm)}</div><div class="piq-kpi-sub">${cfg.currency}/sqm</div></div>
-      <div class="piq-kpi"><div class="piq-kpi-lbl">Rental Yield</div><div class="piq-kpi-val" style="color:var(--green)">${piq_cleanKpi(a.kpis?.yield||a.rentalYield)}</div><div class="piq-kpi-sub">Gross annual</div></div>
-      <div class="piq-kpi"><div class="piq-kpi-lbl">Appreciation</div><div class="piq-kpi-val" style="color:var(--blue);font-size:14px">${piq_cleanKpi(a.kpis?.appreciation)}</div><div class="piq-kpi-sub">Annual est.</div></div>
-      <div class="piq-kpi"><div class="piq-kpi-lbl">Liquidity</div><div class="piq-kpi-val" style="font-size:13px">${piq_cleanKpi(a.kpis?.liquidity)}</div><div class="piq-kpi-sub">Market depth</div></div>
+      <div class="piq-kpi"><div class="piq-kpi-lbl">${esc2(t('piq.kpi.avgPrice'))}</div><div class="piq-kpi-val" style="font-size:13px;color:var(--text)">${piq_cleanKpi(a.kpis?.avgPrice||a.priceRange)}</div><div class="piq-kpi-sub">${esc2(query)}</div></div>
+      <div class="piq-kpi"><div class="piq-kpi-lbl">${esc2(t('piq.kpi.pricePerSqm'))}</div><div class="piq-kpi-val" style="font-size:12px;color:var(--text2)">${piq_cleanKpi(a.pricePerSqm)}</div><div class="piq-kpi-sub">${esc2(t('piq.kpi.pricePerSqm.sub', { cur: cfg.currency }))}</div></div>
+      <div class="piq-kpi"><div class="piq-kpi-lbl">${esc2(t('piq.kpi.yield'))}</div><div class="piq-kpi-val" style="color:var(--green)">${piq_cleanKpi(a.kpis?.yield||a.rentalYield)}</div><div class="piq-kpi-sub">${esc2(t('piq.kpi.yield.sub'))}</div></div>
+      <div class="piq-kpi"><div class="piq-kpi-lbl">${esc2(t('piq.kpi.appreciation'))}</div><div class="piq-kpi-val" style="color:var(--blue);font-size:14px">${piq_cleanKpi(a.kpis?.appreciation)}</div><div class="piq-kpi-sub">${esc2(t('piq.kpi.appreciation.sub'))}</div></div>
+      <div class="piq-kpi"><div class="piq-kpi-lbl">${esc2(t('piq.kpi.liquidity'))}</div><div class="piq-kpi-val" style="font-size:13px">${piq_cleanKpi(a.kpis?.liquidity)}</div><div class="piq-kpi-sub">${esc2(t('piq.kpi.liquidity.sub'))}</div></div>
     </div>
 
     <div class="piq-tabs">
-      <button class="piq-tab on" onclick="piq_switchTab('inv',this)">Investment</button>
-      <button class="piq-tab" onclick="piq_switchTab('mortgage',this)">Mortgage</button>
-      <button class="piq-tab" onclick="piq_switchTab('pipe',this)">Pipeline</button>
-      <button class="piq-tab" onclick="piq_switchTab('sig',this)">Signals</button>
-      <button class="piq-tab" onclick="piq_switchTab('title',this)">Legal Risk</button>
-      <button class="piq-tab" onclick="piq_switchTab('fx',this)">Currency</button>
-      <button class="piq-tab piq-tab-report" onclick="piq_switchTab('report',this);piq_reportPaneInit()">📋 Full Report</button>
-      <button class="piq-tab" onclick="piq_switchTab('share',this)">Share</button>
+      <button class="piq-tab on" onclick="piq_switchTab('inv',this)">${esc2(t('piq.tab.investment'))}</button>
+      <button class="piq-tab" onclick="piq_switchTab('mortgage',this)">${esc2(t('piq.tab.mortgage'))}</button>
+      <button class="piq-tab" onclick="piq_switchTab('pipe',this)">${esc2(t('piq.tab.pipeline'))}</button>
+      <button class="piq-tab" onclick="piq_switchTab('sig',this)">${esc2(t('piq.tab.signals'))}</button>
+      <button class="piq-tab" onclick="piq_switchTab('title',this)">${esc2(t('piq.tab.legal'))}</button>
+      <button class="piq-tab" onclick="piq_switchTab('fx',this)">${esc2(t('piq.tab.currency'))}</button>
+      <button class="piq-tab piq-tab-report" onclick="piq_switchTab('report',this);piq_reportPaneInit()">${t('piq.tab.report')}</button>
+      <button class="piq-tab" onclick="piq_switchTab('share',this)">${esc2(t('piq.tab.share'))}</button>
     </div>
 
     <div id="piq-pane-inv" class="piq-pane on">
       <div class="piq-card">
-        <div class="piq-card-hd"><div class="piq-card-icon" style="background:var(--green-dim)">📈</div><div><div class="piq-card-title">AI Investment Analysis</div><div class="piq-card-sub">Claude · Live signals · ${cfg.flag} ${cfg.name}</div></div></div>
+        <div class="piq-card-hd"><div class="piq-card-icon" style="background:var(--green-dim)">📈</div><div><div class="piq-card-title">${esc2(t('piq.inv.title'))}</div><div class="piq-card-sub">${esc2(t('piq.inv.sub', { flag: cfg.flag, country: cfg.name }))}</div></div></div>
         <div class="piq-card-body">
-          <div class="piq-ai-box"><div class="piq-ai-lbl">Executive Summary</div><div class="piq-ai-text">${mdParse(a.summary||'')}</div></div>
-          <div class="piq-ai-box"><div class="piq-ai-lbl">Investment Thesis</div><div class="piq-ai-text">${mdParse(a.investmentThesis||'')}</div></div>
+          <div class="piq-ai-box"><div class="piq-ai-lbl">${esc2(t('piq.inv.summaryLbl'))}</div><div class="piq-ai-text">${mdParse(a.summary||'')}</div></div>
+          <div class="piq-ai-box"><div class="piq-ai-lbl">${esc2(t('piq.inv.thesisLbl'))}</div><div class="piq-ai-text">${mdParse(a.investmentThesis||'')}</div></div>
           <div class="piq-verdict-row">
-            <div class="piq-verdict-card"><div class="piq-verdict-lbl">Price Range</div><div class="piq-verdict-val" style="color:var(--text);font-size:11px">${a.priceRange}</div></div>
-            <div class="piq-verdict-card"><div class="piq-verdict-lbl">Verdict</div><div class="piq-verdict-val ${vCls}" style="font-size:20px">${vIcon} ${a.verdict}</div></div>
-            <div class="piq-verdict-card"><div class="piq-verdict-lbl">Rationale</div><div class="piq-verdict-val" style="font-weight:400">${mdParse(a.verdictReason||'')}</div></div>
+            <div class="piq-verdict-card"><div class="piq-verdict-lbl">${esc2(t('piq.inv.priceRange'))}</div><div class="piq-verdict-val" style="color:var(--text);font-size:11px">${a.priceRange}</div></div>
+            <div class="piq-verdict-card"><div class="piq-verdict-lbl">${esc2(t('piq.inv.verdict'))}</div><div class="piq-verdict-val ${vCls}" style="font-size:20px">${vIcon} ${a.verdict}</div></div>
+            <div class="piq-verdict-card"><div class="piq-verdict-lbl">${esc2(t('piq.inv.rationale'))}</div><div class="piq-verdict-val" style="font-weight:400">${mdParse(a.verdictReason||'')}</div></div>
           </div>
         </div>
       </div>
@@ -14894,53 +14988,53 @@ function piq_renderResults(query,a,cfg){
 
     <div id="piq-pane-mortgage" class="piq-pane">
       <div class="piq-card">
-        <div class="piq-card-hd"><div class="piq-card-icon" style="background:var(--green-dim)">💳</div><div><div class="piq-card-title">Mortgage Calculator</div><div class="piq-card-sub">${cfg.currency} · ${cfg.flag} ${cfg.name} market rates</div></div></div>
+        <div class="piq-card-hd"><div class="piq-card-icon" style="background:var(--green-dim)">💳</div><div><div class="piq-card-title">${esc2(t('piq.mc.title'))}</div><div class="piq-card-sub">${esc2(t('piq.mc.sub', { cur: cfg.currency, flag: cfg.flag, country: cfg.name }))}</div></div></div>
         <div class="piq-card-body">
           <div class="piq-calc-grid">
-            <div class="field"><label>Property price (${cfg.currency})</label><input id="piq-mc-price" type="number" placeholder="${cfg.currency==='KES'?'12000000':'6000000'}" oninput="piq_calcMortgage()"></div>
-            <div class="field"><label>Deposit (%)</label><input id="piq-mc-deposit" type="number" value="${cfg.mortgageDeposit}" oninput="piq_calcMortgage()"></div>
-            <div class="field"><label>Interest rate</label><select id="piq-mc-rate" onchange="piq_calcMortgage()">${rateOpts}</select></div>
-            <div class="field"><label>Loan term</label><select id="piq-mc-term" onchange="piq_calcMortgage()">${termOpts}</select></div>
+            <div class="field"><label>${esc2(t('piq.mc.priceLbl', { cur: cfg.currency }))}</label><input id="piq-mc-price" type="number" placeholder="${cfg.currency==='KES'?'12000000':'6000000'}" oninput="piq_calcMortgage()"></div>
+            <div class="field"><label>${esc2(t('piq.mc.depositLbl'))}</label><input id="piq-mc-deposit" type="number" value="${cfg.mortgageDeposit}" oninput="piq_calcMortgage()"></div>
+            <div class="field"><label>${esc2(t('piq.mc.rateLbl'))}</label><select id="piq-mc-rate" onchange="piq_calcMortgage()">${rateOpts}</select></div>
+            <div class="field"><label>${esc2(t('piq.mc.termLbl'))}</label><select id="piq-mc-term" onchange="piq_calcMortgage()">${termOpts}</select></div>
           </div>
-          <div id="piq-mc-result"><div style="color:var(--text3);font-size:11px;font-family:var(--fm)">Enter a property price above to calculate payments</div></div>
+          <div id="piq-mc-result"><div style="color:var(--text3);font-size:11px;font-family:var(--fm)">${esc2(t('piq.mc.placeholder'))}</div></div>
         </div>
       </div>
     </div>
 
     <div id="piq-pane-pipe" class="piq-pane">
       <div class="piq-card">
-        <div class="piq-card-hd"><div class="piq-card-icon" style="background:var(--blue-dim)">🏗</div><div><div class="piq-card-title">Development Pipeline</div><div class="piq-card-sub">${cfg.currency==='SEK'?'Nyproduktion & byggprojekt':'Active and planned developments'} · ${query}</div></div></div>
-        <div class="piq-card-body" style="padding:0">${pipeRows?`<div style="overflow-x:auto"><table class="piq-table"><thead><tr><th>Project</th><th>Developer</th><th>Units</th><th>Status</th><th>Completion</th><th>Price from</th></tr></thead><tbody>${pipeRows}</tbody></table></div>`:'<div class="piq-empty" style="padding:20px"><div class="piq-empty-s">No pipeline data returned</div></div>'}</div>
+        <div class="piq-card-hd"><div class="piq-card-icon" style="background:var(--blue-dim)">🏗</div><div><div class="piq-card-title">${esc2(t('piq.pipe.title'))}</div><div class="piq-card-sub">${esc2(cfg.currency==='SEK'?t('piq.pipe.sub.sek'):t('piq.pipe.sub.default'))} · ${query}</div></div></div>
+        <div class="piq-card-body" style="padding:0">${pipeRows?`<div style="overflow-x:auto"><table class="piq-table"><thead><tr><th>${esc2(t('piq.pipe.col.project'))}</th><th>${esc2(t('piq.pipe.col.developer'))}</th><th>${esc2(t('piq.pipe.col.units'))}</th><th>${esc2(t('piq.pipe.col.status'))}</th><th>${esc2(t('piq.pipe.col.completion'))}</th><th>${esc2(t('piq.pipe.col.priceFrom'))}</th></tr></thead><tbody>${pipeRows}</tbody></table></div>`:`<div class="piq-empty" style="padding:20px"><div class="piq-empty-s">${esc2(t('piq.pipe.empty'))}</div></div>`}</div>
       </div>
     </div>
 
     <div id="piq-pane-sig" class="piq-pane">
       <div class="piq-card">
-        <div class="piq-card-hd"><div class="piq-card-icon" style="background:var(--amber-dim)">📡</div><div><div class="piq-card-title">Market Signals</div><div class="piq-card-sub">Live intelligence · ${cfg.flag} ${cfg.name}</div></div></div>
-        <div class="piq-card-body">${signalsHtml||'<div style="color:var(--text3);font-size:11px">No signals returned</div>'}</div>
+        <div class="piq-card-hd"><div class="piq-card-icon" style="background:var(--amber-dim)">📡</div><div><div class="piq-card-title">${esc2(t('piq.sig.title'))}</div><div class="piq-card-sub">${esc2(t('piq.sig.sub', { flag: cfg.flag, country: cfg.name }))}</div></div></div>
+        <div class="piq-card-body">${signalsHtml||`<div style="color:var(--text3);font-size:11px">${esc2(t('piq.sig.empty'))}</div>`}</div>
       </div>
     </div>
 
     <div id="piq-pane-title" class="piq-pane">
       <div class="piq-card">
-        <div class="piq-card-hd"><div class="piq-card-icon" style="background:var(--red-dim)">⚖</div><div><div class="piq-card-title">${cfg.currency==='SEK'?'Legal & Title Risk':'Title Risk Assessment'}</div><div class="piq-card-sub">${cfg.flag} ${cfg.name} · ${query}</div></div></div>
+        <div class="piq-card-hd"><div class="piq-card-icon" style="background:var(--red-dim)">⚖</div><div><div class="piq-card-title">${esc2(cfg.currency==='SEK'?t('piq.legal.title.sek'):t('piq.legal.title.default'))}</div><div class="piq-card-sub">${cfg.flag} ${cfg.name} · ${query}</div></div></div>
         <div class="piq-card-body"><div class="piq-flags">${flagsHtml}</div><div class="piq-legal">${cfg.legalNote}</div></div>
       </div>
     </div>
 
     <div id="piq-pane-fx" class="piq-pane">
       <div class="piq-card">
-        <div class="piq-card-hd"><div class="piq-card-icon" style="background:var(--blue-dim)">💱</div><div><div class="piq-card-title">Currency Converter</div><div class="piq-card-sub">KES · SEK · USD · EUR · Indicative rates</div></div></div>
+        <div class="piq-card-hd"><div class="piq-card-icon" style="background:var(--blue-dim)">💱</div><div><div class="piq-card-title">${esc2(t('piq.fx.title'))}</div><div class="piq-card-sub">${esc2(t('piq.fx.sub'))}</div></div></div>
         <div class="piq-card-body">
           <div class="piq-fx-row">
-            <div class="piq-fx-f"><label>Amount</label><input id="piq-fx-amount" type="number" placeholder="Enter amount" oninput="piq_convertFX()"></div>
+            <div class="piq-fx-f"><label>${esc2(t('piq.fx.amount'))}</label><input id="piq-fx-amount" type="number" placeholder="${esc2(t('piq.fx.amountPlaceholder'))}" oninput="piq_convertFX()"></div>
             <select class="piq-fx-sel" id="piq-fx-from" onchange="piq_convertFX()"><option value="KES">KES</option><option value="SEK">SEK</option><option value="USD">USD</option><option value="EUR">EUR</option></select>
             <div class="piq-fx-arrow">→</div>
-            <div class="piq-fx-f"><label>Converted</label><input id="piq-fx-result" type="text" readonly placeholder="Result" style="color:var(--green)"></div>
+            <div class="piq-fx-f"><label>${esc2(t('piq.fx.converted'))}</label><input id="piq-fx-result" type="text" readonly placeholder="${esc2(t('piq.fx.resultPlaceholder'))}" style="color:var(--green)"></div>
             <select class="piq-fx-sel" id="piq-fx-to" onchange="piq_convertFX()"><option value="USD">USD</option><option value="SEK">SEK</option><option value="KES">KES</option><option value="EUR">EUR</option></select>
           </div>
-          <div class="piq-fx-rate" id="piq-fx-rate-label">Select currencies and enter an amount</div>
-          <div style="margin-top:10px;padding:8px 10px;background:var(--bg3);border-radius:6px;font-size:10px;color:var(--text3);font-family:var(--fm)">Quick reference: KES 1M ≈ USD 7,700 ≈ SEK 120,000 · KES 10M ≈ USD 77,000 ≈ SEK 1.2M · Rates indicative only</div>
+          <div class="piq-fx-rate" id="piq-fx-rate-label">${esc2(t('piq.fx.rateLabel'))}</div>
+          <div style="margin-top:10px;padding:8px 10px;background:var(--bg3);border-radius:6px;font-size:10px;color:var(--text3);font-family:var(--fm)">${esc2(t('piq.fx.quickRef'))}</div>
         </div>
       </div>
     </div>
@@ -14951,17 +15045,17 @@ function piq_renderResults(query,a,cfg){
 
     <div id="piq-pane-share" class="piq-pane">
       <div class="piq-card">
-        <div class="piq-card-hd"><div class="piq-card-icon" style="background:var(--green-dim)">📤</div><div><div class="piq-card-title">Share & Export</div><div class="piq-card-sub">Share this analysis with your agent, lawyer, or family</div></div></div>
+        <div class="piq-card-hd"><div class="piq-card-icon" style="background:var(--green-dim)">📤</div><div><div class="piq-card-title">${esc2(t('piq.share.title'))}</div><div class="piq-card-sub">${esc2(t('piq.share.sub'))}</div></div></div>
         <div class="piq-card-body">
           <div class="piq-share-grid">
-            <div class="piq-share-btn" onclick="piq_copyReport()"><div class="piq-share-icon">📋</div><div class="piq-share-lbl">Copy report</div><div class="piq-share-sub">Full text</div></div>
-            <div class="piq-share-btn" onclick="piq_shareWhatsApp()"><div class="piq-share-icon">💬</div><div class="piq-share-lbl">WhatsApp</div><div class="piq-share-sub">Share summary</div></div>
-            <div class="piq-share-btn" onclick="window.print()"><div class="piq-share-icon">🖨️</div><div class="piq-share-lbl">Print / PDF</div><div class="piq-share-sub">Save as PDF</div></div>
+            <div class="piq-share-btn" onclick="piq_copyReport()"><div class="piq-share-icon">📋</div><div class="piq-share-lbl">${esc2(t('piq.share.copy'))}</div><div class="piq-share-sub">${esc2(t('piq.share.copy.sub'))}</div></div>
+            <div class="piq-share-btn" onclick="piq_shareWhatsApp()"><div class="piq-share-icon">💬</div><div class="piq-share-lbl">${esc2(t('piq.share.whatsapp'))}</div><div class="piq-share-sub">${esc2(t('piq.share.whatsapp.sub'))}</div></div>
+            <div class="piq-share-btn" onclick="window.print()"><div class="piq-share-icon">🖨️</div><div class="piq-share-lbl">${esc2(t('piq.share.print'))}</div><div class="piq-share-sub">${esc2(t('piq.share.print.sub'))}</div></div>
           </div>
           <div class="piq-toast" id="piq-toast"></div>
           <div style="background:var(--bg3);border-radius:6px;padding:10px 12px;font-size:11px;color:var(--text2);line-height:1.6;margin-top:4px">
-            ${cfg.flag} <strong>${query}</strong> · Verdict: <strong class="${vCls}">${a.verdict}</strong><br>
-            Price: ${a.priceRange} · Yield: ${a.rentalYield} · Appreciation: ${a.capitalAppreciation}<br>
+            ${cfg.flag} <strong>${query}</strong> · ${esc2(t('piq.share.summary'))} <strong class="${vCls}">${a.verdict}</strong><br>
+            ${esc2(t('piq.share.summary.price'))} ${a.priceRange} · ${esc2(t('piq.share.summary.yield'))} ${a.rentalYield} · ${esc2(t('piq.share.summary.appreciation'))} ${a.capitalAppreciation}<br>
             <span style="color:var(--text3);font-size:10px">${a.summary}</span>
           </div>
         </div>
@@ -14971,9 +15065,10 @@ function piq_renderResults(query,a,cfg){
   // re-render history sidebar with active state
   const histEl=document.getElementById('piq-hist-list');
   if(histEl && piq_history.length>0){
+    const histLocale = state.lang === 'sv' ? 'sv-SE' : 'en-GB';
     histEl.innerHTML=piq_history.map((h,i)=>{
       const vCls2=h.verdict==='BUY'?'piq-hv-buy':h.verdict==='AVOID'?'piq-hv-avoid':'piq-hv-hold';
-      const time=new Date(h.timestamp).toLocaleDateString('en-GB',{day:'numeric',month:'short'});
+      const time=new Date(h.timestamp).toLocaleDateString(histLocale,{day:'numeric',month:'short'});
       return `<div class="piq-hist-item${i===0?' active':''}" onclick="piq_loadHistory(${i})">
         <div class="piq-hi-q">${h.query}</div>
         <div class="piq-hi-m"><span>${PIQ_MC[h.market]?.flag||''}</span><span>${time}</span>${h.verdict?`<span class="piq-hi-verdict ${vCls2}">${h.verdict}</span>`:''}</div>
