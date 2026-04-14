@@ -3454,6 +3454,44 @@ const STRINGS = {
   'dash.report.concern':    { en:'Areas of concern',            sv:'Områden att hålla koll på' },
   'dash.report.recs':       { en:'Recommendations',             sv:'Rekommendationer' },
 
+  // ── Yearly Forecast body ───────────────────────────────
+  'yearly.window':          { en:'Window: {start}\u2013{end} · age {cur}\u2192{ret}',
+                              sv:'Fönster: {start}\u2013{end} · ålder {cur}\u2192{ret}' },
+  'yearly.cascade.toggle':  { en:'Cascade to all future years',
+                              sv:'Kaskad till alla framtida år' },
+  'yearly.cascade.active':  { en:'⚡ CASCADING → ALL FUTURE YEARS',
+                              sv:'⚡ KASKADERAR → ALLA FRAMTIDA ÅR' },
+  'yearly.retire.callout':  { en:'<strong>{year} is your retirement year</strong> — this is the last year the Yearly Forecast projects. From age <strong>{age}</strong> onward, your <strong>Retirement Expenses</strong> take over as the active expense set. Edit those on the <a href="#" onclick="nav(\'retirement\');return false" style="color:var(--green);font-weight:700">Retirement Plan tab →</a>',
+                              sv:'<strong>{year} är ditt pensionsår</strong> — detta är det sista året som Årsprognos projicerar. Från ålder <strong>{age}</strong> tar dina <strong>pensionsutgifter</strong> över som det aktiva utgiftssettet. Redigera dem på <a href="#" onclick="nav(\'retirement\');return false" style="color:var(--green);font-weight:700">Pensionsplan-fliken →</a>' },
+  // KPI row
+  'yearly.kpi.income':      { en:'ANNUAL INCOME · {year}',
+                              sv:'ÅRSINKOMST · {year}' },
+  'yearly.kpi.expenses':    { en:'ANNUAL EXPENSES · {year}',
+                              sv:'ÅRSUTGIFTER · {year}' },
+  'yearly.kpi.savings':     { en:'ANNUAL SAVINGS TARGET',
+                              sv:'ÅRSMÅL FÖR SPARANDE' },
+  'yearly.kpi.net':         { en:'NET · AFTER SAVINGS',
+                              sv:'NETTO · EFTER SPARANDE' },
+  'yearly.kpi.lineItems':   { en:'{n} line item{s}',
+                              sv:'{n} rader' },
+  'yearly.kpi.pctIncome':   { en:'{pct}% of income',
+                              sv:'{pct}% av inkomsten' },
+  'yearly.kpi.savingsSub':  { en:'{mo}/mo',
+                              sv:'{mo}/mån' },
+  'yearly.kpi.netSub':      { en:'Income − Expenses − Savings',
+                              sv:'Inkomst − Utgifter − Sparande' },
+  // Two-col cards
+  'yearly.card.income':     { en:'Yearly Income',         sv:'Årsinkomst' },
+  'yearly.card.expenses':   { en:'Yearly Expenses',       sv:'Årsutgifter' },
+  'yearly.card.annualHint': { en:'· enter amounts as annual totals',
+                              sv:'· ange belopp som årliga totaler' },
+  'yearly.card.savingsTarget': { en:'Annual Savings Target for {year}',
+                                 sv:'Årligt sparmål för {year}' },
+  'yearly.card.savingsHint':{ en:'Equivalent to {mo}/mo applied to every month in {year}.',
+                              sv:'Motsvarar {mo}/mån som tillämpas på varje månad i {year}.' },
+  'yearly.btn.addIncome':   { en:'+ Add Income',          sv:'+ Lägg till inkomst' },
+  'yearly.btn.addExpense':  { en:'+ Add Expense',         sv:'+ Lägg till utgift' },
+
   // ── Shared line-item branches (trip / carry-forward / paid / variance) ──
   // Trip rows (read-only, linked from the Fun Fund tab)
   'li.trip.hint':           { en:'Trip expenses are managed in the Fun Fund tab — click there to edit the name, month, or amount.',
@@ -8200,21 +8238,21 @@ function renderYearly() {
         <button style="background:var(--bg3);border:1px solid var(--border);color:${canGoBwd?'var(--text2)':'var(--text3)'};width:32px;height:32px;border-radius:7px;cursor:${canGoBwd?'pointer':'not-allowed'};font-size:13px;opacity:${canGoBwd?1:.4}" ${canGoBwd?'':'disabled'} onclick="state.selectedYear=Math.max(${CY+1},state.selectedYear-1);renderYearly()">◀</button>
         <span style="font-family:var(--ff);font-size:26px;font-weight:800;min-width:90px;text-align:center">${clampedYr}</span>
         <button style="background:var(--bg3);border:1px solid var(--border);color:${canGoFwd?'var(--text2)':'var(--text3)'};width:32px;height:32px;border-radius:7px;cursor:${canGoFwd?'pointer':'not-allowed'};font-size:13px;opacity:${canGoFwd?1:.4}" ${canGoFwd?'':'disabled'} onclick="if(state.selectedYear<${retireYear}){state.selectedYear++;renderYearly()}">▶</button>
-        <span style="font-family:var(--fm);font-size:10px;color:var(--text3);margin-left:6px;letter-spacing:.06em">Window: ${CY+1}–${retireYear} · age ${state.currentAge}→${state.retirementAge}</span>
+        <span style="font-family:var(--fm);font-size:10px;color:var(--text3);margin-left:6px;letter-spacing:.06em">${esc2(t('yearly.window', { start: CY+1, end: retireYear, cur: state.currentAge, ret: state.retirementAge }))}</span>
       </div>
       <label class="toggle-wrap">
         <input type="checkbox" ${state.cascadeEnabled?'checked':''} onchange="state.cascadeEnabled=this.checked;syncYearCascade();save()">
         <div class="toggle-slider"></div>
-        Cascade to all future years
+        ${esc2(t('yearly.cascade.toggle'))}
       </label>
-      ${state.cascadeEnabled?`<span style="background:var(--violet-dim);color:var(--violet);padding:4px 10px;border-radius:6px;font-size:11px;font-weight:700;font-family:var(--fm)">⚡ CASCADING → ALL FUTURE YEARS</span>`:''}
+      ${state.cascadeEnabled?`<span style="background:var(--violet-dim);color:var(--violet);padding:4px 10px;border-radius:6px;font-size:11px;font-weight:700;font-family:var(--fm)">${esc2(t('yearly.cascade.active'))}</span>`:''}
     </div>
 
     ${isRetireYear ? `
       <div class="callout" style="margin-bottom:14px">
         <span>🏖</span>
         <div>
-          <strong>${clampedYr} is your retirement year</strong> — this is the last year the Yearly Forecast projects. From age <strong>${state.retirementAge}</strong> onward, your <strong>Retirement Expenses</strong> take over as the active expense set. Edit those on the <a href="#" onclick="nav('retirement');return false" style="color:var(--green);font-weight:700">Retirement Plan tab →</a>
+          ${t('yearly.retire.callout', { year: clampedYr, age: state.retirementAge })}
         </div>
       </div>
     ` : ''}
@@ -8224,23 +8262,23 @@ function renderYearly() {
          60,000 line in the Yearly Expenses total (not 720,000).
          No double counting. -->
     <div class="kpi-row" style="margin-bottom:14px">
-      <div class="kpi"><div class="kpi-icon">💰</div><div class="kpi-lbl">ANNUAL INCOME · ${clampedYr}</div><div class="kpi-val pos">${fmt(incAnnual)}</div><div class="kpi-sub">${incItems.length} line item${incItems.length===1?'':'s'}</div></div>
-      <div class="kpi"><div class="kpi-icon">📤</div><div class="kpi-lbl">ANNUAL EXPENSES · ${clampedYr}</div><div class="kpi-val neg">${fmt(expAnnual)}</div><div class="kpi-sub">${incAnnual>0?Math.round(expAnnual/incAnnual*100):0}% of income</div></div>
-      <div class="kpi"><div class="kpi-icon">🏦</div><div class="kpi-lbl">ANNUAL SAVINGS TARGET</div><div class="kpi-val" style="color:var(--amber)">${fmt(savAnnual)}</div><div class="kpi-sub">${fmt(sav)}/mo</div></div>
-      <div class="kpi"><div class="kpi-icon">${netAnnual>=0?'✨':'⚠️'}</div><div class="kpi-lbl">NET · AFTER SAVINGS</div><div class="kpi-val ${netAnnual>=0?'pos':'neg'}">${fmt(netAnnual)}</div><div class="kpi-sub">Income − Expenses − Savings</div></div>
+      <div class="kpi"><div class="kpi-icon">💰</div><div class="kpi-lbl">${esc2(t('yearly.kpi.income', { year: clampedYr }))}</div><div class="kpi-val pos">${fmt(incAnnual)}</div><div class="kpi-sub">${esc2(t('yearly.kpi.lineItems', { n: incItems.length, s: incItems.length === 1 ? '' : 's' }))}</div></div>
+      <div class="kpi"><div class="kpi-icon">📤</div><div class="kpi-lbl">${esc2(t('yearly.kpi.expenses', { year: clampedYr }))}</div><div class="kpi-val neg">${fmt(expAnnual)}</div><div class="kpi-sub">${esc2(t('yearly.kpi.pctIncome', { pct: incAnnual>0?Math.round(expAnnual/incAnnual*100):0 }))}</div></div>
+      <div class="kpi"><div class="kpi-icon">🏦</div><div class="kpi-lbl">${esc2(t('yearly.kpi.savings'))}</div><div class="kpi-val" style="color:var(--amber)">${fmt(savAnnual)}</div><div class="kpi-sub">${esc2(t('yearly.kpi.savingsSub', { mo: fmt(sav) }))}</div></div>
+      <div class="kpi"><div class="kpi-icon">${netAnnual>=0?'✨':'⚠️'}</div><div class="kpi-lbl">${esc2(t('yearly.kpi.net'))}</div><div class="kpi-val ${netAnnual>=0?'pos':'neg'}">${fmt(netAnnual)}</div><div class="kpi-sub">${esc2(t('yearly.kpi.netSub'))}</div></div>
     </div>
 
     <div class="two-col">
-      <div class="card"><div class="card-title">Yearly Income <span style="font-size:9px;font-weight:400;color:var(--text3);text-transform:none;margin-left:6px">· enter amounts as annual totals</span></div><div id="yr-inc"></div><button class="btn-add" onclick="addYearlyItem('income')">+ Add Income</button></div>
-      <div class="card"><div class="card-title">Yearly Expenses <span style="font-size:9px;font-weight:400;color:var(--text3);text-transform:none;margin-left:6px">· enter amounts as annual totals</span></div><div id="yr-exp"></div><button class="btn-add" onclick="addYearlyItem('expenses')">+ Add Expense</button></div>
+      <div class="card"><div class="card-title">${esc2(t('yearly.card.income'))} <span style="font-size:9px;font-weight:400;color:var(--text3);text-transform:none;margin-left:6px">${esc2(t('yearly.card.annualHint'))}</span></div><div id="yr-inc"></div><button class="btn-add" onclick="addYearlyItem('income')">${esc2(t('yearly.btn.addIncome'))}</button></div>
+      <div class="card"><div class="card-title">${esc2(t('yearly.card.expenses'))} <span style="font-size:9px;font-weight:400;color:var(--text3);text-transform:none;margin-left:6px">${esc2(t('yearly.card.annualHint'))}</span></div><div id="yr-exp"></div><button class="btn-add" onclick="addYearlyItem('expenses')">${esc2(t('yearly.btn.addExpense'))}</button></div>
       <div class="card" style="grid-column:1/-1">
-        <div class="card-title">Annual Savings Target for ${clampedYr}</div>
+        <div class="card-title">${esc2(t('yearly.card.savingsTarget', { year: clampedYr }))}</div>
         <div style="display:flex;align-items:center;gap:8px;background:var(--bg3);border-radius:8px;padding:4px 14px;max-width:320px">
           <span style="color:var(--text3);font-size:12px;font-family:var(--fm)">${s}</span>
           <input type="number" value="${Math.round(savAnnual*r)}" style="background:transparent;border:none;color:var(--text);font-family:var(--fm);font-size:20px;font-weight:700;padding:10px 0;outline:none;width:200px" oninput="setYearlySavings(this.value/${r}/12)">
           <span style="font-size:11px;color:var(--text3);font-family:var(--fm)">/yr</span>
         </div>
-        <div style="font-size:10px;color:var(--text3);margin-top:4px;font-family:var(--fm)">Equivalent to ${fmt(sav)}/mo applied to every month in ${clampedYr}.</div>
+        <div style="font-size:10px;color:var(--text3);margin-top:4px;font-family:var(--fm)">${esc2(t('yearly.card.savingsHint', { mo: fmt(sav), year: clampedYr }))}</div>
       </div>
     </div>`;
 
@@ -8257,11 +8295,11 @@ function renderYearlyLineItems(cid,items,field){
   const el=document.getElementById(cid); if(!el) return;
   const r=rate(); const s=sym();
   el.innerHTML=items.map(it=>`<div class="line-item">
-    <input class="line-name" value="${esc(it.name)}" placeholder="Name" oninput="updateYrItem('${field}','${it.id}','name',this.value)">
+    <input class="line-name" value="${esc(it.name)}" placeholder="${esc2(t('li.placeholder.name'))}" oninput="updateYrItem('${field}','${it.id}','name',this.value)">
     <div class="line-amt-wrap"><span class="line-cur">${s}</span><input class="line-amt" type="number" value="${Math.round(it.amount*12*r)}" oninput="updateYrItem('${field}','${it.id}','amount',this.value/${r}/12)"><span style="font-size:10px;color:var(--text3);font-family:var(--fm);padding-right:4px">/yr</span></div>
     <select class="line-type" onchange="updateYrItem('${field}','${it.id}','type',this.value)">
-      <option value="fixed" ${it.type==='fixed'?'selected':''}>Fixed</option>
-      <option value="variable" ${it.type==='variable'?'selected':''}>Variable</option>
+      <option value="fixed" ${it.type==='fixed'?'selected':''}>${esc2(t('li.type.fixed'))}</option>
+      <option value="variable" ${it.type==='variable'?'selected':''}>${esc2(t('li.type.variable'))}</option>
     </select>
     <button class="line-rm" onclick="removeYrItem('${field}','${it.id}')">×</button>
   </div>`).join('');
