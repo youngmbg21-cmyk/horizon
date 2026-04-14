@@ -3453,6 +3453,14 @@ const STRINGS = {
   'dash.report.good':       { en:'What is going well',          sv:'Vad som går bra' },
   'dash.report.concern':    { en:'Areas of concern',            sv:'Områden att hålla koll på' },
   'dash.report.recs':       { en:'Recommendations',             sv:'Rekommendationer' },
+  // Stale-language chip shown when a cached report was generated
+  // in a different language than the user's current selection.
+  'dash.ai.langStale':      { en:'⚠ This report was generated in {other}. Regenerate in {current}?',
+                              sv:'⚠ Den här rapporten genererades på {other}. Generera på {current}?' },
+  'dash.ai.langStale.btn':  { en:'🌐 Regenerate in {lang}',
+                              sv:'🌐 Generera om på {lang}' },
+  'lang.label.en':          { en:'English',                      sv:'engelska' },
+  'lang.label.sv':          { en:'Swedish',                      sv:'svenska' },
 
   // ── Retire Anywhere · location analysis slideover ─────
   'ra.so.closeTitle':       { en:'Close',                 sv:'Stäng' },
@@ -4165,6 +4173,27 @@ const STRINGS = {
   'slice.all.sub':          { en:'Full state backup (overwrites on import)',
                               sv:'Fullständig säkerhetskopia (skriver över vid import)' },
 };
+// Build the LANGUAGE: directive that gets prepended to every AI
+// system prompt (Horizon AI advisor + Retire Anywhere Deep Dive +
+// Dashboard analysis report). The model is fully capable of
+// responding in Swedish — the work is purely instructing it
+// consistently. Returns an empty-ish line for English so the
+// system prompt looks unchanged in English mode.
+function langDirective(){
+  if(state.lang === 'sv'){
+    return `LANGUAGE: Respond exclusively in Swedish (svenska). All prose, headings, bullet lists, chart captions, and callouts must be in Swedish. Use standard Swedish financial vocabulary (e.g. "pensionskapital", "nettoförmögenhet", "uttagsgrad", "kassaflöde"). Keep numbers and the user's own field names unchanged. The structured snapshot data below is in English for stability — translate it on output.`;
+  }
+  return `LANGUAGE: Respond in clear, concise English.`;
+}
+window.langDirective = langDirective;
+// Short suffix appended to one-shot user prompts (report generation,
+// Deep Dive runs) as a belt-and-braces reminder. Returns '' for English.
+function langSuffix(){
+  if(state.lang === 'sv') return '\n\nSvara på svenska.';
+  return '';
+}
+window.langSuffix = langSuffix;
+
 // Resolve a translation. `vars` supplies values for {placeholder}
 // tokens. Falls through to English, then to the key itself, so a
 // missing string is visible but non-fatal.
@@ -7531,6 +7560,20 @@ function renderDashboardAIReportBody(){
       ${t('dash.ai.empty')}
     </div>`;
   }
+  // Stale-language banner — surfaces when the cached report was
+  // generated in a different language than the user's current
+  // selection. Clicking the chip kicks off a fresh run in the
+  // active language. We pre-resolve the "other" / "current"
+  // language label strings in the active language so the chip
+  // reads naturally regardless of which side it's on.
+  const reportLang = r.lang || 'en';
+  const langStale = reportLang !== state.lang;
+  const langStaleHtml = langStale ? `
+    <div class="dash-ai-lang-stale" style="display:flex;align-items:center;gap:10px;margin-bottom:10px;padding:8px 12px;background:rgba(245,158,11,.10);border:1px solid rgba(245,158,11,.35);border-radius:8px;font-size:11px;color:var(--text2)">
+      <span style="flex:1">${t('dash.ai.langStale', { other: t('lang.label.'+reportLang), current: t('lang.label.'+state.lang) })}</span>
+      <button class="btn btn-xs btn-o" onclick="runDashboardAIReport()">${t('dash.ai.langStale.btn', { lang: t('lang.label.'+state.lang) })}</button>
+    </div>
+  ` : '';
   const actions = `
     <button class="btn btn-sm btn-o" onclick="saveDashboardReportToVault()">${t('dash.ai.saveToVault')}</button>
     <button class="btn btn-sm btn-o" onclick="runDashboardAIReport()">${t('dash.ai.rerun')}</button>`;
@@ -7542,7 +7585,7 @@ function renderDashboardAIReportBody(){
       ${body ? _renderAISectionBody(body) : `<div class="md" style="color:var(--text3);font-style:italic">${t('dash.ai.emptyNotes')}</div>`}
     </div>`;
   }).join('');
-  return head(actions) + `<div class="dash-ai-sections">${sections}</div>`;
+  return head(actions) + langStaleHtml + `<div class="dash-ai-sections">${sections}</div>`;
 }
 function _fmtWhen(ts){
   if(!ts) return '';
@@ -7614,11 +7657,15 @@ Key snapshot values to reference where relevant:
 - Retirement coverage: **${nums.coveragePct.toFixed(0)}%** (verdict: ${nums.verdict})
 - Nest egg (today's money): **${Math.round(nums.nestEgg).toLocaleString()} kr** at age **${state.retirementAge}**
 
-Return plain markdown only — no preamble, no sign-off, no JSON.`;
+Return plain markdown only — no preamble, no sign-off, no JSON.${langSuffix()}`;
     const raw = await callClaude(prompt, 1800);
     const parsed = _parseDashboardReport(raw);
     state.dashboardReport = {
       generatedAt: Date.now(),
+      // Tag the cached report with the language it was generated in
+      // so the UI can surface a "Regenerate in {other}?" chip when
+      // the active language no longer matches the cached prose.
+      lang: state.lang,
       raw,
       sections: parsed || { position: raw, good:'', concern:'', recs:'' },
       snapshot: {
@@ -10326,7 +10373,7 @@ Buy vs rent economics at this income level. Typical purchase prices in the main 
 Two short markdown bullet lists. Be specific and concrete — no generic filler.
 
 ## Final Verdict
-One paragraph. Recommendation: "proceed", "proceed with caveats", or "reconsider". State the single biggest risk and the single biggest opportunity.`;
+One paragraph. Recommendation: "proceed", "proceed with caveats", or "reconsider". State the single biggest risk and the single biggest opportunity.${langSuffix()}`;
   (async () => {
     try {
       const reply = await callClaude(prompt, 3000, key);
@@ -10340,6 +10387,10 @@ One paragraph. Recommendation: "proceed", "proceed with caveats", or "reconsider
         country: loc.country,
         flag: loc.flag || '🌍',
         date: new Date().toISOString(),
+        // Tag with the language the report was generated in so the
+        // Vault list and the slide-over can show a stale-language
+        // indicator when the active UI language no longer matches.
+        lang: state.lang,
         citizenship: state.citizenship,
         homeBase: state.homeBase,
         markdown: reply,
@@ -10958,7 +11009,7 @@ window.aiAnalyzeLocations=function(){
   const nums=getRetirementNumbers();
   const income=nums.totalRetirementIncome;
   const ctx = (typeof buildPersonalContext==='function') ? buildPersonalContext() : '';
-  const prompt=`${ctx}\n\nThe user is planning to retire with a monthly income of ${fmt(income)} (this is TODAY'S MONEY — real, inflation-adjusted purchasing power, not nominal future kr). Recommend the BEST retirement destinations globally based on this real income. Consider: cost of living, healthcare quality, climate, expat communities, visa/residency requirements, and lifestyle. Tailor visa and tax-treaty advice to the user's citizenship and home base. Give 5 specific recommendations with monthly cost estimates (also in today's money / local-currency-equivalent) and a viability score. Format as a structured list.`;
+  const prompt=`${ctx}\n\nThe user is planning to retire with a monthly income of ${fmt(income)} (this is TODAY'S MONEY — real, inflation-adjusted purchasing power, not nominal future kr). Recommend the BEST retirement destinations globally based on this real income. Consider: cost of living, healthcare quality, climate, expat communities, visa/residency requirements, and lifestyle. Tailor visa and tax-treaty advice to the user's citizenship and home base. Give 5 specific recommendations with monthly cost estimates (also in today's money / local-currency-equivalent) and a viability score. Format as a structured list.${langSuffix()}`;
   // Kick off in the background (fire-and-forget); the UI is driven by the
   // bgtask:* event subscription below.
   runBgTask(RETIRE_AI_KEY, () => callClaude(prompt, 1200, key)).catch(()=>{/* rendered via event */});
@@ -10974,7 +11025,7 @@ window.aiAnalyzeLoc=async function(id){
   const income=nums.totalRetirementIncome;
   const el=document.getElementById('loc-ai-out'); el.innerHTML='<span class="pulse">🤖 Analyzing…</span>';
   const ctx = buildPersonalContext();
-  const prompt=`${ctx}\n\nDetailed retirement feasibility analysis for ${loc.name}, ${loc.country}. The retiree has a monthly income of ${fmt(income)} (in today's money). Local cost of living: ${fmt(loc.costOfLiving)}/mo. Local income tax: ${loc.taxRate}%. Cover: actual cost of living breakdown, healthcare quality, visa/residency for the user's citizenship, quality of life, pros/cons, and an overall verdict. Be specific and practical. Under 250 words.`;
+  const prompt=`${ctx}\n\nDetailed retirement feasibility analysis for ${loc.name}, ${loc.country}. The retiree has a monthly income of ${fmt(income)} (in today's money). Local cost of living: ${fmt(loc.costOfLiving)}/mo. Local income tax: ${loc.taxRate}%. Cover: actual cost of living breakdown, healthcare quality, visa/residency for the user's citizenship, quality of life, pros/cons, and an overall verdict. Be specific and practical. Under 250 words.${langSuffix()}`;
   try {
     const reply=await callClaude(prompt,800,key);
     el.innerHTML=mdParse(reply);
@@ -11050,7 +11101,7 @@ Buy vs rent economics at this income level. Typical purchase prices in the main 
 Two short markdown bullet lists. Be specific and concrete — no generic filler.
 
 ## Final Verdict
-One paragraph. Recommendation: "proceed", "proceed with caveats", or "reconsider". State the single biggest risk and the single biggest opportunity.`;
+One paragraph. Recommendation: "proceed", "proceed with caveats", or "reconsider". State the single biggest risk and the single biggest opportunity.${langSuffix()}`;
   const controller = new AbortController();
   const startedAt = Date.now();
   (async () => {
@@ -11066,6 +11117,8 @@ One paragraph. Recommendation: "proceed", "proceed with caveats", or "reconsider
         countryCode: (loc.flag||'🌍'),
         flag: loc.flag || '🌍',
         date: new Date().toISOString(),
+        // Tag with the language the report was generated in.
+        lang: state.lang,
         citizenship: state.citizenship,
         homeBase: state.homeBase,
         markdown: reply,
@@ -12200,6 +12253,8 @@ function buildAIContext() {
     .map(e => `    · ${e.name}: ${Math.round(e.amount).toLocaleString()} kr/mo`)
     .join('\n');
   return `You are HORIZON AI — a personal finance and life planning assistant embedded in Horizon Finance OS.
+
+${langDirective()}
 
 ${ctx}
 
@@ -13531,7 +13586,16 @@ async function sendToFriend(thread, msg){
   }
   const contact = (state.contacts || []).find(c => c.id === thread.contactId);
   const personaKey = contact?.persona || 'sara';
-  const systemPrompt = FRIEND_PERSONA_PROMPTS[personaKey] || FRIEND_PERSONA_PROMPTS.sara;
+  // Friend persona prompts stay English (the personas are written
+  // in English) but get a one-line bilingual directive so they
+  // respond in whichever language the user is writing in. This
+  // preserves persona voice while letting Swedish users chat
+  // naturally with the same friend characters.
+  const personaBase = FRIEND_PERSONA_PROMPTS[personaKey] || FRIEND_PERSONA_PROMPTS.sara;
+  const personaLangBit = state.lang === 'sv'
+    ? '\n\nLANGUAGE: Reply in Swedish (svenska) when the user writes in Swedish, while preserving your persona voice. If the user switches back to English, follow them.'
+    : '\n\nLANGUAGE: Reply in the same language the user is writing in. Default to English. Preserve your persona voice in any language.';
+  const systemPrompt = personaBase + personaLangBit;
   // Build the full conversation history for Claude. We deliberately
   // send the ENTIRE thread (not a last-N slice) so the character
   // retains full continuity across the conversation. If a thread ever
