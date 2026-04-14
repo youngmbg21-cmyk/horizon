@@ -3329,6 +3329,128 @@ function getMonthlyFunFundBalance() {
   return m.slice(0,12).reduce((s,mo)=>s+mo.pureFunFund,0);
 }
 
+// ══ FINANCIAL ENGINE ═════════════════════════════════════════════════════════
+// Read-only namespace that owns every user-visible financial number.
+// Panels MUST consume numbers through this engine; renderers MUST NOT
+// do inline arithmetic on financial values (no `sumArr` over state
+// arrays, no `/ inflF`, no running reduces, no `futureValue` calls
+// outside getProjection). If a renderer needs a derived metric, add
+// it to the engine first, then READ it from the renderer — never
+// recompute.
+//
+// Why: every "shows X here and Y there for the same number" bug we
+// have chased is a symptom of the same calculation living in two
+// places. Consolidating makes drift impossible by construction — the
+// engine is the single source of truth, and it piggybacks on the
+// existing memoSelect cache so reading from many surfaces stays cheap.
+//
+// Contract:
+//   · Every method is a PURE read — no mutations, no DOM, no save().
+//   · Every method returns already-compounded, already-inflated,
+//     already-unit-correct numbers. Renderers format them (fmt / fmtC)
+//     and lay them out; they don't transform them.
+//   · Adding a new derived metric = add a new getter here and point
+//     its consumers at it. Never inline the math in a renderer.
+const FinancialEngine = (() => {
+  // ── helpers ─────────────────────────────────────────────────────────
+  const _yearsToRetirement = () =>
+    Math.max(0, (state.retirementAge || 65) - (state.currentAge || 30));
+  const _inflFactor = (years) =>
+    Math.pow(1 + (state.inflationRate || 0) / 100, Math.max(0, years || 0));
+  const _projLast = () => {
+    const p = getProjection();
+    return p.length ? p[p.length - 1] : null;
+  };
+  // ── months · 12-month forward window ────────────────────────────────
+  const months = {
+    next12:            () => get12Months(),
+    current:           () => get12Months()[0] || null,
+    find:              (key) => get12Months().find(m => m.key === key) || null,
+    // Running cumulative savings across the 12-month window. Each
+    // index i holds the sum of months[0..i].savings. Replaces the
+    // five independent `let run=0; months.map(...)` blocks that
+    // previously lived in renderDashboard / renderMonthly /
+    // liveSyncMonthlyReview / _liveSyncCharts.
+    runningSavings:    () => {
+      const all = get12Months();
+      let run = 0;
+      return all.map(m => { run += (m.savings || 0); return run; });
+    },
+    // Running cumulative Fun Fund balance. m.funFund is already the
+    // chained running value from get12Months() pass 2, so this is a
+    // thin projection of that field — kept as a named helper so
+    // callers never read the wrong field by mistake.
+    runningFunFund:    () => get12Months().map(m => m.funFund || 0),
+    // Sum of per-month pure Fun Fund allocations over the 12-month
+    // window. Used as the headline "12-month Fun Fund" KPI.
+    funFundTwelveMoTotal: () => getMonthlyFunFundBalance(),
+  };
+  // ── projection · yearly compounding (today → retirement age) ────────
+  const projection = {
+    yearly:             () => getProjection(),
+    atRetirement:       _projLast,
+    totalNominal:       () => { const p = _projLast(); return p ? p.total      : 0; },
+    totalReal:          () => { const p = _projLast(); return p ? p.realTotal  : 0; },
+    investmentsNominal: () => { const p = _projLast(); return p ? p.external   : 0; },
+    savingsNominal:     () => { const p = _projLast(); return p ? p.appSavings : 0; },
+    investmentsReal:    () => {
+      const nom = projection.investmentsNominal();
+      return nom / (_inflFactor(_yearsToRetirement()) || 1);
+    },
+    savingsReal:        () => {
+      const nom = projection.savingsNominal();
+      return nom / (_inflFactor(_yearsToRetirement()) || 1);
+    },
+    perAccountNominal:  (id) => {
+      const p = _projLast();
+      return (p && p.perAccount && p.perAccount[id]) || 0;
+    },
+    perAccountReal:     (id) =>
+      projection.perAccountNominal(id) / (_inflFactor(_yearsToRetirement()) || 1),
+    // Year-0 savings accumulated so far inside the current calendar
+    // year — used by the Retirement Plan "Total Investment Balance"
+    // card so it includes in-app savings year-to-date.
+    savingsYearToDate:  () => {
+      const p = getProjection();
+      return p.length ? (p[0].appSavings || 0) : 0;
+    },
+  };
+  // ── retirement · high-level numbers + runway simulation ────────────
+  const retirement = {
+    numbers:             () => getRetirementNumbers(),
+    nestEggTodayMoney:   () => getRetirementNumbers().nestEgg,
+    runwayData:          () => buildRunwayChartData(getRetirementNumbers()),
+    yearsToRetirement:   _yearsToRetirement,
+  };
+  // ── inflation · single source for today's-money conversions ────────
+  const inflation = {
+    factor:        _inflFactor,
+    toTodaysMoney: (nominal, years) => nominal / (_inflFactor(years) || 1),
+  };
+  // ── currency + format ──────────────────────────────────────────────
+  const format = {
+    // Convert a native-kr value to the user's selected display
+    // currency. Used in Chart.js datasets that previously spread
+    // `v * rate()` inline across every series.
+    toDisplay:       (v) => Number(v || 0) * rate(),
+    currency:        (v) => fmt(v),
+    currencyCompact: (v) => fmtC(v),
+    symbol:          () => sym(),
+    rate:            () => rate(),
+    // Small % helper used in bar widths and KPI subtitles. Returns
+    // 0 when income is 0/negative so callers don't divide by zero.
+    pctOfIncome: (value, income, cap = 100) => {
+      if(!(income > 0)) return 0;
+      const p = (value / income) * 100;
+      return Math.max(0, Math.min(cap, p));
+    },
+  };
+  return { months, projection, retirement, inflation, format };
+})();
+// Short alias so renderers can write `FE.months.current()` without
+// cluttering the site — same identity, purely ergonomic.
+const FE = FinancialEngine;
+
 // ─── TRANSACTIONS → BUDGET MAPPING ──────────────────────────────────────────
 // Computes per-line-item actuals from the current bank transactions and
 // returns a map keyed by baseline-expense line-item id. Category → line-item
@@ -3603,32 +3725,24 @@ function _liveSyncCharts(){
   // uses the chained running balance so it matches the Month
   // Summary + Running Balance table + Fun Fund tab chart. Savings
   // uses a CUMULATIVE running total so the line grows steadily
-  // across the window.
-  {
-    let savRun = 0;
-    const savingsCumulative = months.map(m => { savRun += (m.savings || 0); return savRun; });
-    patch('dash-cf', {
-      'Income':   () => months.map(m => m.pureIncome),
-      'Expenses': () => months.map(m => m.pureExpenses),
-      'Savings':  () => savingsCumulative,
-      'Fun Fund': () => months.map(m => m.funFund),
-    });
-  }
+  // across the window. Both series read through FinancialEngine so
+  // no local running-sum math lives in a renderer anymore.
+  patch('dash-cf', {
+    'Income':   () => months.map(m => m.pureIncome),
+    'Expenses': () => months.map(m => m.pureExpenses),
+    'Savings':  () => FE.months.runningSavings(),
+    'Fun Fund': () => FE.months.runningFunFund(),
+  });
   // Monthly Review — Income vs Expenses (left chart)
   patch('mo-ie', {
     'Income':   () => months.map(m => m.pureIncome),
     'Expenses': () => months.map(m => m.pureExpenses),
   });
   // Monthly Review — Savings & Fun Fund running net flow (right chart)
-  {
-    let savRun = 0;
-    const savingsRunning = months.map(m => { savRun += (m.savings || 0); return savRun; });
-    const funFundRunning = months.map(m => m.funFund || 0);
-    patch('mo-nf', {
-      'Savings · running':  () => savingsRunning,
-      'Fun Fund · running': () => funFundRunning,
-    });
-  }
+  patch('mo-nf', {
+    'Savings · running':  () => FE.months.runningSavings(),
+    'Fun Fund · running': () => FE.months.runningFunFund(),
+  });
   // Transactions — Next 12 Months spending chart (next scope only)
   patch('tx', {
     'Income':   () => fwd.map(m => m.pureIncome),
@@ -4201,8 +4315,8 @@ function renderAll() {
 }
 
 function updateSidebar() {
-  const months = get12Months();
-  const cm = months[0];
+  const cm = FE.months.current();
+  if(!cm) return;
   const sb = document.getElementById('sb-surplus');
   const ff = document.getElementById('sb-funfund');
   // Sidebar mini-widget shows the current month's PURE surplus/Fun
@@ -4220,13 +4334,13 @@ function renderTicker() {
   // (same source the Dashboard + Monthly Review show), not the bare
   // baseline, so the ticker at the top of every tab never drifts from
   // what the user sees inside the app.
-  const cm=get12Months()[0];
+  const cm = FE.months.current();
   const ti=cm.pureIncome;
   const te=cm.pureExpenses;
   const curSavings=cm.savings;
   const savRate=ti>0?((curSavings/ti)*100).toFixed(1):0;
-  const proj=getProjection(); const nestEgg=proj.length?proj[proj.length-1].total:0;
-  const ytr=Math.max(0,state.retirementAge-state.currentAge);
+  const nestEgg = FE.projection.totalNominal();
+  const ytr = FE.retirement.yearsToRetirement();
   const extBal=state.externalAssets.filter(a=>(a.assetType||'investment')==='investment').reduce((s,a)=>s+a.balance,0);
   const items=[
     {sym:'INCOME',val:fmtC(ti),chg:'+'+savRate+'%',up:true},
@@ -4948,8 +5062,8 @@ window.runDashboardAIReport = async function(){
     if(btn){ btn.disabled = true; btn.innerHTML = '⏳ Analysing…'; }
   } catch(_e){}
   try {
-    const cm = get12Months()[0];
-    const nums = getRetirementNumbers();
+    const cm = FE.months.current();
+    const nums = FE.retirement.numbers();
     const funFundTotal = getMonthlyFunFundBalance();
     // A focused prompt: one-shot, structured, with enough numeric
     // context to make the advice specific. The system prompt from
@@ -5048,30 +5162,22 @@ window.saveDashboardReportToVault = function(){
 };
 
 function renderDashboard() {
-  const months=get12Months(); const cm=months[0];
-  const proj=getProjection();
-  // Keep the nominal value around so we can show it as secondary context,
-  // but every PRIMARY display now reads from retNums (the shared real-value
-  // source of truth) so the Dashboard, Retirement Plan, Retire Anywhere,
-  // and AI prompts can never disagree.
-  const nominalNestEgg=proj.length?proj[proj.length-1].total:0;
-  const retNums=getRetirementNumbers();
-  const realNestEgg=retNums.nestEgg; // shared real-value source of truth
-  const realRetirementIncome=retNums.totalRetirementIncome;
-  const ytr=Math.max(0,state.retirementAge-state.currentAge);
-  // Use the CURRENT month's effective income/expenses/savings — i.e.
-  // the same numbers the Monthly Review tab shows for this month,
-  // including any overrides — instead of the bare baseline. Before
-  // this fix the Dashboard KPI row showed baseIncome/baseExpenses
-  // while the Fun Fund KPI beside it read from get12Months(), so a
-  // user with a current-month override would see the two tiles
-  // disagree with each other and with Monthly Review. Everything now
-  // flows from the same per-month source.
-  const ti = cm.pureIncome;
-  const te = cm.pureExpenses;
-  const curSavings = cm.savings;
-  const curIncomeStreams = (cm.incomeItems||[]).filter(it => !it.carryForward).length;
-  const funFundTotal=getMonthlyFunFundBalance();
+  const months  = FE.months.next12();
+  const cm      = FE.months.current();
+  // Every retirement number comes from FinancialEngine so this tab
+  // can never disagree with the Retirement Plan KPIs or the
+  // Longevity Runway card — they all read from the same source.
+  const nominalNestEgg       = FE.projection.totalNominal();
+  const retNums              = FE.retirement.numbers();
+  const realNestEgg          = FE.retirement.nestEggTodayMoney();
+  const realRetirementIncome = retNums.totalRetirementIncome;
+  const ytr                  = FE.retirement.yearsToRetirement();
+  // Current-month cash flow (matches Monthly Review Month Summary).
+  const ti          = cm.pureIncome;
+  const te          = cm.pureExpenses;
+  const curSavings  = cm.savings;
+  const curIncomeStreams = (cm.incomeItems || []).filter(it => !it.carryForward).length;
+  const funFundTotal = FE.months.funFundTwelveMoTotal();
   const extBal=state.externalAssets.filter(a=>(a.assetType||'investment')==='investment').reduce((s,a)=>s+a.balance,0);
 
   const el=document.getElementById('panel-dashboard');
@@ -5179,8 +5285,7 @@ function renderDashboard() {
       // of the 12-month window, so the line reads as a continuous
       // growth curve rather than a flat per-month value. Matches the
       // running net-flow line on the Monthly Review chart.
-      let savRun = 0;
-      const savingsCumulative = months.map(m => { savRun += (m.savings || 0); return savRun; });
+      const savingsCumulative = FE.months.runningSavings();
       charts['dash-cf']=new Chart(cf.getContext('2d'),{
         type:'bar',
         data:{
@@ -5221,9 +5326,10 @@ function renderDashboard() {
       //   · Total            — Savings + Investment (p.total)
       //
       // The Today's Money / Nominal toggle divides every series by
-      // cumulative inflation when active.
-      const inflF = y => Math.pow(1+state.inflationRate/100, y);
-      const toReal = (v, y) => Math.round(v / inflF(y));
+      // cumulative inflation when active. Inflation math goes through
+      // FinancialEngine so the factor is identical to the Retirement
+      // Plan tab and the getProjection() .realTotal field.
+      const toReal = (v, y) => Math.round(FE.inflation.toTodaysMoney(v || 0, y));
       const savings    = proj.map(p => mode === 'real' ? toReal(p.appSavings || 0, p.age - state.currentAge) : (p.appSavings || 0));
       const investment = proj.map(p => mode === 'real' ? toReal(p.external   || 0, p.age - state.currentAge) : (p.external   || 0));
       const total      = proj.map(p => mode === 'real' ? p.realTotal : p.total);
@@ -5381,7 +5487,7 @@ function renderTransactions() {
       <div style="font-size:12px;color:var(--text2);margin-bottom:10px">Detected from the last 12 months of transaction data</div>
       <div>${patterns.map(p=>`<span class="pattern-chip ${p.dir}">${p.dir==='up'?'↑':p.dir==='dn'?'↓':'→'} ${p.text}</span>`).join('')}</div>
       <div style="margin-top:14px;padding:12px;background:var(--bg3);border-radius:var(--r);font-size:12px;color:var(--text2);line-height:1.6">
-        💡 <strong style="color:var(--text)">AI Insight:</strong> ${(()=>{const cm=get12Months()[0];return `Your monthly expenses of ${fmt(cm.pureExpenses)} leave you with ${fmt(cm.pureFunFund)}/month in Fun Fund after savings.`;})()} Your biggest opportunity is the <strong>Chase: ${fmt(55000)}</strong> line — this loan repayment, once cleared, would boost your monthly surplus by ~${fmt(55000)}/mo. Connect your AI advisor to get personalised recommendations.
+        💡 <strong style="color:var(--text)">AI Insight:</strong> ${(()=>{const cm=FE.months.current();return `Your monthly expenses of ${fmt(cm.pureExpenses)} leave you with ${fmt(cm.pureFunFund)}/month in Fun Fund after savings.`;})()} Your biggest opportunity is the <strong>Chase: ${fmt(55000)}</strong> line — this loan repayment, once cleared, would boost your monthly surplus by ~${fmt(55000)}/mo. Connect your AI advisor to get personalised recommendations.
       </div>
     </div>`;
 
@@ -5644,13 +5750,12 @@ function renderMonthly() {
     destroyChart('mo-nf');
     const all = get12Months();
     const labels = all.map(m => m.short);
-    // Running cumulative: savings compound purely on their own (each
-    // month's target adds to a cumulative total), and Fun Fund reads
-    // straight from m.funFund which is already the chained running
-    // balance computed in get12Months() pass 2.
-    let savRun = 0;
-    const savingsRunning = all.map(m => { savRun += (m.savings || 0); return savRun; });
-    const funFundRunning = all.map(m => m.funFund || 0);
+    // Running cumulative series — savings cumulate across the window
+    // while Fun Fund reads the already-chained m.funFund. Both come
+    // from FinancialEngine so the left chart matches the Monthly
+    // Summary bar + the Fun Fund tab byte-for-byte.
+    const savingsRunning = FE.months.runningSavings();
+    const funFundRunning = FE.months.runningFunFund();
 
     const ctxIE = document.getElementById('mo-chart-ie');
     if(ctxIE){
@@ -5767,9 +5872,8 @@ function liveSyncMonthlyReview(selKey){
   }
   const nfChart = charts['mo-nf'];
   if(nfChart && nfChart.data && Array.isArray(nfChart.data.datasets)){
-    let savRun = 0;
-    const savingsRunning = months.map(m => { savRun += (m.savings || 0); return savRun; });
-    const funFundRunning = months.map(m => m.funFund || 0);
+    const savingsRunning = FE.months.runningSavings();
+    const funFundRunning = FE.months.runningFunFund();
     nfChart.data.datasets.forEach(ds => {
       if(ds.label === 'Savings · running')       ds.data = savingsRunning;
       else if(ds.label === 'Fun Fund · running') ds.data = funFundRunning;
@@ -5996,39 +6100,25 @@ function renderRetirement() {
   const pensions=getPensionAssets();
   const ytr=Math.max(0,state.retirementAge-state.currentAge);
   const infl=state.inflationRate; const inflF=Math.pow(1+infl/100,ytr);
-  // PORTFOLIO KPIs — everything here reads from the single
-  // getProjection() source used by getRetirementNumbers() and the
-  // Dashboard Nest Egg chart so every view agrees on one projected
-  // value for the nest egg in today's money.
-  //
-  //   tBal    → Total current investment balance (external accounts).
-  //   savNow  → Accumulated in-app savings so far this year, taken
-  //             from proj year 0's appSavings. At the very start of a
-  //             year this rounds to the month's savings target; it
-  //             climbs as the year progresses.
-  //   tContrib → Monthly contributions into investment accounts PLUS
-  //             the user's current in-app monthly savings target, so
-  //             the card reflects every stream feeding the nest egg.
-  //   projNom / projReal → proj[last].total / .realTotal. These
-  //             INCLUDE both the external-investment compounding AND
-  //             the in-app savings stream (proj.appSavings), so the
-  //             number matches the Longevity Runway nestEgg
-  //             exactly (both are now proj[last].realTotal).
-  const proj = getProjection();
-  const projLast = proj.length ? proj[proj.length - 1] : null;
-  const savNow = proj.length ? (proj[0].appSavings || 0) : 0;
-  const tBal = sumArr(investments,'balance') + savNow;
-  const monthlySavingsNow = (get12Months()[0]?.savings) || state.baseSavings || 0;
-  const tContrib = sumArr(investments,'monthlyContribution') + monthlySavingsNow;
-  const projNom  = projLast ? projLast.total     : sumArr(investments,'balance');
-  const projReal = projLast ? projLast.realTotal : sumArr(investments,'balance');
+  // PORTFOLIO KPIs — every number on this row comes from the single
+  // FinancialEngine surface so nothing in this file can drift from
+  // the Longevity Runway nest-egg card or the Dashboard Nest Egg
+  // chart. Fallback to sumArr(investments,'balance') handles the
+  // empty-projection case (e.g. before the user adds any assets).
+  const projLast = FE.projection.atRetirement();
+  const savNow   = FE.projection.savingsYearToDate();
+  const tBal     = sumArr(investments, 'balance') + savNow;
+  const monthlySavingsNow = (FE.months.current()?.savings) || state.baseSavings || 0;
+  const tContrib = sumArr(investments, 'monthlyContribution') + monthlySavingsNow;
+  const projNom  = projLast ? FE.projection.totalNominal() : sumArr(investments, 'balance');
+  const projReal = projLast ? FE.projection.totalReal()    : sumArr(investments, 'balance');
   // Split the projection into its two component streams — still
   // reading from the same proj object so the sum always equals the
   // headline projNom / projReal shown in the KPI card.
-  const investmentsProjNom = projLast ? projLast.external  : sumArr(investments,'balance');
-  const savingsProjNom     = projLast ? projLast.appSavings : 0;
-  const savingsProjReal    = savingsProjNom / (inflF || 1);
-  const investmentsProjReal = investmentsProjNom / (inflF || 1);
+  const investmentsProjNom  = projLast ? FE.projection.investmentsNominal() : sumArr(investments, 'balance');
+  const savingsProjNom      = FE.projection.savingsNominal();
+  const savingsProjReal     = FE.projection.savingsReal();
+  const investmentsProjReal = FE.projection.investmentsReal();
   // Earliest pension start age across all pension assets — used for the
   // pension card subtitle and the Phase 1 / Phase 2 split.
   const earliestPension = pensions.length > 0
@@ -6172,13 +6262,10 @@ function renderRetirement() {
   const assetRows = savingsProjRow + state.externalAssets.map((a,idx)=>{
     const isInv=(a.assetType||'investment')==='investment';
     const gr=a.growthRate??state.growthRate;
-    // Per-account projection is read straight from the same
-    // getProjection() result the headline KPIs use, so the row-
-    // level number always matches the Total Projected and the
-    // Longevity Runway nest egg. projLast.perAccount is populated
-    // by getProjection() per investment account id.
-    const perAccountNom = (projLast && projLast.perAccount) ? (projLast.perAccount[a.id] || 0) : 0;
-    const projR = isInv ? perAccountNom / (inflF || 1) : 0;
+    // Per-account projection is read through FinancialEngine so the
+    // row-level number always matches the Total Projected card and
+    // the Longevity Runway nest egg. No inline inflation math.
+    const projR = isInv ? FE.projection.perAccountReal(a.id) : 0;
     const accentColor=isInv?'var(--green)':'var(--amber)';
     // inp follows the Monthly Review pattern: oninput only updates state +
     // saves; onchange (fires on commit — blur, Tab, Enter) re-renders.
@@ -6852,11 +6939,13 @@ function renderFunFund() {
   // cross-month carry-forward chain here so the chart, the per-month
   // list, and the headline KPIs all mirror exactly what the user typed
   // into each Monthly Review row — a single source of truth.
-  const allMonths=get12Months();
+  const allMonths = FE.months.next12();
   // 12 forward months, starting at the current month (same window the
   // Forecast & Review → Monthly tab shows).
-  const months=allMonths.slice(0,12);
-  const totalFF=months.reduce((s,m)=>s+m.pureFunFund,0);
+  const months = allMonths.slice(0,12);
+  // Headline Fun Fund total — always via FinancialEngine so it stays
+  // identical to the Dashboard KPI + any other 12-month Fun Fund read.
+  const totalFF = FE.months.funFundTwelveMoTotal();
   // Normalise status: the dropdown now only offers "planning" and
   // "booked". Any legacy state left over from the older four-option
   // version (wishlist / completed / …) is coerced to "planning" so
@@ -9975,11 +10064,16 @@ function buildSeriesCatalog(){
   cat['funfund.balance'] = {
     label: 'Fun Fund · cumulative balance', unit: 'currency', xAxis: 'month',
     get(){
-      const months = get12Months();
-      let running = 0;
+      // m.funFund from get12Months() pass 2 IS the chained running
+      // balance. Prior code ran a second cumulative sum over it,
+      // producing a triangular integral instead of the running
+      // balance. Now reads through FinancialEngine so this series
+      // matches the Running Balance column in the Fun Fund tab and
+      // every other surface that shows the same number.
+      const months = FE.months.next12();
       return {
         xValues: months.map(m => m.short),
-        values:  months.map(m => { running += (m.funFund || 0); return running; }),
+        values:  FE.months.runningFunFund(),
       };
     },
   };
