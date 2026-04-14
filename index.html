@@ -3809,11 +3809,103 @@ const FinancialEngine = (() => {
       return Math.max(0, Math.min(cap, p));
     },
   };
-  return { months, projection, retirement, inflation, format };
+  // ── invariant guards · debug-mode runtime assertions ─────────────
+  // Checks a handful of mathematical identities the engine is
+  // supposed to guarantee. Returns an array of violation strings
+  // (empty = healthy). Deliberately non-throwing — called on every
+  // save() when debug mode is on (via ?debug=1 in the URL or
+  // window.__horizonDebug = true in the console). A production
+  // build can wire it behind a feature flag; for now logging is
+  // enough to catch regressions during manual testing.
+  const assertInvariants = () => {
+    const v = [];
+    const near = (a, b, tol = 1) => Math.abs((a || 0) - (b || 0)) <= tol;
+    // I1 — totalReal must equal investmentsReal + savingsReal.
+    // Split of the single canonical projection, so any drift here
+    // means someone reached past the engine with inline math.
+    const total = projection.totalReal();
+    const inv   = projection.investmentsReal();
+    const sav   = projection.savingsReal();
+    if(!near(total, inv + sav, 2)){
+      v.push(`I1: projection.totalReal (${Math.round(total)}) != investmentsReal + savingsReal (${Math.round(inv + sav)})`);
+    }
+    // I2 — nestEggTodayMoney must equal projection.totalReal.
+    // Same number under two different names — they must agree.
+    const nest = retirement.nestEggTodayMoney();
+    if(!near(nest, total, 1)){
+      v.push(`I2: retirement.nestEggTodayMoney (${Math.round(nest)}) != projection.totalReal (${Math.round(total)})`);
+    }
+    // I3 — runningSavings must be monotonically non-decreasing.
+    // You can't un-save (monthly savings target is always ≥ 0).
+    const runSav = months.runningSavings();
+    for(let i = 1; i < runSav.length; i++){
+      if(runSav[i] < runSav[i-1] - 1){
+        v.push(`I3: runningSavings[${i}] (${Math.round(runSav[i])}) < previous (${Math.round(runSav[i-1])})`);
+        break;
+      }
+    }
+    // I4 — months window must always be length 13 (current + 12
+    // forward). Any other length means get12Months drift.
+    const m = months.next12();
+    if(!Array.isArray(m) || m.length !== 13){
+      v.push(`I4: months.next12() length ${m?.length} (expected 13)`);
+    }
+    // I5 — runningFunFund[i] should equal m.funFund[i] for every i,
+    // because runningFunFund is a thin projection of that field.
+    // Catches cases where someone re-defines the helper to do its
+    // own cumulative math and diverges from the canonical chain.
+    const runFF = months.runningFunFund();
+    if(m && m.length && runFF.length === m.length){
+      for(let i = 0; i < m.length; i++){
+        if(!near(runFF[i], m[i].funFund || 0, 1)){
+          v.push(`I5: runningFunFund[${i}] (${Math.round(runFF[i])}) != months[${i}].funFund (${Math.round(m[i].funFund||0)})`);
+          break;
+        }
+      }
+    }
+    // I6 — funFundTwelveMoTotal must equal sum of slice(0,12)
+    // pureFunFund. A quick check that the headline KPI hasn't
+    // drifted from its per-month source.
+    if(m && m.length >= 12){
+      const expected = m.slice(0,12).reduce((s, x) => s + (x.pureFunFund || 0), 0);
+      const actual = months.funFundTwelveMoTotal();
+      if(!near(actual, expected, 1)){
+        v.push(`I6: funFundTwelveMoTotal (${Math.round(actual)}) != sum of first 12 pureFunFund (${Math.round(expected)})`);
+      }
+    }
+    return v;
+  };
+  return { months, projection, retirement, inflation, format, assertInvariants };
 })();
 // Short alias so renderers can write `FE.months.current()` without
 // cluttering the site — same identity, purely ergonomic.
 const FE = FinancialEngine;
+
+// Debug-mode invariant sweeps. Enable by loading the app with
+// `?debug=1` in the URL (or by setting window.__horizonDebug = true
+// in the console). When on, every bus `state:changed` runs
+// FE.assertInvariants() and logs any violations to console.warn.
+// Deliberately not throwing — drift during development should be
+// noticed, not crash the session.
+(() => {
+  try {
+    if(/[?&]debug=1/.test(location.search)) window.__horizonDebug = true;
+  } catch(_){}
+})();
+function _runInvariantSweep(){
+  if(!window.__horizonDebug) return;
+  try {
+    const violations = FE.assertInvariants();
+    if(violations.length){
+      console.warn('[FinancialEngine] invariant violations:', violations);
+    }
+  } catch(e){
+    console.warn('[FinancialEngine] invariant sweep failed:', e);
+  }
+}
+if(typeof bus !== 'undefined'){
+  bus.on('state:changed', _runInvariantSweep);
+}
 
 // ─── TRANSACTIONS → BUDGET MAPPING ──────────────────────────────────────────
 // Computes per-line-item actuals from the current bank transactions and
@@ -10154,27 +10246,28 @@ function _catalogDynamicListing(){
 }
 
 function buildAIContext() {
-  const nums=getRetirementNumbers();
-  const months=get12Months(); const cm=months[0];
-  // Source income/expenses from the current month so the AI context
-  // stays in lockstep with what the Dashboard / Monthly Review show.
-  const ti=cm.pureIncome; const te=cm.pureExpenses;
-  const scored=retirePlaces().map(scoreLocation);
-  const panel=state.activePanel||'dashboard';
-  const viewLabel=(PANEL_META[panel]&&PANEL_META[panel].label)||panel;
-  const section=state.activeSection?` (focused on: ${state.activeSection})`:'';
+  // Every number in this prompt is routed through FinancialEngine
+  // so what the model sees is byte-identical to what the user sees
+  // on-screen. Any drift between the AI's quoted figures and the
+  // visible UI would be a drift inside FE — by construction.
+  const nums = FE.retirement.numbers();
+  const cm   = FE.months.current();
+  const ti = cm.pureIncome; const te = cm.pureExpenses;
+  const scored = retirePlaces().map(scoreLocation);
+  const panel = state.activePanel || 'dashboard';
+  const viewLabel = (PANEL_META[panel] && PANEL_META[panel].label) || panel;
+  const section = state.activeSection ? ` (focused on: ${state.activeSection})` : '';
   const mode = state.aiMode || 'expert';
   const modeInstruction = mode === 'simple'
     ? `RESPONSE STYLE: SIMPLE. Explain like you're talking to a smart friend who is new to personal finance. Avoid jargon (or define it in 4–6 words when unavoidable). Short sentences. No bullet soup; write in plain paragraphs. Skip hedging. Use at most one number per idea and round generously. If the user asks something technical, answer it in everyday language first, then add ONE optional sentence of detail at the end.`
     : `RESPONSE STYLE: EXPERT. The user is financially literate. Use domain vocabulary (sequence-of-returns risk, real vs nominal, withdrawal rate, tax drag, basis points) without over-explaining. Be direct, reference specific numbers from their snapshot, and quote percentages to one decimal. Prefer a short narrative plus a bulleted breakdown. Call out assumptions you're making.`;
   const ctx = buildPersonalContext();
-  // Pull every retirement number from the shared getRetirementNumbers() so
-  // the AI can never quote a different figure than the UI shows. All
-  // monetary values below are in TODAY'S MONEY (real, inflation-adjusted)
-  // — the nominal equivalent is provided as secondary reference only.
-  const proj = getProjection().slice(-1)[0] || {};
-  const realNestEgg = nums.nestEgg;
-  const nominalNestEgg = proj.total || 0;
+  // All monetary values below are in TODAY'S MONEY (real, inflation-
+  // adjusted) — the nominal equivalent is provided as secondary
+  // reference only. Both flavours come from the same projection
+  // result so they can't drift.
+  const realNestEgg          = FE.retirement.nestEggTodayMoney();
+  const nominalNestEgg       = FE.projection.totalNominal();
   const realRetirementIncome = nums.totalRetirementIncome;
   const realRate = Math.max(0, (state.retirementPostGrowth || 4) - state.inflationRate);
   // Compute all three retirement-expense scenarios so the AI can quote any
@@ -10479,7 +10572,7 @@ const AI_CHART_RECIPES = {
   // chat-friendly smaller format. Uses the shared simulation result so the
   // line + bars match what the user sees on the Retirement page.
   runway(params){
-    const nums = getRetirementNumbers();
+    const nums = FE.retirement.numbers();
     const sim  = nums._simResult;
     if(!sim || !sim.labels || sim.labels.length === 0) return null;
     const r = rate();
@@ -10535,7 +10628,7 @@ const AI_CHART_RECIPES = {
   // Nest-egg projection — line from now to retirement, real (today's money)
   // by default, with optional nominal overlay.
   nestEgg(params){
-    const proj = getProjection();
+    const proj = FE.projection.yearly();
     if(!proj || proj.length === 0) return null;
     const r = rate();
     const showNominal = params?.includeNominal === true;
@@ -10565,7 +10658,7 @@ const AI_CHART_RECIPES = {
   // 12-month expense breakdown — bar chart of monthly expenses. Falls back
   // to a single aggregate bar if baseExpenses is thin.
   expense12mo(params){
-    const months = get12Months();
+    const months = FE.months.next12();
     if(!months || months.length === 0) return null;
     const r = rate();
     return {
@@ -10588,7 +10681,7 @@ const AI_CHART_RECIPES = {
   // 12-month cashflow — income vs expenses, stacked/overlaid bars with a
   // surplus line on top. Answers "am I saving enough this year?".
   cashflow12mo(params){
-    const months = get12Months();
+    const months = FE.months.next12();
     if(!months || months.length === 0) return null;
     const r = rate();
     return {
@@ -10690,7 +10783,7 @@ function buildSeriesCatalog(){
     cat[key] = {
       label, unit:'currency', xAxis:'age',
       get(){
-        const proj = getProjection();
+        const proj = FE.projection.yearly();
         return {
           xValues: proj.map(p => p.age),
           values:  proj.map(p => pick(p) || 0),
@@ -10709,7 +10802,7 @@ function buildSeriesCatalog(){
     cat[key] = {
       label, unit, xAxis:'age',
       get(){
-        const sim = getRetirementNumbers()._simResult;
+        const sim = FE.retirement.numbers()._simResult;
         if(!sim || !sim.labels) return { xValues:[], values:[] };
         return {
           xValues: sim.labels.slice(),
@@ -10741,7 +10834,7 @@ function buildSeriesCatalog(){
   cat['runway.coverage'] = {
     label: 'Coverage · cumulative %', unit:'percent', xAxis:'age',
     get(){
-      const sim = getRetirementNumbers()._simResult;
+      const sim = FE.retirement.numbers()._simResult;
       if(!sim || !sim.labels) return { xValues:[], values:[] };
       const out = [];
       let funded = 0;
@@ -10758,7 +10851,7 @@ function buildSeriesCatalog(){
     cat[key] = {
       label, unit:'currency', xAxis:'month',
       get(){
-        const months = get12Months();
+        const months = FE.months.next12();
         return {
           xValues: months.map(m => m.short),
           values:  months.map(m => pick(m) || 0),
@@ -10787,7 +10880,7 @@ function buildSeriesCatalog(){
       },
     };
   };
-  addDestSeries('destinations.income',        'Monthly retirement income', 'currency', () => getRetirementNumbers().totalRetirementIncome);
+  addDestSeries('destinations.income',        'Monthly retirement income', 'currency', () => FE.retirement.numbers().totalRetirementIncome);
   addDestSeries('destinations.costOfLiving',  'Cost of living · monthly',  'currency', l => l.costOfLiving);
   addDestSeries('destinations.surplus',       'Monthly surplus',           'currency', l => l.surplus);
   addDestSeries('destinations.taxRate',       'Tax rate · %',              'percent',  l => l.taxRate);
@@ -10814,7 +10907,7 @@ function buildSeriesCatalog(){
       label: `${acc.name || 'Account'} · projected balance`,
       unit: 'currency', xAxis: 'age',
       get(){
-        const proj = getProjection();
+        const proj = FE.projection.yearly();
         return {
           xValues: proj.map(p => p.age),
           values:  proj.map(p => (p.perAccount && p.perAccount[acc.id]) || 0),
@@ -10837,8 +10930,8 @@ function buildSeriesCatalog(){
       label: `${pen.name || 'Pension'} · annual payout`,
       unit: 'currency', xAxis: 'age',
       get(){
-        const proj = getProjection();
-        const sim  = getRetirementNumbers()._simResult;
+        const proj = FE.projection.yearly();
+        const sim  = FE.retirement.numbers()._simResult;
         const xAcc = proj.map(p => p.age);
         const xDraw = (sim && sim.labels) ? sim.labels.slice(1) : [];
         const pStart = pen.startAge ?? state.retirementAge;
@@ -10867,7 +10960,7 @@ function buildSeriesCatalog(){
       label: `${item.name || 'Expense'} · monthly`,
       unit: 'currency', xAxis: 'month',
       get(){
-        const months = get12Months();
+        const months = FE.months.next12();
         return {
           xValues: months.map(m => m.short),
           values:  months.map(m => {
@@ -10893,8 +10986,8 @@ function buildSeriesCatalog(){
   // currency-unit so they plot cleanly side by side.
   const buildLifetimeSeries = (accPick, drawPick) => ({
     get(){
-      const proj = getProjection();
-      const sim  = getRetirementNumbers()._simResult;
+      const proj = FE.projection.yearly();
+      const sim  = FE.retirement.numbers()._simResult;
       const xAcc = proj.map(p => p.age);
       const valAcc = proj.map(accPick);
       const xDraw = (sim && sim.labels) ? sim.labels.slice(1) : [];
@@ -10949,7 +11042,7 @@ function buildSeriesCatalog(){
   cat['funfund.spend'] = {
     label: 'Fun Fund · planned trip spend · monthly', unit: 'currency', xAxis: 'month',
     get(){
-      const months = get12Months();
+      const months = FE.months.next12();
       const tripByMonth = {};
       (state.trips || []).forEach(t => {
         (t.expenses || []).forEach(ex => {
