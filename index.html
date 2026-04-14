@@ -3261,6 +3261,103 @@ const STRINGS = {
   'common.loading':         { en:'Loading…',          sv:'Laddar…' },
   'common.empty':           { en:'No data yet.',      sv:'Ingen data ännu.' },
   'common.more':            { en:'More',              sv:'Mer' },
+
+  // ── Shared line-item widget (Settings + Monthly + Yearly) ──
+  'li.placeholder.name':    { en:'Name',              sv:'Namn' },
+  'li.type.fixed':          { en:'Fixed',             sv:'Fast' },
+  'li.type.variable':       { en:'Variable',          sv:'Rörlig' },
+
+  // ── Shared country dropdown (Settings, Retire Anywhere, Property IQ) ──
+  'cd.placeholder':         { en:'Select a country',  sv:'Välj ett land' },
+  'cd.search':              { en:'Type to search…',   sv:'Skriv för att söka…' },
+  'cd.noMatches':           { en:'No matches.',       sv:'Inga träffar.' },
+
+  // ── Settings · page header ─────────────────────────────
+  'settings.page.title':    { en:'Settings & Baseline',
+                              sv:'Inställningar & grunddata' },
+  'settings.page.sub':      { en:'Configure your recurring income, expenses, retirement parameters, and AI keys',
+                              sv:'Konfigurera dina återkommande inkomster, utgifter, pensionsparametrar och AI-nycklar' },
+
+  // ── Settings · Personal Context card ───────────────────
+  'settings.ctx.title':     { en:'🪪 Personal Context',
+                              sv:'🪪 Personlig kontext' },
+  'settings.ctx.required':  { en:'REQUIRED',           sv:'KRÄVS' },
+  'settings.ctx.complete':  { en:'✓ COMPLETE',         sv:'✓ KOMPLETT' },
+  'settings.ctx.blurb':     { en:"Your citizenship and current country of residence are injected into every AI prompt across the app — tax implications, pension entitlements, visa rules, and cost-of-living comparisons are all tailored to your personal situation.",
+                              sv:'Ditt medborgarskap och nuvarande hemvist injiceras i varje AI-förfrågan i appen — skattefrågor, pensionsrätt, visumregler och levnadskostnadsjämförelser anpassas efter din personliga situation.' },
+  'settings.ctx.citizenship':  { en:'Citizenship (nationality)',   sv:'Medborgarskap (nationalitet)' },
+  'settings.ctx.homeBase':     { en:'Home Base (current residence)', sv:'Hemvist (nuvarande bostadsland)' },
+  'settings.ctx.selectCitizenship': { en:'Select your citizenship', sv:'Välj ditt medborgarskap' },
+  'settings.ctx.selectHomeBase':    { en:'Select your home base',   sv:'Välj din hemvist' },
+
+  // ── Settings · recurring baseline cards ────────────────
+  'settings.recurring':     { en:'RECURRING',          sv:'ÅTERKOMMANDE' },
+  'settings.baseline.applies': { en:'Applied to every month unless overridden',
+                                 sv:'Används varje månad om inte överskriven' },
+  'settings.income.title':  { en:'💰 Baseline Monthly Income',
+                              sv:'💰 Månatlig grundinkomst' },
+  'settings.expenses.title':{ en:'📤 Baseline Monthly Expenses',
+                              sv:'📤 Månatliga grundutgifter' },
+  'settings.addIncome':     { en:'+ Add Income',       sv:'+ Lägg till inkomst' },
+  'settings.addExpense':    { en:'+ Add Expense',      sv:'+ Lägg till utgift' },
+  'settings.savings.title': { en:'🏦 Monthly Savings Target',
+                              sv:'🏦 Månadsmål för sparande' },
+
+  // ── Settings · exchange rates card ─────────────────────
+  'settings.rates.title':   { en:'💱 Exchange Rates (vs SEK)',
+                              sv:'💱 Växelkurser (mot SEK)' },
+  'settings.rates.oneSekEquals': { en:'1 SEK =',       sv:'1 SEK =' },
+
+  // ── Settings · AI keys card ────────────────────────────
+  'settings.aiKeys.title':  { en:'🤖 AI Keys',         sv:'🤖 AI-nycklar' },
+  'settings.aiKeys.claude': { en:'Claude (Anthropic) API Key',
+                              sv:'Claude-nyckel (Anthropic)' },
+  'settings.aiKeys.openai': { en:'OpenAI API Key',     sv:'OpenAI-nyckel' },
+  'settings.aiKeys.perplexity':     { en:'Perplexity API Key',
+                                      sv:'Perplexity-nyckel' },
+  'settings.aiKeys.perplexityHint': { en:'(optional — enhances Property IQ with live web data)',
+                                      sv:'(valfri — förbättrar Fastighets-IQ med livedata från webben)' },
+  'settings.aiKeys.storage': { en:"Keys are stored only in your browser's localStorage. They're never sent to any server — only directly to the AI provider's API.",
+                               sv:'Nycklarna lagras endast i webbläsarens localStorage. De skickas aldrig till någon server — endast direkt till AI-leverantörens API.' },
+
+  // ── Settings · appearance card ─────────────────────────
+  'settings.appearance.title':    { en:'✦ Ticker Quote & Appearance',
+                                    sv:'✦ Tickercitat & utseende' },
+  'settings.appearance.quoteLbl': { en:'Personal quote / mantra',
+                                    sv:'Personligt citat / mantra' },
+
+  // ── Settings · data management card ────────────────────
+  'settings.data.title':    { en:'💾 Data Management',  sv:'💾 Datahantering' },
+  'settings.data.blurb':    { en:"All data is saved locally in your browser. Export a slice or the full backup to move between devices. Imports merge into your current state (they don't replace the whole thing unless you pick \"Everything\").",
+                              sv:'All data lagras lokalt i din webbläsare. Exportera en del eller hela säkerhetskopian för att flytta mellan enheter. Importer slås samman med din nuvarande data (de ersätter inte allt om du inte väljer ”Allt”).' },
+  'settings.data.export':   { en:'⬇ Export',           sv:'⬇ Exportera' },
+  'settings.data.import':   { en:'⬆ Import',           sv:'⬆ Importera' },
+  'settings.data.resetAll': { en:'⚠ Reset All',        sv:'⚠ Återställ allt' },
+  'settings.data.resetConfirm': { en:'Reset all data? This cannot be undone.',
+                                  sv:'Återställ all data? Detta kan inte ångras.' },
+
+  // ── Export slices (data management rows) ───────────────
+  'slice.baseline.label':   { en:'Baseline',          sv:'Grunddata' },
+  'slice.baseline.sub':     { en:'Income, expenses, savings target',
+                              sv:'Inkomster, utgifter, sparmål' },
+  'slice.retirement.label': { en:'Retirement',        sv:'Pension' },
+  'slice.retirement.sub':   { en:'Portfolio assets, scenarios, ages, tax',
+                              sv:'Portföljtillgångar, scenarier, åldrar, skatt' },
+  'slice.places.label':     { en:'Places',            sv:'Platser' },
+  'slice.places.sub':       { en:'Retire Anywhere destinations',
+                              sv:'Pensionsdestinationer' },
+  'slice.trips.label':      { en:'Trips & Fun Fund',  sv:'Resor & Fun Fund' },
+  'slice.trips.sub':        { en:'Planned travel and lifestyle budget',
+                              sv:'Planerade resor och livsstilsbudget' },
+  'slice.overrides.label':  { en:'Overrides',         sv:'Överskrifter' },
+  'slice.overrides.sub':    { en:'Monthly overrides + yearly bases',
+                              sv:'Månadsöverskrifter + årsgrunder' },
+  'slice.settings.label':   { en:'Preferences',       sv:'Inställningar' },
+  'slice.settings.sub':     { en:'Theme, currency, exchange rates, AI keys',
+                              sv:'Tema, valuta, växelkurser, AI-nycklar' },
+  'slice.all.label':        { en:'Everything',        sv:'Allt' },
+  'slice.all.sub':          { en:'Full state backup (overwrites on import)',
+                              sv:'Fullständig säkerhetskopia (skriver över vid import)' },
 };
 // Resolve a translation. `vars` supplies values for {placeholder}
 // tokens. Falls through to English, then to the key itself, so a
@@ -6197,11 +6294,11 @@ function renderLineItems(containerId, items, stateKey, readOnly, showPaid) {
     const paidClass = isPaid ? ' line-item-paid' : '';
     return `<div class="line-item${paidClass}">
       ${paidBox}
-      <input class="line-name" value="${esc(it.name)}" placeholder="Name" ${readOnly?'disabled':''} oninput="updateLineItem('${stateKey}','${it.id}','name',this.value)">
+      <input class="line-name" value="${esc(it.name)}" placeholder="${esc2(t('li.placeholder.name'))}" ${readOnly?'disabled':''} oninput="updateLineItem('${stateKey}','${it.id}','name',this.value)">
       <div class="line-amt-wrap"><span class="line-cur">${s}</span><input class="line-amt" type="number" value="${Math.round(it.amount*r)}" ${readOnly?'disabled':''} oninput="updateLineItem('${stateKey}','${it.id}','amount',this.value/${r})"></div>
       <select class="line-type" ${readOnly?'disabled':''} onchange="updateLineItem('${stateKey}','${it.id}','type',this.value)">
-        <option value="fixed" ${it.type==='fixed'?'selected':''}>Fixed</option>
-        <option value="variable" ${it.type==='variable'?'selected':''}>Variable</option>
+        <option value="fixed" ${it.type==='fixed'?'selected':''}>${esc2(t('li.type.fixed'))}</option>
+        <option value="variable" ${it.type==='variable'?'selected':''}>${esc2(t('li.type.variable'))}</option>
       </select>
       ${variancePill}
       ${readOnly?'':`<button class="line-rm" onclick="removeLineItem('${stateKey}','${it.id}')">×</button>`}
@@ -9424,13 +9521,13 @@ function createCountryDropdown({host, currentCode, placeholder, onPick}){
     <div class="country-dd" data-cd-id="${id}">
       <button type="button" class="cd-trigger">
         <span class="cd-flag">${current ? current.flag : '🌍'}</span>
-        <span class="cd-name ${current?'':'cd-placeholder'}">${current ? esc2(current.name) : esc2(placeholder||'Select a country')}</span>
+        <span class="cd-name ${current?'':'cd-placeholder'}">${current ? esc2(current.name) : esc2(placeholder||t('cd.placeholder'))}</span>
         <span class="cd-caret">▾</span>
       </button>
       <div class="cd-menu">
         <div class="cd-search-wrap">
           <span class="cd-search-icon">🔍</span>
-          <input type="text" class="cd-search" placeholder="Type to search…" autocomplete="off">
+          <input type="text" class="cd-search" placeholder="${esc2(t('cd.search'))}" autocomplete="off">
         </div>
         <div class="cd-results"></div>
       </div>
@@ -9451,7 +9548,7 @@ function createCountryDropdown({host, currentCode, placeholder, onPick}){
     );
     if(activeIdx >= filtered.length) activeIdx = 0;
     if(!filtered.length){
-      results.innerHTML = '<div class="cd-empty">No matches.</div>';
+      results.innerHTML = `<div class="cd-empty">${esc2(t('cd.noMatches'))}</div>`;
       return;
     }
     results.innerHTML = filtered.slice(0, 100).map((c, i) => `
@@ -10039,19 +10136,19 @@ function renderSettings() {
   const r=rate(); const s=sym();
   const ctxIncomplete = !state.citizenship || !state.homeBase;
   document.getElementById('panel-settings').innerHTML=`
-    <div class="ph"><div class="ph-tag">SYSTEM</div><div class="ph-title">Settings & Baseline</div><div class="ph-sub">Configure your recurring income, expenses, retirement parameters, and AI keys</div></div>
+    <div class="ph"><div class="ph-tag">${t('sb.group.system')}</div><div class="ph-title">${esc2(t('settings.page.title'))}</div><div class="ph-sub">${esc2(t('settings.page.sub'))}</div></div>
 
     <!-- Personal Context — MANDATORY before the app is functional -->
     <div class="card ctx-card ${ctxIncomplete?'ctx-incomplete':''}">
-      <div class="card-title">🪪 Personal Context <span class="ctx-badge ${ctxIncomplete?'neg':'pos'}">${ctxIncomplete?'REQUIRED':'✓ COMPLETE'}</span></div>
-      <p class="ctx-blurb">Your citizenship and current country of residence are injected into every AI prompt across the app — tax implications, pension entitlements, visa rules, and cost-of-living comparisons are all tailored to your personal situation.</p>
+      <div class="card-title">${esc2(t('settings.ctx.title'))} <span class="ctx-badge ${ctxIncomplete?'neg':'pos'}">${ctxIncomplete?esc2(t('settings.ctx.required')):esc2(t('settings.ctx.complete'))}</span></div>
+      <p class="ctx-blurb">${esc2(t('settings.ctx.blurb'))}</p>
       <div class="ctx-grid">
         <div class="ctx-field">
-          <label>Citizenship (nationality)</label>
+          <label>${esc2(t('settings.ctx.citizenship'))}</label>
           <div id="set-citizenship-dd"></div>
         </div>
         <div class="ctx-field">
-          <label>Home Base (current residence)</label>
+          <label>${esc2(t('settings.ctx.homeBase'))}</label>
           <div id="set-homebase-dd"></div>
         </div>
       </div>
@@ -10060,21 +10157,21 @@ function renderSettings() {
     <div class="two-col">
       <!-- Baseline income -->
       <div class="card">
-        <div class="card-title">💰 Baseline Monthly Income <span style="background:var(--green-dim);color:var(--green);font-size:9px;padding:2px 7px;border-radius:4px;font-family:var(--fm);font-weight:700;letter-spacing:.06em;margin-left:6px">RECURRING</span></div>
-        <p style="font-size:11px;color:var(--text2);margin-bottom:10px">Applied to every month unless overridden</p>
+        <div class="card-title">${esc2(t('settings.income.title'))} <span style="background:var(--green-dim);color:var(--green);font-size:9px;padding:2px 7px;border-radius:4px;font-family:var(--fm);font-weight:700;letter-spacing:.06em;margin-left:6px">${esc2(t('settings.recurring'))}</span></div>
+        <p style="font-size:11px;color:var(--text2);margin-bottom:10px">${esc2(t('settings.baseline.applies'))}</p>
         <div id="set-income"></div>
-        <button class="btn-add" onclick="state.baseIncome.push({id:genId(),name:'',amount:0,type:'fixed'});save();renderSettings()">+ Add Income</button>
+        <button class="btn-add" onclick="state.baseIncome.push({id:genId(),name:'',amount:0,type:'fixed'});save();renderSettings()">${esc2(t('settings.addIncome'))}</button>
       </div>
       <!-- Baseline expenses -->
       <div class="card">
-        <div class="card-title">📤 Baseline Monthly Expenses <span style="background:var(--green-dim);color:var(--green);font-size:9px;padding:2px 7px;border-radius:4px;font-family:var(--fm);font-weight:700;letter-spacing:.06em;margin-left:6px">RECURRING</span></div>
-        <p style="font-size:11px;color:var(--text2);margin-bottom:10px">Applied to every month unless overridden</p>
+        <div class="card-title">${esc2(t('settings.expenses.title'))} <span style="background:var(--green-dim);color:var(--green);font-size:9px;padding:2px 7px;border-radius:4px;font-family:var(--fm);font-weight:700;letter-spacing:.06em;margin-left:6px">${esc2(t('settings.recurring'))}</span></div>
+        <p style="font-size:11px;color:var(--text2);margin-bottom:10px">${esc2(t('settings.baseline.applies'))}</p>
         <div id="set-expenses"></div>
-        <button class="btn-add" onclick="state.baseExpenses.push({id:genId(),name:'',amount:0,type:'variable'});save();renderSettings()">+ Add Expense</button>
+        <button class="btn-add" onclick="state.baseExpenses.push({id:genId(),name:'',amount:0,type:'variable'});save();renderSettings()">${esc2(t('settings.addExpense'))}</button>
       </div>
       <!-- Savings -->
       <div class="card">
-        <div class="card-title">🏦 Monthly Savings Target</div>
+        <div class="card-title">${esc2(t('settings.savings.title'))}</div>
         <div style="display:flex;align-items:center;gap:8px;background:var(--bg3);border-radius:8px;padding:4px 14px;max-width:260px">
           <span style="color:var(--text3);font-size:12px;font-family:var(--fm)">${s}</span>
           <input type="number" value="${Math.round(state.baseSavings*r)}" style="background:transparent;border:none;color:var(--text);font-family:var(--fm);font-size:20px;font-weight:700;padding:10px 0;outline:none;width:180px" oninput="state.baseSavings=this.value/${r};save()">
@@ -10082,23 +10179,23 @@ function renderSettings() {
       </div>
       <!-- Exchange rates -->
       <div class="card">
-        <div class="card-title">💱 Exchange Rates (vs SEK)</div>
+        <div class="card-title">${esc2(t('settings.rates.title'))}</div>
         <div style="display:flex;flex-direction:column;gap:8px;font-size:13px">
-          ${['USD','EUR','KES'].map(cur=>`<div style="display:flex;align-items:center;gap:10px"><span style="font-family:var(--fm);min-width:50px;font-weight:600">${CURRENCY_SYMBOLS[cur]} ${cur}</span><span style="color:var(--text2)">1 SEK =</span><div style="display:flex;align-items:center;gap:3px;background:var(--bg3);border:1px solid var(--border);border-radius:6px;padding:0 10px;flex:1;max-width:140px"><input type="number" style="background:transparent;border:none;color:var(--text);font-family:var(--fm);font-size:13px;padding:6px 0;outline:none;width:100%" value="${state.exchangeRates[cur]||DEFAULT_RATES[cur]}" oninput="state.exchangeRates['${cur}']=+this.value;save()" onchange="commitRender('renderAll')"></div><span style="font-size:11px;color:var(--text3)">≈ ${Math.round(1/(state.exchangeRates[cur]||DEFAULT_RATES[cur]))} SEK/${cur==='KES'?'KSh':cur==='EUR'?'€':'$'}</span></div>`).join('')}
+          ${['USD','EUR','KES'].map(cur=>`<div style="display:flex;align-items:center;gap:10px"><span style="font-family:var(--fm);min-width:50px;font-weight:600">${CURRENCY_SYMBOLS[cur]} ${cur}</span><span style="color:var(--text2)">${esc2(t('settings.rates.oneSekEquals'))}</span><div style="display:flex;align-items:center;gap:3px;background:var(--bg3);border:1px solid var(--border);border-radius:6px;padding:0 10px;flex:1;max-width:140px"><input type="number" style="background:transparent;border:none;color:var(--text);font-family:var(--fm);font-size:13px;padding:6px 0;outline:none;width:100%" value="${state.exchangeRates[cur]||DEFAULT_RATES[cur]}" oninput="state.exchangeRates['${cur}']=+this.value;save()" onchange="commitRender('renderAll')"></div><span style="font-size:11px;color:var(--text3)">≈ ${Math.round(1/(state.exchangeRates[cur]||DEFAULT_RATES[cur]))} SEK/${cur==='KES'?'KSh':cur==='EUR'?'€':'$'}</span></div>`).join('')}
         </div>
       </div>
       <!-- AI Keys -->
       <div class="card" id="set-ai-keys-section">
-        <div class="card-title">🤖 AI Keys</div>
-        <div class="field"><label>Claude (Anthropic) API Key</label><input type="password" value="${state.aiKeys?.claude||''}" placeholder="sk-ant-…" oninput="if(!state.aiKeys)state.aiKeys={};state.aiKeys.claude=this.value;save()"></div>
-        <div class="field"><label>OpenAI API Key</label><input type="password" value="${state.aiKeys?.openai||''}" placeholder="sk-…" oninput="if(!state.aiKeys)state.aiKeys={};state.aiKeys.openai=this.value;save()"></div>
-        <div class="field"><label>Perplexity API Key <span style="font-size:10px;color:var(--text3)">(optional — enhances Property IQ with live web data)</span></label><input type="password" value="${state.aiKeys?.perplexity||''}" placeholder="pplx-…" oninput="if(!state.aiKeys)state.aiKeys={};state.aiKeys.perplexity=this.value;save()"></div>
-        <p style="font-size:11px;color:var(--text3);line-height:1.5">Keys are stored only in your browser's localStorage. They're never sent to any server — only directly to the AI provider's API.</p>
+        <div class="card-title">${esc2(t('settings.aiKeys.title'))}</div>
+        <div class="field"><label>${esc2(t('settings.aiKeys.claude'))}</label><input type="password" value="${state.aiKeys?.claude||''}" placeholder="sk-ant-…" oninput="if(!state.aiKeys)state.aiKeys={};state.aiKeys.claude=this.value;save()"></div>
+        <div class="field"><label>${esc2(t('settings.aiKeys.openai'))}</label><input type="password" value="${state.aiKeys?.openai||''}" placeholder="sk-…" oninput="if(!state.aiKeys)state.aiKeys={};state.aiKeys.openai=this.value;save()"></div>
+        <div class="field"><label>${esc2(t('settings.aiKeys.perplexity'))} <span style="font-size:10px;color:var(--text3)">${esc2(t('settings.aiKeys.perplexityHint'))}</span></label><input type="password" value="${state.aiKeys?.perplexity||''}" placeholder="pplx-…" oninput="if(!state.aiKeys)state.aiKeys={};state.aiKeys.perplexity=this.value;save()"></div>
+        <p style="font-size:11px;color:var(--text3);line-height:1.5">${esc2(t('settings.aiKeys.storage'))}</p>
       </div>
       <!-- Ticker quote -->
       <div class="card">
-        <div class="card-title">✦ Ticker Quote & Appearance</div>
-        <div class="field"><label>Personal quote / mantra</label><input value="${esc(state.tickerQuote||'')}" oninput="state.tickerQuote=this.value;save()" onchange="commitRender('renderTicker')"></div>
+        <div class="card-title">${esc2(t('settings.appearance.title'))}</div>
+        <div class="field"><label>${esc2(t('settings.appearance.quoteLbl'))}</label><input value="${esc(state.tickerQuote||'')}" oninput="state.tickerQuote=this.value;save()" onchange="commitRender('renderTicker')"></div>
         <div style="margin-top:6px">
           <label class="toggle-wrap">
             <input type="checkbox" ${state.darkMode?'checked':''} onchange="state.darkMode=this.checked;save();applyTheme()">
@@ -10121,28 +10218,35 @@ function renderSettings() {
       </div>
       <!-- Data management -->
       <div class="card" style="grid-column:1/-1">
-        <div class="card-title">💾 Data Management</div>
-        <p style="font-size:12px;color:var(--text2);margin-bottom:12px;line-height:1.5">All data is saved locally in your browser. Export a slice or the full backup to move between devices. Imports merge into your current state (they don't replace the whole thing unless you pick "Everything").</p>
+        <div class="card-title">${esc2(t('settings.data.title'))}</div>
+        <p style="font-size:12px;color:var(--text2);margin-bottom:12px;line-height:1.5">${esc2(t('settings.data.blurb'))}</p>
         <div class="data-mgmt-grid">
-          ${EXPORT_SLICES.map(slice => `
+          ${EXPORT_SLICES.map(slice => {
+            // Slice label and sub are looked up via t() so they
+            // flip with the current language. The EXPORT_SLICES
+            // constant stays the English source of truth + holds
+            // the field whitelist used by exportSlice/importSlice.
+            const label = t('slice.'+slice.key+'.label');
+            const sub   = t('slice.'+slice.key+'.sub');
+            return `
             <div class="data-mgmt-row">
               <div class="data-mgmt-meta">
                 <div class="data-mgmt-icon">${slice.icon}</div>
                 <div>
-                  <div class="data-mgmt-title">${esc2(slice.label)}</div>
-                  <div class="data-mgmt-sub">${esc2(slice.sub)}</div>
+                  <div class="data-mgmt-title">${esc2(label)}</div>
+                  <div class="data-mgmt-sub">${esc2(sub)}</div>
                 </div>
               </div>
               <div class="data-mgmt-btns">
-                <button class="btn btn-o btn-xs" onclick="exportSlice('${slice.key}')">⬇ Export</button>
-                <button class="btn btn-o btn-xs" onclick="document.getElementById('import-input-${slice.key}').click()">⬆ Import</button>
+                <button class="btn btn-o btn-xs" onclick="exportSlice('${slice.key}')">${esc2(t('settings.data.export'))}</button>
+                <button class="btn btn-o btn-xs" onclick="document.getElementById('import-input-${slice.key}').click()">${esc2(t('settings.data.import'))}</button>
                 <input id="import-input-${slice.key}" type="file" accept=".json" style="display:none" onchange="importSlice(this, '${slice.key}')">
               </div>
-            </div>
-          `).join('')}
+            </div>`;
+          }).join('')}
         </div>
         <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:14px;padding-top:12px;border-top:1px solid var(--border)">
-          <button class="btn btn-danger" onclick="if(confirm('Reset all data? This cannot be undone.')){localStorage.removeItem('${STORAGE_KEY}');localStorage.removeItem('${VAULT_STORAGE_KEY}');location.reload()}">⚠ Reset All</button>
+          <button class="btn btn-danger" onclick="if(confirm(t('settings.data.resetConfirm'))){localStorage.removeItem('${STORAGE_KEY}');localStorage.removeItem('${VAULT_STORAGE_KEY}');location.reload()}">${esc2(t('settings.data.resetAll'))}</button>
         </div>
       </div>
     </div>`;
@@ -10154,7 +10258,7 @@ function renderSettings() {
   if(czHost) createCountryDropdown({
     host: czHost,
     currentCode: state.citizenship,
-    placeholder: 'Select your citizenship',
+    placeholder: t('settings.ctx.selectCitizenship'),
     onPick: (code) => {
       state.citizenship = code;
       save();
@@ -10168,7 +10272,7 @@ function renderSettings() {
   if(hbHost) createCountryDropdown({
     host: hbHost,
     currentCode: state.homeBase,
-    placeholder: 'Select your home base',
+    placeholder: t('settings.ctx.selectHomeBase'),
     onPick: (code) => {
       state.homeBase = code;
       save();
