@@ -3454,6 +3454,77 @@ const STRINGS = {
   'dash.report.concern':    { en:'Areas of concern',            sv:'Områden att hålla koll på' },
   'dash.report.recs':       { en:'Recommendations',             sv:'Rekommendationer' },
 
+  // ── Bank & Transactions ────────────────────────────────
+  'tx.page.title':          { en:'Bank & Transactions',   sv:'Bank & transaktioner' },
+  'tx.page.sub.empty':      { en:'Connect your bank account to view real transaction data and spending patterns',
+                              sv:'Anslut ditt bankkonto för att se faktisk transaktionsdata och utgiftsmönster' },
+  'tx.page.sub.connected':  { en:'Real transaction data · spending analysis · 12-month patterns',
+                              sv:'Faktisk transaktionsdata · utgiftsanalys · 12-månadersmönster' },
+  // Empty state
+  'tx.empty.title':         { en:'No Bank Connected',     sv:'Ingen bank ansluten' },
+  'tx.empty.sub':           { en:'Connect via Open Banking (PSD2) to automatically import transactions from your bank. Supported banks:',
+                              sv:'Anslut via Open Banking (PSD2) för att automatiskt importera transaktioner från din bank. Banker som stöds:' },
+  'tx.empty.allPsd2':       { en:'All PSD2',              sv:'Alla PSD2' },
+  'tx.empty.cta.connect':   { en:'🏦 Connect Bank Account',
+                              sv:'🏦 Anslut bankkonto' },
+  'tx.empty.cta.demo':      { en:'📊 Load Demo Data',     sv:'📊 Ladda demodata' },
+  // Connected status row
+  'tx.status.demo':         { en:'📊 DEMO MODE',          sv:'📊 DEMOLÄGE' },
+  'tx.status.live':         { en:'🟢 LIVE CONNECTED',     sv:'🟢 LIVE ANSLUTEN' },
+  'tx.status.loaded':       { en:'{n} transactions loaded',
+                              sv:'{n} transaktioner laddade' },
+  'tx.status.changeBank':   { en:'Change Bank',           sv:'Byt bank' },
+  // KPI row
+  'tx.kpi.totalIncome':     { en:'TOTAL INCOME (MTH)',    sv:'TOTAL INKOMST (MÅN)' },
+  'tx.kpi.totalSpend':      { en:'TOTAL SPEND (MTH)',     sv:'TOTAL UTGIFT (MÅN)' },
+  'tx.kpi.transactions':    { en:'TRANSACTIONS',          sv:'TRANSAKTIONER' },
+  'tx.kpi.largestExpense':  { en:'LARGEST EXPENSE',       sv:'STÖRSTA UTGIFTEN' },
+  'tx.kpi.largestExpense.sub':{ en:'Mortgage',            sv:'Bolån' },
+  // Cards
+  'tx.card.recent':         { en:'Recent Transactions',   sv:'Senaste transaktioner' },
+  'tx.card.byCategory':     { en:'12-Month Spending by Category',
+                              sv:'12-månaders utgifter per kategori' },
+  'tx.badge.demoData':      { en:'DEMO DATA',             sv:'DEMODATA' },
+  'tx.badge.bankData':      { en:'BANK DATA',             sv:'BANKDATA' },
+  'tx.badge.projection':    { en:'PROJECTION',            sv:'PROGNOS' },
+  // Two side-by-side charts
+  'tx.chart.past12':        { en:'📊 Past 12 Months',     sv:'📊 Senaste 12 månaderna' },
+  'tx.chart.next12':        { en:'🔮 Next 12 Months',     sv:'🔮 Nästa 12 månader' },
+  'tx.series.income':       { en:'Income',                sv:'Inkomst' },
+  'tx.series.expenses':     { en:'Expenses',              sv:'Utgifter' },
+  'tx.series.netFlow':      { en:'Net Flow',              sv:'Nettoflöde' },
+  'tx.series.savings':      { en:'Savings',               sv:'Sparande' },
+  'tx.series.funFund':      { en:'Fun Fund',              sv:'Fun Fund' },
+  // AI patterns block
+  'tx.ai.title':            { en:'🤖 AI Spending Patterns',
+                              sv:'🤖 AI-utgiftsmönster' },
+  'tx.ai.sub':              { en:'Detected from the last 12 months of transaction data',
+                              sv:'Upptäckt från de senaste 12 månadernas transaktionsdata' },
+  'tx.ai.pattern.groceries':{ en:'Groceries up 8% vs last month',
+                              sv:'Mat upp 8% mot förra månaden' },
+  'tx.ai.pattern.dining':   { en:'Dining out within budget',
+                              sv:'Restaurangbesök inom budget' },
+  'tx.ai.pattern.transport':{ en:'Transport stable',      sv:'Transport stabilt' },
+  'tx.ai.pattern.unexpected':{ en:'No large unexpected items',
+                              sv:'Inga större oväntade poster' },
+  'tx.ai.insightLbl':       { en:'AI Insight:',           sv:'AI-insikt:' },
+  'tx.ai.insightBody':      { en:'Your monthly expenses of {expenses} leave you with {funFund}/month in Fun Fund after savings. Your biggest opportunity is the <strong>Chase: {chase}</strong> line — this loan repayment, once cleared, would boost your monthly surplus by ~{boost}/mo. Connect your AI advisor to get personalised recommendations.',
+                              sv:'Dina månadsutgifter på {expenses} lämnar dig med {funFund}/mån i Fun Fund efter sparande. Din största möjlighet är <strong>Chase: {chase}</strong>-raden — när detta lån är avbetalat ökar ditt månadsöverskott med ~{boost}/mån. Anslut din AI-rådgivare för personliga rekommendationer.' },
+  // Categories — display labels (CAT_SPENDING_12M keys stay
+  // English as the canonical data; we translate at read time)
+  'tx.cat.Groceries':       { en:'Groceries',             sv:'Mat' },
+  'tx.cat.Mortgage/Rent':   { en:'Mortgage/Rent',         sv:'Bolån/Hyra' },
+  'tx.cat.Dining & Drinks': { en:'Dining & Drinks',       sv:'Restaurang & dryck' },
+  'tx.cat.Transport':       { en:'Transport',             sv:'Transport' },
+  'tx.cat.Shopping':        { en:'Shopping',              sv:'Shopping' },
+  'tx.cat.Utilities':       { en:'Utilities',             sv:'Hushåll' },
+  'tx.cat.Subscriptions':   { en:'Subscriptions',         sv:'Prenumerationer' },
+  'tx.cat.Healthcare':      { en:'Healthcare',            sv:'Sjukvård' },
+  'tx.cat.Cleaning':        { en:'Cleaning',              sv:'Städning' },
+  'tx.cat.Insurance':       { en:'Insurance',             sv:'Försäkring' },
+  'tx.cat.Entertainment':   { en:'Entertainment',         sv:'Underhållning' },
+  'tx.cat.Other':           { en:'Other',                 sv:'Övrigt' },
+
   // ── Fun Fund · running balance table ───────────────────
   'ff.run.title':           { en:'Monthly Fun Fund — Running Balance',
                               sv:'Månadsvis Fun Fund — löpande saldo' },
@@ -7744,17 +7815,17 @@ function renderTransactions() {
 
   if(!state.bankConnected) {
     el.innerHTML = `
-      ${ui.ph({tag:'PERSONAL FINANCES', title:'Bank & Transactions', sub:'Connect your bank account to view real transaction data and spending patterns'})}
+      ${ui.ph({tag:t('sb.group.personal'), title:t('tx.page.title'), sub:t('tx.page.sub.empty')})}
       ${ui.empty({
         icon:'🏦',
-        title:'No Bank Connected',
-        sub:`Connect via Open Banking (PSD2) to automatically import transactions from your bank. Supported banks:
+        title:t('tx.empty.title'),
+        sub:`${t('tx.empty.sub')}
           <div style="margin-top:14px;display:flex;gap:6px;flex-wrap:wrap;justify-content:center">
             <span class="bank-badge">🇸🇪 SEB</span><span class="bank-badge">🇸🇪 Swedbank</span><span class="bank-badge">🇸🇪 Handelsbanken</span>
-            <span class="bank-badge">🇸🇪 Nordea</span><span class="bank-badge">🇩🇰 Danske Bank</span><span class="bank-badge">🇪🇺 All PSD2</span>
+            <span class="bank-badge">🇸🇪 Nordea</span><span class="bank-badge">🇩🇰 Danske Bank</span><span class="bank-badge">🇪🇺 ${t('tx.empty.allPsd2')}</span>
           </div>`,
-        cta:`<button class="btn btn-g" onclick="openModal('bank-modal')">🏦 Connect Bank Account</button>
-             <button class="btn btn-o btn-sm" onclick="connectBankDemo()">📊 Load Demo Data</button>`
+        cta:`<button class="btn btn-g" onclick="openModal('bank-modal')">${t('tx.empty.cta.connect')}</button>
+             <button class="btn btn-o btn-sm" onclick="connectBankDemo()">${t('tx.empty.cta.demo')}</button>`
       })}
     `;
     return;
@@ -7765,44 +7836,50 @@ function renderTransactions() {
   const catRows=Object.entries(CAT_SPENDING_12M).sort((a,b)=>b[1]-a[1]).map(([cat,amt],i)=>{
     const pct=Math.round(amt/totalSpend*100);
     const barPct=Math.round(amt/Object.values(CAT_SPENDING_12M)[0]*100);
+    // Translate the category display name via t('tx.cat.<key>'),
+    // falling back to the raw English key for any future categories
+    // that don't yet have a translation entry. CAT_SPENDING_12M
+    // stays the canonical English-keyed source of truth.
+    const catLabel = STRINGS['tx.cat.'+cat] ? t('tx.cat.'+cat) : cat;
     return `<div class="cat-row">
-      <div class="cat-name">${cat}</div>
+      <div class="cat-name">${esc2(catLabel)}</div>
       <div class="cat-bar-wrap"><div class="cat-bar-track"><div class="cat-bar-fill" style="width:${barPct}%;background:${CAT_COLORS[i%CAT_COLORS.length]}"></div></div></div>
       <div class="cat-pct">${pct}%</div>
       <div class="cat-amt neg">${fmt(amt)}</div>
     </div>`;
   }).join('');
 
-  // AI patterns
+  // AI patterns — keyed so the labels translate while the
+  // direction arrows stay code-driven.
   const patterns=[
-    {text:'Groceries up 8% vs last month',dir:'dn'},
-    {text:'Dining out within budget',dir:'up'},
-    {text:'Transport stable',dir:'neu'},
-    {text:'No large unexpected items',dir:'up'},
+    {key:'tx.ai.pattern.groceries', dir:'dn'},
+    {key:'tx.ai.pattern.dining',    dir:'up'},
+    {key:'tx.ai.pattern.transport', dir:'neu'},
+    {key:'tx.ai.pattern.unexpected',dir:'up'},
   ];
 
   el.innerHTML=`
     <div class="ph">
-      <div class="ph-tag">PERSONAL FINANCES</div>
-      <div class="ph-title">Bank & Transactions</div>
-      <div class="ph-sub">Real transaction data · spending analysis · 12-month patterns</div>
+      <div class="ph-tag">${t('sb.group.personal')}</div>
+      <div class="ph-title">${esc2(t('tx.page.title'))}</div>
+      <div class="ph-sub">${esc2(t('tx.page.sub.connected'))}</div>
     </div>
     <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px">
-      <span class="conn-badge ${state.bankMode==='demo'?'demo':'live'}">${state.bankMode==='demo'?'📊 DEMO MODE':'🟢 LIVE CONNECTED'}</span>
-      <span style="font-size:12px;color:var(--text2)">${state.transactions.length} transactions loaded</span>
-      <button class="btn btn-o btn-sm" style="margin-left:auto" onclick="openModal('bank-modal')">Change Bank</button>
+      <span class="conn-badge ${state.bankMode==='demo'?'demo':'live'}">${state.bankMode==='demo'?t('tx.status.demo'):t('tx.status.live')}</span>
+      <span style="font-size:12px;color:var(--text2)">${esc2(t('tx.status.loaded', { n: state.transactions.length }))}</span>
+      <button class="btn btn-o btn-sm" style="margin-left:auto" onclick="openModal('bank-modal')">${esc2(t('tx.status.changeBank'))}</button>
     </div>
     <div class="kpi-row">
-      <div class="kpi"><div class="kpi-lbl">TOTAL INCOME (MTH)</div><div class="kpi-val pos">${fmt(state.transactions.filter(t=>t.type==='credit').reduce((s,t)=>s+t.amount,0))}</div></div>
-      <div class="kpi"><div class="kpi-lbl">TOTAL SPEND (MTH)</div><div class="kpi-val neg">${fmt(Math.abs(state.transactions.filter(t=>t.type==='debit').reduce((s,t)=>s+t.amount,0)))}</div></div>
-      <div class="kpi"><div class="kpi-lbl">TRANSACTIONS</div><div class="kpi-val">${state.transactions.length}</div></div>
-      <div class="kpi"><div class="kpi-lbl">LARGEST EXPENSE</div><div class="kpi-val neg">${(()=>{const debits=state.transactions.filter(t=>t.type==='debit').map(t=>t.amount);return debits.length?fmt(Math.abs(Math.min(...debits))):fmt(0);})()}</div><div class="kpi-sub">Mortgage</div></div>
+      <div class="kpi"><div class="kpi-lbl">${esc2(t('tx.kpi.totalIncome'))}</div><div class="kpi-val pos">${fmt(state.transactions.filter(t=>t.type==='credit').reduce((s,t)=>s+t.amount,0))}</div></div>
+      <div class="kpi"><div class="kpi-lbl">${esc2(t('tx.kpi.totalSpend'))}</div><div class="kpi-val neg">${fmt(Math.abs(state.transactions.filter(t=>t.type==='debit').reduce((s,t)=>s+t.amount,0)))}</div></div>
+      <div class="kpi"><div class="kpi-lbl">${esc2(t('tx.kpi.transactions'))}</div><div class="kpi-val">${state.transactions.length}</div></div>
+      <div class="kpi"><div class="kpi-lbl">${esc2(t('tx.kpi.largestExpense'))}</div><div class="kpi-val neg">${(()=>{const debits=state.transactions.filter(t=>t.type==='debit').map(t=>t.amount);return debits.length?fmt(Math.abs(Math.min(...debits))):fmt(0);})()}</div><div class="kpi-sub">${esc2(t('tx.kpi.largestExpense.sub'))}</div></div>
     </div>
 
     <div class="two-col">
       <!-- Recent transactions — compact card with pinned title + scrollable body -->
       <div class="card card-compact">
-        <div class="card-title">Recent Transactions</div>
+        <div class="card-title">${esc2(t('tx.card.recent'))}</div>
         <div class="card-body">
           <div class="tx-list">
             ${state.transactions.slice(0,10).map(tx=>`
@@ -7810,7 +7887,7 @@ function renderTransactions() {
                 <div class="tx-icon" style="background:${tx.type==='credit'?'var(--green-dim)':'var(--bg3)'}">${tx.icon||'💳'}</div>
                 <div class="tx-info">
                   <div class="tx-name">${esc(tx.name)}</div>
-                  <div class="tx-cat">${tx.category}</div>
+                  <div class="tx-cat">${esc2(STRINGS['tx.cat.'+tx.category] ? t('tx.cat.'+tx.category) : (tx.category||''))}</div>
                 </div>
                 <div class="tx-date">${tx.date}</div>
                 <div class="tx-amount ${tx.type==='credit'?'inp':'out'}">${tx.type==='credit'?'+':''}${fmt(Math.abs(tx.amount))}</div>
@@ -7821,8 +7898,8 @@ function renderTransactions() {
 
       <!-- Spending categories — compact card with pinned title + scrollable body -->
       <div class="card card-compact">
-        <div class="card-title">12-Month Spending by Category
-          <div class="ct-actions"><span class="conn-badge demo">DEMO DATA</span></div>
+        <div class="card-title">${esc2(t('tx.card.byCategory'))}
+          <div class="ct-actions"><span class="conn-badge demo">${esc2(t('tx.badge.demoData'))}</span></div>
         </div>
         <div class="card-body">${catRows}</div>
       </div>
@@ -7836,14 +7913,14 @@ function renderTransactions() {
          state (Income / Expenses bars + Savings + Fun Fund lines). -->
     <div class="two-col">
       <div class="card" data-section="past12">
-        <div class="card-title">📊 Past 12 Months
-          <div class="ct-actions"><span class="conn-badge demo">BANK DATA</span></div>
+        <div class="card-title">${esc2(t('tx.chart.past12'))}
+          <div class="ct-actions"><span class="conn-badge demo">${esc2(t('tx.badge.bankData'))}</span></div>
         </div>
         <div class="chart-wrap lg"><canvas id="tx-chart-past"></canvas></div>
       </div>
       <div class="card" data-section="next12">
-        <div class="card-title">🔮 Next 12 Months
-          <div class="ct-actions"><span class="conn-badge demo">PROJECTION</span></div>
+        <div class="card-title">${esc2(t('tx.chart.next12'))}
+          <div class="ct-actions"><span class="conn-badge demo">${esc2(t('tx.badge.projection'))}</span></div>
         </div>
         <div class="chart-wrap lg"><canvas id="tx-chart-next"></canvas></div>
       </div>
@@ -7851,11 +7928,11 @@ function renderTransactions() {
 
     <!-- AI Patterns -->
     <div class="card">
-      <div class="card-title">🤖 AI Spending Patterns</div>
-      <div style="font-size:12px;color:var(--text2);margin-bottom:10px">Detected from the last 12 months of transaction data</div>
-      <div>${patterns.map(p=>`<span class="pattern-chip ${p.dir}">${p.dir==='up'?'↑':p.dir==='dn'?'↓':'→'} ${p.text}</span>`).join('')}</div>
+      <div class="card-title">${esc2(t('tx.ai.title'))}</div>
+      <div style="font-size:12px;color:var(--text2);margin-bottom:10px">${esc2(t('tx.ai.sub'))}</div>
+      <div>${patterns.map(p=>`<span class="pattern-chip ${p.dir}">${p.dir==='up'?'↑':p.dir==='dn'?'↓':'→'} ${esc2(t(p.key))}</span>`).join('')}</div>
       <div style="margin-top:14px;padding:12px;background:var(--bg3);border-radius:var(--r);font-size:12px;color:var(--text2);line-height:1.6">
-        💡 <strong style="color:var(--text)">AI Insight:</strong> ${(()=>{const cm=FE.months.current();return `Your monthly expenses of ${fmt(cm.pureExpenses)} leave you with ${fmt(cm.pureFunFund)}/month in Fun Fund after savings.`;})()} Your biggest opportunity is the <strong>Chase: ${fmt(55000)}</strong> line — this loan repayment, once cleared, would boost your monthly surplus by ~${fmt(55000)}/mo. Connect your AI advisor to get personalised recommendations.
+        💡 <strong style="color:var(--text)">${esc2(t('tx.ai.insightLbl'))}</strong> ${(()=>{const cm=FE.months.current();return t('tx.ai.insightBody', { expenses: fmt(cm.pureExpenses), funFund: fmt(cm.pureFunFund), chase: fmt(55000), boost: fmt(55000) });})()}
       </div>
     </div>`;
 
@@ -7886,9 +7963,9 @@ function renderTransactions() {
         data: {
           labels: pastLabels,
           datasets: [
-            {label:'Income',   data: pastIncome,   backgroundColor:'#00e8a028', borderColor:'#00e8a0', borderWidth:1.75, borderRadius:4, order:2, categoryPercentage:0.7, barPercentage:0.85},
-            {label:'Expenses', data: pastExpenses, backgroundColor:'#ff4d6d22', borderColor:'#ff4d6d', borderWidth:1.75, borderRadius:4, order:2, categoryPercentage:0.7, barPercentage:0.85},
-            {label:'Net Flow', data: pastNet,      type:'line', borderColor:'#4d9fff', backgroundColor:'transparent', fill:false, tension:.3, pointRadius:2, pointHoverRadius:4, pointBackgroundColor:'#4d9fff', borderWidth:1.75, order:1},
+            {label:t('tx.series.income'),   data: pastIncome,   backgroundColor:'#00e8a028', borderColor:'#00e8a0', borderWidth:1.75, borderRadius:4, order:2, categoryPercentage:0.7, barPercentage:0.85},
+            {label:t('tx.series.expenses'), data: pastExpenses, backgroundColor:'#ff4d6d22', borderColor:'#ff4d6d', borderWidth:1.75, borderRadius:4, order:2, categoryPercentage:0.7, barPercentage:0.85},
+            {label:t('tx.series.netFlow'),  data: pastNet,      type:'line', borderColor:'#4d9fff', backgroundColor:'transparent', fill:false, tension:.3, pointRadius:2, pointHoverRadius:4, pointBackgroundColor:'#4d9fff', borderWidth:1.75, order:1},
           ],
         },
         options: chartPreset(),
@@ -7917,10 +7994,10 @@ function renderTransactions() {
         data: {
           labels: nextLabels,
           datasets: [
-            {label:'Income',   data: nextIncome,   backgroundColor:'#00e8a028', borderColor:'#00e8a0', borderWidth:1.75, borderRadius:4, order:2, categoryPercentage:0.7, barPercentage:0.85},
-            {label:'Expenses', data: nextExpenses, backgroundColor:'#ff4d6d22', borderColor:'#ff4d6d', borderWidth:1.75, borderRadius:4, order:2, categoryPercentage:0.7, barPercentage:0.85},
-            {label:'Savings',  data: nextSavings,  type:'line', borderColor:'#f5a623', backgroundColor:'#f5a62312', fill:true,  tension:.35, pointRadius:2, pointHoverRadius:4, pointBackgroundColor:'#f5a623', borderWidth:1.75, order:1},
-            {label:'Fun Fund', data: nextFunFund,  type:'line', borderColor:'#00d4ff', backgroundColor:'transparent', fill:false, tension:.3,  pointRadius:2, pointHoverRadius:4, pointBackgroundColor:'#00d4ff', borderWidth:1.75, borderDash:[4,3], order:1},
+            {label:t('tx.series.income'),   data: nextIncome,   backgroundColor:'#00e8a028', borderColor:'#00e8a0', borderWidth:1.75, borderRadius:4, order:2, categoryPercentage:0.7, barPercentage:0.85},
+            {label:t('tx.series.expenses'), data: nextExpenses, backgroundColor:'#ff4d6d22', borderColor:'#ff4d6d', borderWidth:1.75, borderRadius:4, order:2, categoryPercentage:0.7, barPercentage:0.85},
+            {label:t('tx.series.savings'),  data: nextSavings,  type:'line', borderColor:'#f5a623', backgroundColor:'#f5a62312', fill:true,  tension:.35, pointRadius:2, pointHoverRadius:4, pointBackgroundColor:'#f5a623', borderWidth:1.75, order:1},
+            {label:t('tx.series.funFund'),  data: nextFunFund,  type:'line', borderColor:'#00d4ff', backgroundColor:'transparent', fill:false, tension:.3,  pointRadius:2, pointHoverRadius:4, pointBackgroundColor:'#00d4ff', borderWidth:1.75, borderDash:[4,3], order:1},
           ],
         },
         options: chartPreset(),
