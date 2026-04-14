@@ -3079,12 +3079,12 @@ body.light .piq-country-menu { box-shadow:0 12px 28px -10px rgba(60,40,10,0.22);
 <div class="modal-backdrop" id="onboarding-modal">
   <div class="modal onboarding-modal">
     <div class="onboarding-icon">🪪</div>
-    <div class="onboarding-title">Welcome to Horizon Finance OS</div>
-    <div class="onboarding-sub">To get started, please set your <strong>Citizenship</strong> and <strong>Home Base</strong> in Settings. These are required for personalised AI analysis across the app — tax implications, pension entitlements, visa eligibility, and cost-of-living comparisons are all tailored to your specific situation.</div>
+    <div class="onboarding-title" data-i18n="onb.title">Welcome to Horizon Finance OS</div>
+    <div class="onboarding-sub" data-i18n-html="onb.sub">To get started, please set your <strong>Citizenship</strong> and <strong>Home Base</strong> in Settings. These are required for personalised AI analysis across the app — tax implications, pension entitlements, visa eligibility, and cost-of-living comparisons are all tailored to your specific situation.</div>
     <div class="onboarding-actions">
-      <button class="btn btn-g" onclick="nav('settings'); hideOnboardingBlock();">Go to Settings</button>
+      <button class="btn btn-g" onclick="nav('settings'); hideOnboardingBlock();" data-i18n="onb.goSettings">Go to Settings</button>
     </div>
-    <div class="onboarding-note">This message will reappear on every tab until both fields are completed.</div>
+    <div class="onboarding-note" data-i18n="onb.note">This message will reappear on every tab until both fields are completed.</div>
   </div>
 </div>
 
@@ -3550,6 +3550,53 @@ const STRINGS = {
                               sv:'🤖 AI: Föreslå destinationer åt mig' },
   // addLocation defaults
   'ra.new.name':            { en:'New Destination',       sv:'Ny destination' },
+
+  // ── Welcome / onboarding modals ────────────────────────
+  // Onboarding gate (citizenship + home base required)
+  'onb.title':              { en:'Welcome to Horizon Finance OS',
+                              sv:'Välkommen till Horizon Finance OS' },
+  'onb.sub':                { en:'To get started, please set your <strong>Citizenship</strong> and <strong>Home Base</strong> in Settings. These are required for personalised AI analysis across the app — tax implications, pension entitlements, visa eligibility, and cost-of-living comparisons are all tailored to your specific situation.',
+                              sv:'Sätt ditt <strong>medborgarskap</strong> och din <strong>hemvist</strong> i Inställningar för att komma igång. De krävs för personlig AI-analys i hela appen — skattefrågor, pensionsrätt, visumberättigande och levnadskostnadsjämförelser anpassas alla efter din specifika situation.' },
+  'onb.goSettings':         { en:'Go to Settings',        sv:'Öppna Inställningar' },
+  'onb.note':               { en:'This message will reappear on every tab until both fields are completed.',
+                              sv:'Det här meddelandet visas på varje flik tills båda fälten är ifyllda.' },
+  // Welcome flow (3-step fresh-install onboarding)
+  'welcome.skipBtn':        { en:'Skip setup',            sv:'Hoppa över' },
+  'welcome.nextBtn':        { en:'Next →',                sv:'Nästa →' },
+  'welcome.backBtn':        { en:'← Back',                sv:'← Tillbaka' },
+  'welcome.finishBtn':      { en:'Finish setup ✓',        sv:'Slutför ✓' },
+  // Step 0 — name
+  'welcome.s0.title':       { en:'Welcome to Horizon',    sv:'Välkommen till Horizon' },
+  'welcome.s0.sub':         { en:"A calm place to plan your money — from this month's Fun Fund to the decade you retire in. Let's set you up with the basics. It takes under a minute.",
+                              sv:'En lugn plats för att planera din ekonomi — från denna månads Fun Fund till decenniet då du går i pension. Vi tar dig genom grunderna. Det tar under en minut.' },
+  'welcome.s0.label':       { en:'What should I call you?',
+                              sv:'Vad ska jag kalla dig?' },
+  'welcome.s0.placeholder': { en:'e.g. Alex',             sv:'t.ex. Alex' },
+  'welcome.s0.hint':        { en:'Optional — used for the Dashboard greeting.',
+                              sv:'Valfritt — används för översiktens hälsning.' },
+  // Step 1 — timeline
+  'welcome.s1.title':       { en:'Your timeline',         sv:'Din tidslinje' },
+  'welcome.s1.sub':         { en:'These anchor every projection — retirement runway, nest egg curves, yearly forecast. You can change them anytime in Settings.',
+                              sv:'Dessa ankarvärden styr varje prognos — pensionsbana, pensionskapitalkurvor, årsprognos. Du kan ändra dem när som helst i Inställningar.' },
+  'welcome.s1.currentAge':  { en:'Current age',           sv:'Nuvarande ålder' },
+  'welcome.s1.retireAge':   { en:'Retirement age',        sv:'Pensionsålder' },
+  'welcome.s1.compoundHint':{ en:"That's <strong>{years} years</strong> of compounding ahead.",
+                              sv:'Det blir <strong>{years} år</strong> av ränta-på-ränta framöver.' },
+  'welcome.s1.years':       { en:'{n} years',             sv:'{n} år' },
+  // Step 2 — cashflow
+  'welcome.s2.title':       { en:'A quick cashflow baseline',
+                              sv:'En snabb kassaflödesgrund' },
+  'welcome.s2.sub':         { en:"Rough monthly numbers for your current life. No line items yet — you can break them down and refine in the Monthly Review tab once you're in.",
+                              sv:'Ungefärliga månadsbelopp för ditt nuvarande liv. Inga poster ännu — du kan bryta ner och förfina dem i Månadsgenomgång-fliken när du är inne.' },
+  'welcome.s2.income':      { en:'Monthly take-home income',
+                              sv:'Månadsinkomst (efter skatt)' },
+  'welcome.s2.expenses':    { en:'Monthly expenses (rough total)',
+                              sv:'Månadsutgifter (ungefärlig summa)' },
+  'welcome.s2.hint':        { en:'These become single placeholder line items in Monthly Review — edit, split, or delete them whenever you like.',
+                              sv:'Dessa blir enkla platshållarposter i Månadsgenomgång — redigera, dela upp eller ta bort dem när du vill.' },
+  // Default seed names persisted by welcomeFinish()
+  'welcome.seed.income':    { en:'Take-home pay',         sv:'Lön efter skatt' },
+  'welcome.seed.expenses':  { en:'Monthly expenses',      sv:'Månadsutgifter' },
 
   // ── Vault ──────────────────────────────────────────────
   'vault.page.title':       { en:'Vault',                 sv:'Arkiv' },
@@ -4500,6 +4547,11 @@ function paintI18n(root){
   const scope = root || document;
   scope.querySelectorAll('[data-i18n]').forEach(el => {
     const k = el.getAttribute('data-i18n'); if(k) el.textContent = t(k);
+  });
+  // [data-i18n-html] keeps inline markup (e.g. <strong>) — used
+  // for static modal copy where the literal contains tags.
+  scope.querySelectorAll('[data-i18n-html]').forEach(el => {
+    const k = el.getAttribute('data-i18n-html'); if(k) el.innerHTML = t(k);
   });
   scope.querySelectorAll('[data-i18n-title]').forEach(el => {
     const k = el.getAttribute('data-i18n-title'); if(k) el.setAttribute('title', t(k));
@@ -6215,43 +6267,46 @@ function renderWelcomeStep(){
   if(step === 0){
     body.innerHTML = `
       <div class="welcome-icon">✦</div>
-      <div class="welcome-title">Welcome to Horizon</div>
-      <div class="welcome-sub">A calm place to plan your money — from this month's Fun Fund to the decade you retire in. Let's set you up with the basics. It takes under a minute.</div>
+      <div class="welcome-title">${esc2(t('welcome.s0.title'))}</div>
+      <div class="welcome-sub">${esc2(t('welcome.s0.sub'))}</div>
       <div class="welcome-field">
-        <label>What should I call you?</label>
-        <input class="welcome-input" id="w-name" type="text" placeholder="e.g. Alex" value="${esc2(_welcomeDraft.name)}" oninput="_welcomeDraft.name=this.value">
-        <div class="welcome-hint">Optional — used for the Dashboard greeting.</div>
+        <label>${esc2(t('welcome.s0.label'))}</label>
+        <input class="welcome-input" id="w-name" type="text" placeholder="${esc2(t('welcome.s0.placeholder'))}" value="${esc2(_welcomeDraft.name)}" oninput="_welcomeDraft.name=this.value">
+        <div class="welcome-hint">${esc2(t('welcome.s0.hint'))}</div>
       </div>
       <div class="welcome-actions">
-        <button class="btn btn-o btn-sm" onclick="dismissWelcome()">Skip setup</button>
-        <button class="btn btn-g" onclick="welcomeNext()">Next →</button>
+        <button class="btn btn-o btn-sm" onclick="dismissWelcome()">${esc2(t('welcome.skipBtn'))}</button>
+        <button class="btn btn-g" onclick="welcomeNext()">${esc2(t('welcome.nextBtn'))}</button>
       </div>`;
     return;
   }
   if(step === 1){
+    const yrs0 = Math.max(0, _welcomeDraft.retirementAge - _welcomeDraft.currentAge);
     body.innerHTML = `
       <div class="welcome-icon">🗓</div>
-      <div class="welcome-title">Your timeline</div>
-      <div class="welcome-sub">These anchor every projection — retirement runway, nest egg curves, yearly forecast. You can change them anytime in Settings.</div>
+      <div class="welcome-title">${esc2(t('welcome.s1.title'))}</div>
+      <div class="welcome-sub">${esc2(t('welcome.s1.sub'))}</div>
       <div class="welcome-field-row">
         <div class="welcome-field">
-          <label>Current age</label>
+          <label>${esc2(t('welcome.s1.currentAge'))}</label>
           <input class="welcome-input" id="w-age" type="number" min="18" max="100" value="${_welcomeDraft.currentAge}" oninput="_welcomeDraft.currentAge=+this.value||30">
         </div>
         <div class="welcome-field">
-          <label>Retirement age</label>
+          <label>${esc2(t('welcome.s1.retireAge'))}</label>
           <input class="welcome-input" id="w-retage" type="number" min="40" max="100" value="${_welcomeDraft.retirementAge}" oninput="_welcomeDraft.retirementAge=+this.value||65">
         </div>
       </div>
-      <div class="welcome-hint" style="margin-top:6px">That's <strong id="w-years-span">${Math.max(0, _welcomeDraft.retirementAge - _welcomeDraft.currentAge)} years</strong> of compounding ahead.</div>
+      <div class="welcome-hint" style="margin-top:6px">${t('welcome.s1.compoundHint', { years: `<span id="w-years-span">${yrs0}</span>` })}</div>
       <div class="welcome-actions">
-        <button class="btn btn-o btn-sm" onclick="welcomeBack()">← Back</button>
-        <button class="btn btn-g" onclick="welcomeNext()">Next →</button>
+        <button class="btn btn-o btn-sm" onclick="welcomeBack()">${esc2(t('welcome.backBtn'))}</button>
+        <button class="btn btn-g" onclick="welcomeNext()">${esc2(t('welcome.nextBtn'))}</button>
       </div>`;
-    // Live-update the "N years" hint as the user types.
+    // Live-update the "N years" span as the user types. We only
+    // patch the inner number, not the surrounding template, so
+    // the localised wrapper stays intact across keystrokes.
     const sync = () => {
       const s = document.getElementById('w-years-span');
-      if(s) s.innerHTML = Math.max(0, _welcomeDraft.retirementAge - _welcomeDraft.currentAge) + ' years';
+      if(s) s.textContent = String(Math.max(0, _welcomeDraft.retirementAge - _welcomeDraft.currentAge));
     };
     document.getElementById('w-age')?.addEventListener('input', sync);
     document.getElementById('w-retage')?.addEventListener('input', sync);
@@ -6262,20 +6317,20 @@ function renderWelcomeStep(){
     const r = rate();
     body.innerHTML = `
       <div class="welcome-icon">💰</div>
-      <div class="welcome-title">A quick cashflow baseline</div>
-      <div class="welcome-sub">Rough monthly numbers for your current life. No line items yet — you can break them down and refine in the Monthly Review tab once you're in.</div>
+      <div class="welcome-title">${esc2(t('welcome.s2.title'))}</div>
+      <div class="welcome-sub">${esc2(t('welcome.s2.sub'))}</div>
       <div class="welcome-field">
-        <label>Monthly take-home income</label>
+        <label>${esc2(t('welcome.s2.income'))}</label>
         <div class="welcome-input-wrap"><span class="welcome-input-cur">${s}</span><input class="welcome-input welcome-input-amt" id="w-inc" type="number" min="0" placeholder="e.g. 80000" value="${_welcomeDraft.income ? Math.round(_welcomeDraft.income * r) : ''}" oninput="_welcomeDraft.income=(+this.value||0)/${r}"></div>
       </div>
       <div class="welcome-field">
-        <label>Monthly expenses (rough total)</label>
+        <label>${esc2(t('welcome.s2.expenses'))}</label>
         <div class="welcome-input-wrap"><span class="welcome-input-cur">${s}</span><input class="welcome-input welcome-input-amt" id="w-exp" type="number" min="0" placeholder="e.g. 45000" value="${_welcomeDraft.expenses ? Math.round(_welcomeDraft.expenses * r) : ''}" oninput="_welcomeDraft.expenses=(+this.value||0)/${r}"></div>
       </div>
-      <div class="welcome-hint">These become single placeholder line items in Monthly Review — edit, split, or delete them whenever you like.</div>
+      <div class="welcome-hint">${esc2(t('welcome.s2.hint'))}</div>
       <div class="welcome-actions">
-        <button class="btn btn-o btn-sm" onclick="welcomeBack()">← Back</button>
-        <button class="btn btn-g" onclick="welcomeFinish()">Finish setup ✓</button>
+        <button class="btn btn-o btn-sm" onclick="welcomeBack()">${esc2(t('welcome.backBtn'))}</button>
+        <button class="btn btn-g" onclick="welcomeFinish()">${esc2(t('welcome.finishBtn'))}</button>
       </div>`;
     return;
   }
@@ -6309,10 +6364,10 @@ window.welcomeFinish = function(){
   // in Monthly Review later — but the Dashboard will already show
   // real numbers instead of the demo seed on first paint.
   if(_welcomeDraft.income > 0){
-    state.baseIncome = [{ id: genId(), name: 'Take-home pay', amount: Math.round(_welcomeDraft.income), type: 'fixed' }];
+    state.baseIncome = [{ id: genId(), name: t('welcome.seed.income'), amount: Math.round(_welcomeDraft.income), type: 'fixed' }];
   }
   if(_welcomeDraft.expenses > 0){
-    state.baseExpenses = [{ id: genId(), name: 'Monthly expenses', amount: Math.round(_welcomeDraft.expenses), type: 'variable', icon: '💸' }];
+    state.baseExpenses = [{ id: genId(), name: t('welcome.seed.expenses'), amount: Math.round(_welcomeDraft.expenses), type: 'variable', icon: '💸' }];
   }
   state.welcomeComplete = true;
   // Drop the user on the Dashboard so their first view is the
