@@ -3454,6 +3454,36 @@ const STRINGS = {
   'dash.report.concern':    { en:'Areas of concern',            sv:'Områden att hålla koll på' },
   'dash.report.recs':       { en:'Recommendations',             sv:'Rekommendationer' },
 
+  // ── Fun Fund · trip cards ──────────────────────────────
+  'ff.trip.namePlaceholder':{ en:'Trip name',             sv:'Resans namn' },
+  'ff.trip.countryPlaceholder':{ en:'Country / region',   sv:'Land / region' },
+  'ff.trip.removeTitle':    { en:'Remove trip',           sv:'Ta bort resa' },
+  'ff.trip.statusLbl':      { en:'STATUS',                sv:'STATUS' },
+  'ff.trip.budgetLbl':      { en:'BUDGET',                sv:'BUDGET' },
+  'ff.trip.spentLbl':       { en:'SPENT',                 sv:'SPENDERAT' },
+  'ff.trip.status.planning':{ en:'Planning',              sv:'Planeras' },
+  'ff.trip.status.booked':  { en:'Booked',                sv:'Bokad' },
+  // Status pill is uppercased via .toUpperCase() in the template; we
+  // expose a separate key per status so each language can pre-format
+  // its own caps treatment.
+  'ff.trip.statusPill.planning':{ en:'PLANNING',          sv:'PLANERAS' },
+  'ff.trip.statusPill.booked':  { en:'BOOKED',            sv:'BOKAD' },
+  'ff.trip.expenses.title': { en:'EXPENSES BY MONTH',     sv:'UTGIFTER PER MÅNAD' },
+  'ff.trip.expenses.add':   { en:'+ Add expense',         sv:'+ Lägg till utgift' },
+  'ff.trip.expenses.empty': { en:'No expenses yet — add one to allocate costs to specific months.',
+                              sv:'Inga utgifter ännu — lägg till en för att fördela kostnader på specifika månader.' },
+  'ff.trip.exp.namePlaceholder':{ en:'e.g. Flights, hotel, shopping…',
+                                  sv:'t.ex. flyg, hotell, shopping…' },
+  'ff.trip.exp.dateTitle':  { en:'Month this cost lands in the Monthly Review tab · click to pick',
+                              sv:'Månad denna kostnad landar på i Månadsgenomgång-fliken · klicka för att välja' },
+  'ff.trip.exp.removeTitle':{ en:'Remove this expense',   sv:'Ta bort denna utgift' },
+  'ff.trip.progress.spent': { en:'{pct}% spent',          sv:'{pct}% spenderat' },
+  'ff.trip.progress.remaining':{ en:'{amt} remaining',    sv:'{amt} kvar' },
+  // Default name for a freshly added trip
+  'ff.trip.newName':        { en:'New Trip',              sv:'Ny resa' },
+  // Default expense name for the first expense seeded with a new trip
+  'ff.trip.newExpenseName': { en:'Budget',                sv:'Budget' },
+
   // ── Fun Fund · header + KPIs + chart ───────────────────
   'ff.page.tag':            { en:'LIFESTYLE PLANNING',    sv:'LIVSSTILSPLANERING' },
   'ff.page.title':          { en:'Fun Fund & Travel',     sv:'Fun Fund & resor' },
@@ -9569,51 +9599,51 @@ function renderFunFund() {
     const expenseRows = (t.expenses || []).map((ex, exIdx) => {
       const ym = (ex.date || '').slice(0,7);
       return `<div class="trip-exp-row">
-        <input class="trip-exp-name" value="${esc(ex.name || '')}" placeholder="e.g. Flights, hotel, shopping…" oninput="updateTripExpense('${t.id}','${ex.id}','name',this.value)">
-        <input type="month" class="trip-exp-date" value="${ym}" onclick="try{this.showPicker&&this.showPicker()}catch(_){}" onfocus="try{this.showPicker&&this.showPicker()}catch(_){}" onchange="updateTripExpense('${t.id}','${ex.id}','date',this.value)" title="Month this cost lands in the Monthly Review tab · click to pick">
+        <input class="trip-exp-name" value="${esc(ex.name || '')}" placeholder="${esc2(t('ff.trip.exp.namePlaceholder'))}" oninput="updateTripExpense('${t.id}','${ex.id}','name',this.value)">
+        <input type="month" class="trip-exp-date" value="${ym}" onclick="try{this.showPicker&&this.showPicker()}catch(_){}" onfocus="try{this.showPicker&&this.showPicker()}catch(_){}" onchange="updateTripExpense('${t.id}','${ex.id}','date',this.value)" title="${esc2(t('ff.trip.exp.dateTitle'))}">
         <div class="trip-exp-amt-wrap"><span class="trip-exp-cur">${s}</span><input class="trip-exp-amt" type="number" value="${Math.round((Number(ex.amount)||0)*r)}" oninput="updateTripExpense('${t.id}','${ex.id}','amount',this.value/${r})"></div>
-        <button class="line-rm" onclick="removeTripExpense('${t.id}','${ex.id}')" title="Remove this expense">×</button>
+        <button class="line-rm" onclick="removeTripExpense('${t.id}','${ex.id}')" title="${esc2(t('ff.trip.exp.removeTitle'))}">×</button>
       </div>`;
     }).join('');
     return `<div class="trip-card">
       <div class="trip-card-head">
         <span class="trip-card-icon">${t.icon||'✈️'}</span>
         <div class="trip-card-hd-body">
-          <input class="trip-card-name" value="${esc(t.name)}" placeholder="Trip name" oninput="updateTripField('${t.id}','name',this.value)">
-          <input class="trip-card-country" value="${esc(t.country||'')}" placeholder="Country / region" oninput="updateTripField('${t.id}','country',this.value)">
+          <input class="trip-card-name" value="${esc(t.name)}" placeholder="${esc2(t('ff.trip.namePlaceholder'))}" oninput="updateTripField('${t.id}','name',this.value)">
+          <input class="trip-card-country" value="${esc(t.country||'')}" placeholder="${esc2(t('ff.trip.countryPlaceholder'))}" oninput="updateTripField('${t.id}','country',this.value)">
         </div>
-        <span class="trip-status ${t.status}">${t.status.toUpperCase()}</span>
-        <button class="line-rm" onclick="removeTrip('${t.id}')" title="Remove trip">×</button>
+        <span class="trip-status ${t.status}">${esc2(t('ff.trip.statusPill.'+t.status))}</span>
+        <button class="line-rm" onclick="removeTrip('${t.id}')" title="${esc2(t('ff.trip.removeTitle'))}">×</button>
       </div>
       <div class="trip-card-meta">
         <div class="trip-meta-field">
-          <div class="trip-meta-lbl">STATUS</div>
+          <div class="trip-meta-lbl">${esc2(t('ff.trip.statusLbl'))}</div>
           <select class="trip-meta-sel" onchange="updateTripField('${t.id}','status',this.value)">
-            <option value="planning" ${t.status==='planning'?'selected':''}>Planning</option>
-            <option value="booked" ${t.status==='booked'?'selected':''}>Booked</option>
+            <option value="planning" ${t.status==='planning'?'selected':''}>${esc2(t('ff.trip.status.planning'))}</option>
+            <option value="booked" ${t.status==='booked'?'selected':''}>${esc2(t('ff.trip.status.booked'))}</option>
           </select>
         </div>
         <div class="trip-meta-field">
-          <div class="trip-meta-lbl">BUDGET</div>
+          <div class="trip-meta-lbl">${esc2(t('ff.trip.budgetLbl'))}</div>
           <div class="trip-meta-val" style="color:var(--amber)">${fmt(budget)}</div>
         </div>
         <div class="trip-meta-field">
-          <div class="trip-meta-lbl">SPENT</div>
+          <div class="trip-meta-lbl">${esc2(t('ff.trip.spentLbl'))}</div>
           <div class="trip-meta-val-wrap"><span class="trip-meta-cur">${s}</span><input class="trip-meta-amt" type="number" value="${Math.round((Number(t.spent)||0)*r)}" oninput="updateTripField('${t.id}','spent',this.value/${r})"></div>
         </div>
       </div>
       <div class="trip-exp-list">
         <div class="trip-exp-hd">
-          <span class="trip-exp-hd-lbl">EXPENSES BY MONTH</span>
-          <button class="trip-exp-add" onclick="addTripExpense('${t.id}')">+ Add expense</button>
+          <span class="trip-exp-hd-lbl">${esc2(t('ff.trip.expenses.title'))}</span>
+          <button class="trip-exp-add" onclick="addTripExpense('${t.id}')">${esc2(t('ff.trip.expenses.add'))}</button>
         </div>
-        ${expenseRows || '<div class="trip-exp-empty">No expenses yet — add one to allocate costs to specific months.</div>'}
+        ${expenseRows || `<div class="trip-exp-empty">${esc2(t('ff.trip.expenses.empty'))}</div>`}
       </div>
       <div class="trip-progress">
         <div class="trip-progress-bar" style="width:${Math.min(100,spentPct)}%;background:${spentPct<75?'var(--green)':spentPct<100?'var(--amber)':'var(--red)'}"></div>
       </div>
       <div class="trip-progress-meta">
-        <span>${spentPct}% spent</span><span>${fmt(budget-(Number(t.spent)||0))} remaining</span>
+        <span>${esc2(t('ff.trip.progress.spent', { pct: spentPct }))}</span><span>${esc2(t('ff.trip.progress.remaining', { amt: fmt(budget-(Number(t.spent)||0)) }))}</span>
       </div>
     </div>`;
   }).join('');
@@ -9726,13 +9756,13 @@ window.addTrip = function(){
   const mo = String(d.getMonth()+1).padStart(2,'0');
   state.trips.push({
     id: genId(),
-    name: 'New Trip',
+    name: t('ff.trip.newName'),
     country: '',
     spent: 0,
     status: 'planning',
     icon: '✈️',
     expenses: [
-      { id: genId(), name: 'Budget', date: `${y}-${mo}`, amount: 20000 },
+      { id: genId(), name: t('ff.trip.newExpenseName'), date: `${y}-${mo}`, amount: 20000 },
     ],
   });
   save();
