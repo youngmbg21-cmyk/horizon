@@ -3454,6 +3454,81 @@ const STRINGS = {
   'dash.report.concern':    { en:'Areas of concern',            sv:'Områden att hålla koll på' },
   'dash.report.recs':       { en:'Recommendations',             sv:'Rekommendationer' },
 
+  // ── Retirement · s2 Portfolio & Pension ────────────────
+  // KPI row above the two-column card grid.
+  's2.kpi.totalBalance':    { en:'TOTAL INVESTMENT BALANCE',
+                              sv:'TOTAL INVESTERINGSSALDO' },
+  's2.kpi.totalBalance.sub':{ en:'{n} investment account{s} · incl. {savings} savings YTD',
+                              sv:'{n} investeringskonton · inkl. {savings} sparande hittills i år' },
+  's2.kpi.monthlyContrib':  { en:'MONTHLY CONTRIBUTIONS',
+                              sv:'MÅNATLIGA INSÄTTNINGAR' },
+  's2.kpi.monthlyContrib.sub':{ en:'Investments + savings stream',
+                                sv:'Investeringar + sparflöde' },
+  's2.kpi.projected':       { en:'PROJECTED (TODAY\u2019S MONEY)',
+                              sv:'PROGNOS (DAGENS PENNINGVÄRDE)' },
+  's2.kpi.projected.sub':   { en:'{ytr} yrs · investments {inv} + savings {sav}',
+                              sv:'{ytr} år · investeringar {inv} + sparande {sav}' },
+  's2.kpi.pensionIncome':   { en:'TOTAL PENSION INCOME',
+                              sv:'TOTAL PENSIONSINKOMST' },
+  's2.kpi.pensionIncome.sub.starts':{ en:'{n} pension plan{s} · starts age {age}',
+                                      sv:'{n} pensionsplaner · startar vid ålder {age}' },
+  's2.kpi.pensionIncome.sub.active':{ en:'{n} pension plan{s} · active at retirement',
+                                      sv:'{n} pensionsplaner · aktiva vid pensionen' },
+
+  // Two-column header
+  's2.col.pensions':        { en:'Pension Accounts',     sv:'Pensionskonton' },
+  's2.col.investments':     { en:'Investment Accounts',  sv:'Investeringskonton' },
+  's2.col.pensionCount':    { en:'{n} plan{s}',          sv:'{n} planer' },
+  's2.col.pensionCount.withIncome':{ en:'{n} plan{s} · {mo}/mo',
+                                     sv:'{n} planer · {mo}/mån' },
+  's2.col.investmentCount': { en:'{n} account{s} · {total} invested',
+                              sv:'{n} konton · {total} investerat' },
+  's2.col.addInvestment':   { en:'+ Add Investment',     sv:'+ Lägg till investering' },
+  's2.col.addPension':      { en:'+ Add Pension',        sv:'+ Lägg till pension' },
+  's2.col.emptyInv':        { en:'No investment accounts yet — click <strong>+ Add Investment</strong> above to add one.',
+                              sv:'Inga investeringskonton ännu — klicka på <strong>+ Lägg till investering</strong> ovan för att skapa ett.' },
+  's2.col.emptyPen':        { en:'No pension plans yet — click <strong>+ Add Pension</strong> above to add one.',
+                              sv:'Inga pensionsplaner ännu — klicka på <strong>+ Lägg till pension</strong> ovan för att skapa en.' },
+
+  // Account card chrome
+  's2.card.badge.investment':{ en:'◈ Investment',        sv:'◈ Investering' },
+  's2.card.badge.pension':  { en:'🏛 Pension',           sv:'🏛 Pension' },
+  's2.card.namePlaceholder':{ en:'Account name',         sv:'Kontonamn' },
+  's2.card.typeChange':     { en:'Change account type',  sv:'Ändra kontotyp' },
+  's2.card.type.investment':{ en:'Investment',           sv:'Investering' },
+  's2.card.type.pension':   { en:'Pension',              sv:'Pension' },
+  's2.card.removeTitle':    { en:'Remove account',       sv:'Ta bort konto' },
+  // Field cell labels
+  's2.card.field.balance':      { en:'Balance',          sv:'Saldo' },
+  's2.card.field.contribution': { en:'Contribution',     sv:'Insättning' },
+  's2.card.field.growthRate':   { en:'Growth rate',      sv:'Tillväxttakt' },
+  's2.card.field.payout':       { en:'Payout',           sv:'Utbetalning' },
+  's2.card.field.fromAge':      { en:'From age',         sv:'Från ålder' },
+  // Projected chip
+  's2.card.proj.projected':     { en:'Projected',        sv:'Prognos' },
+  's2.card.proj.atAge':         { en:'today\u2019s {s} at age {age}',
+                                  sv:'dagens {s} vid ålder {age}' },
+  's2.card.proj.pensionIncome': { en:'Pension income',   sv:'Pensionsinkomst' },
+  's2.card.proj.pensionSub':    { en:'today\u2019s {s}',
+                                  sv:'dagens {s}' },
+  // "New Account" / "New Pension" default names used by + Add buttons
+  's2.new.account':             { en:'New Account',      sv:'Nytt konto' },
+  's2.new.pension':              { en:'New Pension',     sv:'Ny pension' },
+
+  // Derived Savings Projection card
+  's2.derived.title':       { en:'Auto-generated from your Monthly Review + Yearly Forecast savings targets. Edit those upstream to change this projection.',
+                              sv:'Genereras automatiskt från dina Månadsgenomgång + Årsprognos-sparmål. Redigera dem för att ändra prognosen.' },
+  's2.derived.badge':       { en:'💾 Derived',           sv:'💾 Härledd' },
+  's2.derived.name':        { en:'Savings Projection',   sv:'Sparprognos' },
+  's2.derived.lockTitle':   { en:'Read-only — computed from upstream',
+                              sv:'Skrivskyddad — beräknas uppströms' },
+  's2.derived.field.contribAvg':{ en:'Contrib avg',      sv:'Snittinsättning' },
+  's2.derived.field.growthRate':{ en:'Growth rate',      sv:'Tillväxttakt' },
+  's2.derived.field.source':{ en:'Source',               sv:'Källa' },
+  's2.derived.source.value':{ en:'Monthly / Yearly',     sv:'Månad / År' },
+  's2.derived.note':        { en:'Sourced from your <strong>Monthly Review</strong> / <strong>Yearly Forecast</strong> savings targets — this row is read-only. Matches the <strong>Savings Growth</strong> line on the Dashboard Nest Egg chart.',
+                              sv:'Hämtas från dina <strong>Månadsgenomgång</strong> / <strong>Årsprognos</strong>-sparmål — raden är skrivskyddad. Matchar <strong>Spartillväxt</strong>-linjen på Översiktens pensionskapitalkurva.' },
+
   // ── Retirement · Income Requirements (top block) ──────
   'ireq.title':             { en:'Income Requirements',
                               sv:'Inkomstbehov' },
@@ -8329,31 +8404,31 @@ function renderRetirement() {
   // upstream". Fields render as static spans instead of inputs since
   // the user cannot edit this row — they edit Monthly Review /
   // Yearly Forecast upstream and the row recomputes.
-  const savingsProjRow = `<div class="ret-asset is-derived" title="Auto-generated from your Monthly Review + Yearly Forecast savings targets. Edit those upstream to change this projection.">
+  const savingsProjRow = `<div class="ret-asset is-derived" title="${esc2(t('s2.derived.title'))}">
     <div class="ret-asset-top">
-      <span class="ret-asset-badge">💾 Derived</span>
-      <span class="ret-asset-name-static">Savings Projection <span class="ret-asset-lock" title="Read-only — computed from upstream">🔒</span></span>
+      <span class="ret-asset-badge">${t('s2.derived.badge')}</span>
+      <span class="ret-asset-name-static">${esc2(t('s2.derived.name'))} <span class="ret-asset-lock" title="${esc2(t('s2.derived.lockTitle'))}">🔒</span></span>
     </div>
     <div class="ret-asset-grid">
       <div class="ret-asset-cell">
-        <label>Contrib avg</label>
+        <label>${esc2(t('s2.derived.field.contribAvg'))}</label>
         <div class="rac-input-wrap"><span class="rac-prefix">${s}</span><span class="rac-static">${Math.round(savingsMonthlyAvg*r).toLocaleString()}</span><span class="rac-suffix">/mo</span></div>
       </div>
       <div class="ret-asset-cell">
-        <label>Growth rate</label>
+        <label>${esc2(t('s2.derived.field.growthRate'))}</label>
         <div class="rac-input-wrap"><span class="rac-static">${state.growthRate}</span><span class="rac-suffix">%</span></div>
       </div>
       <div class="ret-asset-cell">
-        <label>Source</label>
-        <div class="rac-input-wrap"><span class="rac-static" style="text-align:left">Monthly / Yearly</span></div>
+        <label>${esc2(t('s2.derived.field.source'))}</label>
+        <div class="rac-input-wrap"><span class="rac-static" style="text-align:left">${esc2(t('s2.derived.source.value'))}</span></div>
       </div>
       <div class="ret-asset-proj">
-        <div class="ret-asset-proj-lbl">Projected</div>
+        <div class="ret-asset-proj-lbl">${esc2(t('s2.card.proj.projected'))}</div>
         <div class="ret-asset-proj-val">${fmt(savingsFinalReal)}</div>
-        <div class="ret-asset-proj-sub">today's ${s} at age ${state.retirementAge}</div>
+        <div class="ret-asset-proj-sub">${esc2(t('s2.card.proj.atAge', { s, age: state.retirementAge }))}</div>
       </div>
     </div>
-    <div class="ret-asset-note">Sourced from your <strong>Monthly Review</strong> / <strong>Yearly Forecast</strong> savings targets — this row is read-only. Matches the <strong>Savings Growth</strong> line on the Dashboard Nest Egg chart.</div>
+    <div class="ret-asset-note">${t('s2.derived.note')}</div>
   </div>`;
   const renderAssetCard = (a, idx) => {
     const isInv=(a.assetType||'investment')==='investment';
@@ -8376,35 +8451,35 @@ function renderRetirement() {
         </div>
       </div>`;
     const fields = isInv ? `
-      ${numCell('Balance',      Math.round(a.balance*r),             `state.externalAssets[${idx}].balance=this.value/${r};save()`, s)}
-      ${numCell('Contribution', Math.round(a.monthlyContribution*r), `state.externalAssets[${idx}].monthlyContribution=this.value/${r};save()`, s, '/mo')}
-      ${numCell('Growth rate',  gr,                                  `state.externalAssets[${idx}].growthRate=+this.value;save()`, '', '%')}
+      ${numCell(t('s2.card.field.balance'),      Math.round(a.balance*r),             `state.externalAssets[${idx}].balance=this.value/${r};save()`, s)}
+      ${numCell(t('s2.card.field.contribution'), Math.round(a.monthlyContribution*r), `state.externalAssets[${idx}].monthlyContribution=this.value/${r};save()`, s, '/mo')}
+      ${numCell(t('s2.card.field.growthRate'),   gr,                                  `state.externalAssets[${idx}].growthRate=+this.value;save()`, '', '%')}
     ` : `
-      ${numCell('Payout',   Math.round((a.monthlyPayout||0)*r), `state.externalAssets[${idx}].monthlyPayout=this.value/${r};save()`, s, '/mo')}
-      ${numCell('From age', a.startAge||state.retirementAge,    `state.externalAssets[${idx}].startAge=+this.value;save()`)}
+      ${numCell(t('s2.card.field.payout'),  Math.round((a.monthlyPayout||0)*r), `state.externalAssets[${idx}].monthlyPayout=this.value/${r};save()`, s, '/mo')}
+      ${numCell(t('s2.card.field.fromAge'), a.startAge||state.retirementAge,    `state.externalAssets[${idx}].startAge=+this.value;save()`)}
     `;
     const projCell = isInv ? `
       <div class="ret-asset-proj">
-        <div class="ret-asset-proj-lbl">Projected</div>
+        <div class="ret-asset-proj-lbl">${esc2(t('s2.card.proj.projected'))}</div>
         <div class="ret-asset-proj-val">${fmt(projR)}</div>
-        <div class="ret-asset-proj-sub">today's ${s} at age ${state.retirementAge}</div>
+        <div class="ret-asset-proj-sub">${esc2(t('s2.card.proj.atAge', { s, age: state.retirementAge }))}</div>
       </div>
     ` : `
       <div class="ret-asset-proj">
-        <div class="ret-asset-proj-lbl">Pension income</div>
+        <div class="ret-asset-proj-lbl">${esc2(t('s2.card.proj.pensionIncome'))}</div>
         <div class="ret-asset-proj-val">${fmt(a.monthlyPayout||0)}/mo</div>
-        <div class="ret-asset-proj-sub">today's ${s}</div>
+        <div class="ret-asset-proj-sub">${esc2(t('s2.card.proj.pensionSub', { s }))}</div>
       </div>
     `;
     return `<div class="ret-asset${isInv?'':' is-pension'}">
       <div class="ret-asset-top">
-        <span class="ret-asset-badge">${isInv?'◈ Investment':'🏛 Pension'}</span>
-        <input class="ret-asset-name" value="${esc(a.name)}" placeholder="Account name" oninput="state.externalAssets[${idx}].name=this.value;save()" onchange="commitRender('renderRetirement')">
-        <select class="ret-asset-type" onchange="state.externalAssets[${idx}].assetType=this.value;save();renderRetirement()" title="Change account type">
-          <option value="investment" ${isInv?'selected':''}>Investment</option>
-          <option value="pension" ${!isInv?'selected':''}>Pension</option>
+        <span class="ret-asset-badge">${isInv?t('s2.card.badge.investment'):t('s2.card.badge.pension')}</span>
+        <input class="ret-asset-name" value="${esc(a.name)}" placeholder="${esc2(t('s2.card.namePlaceholder'))}" oninput="state.externalAssets[${idx}].name=this.value;save()" onchange="commitRender('renderRetirement')">
+        <select class="ret-asset-type" onchange="state.externalAssets[${idx}].assetType=this.value;save();renderRetirement()" title="${esc2(t('s2.card.typeChange'))}">
+          <option value="investment" ${isInv?'selected':''}>${esc2(t('s2.card.type.investment'))}</option>
+          <option value="pension" ${!isInv?'selected':''}>${esc2(t('s2.card.type.pension'))}</option>
         </select>
-        <button class="ret-asset-rm" onclick="state.externalAssets.splice(${idx},1);save();renderRetirement()" title="Remove account">×</button>
+        <button class="ret-asset-rm" onclick="state.externalAssets.splice(${idx},1);save();renderRetirement()" title="${esc2(t('s2.card.removeTitle'))}">×</button>
       </div>
       <div class="ret-asset-grid">
         ${fields}
@@ -8429,18 +8504,35 @@ function renderRetirement() {
     .join('');
   const hasPensions    = pensions.length > 0;
   const hasInvestments = investments.length > 0;
-  const addInvestmentBtn = `<button class="ret-col-add" onclick="state.externalAssets.push({id:genId(),name:'New Account',balance:0,monthlyContribution:0,growthRate:7,assetType:'investment'});save();renderRetirement()">+ Add Investment</button>`;
-  const addPensionBtn    = `<button class="ret-col-add" onclick="state.externalAssets.push({id:genId(),name:'New Pension',monthlyPayout:0,startAge:state.retirementAge,endAge:null,assetType:'pension'});save();renderRetirement()">+ Add Pension</button>`;
-  const emptyInv = `<div class="ret-col-empty">No investment accounts yet — click <strong>+ Add Investment</strong> above to add one.</div>`;
-  const emptyPen = `<div class="ret-col-empty">No pension plans yet — click <strong>+ Add Pension</strong> above to add one.</div>`;
+  // "New Account" / "New Pension" default names are pulled through
+  // t() so a Swedish user sees a Swedish default when adding a new
+  // row. The add buttons mutate state.externalAssets with a name
+  // that's already localised.
+  const newAccountName = t('s2.new.account').replace(/'/g, "\\'");
+  const newPensionName = t('s2.new.pension').replace(/'/g, "\\'");
+  const addInvestmentBtn = `<button class="ret-col-add" onclick="state.externalAssets.push({id:genId(),name:'${newAccountName}',balance:0,monthlyContribution:0,growthRate:7,assetType:'investment'});save();renderRetirement()">${esc2(t('s2.col.addInvestment'))}</button>`;
+  const addPensionBtn    = `<button class="ret-col-add" onclick="state.externalAssets.push({id:genId(),name:'${newPensionName}',monthlyPayout:0,startAge:state.retirementAge,endAge:null,assetType:'pension'});save();renderRetirement()">${esc2(t('s2.col.addPension'))}</button>`;
+  const emptyInv = `<div class="ret-col-empty">${t('s2.col.emptyInv')}</div>`;
+  const emptyPen = `<div class="ret-col-empty">${t('s2.col.emptyPen')}</div>`;
+  const pensionCountText = hasPensions
+    ? t('s2.col.pensionCount.withIncome', { n: pensions.length, s: pensions.length !== 1 ? 's' : '', mo: fmt(getAllPensionIncome()) })
+    : t('s2.col.pensionCount', { n: pensions.length, s: pensions.length !== 1 ? 's' : '' });
+  const investmentCountText = t('s2.col.investmentCount', {
+    n: investments.length,
+    s: investments.length !== 1 ? 's' : '',
+    total: fmt(tBal),
+  });
+  const pensionKpiSubKey = (earliestPension > state.retirementAge)
+    ? 's2.kpi.pensionIncome.sub.starts'
+    : 's2.kpi.pensionIncome.sub.active';
 
   const s2 = `
     <div style="padding:0 14px 14px">
       <div class="kpi-row" style="margin-bottom:10px;margin-top:10px">
-        <div class="kpi"><div class="kpi-icon">◈</div><div class="kpi-lbl">TOTAL INVESTMENT BALANCE</div><div class="kpi-val pos">${fmt(tBal)}</div><div class="kpi-sub">${investments.length} investment account${investments.length!==1?'s':''} · incl. ${fmt(savNow)} savings YTD</div></div>
-        <div class="kpi"><div class="kpi-icon">▲</div><div class="kpi-lbl">MONTHLY CONTRIBUTIONS</div><div class="kpi-val" style="color:var(--amber)">${fmt(tContrib)}</div><div class="kpi-sub">Investments + savings stream</div></div>
-        <div class="kpi"><div class="kpi-icon">☀</div><div class="kpi-lbl">PROJECTED (TODAY&rsquo;S MONEY)</div><div class="kpi-val" style="color:var(--cyan)">${fmt(projReal)}</div><div class="kpi-sub">${ytr} yrs · investments ${fmt(investmentsProjReal)} + savings ${fmt(savingsProjReal)}</div></div>
-        ${hasPensions?`<div class="kpi"><div class="kpi-icon">🏛</div><div class="kpi-lbl">TOTAL PENSION INCOME</div><div class="kpi-val" style="color:var(--amber)">${fmt(getAllPensionIncome())}/mo</div><div class="kpi-sub">${pensions.length} pension plan${pensions.length!==1?'s':''} · ${earliestPension>state.retirementAge?`starts age ${earliestPension}`:'active at retirement'}</div></div>`:''}
+        <div class="kpi"><div class="kpi-icon">◈</div><div class="kpi-lbl">${esc2(t('s2.kpi.totalBalance'))}</div><div class="kpi-val pos">${fmt(tBal)}</div><div class="kpi-sub">${t('s2.kpi.totalBalance.sub', { n: investments.length, s: investments.length !== 1 ? 's' : '', savings: fmt(savNow) })}</div></div>
+        <div class="kpi"><div class="kpi-icon">▲</div><div class="kpi-lbl">${esc2(t('s2.kpi.monthlyContrib'))}</div><div class="kpi-val" style="color:var(--amber)">${fmt(tContrib)}</div><div class="kpi-sub">${esc2(t('s2.kpi.monthlyContrib.sub'))}</div></div>
+        <div class="kpi"><div class="kpi-icon">☀</div><div class="kpi-lbl">${esc2(t('s2.kpi.projected'))}</div><div class="kpi-val" style="color:var(--cyan)">${fmt(projReal)}</div><div class="kpi-sub">${t('s2.kpi.projected.sub', { ytr, inv: fmt(investmentsProjReal), sav: fmt(savingsProjReal) })}</div></div>
+        ${hasPensions?`<div class="kpi"><div class="kpi-icon">🏛</div><div class="kpi-lbl">${esc2(t('s2.kpi.pensionIncome'))}</div><div class="kpi-val" style="color:var(--amber)">${fmt(getAllPensionIncome())}/mo</div><div class="kpi-sub">${t(pensionKpiSubKey, { n: pensions.length, s: pensions.length !== 1 ? 's' : '', age: earliestPension })}</div></div>`:''}
       </div>
       <div class="ret-portfolio-grid">
         <!-- LEFT: Pensions -->
@@ -8448,8 +8540,8 @@ function renderRetirement() {
           <div class="ret-col-head">
             <div class="ret-col-icon">🏛</div>
             <div>
-              <div class="ret-col-title">Pension Accounts</div>
-              <div class="ret-col-count">${pensions.length} plan${pensions.length!==1?'s':''}${hasPensions?` · ${fmt(getAllPensionIncome())}/mo`:''}</div>
+              <div class="ret-col-title">${esc2(t('s2.col.pensions'))}</div>
+              <div class="ret-col-count">${esc2(pensionCountText)}</div>
             </div>
             ${addPensionBtn}
           </div>
@@ -8460,8 +8552,8 @@ function renderRetirement() {
           <div class="ret-col-head">
             <div class="ret-col-icon">◈</div>
             <div>
-              <div class="ret-col-title">Investment Accounts</div>
-              <div class="ret-col-count">${investments.length} account${investments.length!==1?'s':''} · ${fmt(tBal)} invested</div>
+              <div class="ret-col-title">${esc2(t('s2.col.investments'))}</div>
+              <div class="ret-col-count">${esc2(investmentCountText)}</div>
             </div>
             ${addInvestmentBtn}
           </div>
