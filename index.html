@@ -3454,6 +3454,27 @@ const STRINGS = {
   'dash.report.concern':    { en:'Areas of concern',            sv:'Områden att hålla koll på' },
   'dash.report.recs':       { en:'Recommendations',             sv:'Rekommendationer' },
 
+  // ── Forecast & Review · scope chrome ───────────────────
+  'review.scope.eyebrow':   { en:'Review Lens',           sv:'Granskningslins' },
+  'review.scope.monthly.title': { en:'Monthly Review',    sv:'Månadsgenomgång' },
+  'review.scope.yearly.title':  { en:'Yearly Forecast',   sv:'Årsprognos' },
+  'review.scope.monthly.sub':   { en:'Each month inherits your baseline. Edit any field to create a monthly override.',
+                                  sv:'Varje månad ärver din grunddata. Redigera ett fält för att skapa en månadsöverskrift.' },
+  'review.scope.yearly.sub':    { en:'Set base values for a given year. Enable cascade to apply to all future years.',
+                                  sv:'Ange grundvärden för ett givet år. Aktivera kaskad för att tillämpa på alla framtida år.' },
+  'review.scope.monthly.hint':  { en:'Showing one month at a time. Switch to Yearly to set base values for a future year.',
+                                  sv:'Visar en månad i taget. Växla till Årlig för att ange grundvärden för ett framtida år.' },
+  'review.scope.yearly.hint':   { en:'Showing one year at a time. Switch to Monthly to review or override individual months.',
+                                  sv:'Visar ett år i taget. Växla till Månatlig för att granska eller överskriva enskilda månader.' },
+  'review.scope.btn.monthly':   { en:'Monthly ☰',         sv:'Månatlig ☰' },
+  'review.scope.btn.yearly':    { en:'Yearly ▦',          sv:'Årlig ▦' },
+  'review.timeNav.title.monthly':{ en:'Step through monthly reviews',
+                                   sv:'Bläddra genom månadsgenomgångar' },
+  'review.timeNav.title.yearly': { en:'Step through forecast years',
+                                   sv:'Bläddra genom prognosår' },
+  'review.timeNav.prev':         { en:'Previous',         sv:'Föregående' },
+  'review.timeNav.next':         { en:'Next',             sv:'Nästa' },
+
   // ── Retirement · Runway chart SVG + chrome + tooltip ──
   'runway.empty':           { en:'Set your retirement age and portfolio to see the runway.',
                               sv:'Ange din pensionsålder och portfölj för att se banan.' },
@@ -7749,16 +7770,20 @@ function renderReview(){
     state.reviewScope = 'monthly';
   }
   const scope = state.reviewScope;
+  // Pull every label through t() so the entire scope chrome flips
+  // with the active language. SCOPE_META shape is preserved as a
+  // local convenience map of resolved strings, so the existing
+  // `meta.title` / `meta.sub` / `meta.hint` reads stay untouched.
   const SCOPE_META = {
     monthly: {
-      title: 'Monthly Review',
-      sub:   'Each month inherits your baseline. Edit any field to create a monthly override.',
-      hint:  'Showing one month at a time. Switch to Yearly to set base values for a future year.',
+      title: t('review.scope.monthly.title'),
+      sub:   t('review.scope.monthly.sub'),
+      hint:  t('review.scope.monthly.hint'),
     },
     yearly: {
-      title: 'Yearly Forecast',
-      sub:   'Set base values for a given year. Enable cascade to apply to all future years.',
-      hint:  'Showing one year at a time. Switch to Monthly to review or override individual months.',
+      title: t('review.scope.yearly.title'),
+      sub:   t('review.scope.yearly.sub'),
+      hint:  t('review.scope.yearly.hint'),
     },
   };
   const meta = SCOPE_META[scope];
@@ -7766,25 +7791,25 @@ function renderReview(){
   wrap.classList.toggle('scope-monthly', scope === 'monthly');
   wrap.classList.toggle('scope-yearly',  scope === 'yearly');
   host.innerHTML = `
-    <div class="ph"><div class="ph-tag">PERSONAL FINANCES</div><div class="ph-title">Forecast & Review</div><div class="ph-sub">${esc(meta.sub)}</div></div>
+    <div class="ph"><div class="ph-tag">${t('sb.group.personal')}</div><div class="ph-title">${esc2(panelLabel('review'))}</div><div class="ph-sub">${esc2(meta.sub)}</div></div>
     <div class="review-scope-bar">
       <div class="review-scope-lbl">
-        <div class="review-scope-eyebrow">Review Lens</div>
-        <div class="review-scope-title">${esc(meta.title)}</div>
+        <div class="review-scope-eyebrow">${esc2(t('review.scope.eyebrow'))}</div>
+        <div class="review-scope-title">${esc2(meta.title)}</div>
       </div>
       <div class="scen-tabs">
-        <button class="scen-btn ${scope==='monthly'?'active':''}" onclick="setReviewScope('monthly')">Monthly ☰</button>
-        <button class="scen-btn ${scope==='yearly' ?'active':''}" onclick="setReviewScope('yearly')">Yearly ▦</button>
+        <button class="scen-btn ${scope==='monthly'?'active':''}" onclick="setReviewScope('monthly')">${esc2(t('review.scope.btn.monthly'))}</button>
+        <button class="scen-btn ${scope==='yearly' ?'active':''}" onclick="setReviewScope('yearly')">${esc2(t('review.scope.btn.yearly'))}</button>
       </div>
       <!-- Integrated time navigator — moved here from the global topbar.
            Keeps the #scope-chip / #sc-label IDs so updateScopeChip()
            and scopeShift() continue to work unchanged. -->
-      <div class="review-time-nav" id="scope-chip" title="Step through ${scope==='yearly'?'forecast years':'monthly reviews'}">
-        <button class="rtn-arrow" onclick="scopeShift(-1)" title="Previous">◀</button>
+      <div class="review-time-nav" id="scope-chip" title="${esc2(t(scope==='yearly'?'review.timeNav.title.yearly':'review.timeNav.title.monthly'))}">
+        <button class="rtn-arrow" onclick="scopeShift(-1)" title="${esc2(t('review.timeNav.prev'))}">◀</button>
         <span class="rtn-label" id="sc-label">—</span>
-        <button class="rtn-arrow" onclick="scopeShift(1)" title="Next">▶</button>
+        <button class="rtn-arrow" onclick="scopeShift(1)" title="${esc2(t('review.timeNav.next'))}">▶</button>
       </div>
-      <div class="review-scope-hint">${esc(meta.hint)}</div>
+      <div class="review-scope-hint">${esc2(meta.hint)}</div>
     </div>`;
   // Paint the current month / year into the nav label now that it
   // exists in the DOM.
