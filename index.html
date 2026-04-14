@@ -1338,6 +1338,47 @@ body.light .md tbody tr:nth-child(even) { background:rgba(0,0,0,0.015); }
 .aip-chip.aip-chip-recent { background:var(--bg3); color:var(--text3); border-style:dashed; max-width:100%; overflow:hidden; text-overflow:ellipsis; }
 .aip-chip.aip-chip-recent:hover { color:var(--accent-positive); border-color:var(--accent-positive); background:var(--accent-positive-dim); }
 .aip-input-row { display:flex; gap:8px; align-items:flex-end; }
+/* ── Snapshot share tray — friend thread only ──────────
+   Appears above the textarea on friend threads. Each chip
+   drops a live chart into the conversation via shareSnapshot(). */
+.aip-snap-tray {
+  display:flex; flex-wrap:wrap; align-items:center; gap:6px;
+  padding:8px 12px;
+  background:var(--bg3);
+  border-top:1px solid var(--border);
+  border-bottom:1px solid var(--border);
+}
+.aip-snap-tray-lbl {
+  font-family:var(--fm); font-size:9px; font-weight:700;
+  letter-spacing:.08em; text-transform:uppercase;
+  color:var(--text3); margin-right:4px;
+}
+.aip-snap-btn {
+  display:inline-flex; align-items:center; gap:5px;
+  background:var(--bg2);
+  border:1px dashed var(--violet);
+  color:var(--text2);
+  font-family:var(--ff); font-size:11px; font-weight:600;
+  padding:4px 9px; border-radius:14px;
+  cursor:pointer;
+  transition:background .15s, border-color .15s, color .15s;
+}
+.aip-snap-btn:hover {
+  background:var(--violet-dim);
+  border-color:var(--violet);
+  color:var(--violet);
+  border-style:solid;
+}
+.aip-snap-btn .aip-snap-ic { font-size:12px; }
+/* Snapshot message bubble — same shape as a regular user
+   message but slightly wider to comfortably host a chart canvas. */
+.ai-msg.ai-msg-snapshot {
+  max-width:100%;
+  background:var(--violet-dim);
+  border:1px dashed var(--violet);
+}
+.ai-msg.ai-msg-snapshot p:first-child { margin-top:0; }
+.ai-msg.ai-msg-snapshot p:last-child  { margin-bottom:0; }
 .aip-textarea {
   flex:1; background:var(--bg4); border:1px solid var(--border); border-radius:8px;
   padding:9px 12px; color:var(--text); font-family:var(--fm); font-size:12px;
@@ -2389,6 +2430,25 @@ body.light .piq-country-menu { box-shadow:0 12px 28px -10px rgba(60,40,10,0.22);
   <!-- Input area -->
   <div class="aip-input-area">
     <div class="aip-chips" id="aip-chips"></div>
+    <!-- Snapshot-share tray — only visible on friend threads.
+         Clicking an option drops a pre-rendered snapshot card into
+         the conversation so you can discuss real numbers with a
+         friend without typing them out. -->
+    <div class="aip-snap-tray" id="aip-snap-tray" style="display:none">
+      <div class="aip-snap-tray-lbl">Share a snapshot</div>
+      <button class="aip-snap-btn" onclick="shareSnapshot('funFund')">
+        <span class="aip-snap-ic">✦</span>Fun Fund outlook
+      </button>
+      <button class="aip-snap-btn" onclick="shareSnapshot('runway')">
+        <span class="aip-snap-ic">🏖</span>Retirement runway
+      </button>
+      <button class="aip-snap-btn" onclick="shareSnapshot('month')">
+        <span class="aip-snap-ic">📅</span>This month
+      </button>
+      <button class="aip-snap-btn" onclick="shareSnapshot('trips')">
+        <span class="aip-snap-ic">✈️</span>Planned trips
+      </button>
+    </div>
     <div class="aip-input-row">
       <textarea class="aip-textarea" id="aip-input" rows="2"
         placeholder="Ask about your finances…"
@@ -9258,11 +9318,15 @@ window.switchChatThread = function(id){
     : 'Aware of your financial context';
   // Simple/Expert + pills belong to the AI advisor, not a friend
   // chat. Hide them entirely on friend threads so the header reads
-  // cleanly as a messaging UI.
+  // cleanly as a messaging UI. Snapshot-share tray is the inverse:
+  // only visible on friend threads, where sharing a chart makes
+  // sense as the reason-the-chat-exists inside a finance app.
   const modeWrap = document.querySelector('#ai-panel .aip-mode-wrap');
   if(modeWrap) modeWrap.style.display = t.kind === 'friend' ? 'none' : '';
   const pillsEl = document.getElementById('aip-pills');
   if(pillsEl) pillsEl.style.display = t.kind === 'friend' ? 'none' : '';
+  const snapTray = document.getElementById('aip-snap-tray');
+  if(snapTray) snapTray.style.display = t.kind === 'friend' ? 'flex' : 'none';
 };
 // Re-paint the message list from the active thread's messages array.
 // Used when switching threads OR when opening the panel. Individual
@@ -9294,17 +9358,36 @@ function aipRenderActiveThread(){
   }
   // Rebuild bubbles from the thread's messages. Friend rows use a
   // friend-labelled .ai-msg-wrap.bot so the existing left/right
-  // bubble CSS carries every case for free.
+  // bubble CSS carries every case for free. Snapshot messages
+  // (kind:'snapshot') carry a horizon-chart recipe reference and
+  // get rendered through mdParse + the chart block pipeline, so
+  // the user can see the shared snapshot inline in the thread.
   msgs.innerHTML = '';
   messages.forEach(m => {
     const side = _roleSide(t, m.role);
     const wrap = document.createElement('div');
     wrap.className = `ai-msg-wrap ${side}`;
+    const label = side === 'bot' ? _roleLabel(t, m.role) : '';
+    const labelHtml = label ? `<div class="ai-msg-label">${esc2(label)}</div>` : '';
+    const bubbleClass = side === 'bot' ? 'ai-msg bot' : 'ai-msg user';
+    if(m.kind === 'snapshot'){
+      // Render the shared snapshot. The content field holds a
+      // pre-built markdown payload with a fenced horizon-chart
+      // block; run it through the same extractor the AI replies
+      // use so the chart becomes a live Chart.js canvas.
+      const msgIdx = _aiChartMsgCounter++;
+      const { text: cleaned, blocks } = _extractAIChartBlocks(String(m.content || ''), msgIdx);
+      let rendered = mdParse(cleaned);
+      if(blocks.length) rendered = _inlineAIChartPlaceholders(rendered, blocks);
+      wrap.innerHTML = `${labelHtml}<div class="${bubbleClass} ai-msg-snapshot">${rendered}</div>`;
+      msgs.appendChild(wrap);
+      if(blocks.length) _renderAIChartBlocks(wrap.querySelector('.ai-msg'), blocks);
+      return;
+    }
     if(side === 'bot'){
-      const label = _roleLabel(t, m.role);
-      wrap.innerHTML = `${label ? `<div class="ai-msg-label">${esc2(label)}</div>` : ''}<div class="ai-msg bot">${mdParse(String(m.content || ''))}</div>`;
+      wrap.innerHTML = `${labelHtml}<div class="${bubbleClass}">${mdParse(String(m.content || ''))}</div>`;
     } else {
-      wrap.innerHTML = `<div class="ai-msg user">${esc(String(m.content || ''))}</div>`;
+      wrap.innerHTML = `<div class="${bubbleClass}">${esc(String(m.content || ''))}</div>`;
     }
     msgs.appendChild(wrap);
   });
@@ -10783,9 +10866,16 @@ Reply now, in character as Sara, to whatever the user just said.`,
 // for the human and assistant for the character's replies. The order
 // of the resulting list preserves the conversation chronology.
 function _threadToClaudeMessages(thread){
+  // Horizon-chart fenced blocks are client-side renderer hints,
+  // not content the friend should reason over. Strip them before
+  // passing history to Claude so Sara sees the prose summary but
+  // not the raw JSON chart payload.
+  const stripCharts = (s) => String(s || '').replace(/```\s*horizon[-_ ]?chart\s*\n?[\s\S]*?```/gi, '').trim();
   return (thread.messages || []).map(m => {
-    if(m.role === 'me' || m.role === 'user') return { role: 'user', content: String(m.content || '') };
-    if(m.role === 'them' || m.role === 'assistant') return { role: 'assistant', content: String(m.content || '') };
+    const content = stripCharts(m.content);
+    if(!content) return null;
+    if(m.role === 'me' || m.role === 'user') return { role: 'user', content };
+    if(m.role === 'them' || m.role === 'assistant') return { role: 'assistant', content };
     return null;
   }).filter(Boolean);
 }
@@ -10886,6 +10976,82 @@ function _scrollToMessageTop(wrap){
 }
 window.aipChip=function(text){
   const ta=document.getElementById('aip-input'); if(ta){ta.value=text;} aipSend();
+};
+// ── SNAPSHOT SHARING ────────────────────────────────────────────────────
+// Drops a live financial snapshot into the active friend thread so
+// the user can discuss real numbers with a friend without typing
+// them out. The snapshot is stored as a message with kind:'snapshot'
+// and a pre-built markdown payload containing a fenced horizon-chart
+// block, so the existing chart extractor + Chart.js pipeline renders
+// it as a canvas inside the thread. Sara sees the prose part of the
+// payload in her history window and can react naturally.
+const SNAPSHOT_RECIPES = {
+  funFund: () => {
+    const total = Math.round(FE.months.funFundTwelveMoTotal());
+    const cm = FE.months.current();
+    return {
+      title: 'Fun Fund · next 12 months',
+      prose: `📊 **Fun Fund outlook** — I've got about **${fmt(total)}** across the next 12 months. Current month is running **${fmt(cm.pureFunFund)}**.`,
+      chart: { kind: 'custom', title: 'Fun Fund · next 12 months', datasets: [
+        { series: 'funfund.balance', display: 'line', label: 'Running balance' },
+      ] },
+    };
+  },
+  runway: () => {
+    const nums = FE.retirement.numbers();
+    return {
+      title: 'Retirement runway',
+      prose: `📊 **Retirement runway** — ${nums.verdict.toLowerCase()}, coverage **${nums.coveragePct.toFixed(0)}%** at age **${state.retirementAge}**. Nest egg today's money: **${fmt(nums.nestEgg)}**.`,
+      chart: { kind: 'runway', title: 'Retirement runway' },
+    };
+  },
+  month: () => {
+    const cm = FE.months.current();
+    return {
+      title: `Cash flow · ${cm.label}`,
+      prose: `📊 **${cm.label} cash flow** — income **${fmt(cm.pureIncome)}**, expenses **${fmt(cm.pureExpenses)}**, savings **${fmt(cm.savings)}**, leaving **${fmt(cm.pureFunFund)}** of Fun Fund.`,
+      chart: { kind: 'custom', title: `Cash flow · ${cm.label}`, datasets: [
+        { series: 'cashflow.income',   display: 'bar',  label: 'Income' },
+        { series: 'cashflow.expenses', display: 'bar',  label: 'Expenses' },
+        { series: 'cashflow.funFund',  display: 'line', label: 'Fun Fund' },
+      ] },
+    };
+  },
+  trips: () => {
+    const trips = state.trips || [];
+    const total = trips.reduce((s,t) => s + (t.expenses||[]).reduce((ss,e)=>ss+(Number(e.amount)||0),0), 0);
+    const names = trips.map(t => t.name).filter(Boolean).slice(0,3).join(', ');
+    return {
+      title: 'Planned trips',
+      prose: `📊 **Planned trips** — ${trips.length} trip${trips.length===1?'':'s'} on the calendar${names ? ` (${names}${trips.length>3?'…':''})` : ''}, total budget **${fmt(total)}**.`,
+      chart: { kind: 'custom', title: 'Planned trip budget', datasets: [
+        { series: 'travel.budget', display: 'bar', label: 'Budget' },
+      ] },
+    };
+  },
+};
+window.shareSnapshot = function(kind){
+  const thread = _activeThread();
+  if(!thread || thread.kind !== 'friend') return;
+  const recipe = SNAPSHOT_RECIPES[kind];
+  if(!recipe){ return; }
+  let built;
+  try { built = recipe(); }
+  catch(e){ console.warn('shareSnapshot failed', e); return; }
+  // Assemble the message body: friendly prose line + fenced chart
+  // block. The chart extractor picks the block out on render and
+  // swaps in a live Chart.js canvas.
+  const content = `${built.prose}\n\n\`\`\`horizon-chart\n${JSON.stringify(built.chart)}\n\`\`\``;
+  thread.messages.push({
+    role: 'me',
+    content,
+    kind: 'snapshot',
+    snapshotKind: kind,
+    snapshotTitle: built.title,
+    at: Date.now(),
+  });
+  save();
+  aipRenderActiveThread();
 };
 function aipAddMsg(role,text){
   const wrap=document.createElement('div');
