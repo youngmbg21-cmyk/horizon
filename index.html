@@ -3454,6 +3454,29 @@ const STRINGS = {
   'dash.report.concern':    { en:'Areas of concern',            sv:'Områden att hålla koll på' },
   'dash.report.recs':       { en:'Recommendations',             sv:'Rekommendationer' },
 
+  // ── Fun Fund · header + KPIs + chart ───────────────────
+  'ff.page.tag':            { en:'LIFESTYLE PLANNING',    sv:'LIVSSTILSPLANERING' },
+  'ff.page.title':          { en:'Fun Fund & Travel',     sv:'Fun Fund & resor' },
+  'ff.page.sub':            { en:'Your discretionary income tracked against travel plans and lifestyle goals',
+                              sv:'Din fritt disponibla inkomst följs mot resplaner och livsstilsmål' },
+  'ff.kpi.total':           { en:'12-MONTH FUN FUND',     sv:'12-MÅNADERS FUN FUND' },
+  'ff.kpi.total.sub':       { en:'{mo}/mo average',       sv:'{mo}/mån snitt' },
+  'ff.kpi.travelBudget':    { en:'TOTAL TRAVEL BUDGET',   sv:'TOTAL RESBUDGET' },
+  'ff.kpi.travelBudget.sub':{ en:'{n} planned trips',     sv:'{n} planerade resor' },
+  'ff.kpi.spent':           { en:'ALREADY SPENT',         sv:'REDAN SPENDERAT' },
+  'ff.kpi.spent.sub':       { en:'{pct}% of budget used', sv:'{pct}% av budgeten använd' },
+  'ff.kpi.balance':         { en:'FUN FUND BALANCE',      sv:'FUN FUND-SALDO' },
+  'ff.kpi.balance.afterTrips':{ en:'After all trips',     sv:'Efter alla resor' },
+  'ff.kpi.balance.over':    { en:'Over budget by {amt}',  sv:'Över budget med {amt}' },
+  'ff.callout.over':        { en:'⚠️ <strong>Over budget!</strong> Your planned trips ({trips}) exceed your 12-month fun fund ({total}) by {over}. Consider adjusting trip budgets or saving more each month.',
+                              sv:'⚠️ <strong>Över budget!</strong> Dina planerade resor ({trips}) överstiger din 12-månaders Fun Fund ({total}) med {over}. Överväg att justera resbudgetar eller spara mer varje månad.' },
+  'ff.section.travelPlans': { en:'Travel Plans',          sv:'Resplaner' },
+  'ff.btn.addTrip':         { en:'+ Add Trip',            sv:'+ Lägg till resa' },
+  'ff.chart.title':         { en:'Fun Fund vs Travel Budget by Month',
+                              sv:'Fun Fund mot resbudget per månad' },
+  'ff.chart.series.fund':   { en:'Fun Fund',              sv:'Fun Fund' },
+  'ff.chart.series.budget': { en:'Trip Budget',           sv:'Resbudget' },
+
   // ── Yearly Forecast body ───────────────────────────────
   'yearly.window':          { en:'Window: {start}\u2013{end} · age {cur}\u2192{ret}',
                               sv:'Fönster: {start}\u2013{end} · ålder {cur}\u2192{ret}' },
@@ -9596,25 +9619,25 @@ function renderFunFund() {
   }).join('');
 
   document.getElementById('panel-funfund').innerHTML=`
-    <div class="ph"><div class="ph-tag">LIFESTYLE PLANNING</div><div class="ph-title">Fun Fund & Travel</div><div class="ph-sub">Your discretionary income tracked against travel plans and lifestyle goals</div></div>
+    <div class="ph"><div class="ph-tag">${t('ff.page.tag')}</div><div class="ph-title">${esc2(t('ff.page.title'))}</div><div class="ph-sub">${esc2(t('ff.page.sub'))}</div></div>
     <div class="kpi-row">
-      <div class="kpi"><div class="kpi-icon">💫</div><div class="kpi-lbl">12-MONTH FUN FUND</div><div class="kpi-val" style="color:var(--cyan)">${fmt(totalFF)}</div><div class="kpi-sub">${fmt(totalFF/12)}/mo average</div></div>
-      <div class="kpi"><div class="kpi-icon">✈️</div><div class="kpi-lbl">TOTAL TRAVEL BUDGET</div><div class="kpi-val" style="color:var(--amber)">${fmt(totalTrips)}</div><div class="kpi-sub">${state.trips.length} planned trips</div></div>
-      <div class="kpi"><div class="kpi-icon">💳</div><div class="kpi-lbl">ALREADY SPENT</div><div class="kpi-val neg">${fmt(totalSpent)}</div><div class="kpi-sub">${totalTrips>0?Math.round(totalSpent/totalTrips*100):0}% of budget used</div></div>
-      <div class="kpi"><div class="kpi-icon">${remaining>=0?'✅':'⚠️'}</div><div class="kpi-lbl">FUN FUND BALANCE</div><div class="kpi-val ${remaining>=0?'pos':'neg'}">${fmt(remaining)}</div><div class="kpi-sub">${remaining>=0?'After all trips':'Over budget by '+fmt(Math.abs(remaining))}</div></div>
+      <div class="kpi"><div class="kpi-icon">💫</div><div class="kpi-lbl">${esc2(t('ff.kpi.total'))}</div><div class="kpi-val" style="color:var(--cyan)">${fmt(totalFF)}</div><div class="kpi-sub">${esc2(t('ff.kpi.total.sub', { mo: fmt(totalFF/12) }))}</div></div>
+      <div class="kpi"><div class="kpi-icon">✈️</div><div class="kpi-lbl">${esc2(t('ff.kpi.travelBudget'))}</div><div class="kpi-val" style="color:var(--amber)">${fmt(totalTrips)}</div><div class="kpi-sub">${esc2(t('ff.kpi.travelBudget.sub', { n: state.trips.length }))}</div></div>
+      <div class="kpi"><div class="kpi-icon">💳</div><div class="kpi-lbl">${esc2(t('ff.kpi.spent'))}</div><div class="kpi-val neg">${fmt(totalSpent)}</div><div class="kpi-sub">${esc2(t('ff.kpi.spent.sub', { pct: totalTrips>0?Math.round(totalSpent/totalTrips*100):0 }))}</div></div>
+      <div class="kpi"><div class="kpi-icon">${remaining>=0?'✅':'⚠️'}</div><div class="kpi-lbl">${esc2(t('ff.kpi.balance'))}</div><div class="kpi-val ${remaining>=0?'pos':'neg'}">${fmt(remaining)}</div><div class="kpi-sub">${esc2(remaining>=0?t('ff.kpi.balance.afterTrips'):t('ff.kpi.balance.over', { amt: fmt(Math.abs(remaining)) }))}</div></div>
     </div>
 
-    ${remaining<0?`<div class="callout callout-danger">⚠️ <strong>Over budget!</strong> Your planned trips (${fmt(totalTrips)}) exceed your 12-month fun fund (${fmt(totalFF)}) by ${fmt(Math.abs(remaining))}. Consider adjusting trip budgets or saving more each month.</div>`:''}
+    ${remaining<0?`<div class="callout callout-danger">${t('ff.callout.over', { trips: fmt(totalTrips), total: fmt(totalFF), over: fmt(Math.abs(remaining)) })}</div>`:''}
 
     <div class="two-col">
       <div>
-        <div style="font-family:var(--ff);font-size:14px;font-weight:700;margin-bottom:10px">Travel Plans</div>
+        <div style="font-family:var(--ff);font-size:14px;font-weight:700;margin-bottom:10px">${esc2(t('ff.section.travelPlans'))}</div>
         ${tripCards}
-        <button class="btn-add" onclick="addTrip()">+ Add Trip</button>
+        <button class="btn-add" onclick="addTrip()">${esc2(t('ff.btn.addTrip'))}</button>
       </div>
       <div>
         <div class="card">
-          <div class="card-title">Fun Fund vs Travel Budget by Month</div>
+          <div class="card-title">${esc2(t('ff.chart.title'))}</div>
           <div class="chart-wrap md"><canvas id="ff-chart"></canvas></div>
         </div>
         <div class="card">
@@ -9683,8 +9706,8 @@ function renderFunFund() {
         // shown in the Running Balance column below, the Month
         // Summary bar on Forecast & Review, and the Fun Fund line on
         // the monthly charts. One Fun Fund number, everywhere.
-        {label:'Fun Fund',data:months.map(m=>Math.max(0,m.funFund)),backgroundColor:'#00d4ff18',borderColor:'#00d4ff',borderWidth:1.5,borderRadius:3},
-        {label:'Trip Budget',data:months.map(m=>tripByMonth[m.key]||0),backgroundColor:'#f5a62325',borderColor:'#f5a623',borderWidth:1.5,borderRadius:3},
+        {label:t('ff.chart.series.fund'),data:months.map(m=>Math.max(0,m.funFund)),backgroundColor:'#00d4ff18',borderColor:'#00d4ff',borderWidth:1.5,borderRadius:3},
+        {label:t('ff.chart.series.budget'),data:months.map(m=>tripByMonth[m.key]||0),backgroundColor:'#f5a62325',borderColor:'#f5a623',borderWidth:1.5,borderRadius:3},
       ]},options:chartPreset()});
     }
   },50);
