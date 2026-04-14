@@ -947,6 +947,146 @@ body.light .loc-card:hover { box-shadow:0 5px 14px -8px rgba(60,40,10,0.18); }
   margin-top:1px; white-space:nowrap;
 }
 
+/* ── RETIREMENT · PORTFOLIO COLUMN LAYOUT ────────────────
+   Two-column card grid for Portfolio & Pension. Left column
+   = pensions, right column = investments (with the derived
+   Savings Projection card pinned at the top). Each column
+   has a titled header with an add button, then stacks
+   .ret-asset cards vertically — same visual vocabulary as
+   the Fun Fund trip-card grid. */
+.ret-portfolio-grid {
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:14px;
+  margin-top:10px;
+}
+@media (max-width:900px){
+  .ret-portfolio-grid { grid-template-columns:1fr; }
+}
+.ret-col {
+  background:var(--bg1);
+  border:1px solid var(--border);
+  border-radius:12px;
+  padding:12px 12px 14px;
+  display:flex; flex-direction:column;
+  min-width:0;
+}
+.ret-col-head {
+  display:flex; align-items:center; gap:10px;
+  margin-bottom:12px;
+  padding-bottom:10px;
+  border-bottom:1px solid var(--border);
+}
+.ret-col-icon {
+  width:30px; height:30px; border-radius:8px;
+  display:flex; align-items:center; justify-content:center;
+  font-size:14px;
+  background:rgba(34,197,94,.12);
+  color:var(--green);
+  border:1px solid rgba(34,197,94,.35);
+  flex-shrink:0;
+}
+.ret-col.is-pension .ret-col-icon {
+  background:rgba(245,158,11,.12);
+  color:var(--amber);
+  border-color:rgba(245,158,11,.35);
+}
+.ret-col-title {
+  font-family:var(--ff); font-size:13px; font-weight:700;
+  color:var(--text); letter-spacing:-.01em;
+  line-height:1.2;
+}
+.ret-col-count {
+  font-family:var(--fm); font-size:10px;
+  color:var(--text3); font-weight:500;
+  margin-top:1px;
+}
+.ret-col-add {
+  margin-left:auto;
+  background:transparent;
+  border:1px dashed var(--border2);
+  color:var(--text2);
+  font-family:var(--fm); font-size:10px; font-weight:700;
+  letter-spacing:.04em;
+  padding:6px 10px; border-radius:6px;
+  cursor:pointer;
+  transition:border-color .15s, color .15s, background .15s;
+  flex-shrink:0;
+}
+.ret-col-add:hover {
+  border-color:var(--green);
+  color:var(--green);
+  background:rgba(34,197,94,.06);
+}
+.ret-col.is-pension .ret-col-add:hover {
+  border-color:var(--amber);
+  color:var(--amber);
+  background:rgba(245,158,11,.06);
+}
+.ret-col-empty {
+  font-family:var(--fm); font-size:11px;
+  color:var(--text3); font-style:italic;
+  text-align:center; padding:18px 12px;
+  border:1px dashed var(--border);
+  border-radius:8px;
+  background:var(--bg2);
+}
+.ret-col .ret-asset:last-child { margin-bottom:0; }
+
+/* ── RETIREMENT · DERIVED (READ-ONLY) ASSET CARD ──────── */
+.ret-asset.is-derived {
+  background:linear-gradient(135deg, rgba(139,92,246,.08) 0%, rgba(163,230,53,.05) 100%);
+  border-color:rgba(139,92,246,.4);
+  border-left-color:#a3e635;
+  border-style:dashed;
+}
+.ret-asset.is-derived:hover {
+  background:linear-gradient(135deg, rgba(139,92,246,.12) 0%, rgba(163,230,53,.07) 100%);
+}
+.ret-asset.is-derived .ret-asset-badge {
+  background:var(--violet);
+  color:#fff;
+  border-color:var(--violet);
+}
+.ret-asset-name-static {
+  flex:1; min-width:0;
+  color:var(--text); font-size:13px; font-weight:700;
+  padding:2px 0;
+  display:flex; align-items:center; gap:6px;
+}
+.ret-asset-lock {
+  font-size:12px;
+  color:var(--text3);
+  flex-shrink:0;
+}
+.ret-asset.is-derived .ret-asset-cell .rac-input-wrap {
+  background:var(--bg2);
+  border-style:dashed;
+  opacity:.85;
+}
+.ret-asset.is-derived .ret-asset-cell .rac-static {
+  flex:1; min-width:0;
+  font-family:var(--fm); font-size:12px; font-weight:600;
+  color:var(--text); text-align:right;
+}
+.ret-asset.is-derived .ret-asset-proj {
+  background:rgba(163,230,53,.10);
+  border-color:rgba(163,230,53,.35);
+}
+.ret-asset.is-derived .ret-asset-proj-val {
+  color:#a3e635;
+}
+.ret-asset-note {
+  margin-top:10px;
+  padding:8px 10px;
+  background:var(--bg2);
+  border-left:2px solid var(--violet);
+  border-radius:4px;
+  font-size:10px; color:var(--text2);
+  line-height:1.5;
+}
+.ret-asset-note strong { color:var(--text); font-weight:700; }
+
 /* ── RETIREMENT · COLLAPSIBLE SECTION — enhanced affordance
    Make the expand/collapse behaviour immediately obvious:
    a hover lift, an explicit "CLICK TO EXPAND / COLLAPSE"
@@ -2352,9 +2492,51 @@ body.light .geo-dropdown { box-shadow:0 10px 30px -10px rgba(60,40,10,0.22); }
   font-family:var(--fm); font-size:10px; color:var(--text3);
   margin-left:auto; line-height:1.4; max-width:280px; text-align:right;
 }
+/* Integrated time navigator — replaces the topbar scope-chip.
+   Sits inline with the Monthly / Yearly switcher in the
+   review-scope-bar so the user can step through months (or
+   years) right next to the lens they're browsing. Styled
+   to feel native to the scope bar (same border radius,
+   font, colour language) while keeping the #scope-chip and
+   #sc-label IDs so updateScopeChip() continues to work. */
+.review-time-nav {
+  display:inline-flex; align-items:center; gap:2px;
+  background:var(--bg3);
+  border:1px solid var(--border);
+  border-radius:8px;
+  padding:3px 4px;
+  font-family:var(--fm);
+  user-select:none;
+  transition:border-color .18s;
+}
+.review-time-nav:hover { border-color:var(--border2); }
+.review-time-nav .rtn-arrow {
+  background:transparent; border:none;
+  color:var(--text2);
+  font-size:12px; font-weight:700;
+  cursor:pointer;
+  padding:4px 8px;
+  border-radius:5px;
+  transition:color .15s, background .15s;
+  line-height:1;
+}
+.review-time-nav .rtn-arrow:hover {
+  color:var(--text);
+  background:var(--bg4);
+}
+.review-time-nav .rtn-label {
+  padding:4px 10px;
+  font-size:12px; font-weight:700;
+  color:var(--text);
+  letter-spacing:.02em;
+  min-width:88px;
+  text-align:center;
+}
+.review-time-nav.is-year .rtn-label { min-width:58px; }
 @media (max-width:680px){
   .review-scope-bar { flex-direction:column; align-items:stretch; }
   .review-scope-hint { margin-left:0; text-align:left; max-width:none; }
+  .review-time-nav { align-self:flex-start; }
 }
 /* When the unified review tab is rendering, exactly one child panel
    shows at a time (Monthly or Yearly) — toggled by a class on the
@@ -2674,11 +2856,6 @@ body.light .piq-country-menu { box-shadow:0 12px 28px -10px rgba(60,40,10,0.22);
       <button class="cmdp-hint" id="cmdp-hint" onclick="cmdpOpen()" title="Command palette">
         <span class="cmdp-hint-icon">⌘</span><span class="cmdp-hint-lbl">K</span>
       </button>
-      <div class="scope-chip" id="scope-chip" title="Current time scope — click to jump to relevant panel" onclick="scopeChipClick()">
-        <button class="sc-arrow" onclick="event.stopPropagation();scopeShift(-1)" title="Previous">◀</button>
-        <span class="sc-label" id="sc-label">—</span>
-        <button class="sc-arrow" onclick="event.stopPropagation();scopeShift(1)" title="Next">▶</button>
-      </div>
       <div class="cur-toggle" id="cur-toggle"></div>
       <button class="iBtn" id="theme-btn" onclick="toggleTheme()" title="Toggle theme">☀</button>
       <button class="iBtn" onclick="toggleAIPanel()" title="AI Advisor">✦</button>
@@ -6747,8 +6924,19 @@ function renderReview(){
         <button class="scen-btn ${scope==='monthly'?'active':''}" onclick="setReviewScope('monthly')">Monthly ☰</button>
         <button class="scen-btn ${scope==='yearly' ?'active':''}" onclick="setReviewScope('yearly')">Yearly ▦</button>
       </div>
+      <!-- Integrated time navigator — moved here from the global topbar.
+           Keeps the #scope-chip / #sc-label IDs so updateScopeChip()
+           and scopeShift() continue to work unchanged. -->
+      <div class="review-time-nav" id="scope-chip" title="Step through ${scope==='yearly'?'forecast years':'monthly reviews'}">
+        <button class="rtn-arrow" onclick="scopeShift(-1)" title="Previous">◀</button>
+        <span class="rtn-label" id="sc-label">—</span>
+        <button class="rtn-arrow" onclick="scopeShift(1)" title="Next">▶</button>
+      </div>
       <div class="review-scope-hint">${esc(meta.hint)}</div>
     </div>`;
+  // Paint the current month / year into the nav label now that it
+  // exists in the DOM.
+  if(typeof updateScopeChip === 'function') updateScopeChip();
   // Always render BOTH bodies so a flip into the other scope is instant
   // (no rebuild flicker). The hidden child is display:none via CSS.
   renderMonthly();
@@ -7440,19 +7628,39 @@ function renderRetirement() {
   const savingsMonthlyAvg = savingsProj.length
     ? Math.round(savingsProj.reduce((sum, p) => sum + (p.yearlyContrib || 0), 0) / (12 * savingsProj.length))
     : 0;
-  const savingsProjRow = `<div class="asset-row-derived" title="Auto-generated from your Monthly Review + Yearly Forecast savings targets. Edit those upstream to change this projection.">
-    <div class="ard-body">
-      <span class="ard-pill">DERIVED</span>
-      <span class="ard-name">💾 Savings Projection</span>
-      <span class="ard-meta">Contrib avg: <strong>${fmt(savingsMonthlyAvg)}</strong>/mo</span>
-      <span class="ard-meta">Growth rate: <strong>${state.growthRate}%</strong></span>
-      <span class="ard-arrow">→</span>
-      <span class="ard-final">${fmt(savingsFinalReal)}</span>
-      <span class="ard-final-sub">today&rsquo;s kr at age ${state.retirementAge}</span>
+  // Savings Projection card — visually identical to the investment
+  // cards (same .ret-asset vocabulary) but marked .is-derived so the
+  // dashed violet+lime treatment signals "read-only, computed from
+  // upstream". Fields render as static spans instead of inputs since
+  // the user cannot edit this row — they edit Monthly Review /
+  // Yearly Forecast upstream and the row recomputes.
+  const savingsProjRow = `<div class="ret-asset is-derived" title="Auto-generated from your Monthly Review + Yearly Forecast savings targets. Edit those upstream to change this projection.">
+    <div class="ret-asset-top">
+      <span class="ret-asset-badge">💾 Derived</span>
+      <span class="ret-asset-name-static">Savings Projection <span class="ret-asset-lock" title="Read-only — computed from upstream">🔒</span></span>
     </div>
-    <div class="ard-note">Sourced from your Monthly Review / Yearly Forecast savings targets — this row is read-only. Matches the <strong>Savings Growth</strong> line on the Dashboard Nest Egg chart.</div>
+    <div class="ret-asset-grid">
+      <div class="ret-asset-cell">
+        <label>Contrib avg</label>
+        <div class="rac-input-wrap"><span class="rac-prefix">${s}</span><span class="rac-static">${Math.round(savingsMonthlyAvg*r).toLocaleString()}</span><span class="rac-suffix">/mo</span></div>
+      </div>
+      <div class="ret-asset-cell">
+        <label>Growth rate</label>
+        <div class="rac-input-wrap"><span class="rac-static">${state.growthRate}</span><span class="rac-suffix">%</span></div>
+      </div>
+      <div class="ret-asset-cell">
+        <label>Source</label>
+        <div class="rac-input-wrap"><span class="rac-static" style="text-align:left">Monthly / Yearly</span></div>
+      </div>
+      <div class="ret-asset-proj">
+        <div class="ret-asset-proj-lbl">Projected</div>
+        <div class="ret-asset-proj-val">${fmt(savingsFinalReal)}</div>
+        <div class="ret-asset-proj-sub">today's ${s} at age ${state.retirementAge}</div>
+      </div>
+    </div>
+    <div class="ret-asset-note">Sourced from your <strong>Monthly Review</strong> / <strong>Yearly Forecast</strong> savings targets — this row is read-only. Matches the <strong>Savings Growth</strong> line on the Dashboard Nest Egg chart.</div>
   </div>`;
-  const assetRows = savingsProjRow + state.externalAssets.map((a,idx)=>{
+  const renderAssetCard = (a, idx) => {
     const isInv=(a.assetType||'investment')==='investment';
     const gr=a.growthRate??state.growthRate;
     // Per-account projection is read through FinancialEngine so the
@@ -7508,7 +7716,28 @@ function renderRetirement() {
         ${projCell}
       </div>
     </div>`;
-  }).join('');
+  };
+  // Split the externalAssets into pension and investment streams while
+  // preserving each asset's ORIGINAL index into state.externalAssets,
+  // since every input handler mutates state.externalAssets[idx] by
+  // position. Build the two columns side-by-side: pensions on the
+  // left, investments on the right with the derived Savings
+  // Projection card pinned at the top.
+  const indexedAssets = state.externalAssets.map((a, idx) => ({ a, idx }));
+  const pensionCards = indexedAssets
+    .filter(x => (x.a.assetType||'investment') === 'pension')
+    .map(x => renderAssetCard(x.a, x.idx))
+    .join('');
+  const investmentCards = indexedAssets
+    .filter(x => (x.a.assetType||'investment') === 'investment')
+    .map(x => renderAssetCard(x.a, x.idx))
+    .join('');
+  const hasPensions    = pensions.length > 0;
+  const hasInvestments = investments.length > 0;
+  const addInvestmentBtn = `<button class="ret-col-add" onclick="state.externalAssets.push({id:genId(),name:'New Account',balance:0,monthlyContribution:0,growthRate:7,assetType:'investment'});save();renderRetirement()">+ Add Investment</button>`;
+  const addPensionBtn    = `<button class="ret-col-add" onclick="state.externalAssets.push({id:genId(),name:'New Pension',monthlyPayout:0,startAge:state.retirementAge,endAge:null,assetType:'pension'});save();renderRetirement()">+ Add Pension</button>`;
+  const emptyInv = `<div class="ret-col-empty">No investment accounts yet — click <strong>+ Add Investment</strong> above to add one.</div>`;
+  const emptyPen = `<div class="ret-col-empty">No pension plans yet — click <strong>+ Add Pension</strong> above to add one.</div>`;
 
   const s2 = `
     <div style="padding:0 14px 14px">
@@ -7516,12 +7745,34 @@ function renderRetirement() {
         <div class="kpi"><div class="kpi-icon">◈</div><div class="kpi-lbl">TOTAL INVESTMENT BALANCE</div><div class="kpi-val pos">${fmt(tBal)}</div><div class="kpi-sub">${investments.length} investment account${investments.length!==1?'s':''} · incl. ${fmt(savNow)} savings YTD</div></div>
         <div class="kpi"><div class="kpi-icon">▲</div><div class="kpi-lbl">MONTHLY CONTRIBUTIONS</div><div class="kpi-val" style="color:var(--amber)">${fmt(tContrib)}</div><div class="kpi-sub">Investments + savings stream</div></div>
         <div class="kpi"><div class="kpi-icon">☀</div><div class="kpi-lbl">PROJECTED (TODAY&rsquo;S MONEY)</div><div class="kpi-val" style="color:var(--cyan)">${fmt(projReal)}</div><div class="kpi-sub">${ytr} yrs · investments ${fmt(investmentsProjReal)} + savings ${fmt(savingsProjReal)}</div></div>
-        ${pensions.length>0?`<div class="kpi"><div class="kpi-icon">🏛</div><div class="kpi-lbl">TOTAL PENSION INCOME</div><div class="kpi-val" style="color:var(--amber)">${fmt(getAllPensionIncome())}/mo</div><div class="kpi-sub">${pensions.length} pension plan${pensions.length!==1?'s':''} · ${earliestPension>state.retirementAge?`starts age ${earliestPension}`:'active at retirement'}</div></div>`:''}
+        ${hasPensions?`<div class="kpi"><div class="kpi-icon">🏛</div><div class="kpi-lbl">TOTAL PENSION INCOME</div><div class="kpi-val" style="color:var(--amber)">${fmt(getAllPensionIncome())}/mo</div><div class="kpi-sub">${pensions.length} pension plan${pensions.length!==1?'s':''} · ${earliestPension>state.retirementAge?`starts age ${earliestPension}`:'active at retirement'}</div></div>`:''}
       </div>
-      ${assetRows}
-      <div style="display:flex;gap:8px">
-        <button class="btn-add" style="flex:1" onclick="state.externalAssets.push({id:genId(),name:'New Account',balance:0,monthlyContribution:0,growthRate:7,assetType:'investment'});save();renderRetirement()">+ Add Investment Account</button>
-        <button class="btn-add" style="flex:1;border-color:var(--amber);color:var(--amber)" onclick="state.externalAssets.push({id:genId(),name:'New Pension',monthlyPayout:0,startAge:state.retirementAge,endAge:null,assetType:'pension'});save();renderRetirement()">+ Add Pension Plan</button>
+      <div class="ret-portfolio-grid">
+        <!-- LEFT: Pensions -->
+        <div class="ret-col is-pension">
+          <div class="ret-col-head">
+            <div class="ret-col-icon">🏛</div>
+            <div>
+              <div class="ret-col-title">Pension Accounts</div>
+              <div class="ret-col-count">${pensions.length} plan${pensions.length!==1?'s':''}${hasPensions?` · ${fmt(getAllPensionIncome())}/mo`:''}</div>
+            </div>
+            ${addPensionBtn}
+          </div>
+          ${hasPensions ? pensionCards : emptyPen}
+        </div>
+        <!-- RIGHT: Investments (Savings Projection pinned at top) -->
+        <div class="ret-col">
+          <div class="ret-col-head">
+            <div class="ret-col-icon">◈</div>
+            <div>
+              <div class="ret-col-title">Investment Accounts</div>
+              <div class="ret-col-count">${investments.length} account${investments.length!==1?'s':''} · ${fmt(tBal)} invested</div>
+            </div>
+            ${addInvestmentBtn}
+          </div>
+          ${savingsProjRow}
+          ${hasInvestments ? investmentCards : emptyInv}
+        </div>
       </div>
     </div>`;
 
