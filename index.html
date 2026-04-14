@@ -3720,6 +3720,15 @@ const FinancialEngine = (() => {
       let run = 0;
       return all.map(m => { run += (m.savings || 0); return run; });
     },
+    // Running cumulative savings across the 12 FORWARD months only
+    // — skipping the current month at index 0. Returns a 12-entry
+    // array so it lines up with views that slice next12() from
+    // index 1 (e.g. the Transactions "Next 12 Months" chart).
+    runningSavingsForward: () => {
+      const fwd = get12Months().slice(1);
+      let run = 0;
+      return fwd.map(m => { run += (m.savings || 0); return run; });
+    },
     // Running cumulative Fun Fund balance. m.funFund is already the
     // chained running value from get12Months() pass 2, so this is a
     // thin projection of that field — kept as a named helper so
@@ -3837,10 +3846,22 @@ const FinancialEngine = (() => {
     }
     // I3 — runningSavings must be monotonically non-decreasing.
     // You can't un-save (monthly savings target is always ≥ 0).
+    // Covers both the full 13-entry window and the 12-forward
+    // variant so the Transactions Next chart helper stays honest.
     const runSav = months.runningSavings();
     for(let i = 1; i < runSav.length; i++){
       if(runSav[i] < runSav[i-1] - 1){
         v.push(`I3: runningSavings[${i}] (${Math.round(runSav[i])}) < previous (${Math.round(runSav[i-1])})`);
+        break;
+      }
+    }
+    const runSavFwd = months.runningSavingsForward();
+    if(runSavFwd.length !== 12){
+      v.push(`I3b: runningSavingsForward length ${runSavFwd.length} (expected 12)`);
+    }
+    for(let i = 1; i < runSavFwd.length; i++){
+      if(runSavFwd[i] < runSavFwd[i-1] - 1){
+        v.push(`I3b: runningSavingsForward[${i}] (${Math.round(runSavFwd[i])}) < previous (${Math.round(runSavFwd[i-1])})`);
         break;
       }
     }
@@ -4622,12 +4643,15 @@ function _liveSyncCharts(){
     'Fun Fund · running': () => FE.months.runningFunFund(),
   });
   // Transactions — Next 12 Months forecast chart (right card).
-  // The left Past card reads from a canonical demo array and does
-  // not need a live-sync patch — no state input feeds it.
+  // Savings uses the cumulative running total helper so this chart
+  // matches the Dashboard Cash Flow Savings line treatment; every
+  // other series stays per-month. The left Past card reads from a
+  // canonical demo array and does not need a live-sync patch — no
+  // state input feeds it.
   patch('tx-next', {
     'Income':   () => fwd.map(m => m.pureIncome),
     'Expenses': () => fwd.map(m => m.pureExpenses),
-    'Savings':  () => fwd.map(m => m.savings),
+    'Savings':  () => FE.months.runningSavingsForward(),
     'Fun Fund': () => fwd.map(m => m.funFund),
   });
   // Fun Fund vs Travel Budget by Month
@@ -6427,7 +6451,11 @@ function renderTransactions() {
       const nextLabels   = fwd.map(m => m.short);
       const nextIncome   = fwd.map(m => m.pureIncome);
       const nextExpenses = fwd.map(m => m.pureExpenses);
-      const nextSavings  = fwd.map(m => m.savings);
+      // Savings uses a CUMULATIVE running total so the line grows
+      // steadily across the window — matches the Dashboard 12-Month
+      // Cash Flow chart. Income / Expenses / Fun Fund stay as
+      // monthly values so the bars still read as per-month flow.
+      const nextSavings  = FE.months.runningSavingsForward();
       const nextFunFund  = fwd.map(m => m.funFund);
       charts['tx-next'] = new Chart(nextCtx.getContext('2d'), {
         type: 'bar',
@@ -6436,8 +6464,8 @@ function renderTransactions() {
           datasets: [
             {label:'Income',   data: nextIncome,   backgroundColor:'#00e8a028', borderColor:'#00e8a0', borderWidth:1.75, borderRadius:4, order:2, categoryPercentage:0.7, barPercentage:0.85},
             {label:'Expenses', data: nextExpenses, backgroundColor:'#ff4d6d22', borderColor:'#ff4d6d', borderWidth:1.75, borderRadius:4, order:2, categoryPercentage:0.7, barPercentage:0.85},
-            {label:'Savings',  data: nextSavings,  type:'line', borderColor:'#f5a623', backgroundColor:'transparent', fill:false, tension:.3, pointRadius:2, pointHoverRadius:4, pointBackgroundColor:'#f5a623', borderWidth:1.75, order:1},
-            {label:'Fun Fund', data: nextFunFund,  type:'line', borderColor:'#00d4ff', backgroundColor:'transparent', fill:false, tension:.3, pointRadius:2, pointHoverRadius:4, pointBackgroundColor:'#00d4ff', borderWidth:1.75, borderDash:[4,3], order:1},
+            {label:'Savings',  data: nextSavings,  type:'line', borderColor:'#f5a623', backgroundColor:'#f5a62312', fill:true,  tension:.35, pointRadius:2, pointHoverRadius:4, pointBackgroundColor:'#f5a623', borderWidth:1.75, order:1},
+            {label:'Fun Fund', data: nextFunFund,  type:'line', borderColor:'#00d4ff', backgroundColor:'transparent', fill:false, tension:.3,  pointRadius:2, pointHoverRadius:4, pointBackgroundColor:'#00d4ff', borderWidth:1.75, borderDash:[4,3], order:1},
           ],
         },
         options: chartPreset(),
