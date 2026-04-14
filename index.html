@@ -3454,6 +3454,55 @@ const STRINGS = {
   'dash.report.concern':    { en:'Areas of concern',            sv:'Områden att hålla koll på' },
   'dash.report.recs':       { en:'Recommendations',             sv:'Rekommendationer' },
 
+  // ── Retirement · page header + scenario bar ────────────
+  'ret.page.tag':           { en:'RETIREMENT PLANNING',    sv:'PENSIONSPLANERING' },
+  'ret.page.title':         { en:'Retirement Plan',        sv:'Pensionsplan' },
+  'ret.page.sub':           { en:'Three interconnected sections — changes anywhere update everything instantly',
+                              sv:'Tre sammanlänkade avsnitt — ändringar någonstans uppdaterar allt direkt' },
+  'ret.scen.eyebrow':       { en:'Planning Scenario',      sv:'Planeringsscenario' },
+  'ret.scen.titleExpenses': { en:'{scenario} expenses',    sv:'{scenario} utgifter' },
+  'ret.scen.hint':          { en:'All metrics, charts and summaries below recompute from the selected scenario.',
+                              sv:'Alla mätvärden, diagram och sammanfattningar nedan räknas om från det valda scenariot.' },
+  'ret.scen.lean':          { en:'Lean 🌿',                sv:'Enkel 🌿' },
+  'ret.scen.baseline':      { en:'Baseline ⚖️',            sv:'Grundnivå ⚖️' },
+  'ret.scen.comfortable':   { en:'Comfortable 🌟',         sv:'Bekväm 🌟' },
+  'ret.scen.lean.plain':    { en:'Lean',                   sv:'Enkel' },
+  'ret.scen.baseline.plain':{ en:'Baseline',               sv:'Grundnivå' },
+  'ret.scen.comfortable.plain':{ en:'Comfortable',         sv:'Bekväm' },
+
+  // ── Retirement · verdict labels (by simulation outcome) ──
+  // getRetirementNumbers() sets both `verdict` (English source of
+  // truth for the AI prompt + parser) and `verdictKey` (used by
+  // retVerdictText() at the UI layer).
+  'ret.verdict.wellFunded':    { en:'Well Funded',      sv:'Väl finansierad' },
+  'ret.verdict.fullyFunded':   { en:'Fully Funded',     sv:'Fullt finansierad' },
+  'ret.verdict.borderline':    { en:'Borderline Funded',sv:'Gränsfall' },
+  'ret.verdict.atRisk':        { en:'At Risk',          sv:'I riskzonen' },
+  'ret.verdict.underfunded':   { en:'Underfunded',      sv:'Underfinansierad' },
+
+  // ── Retirement · collapsible section headers (sectionWrap) ──
+  'ret.sec1.title':         { en:'Sustainability & Longevity Runway',
+                              sv:'Hållbarhet & livslängdsbana' },
+  'ret.sec2.title':         { en:'Retirement Expenses & Parameters',
+                              sv:'Pensionsutgifter & parametrar' },
+  'ret.sec3.title':         { en:'Portfolio & Pension Accounts',
+                              sv:'Portfölj- & pensionskonton' },
+  // Section subtitles — parameterised with the metric the header
+  // summarises. `{depletion}` resolves to "Depletes age N" or
+  // "Never depletes" via t('ret.sec1.sub.depletes' | '...neverDepletes').
+  'ret.sec1.sub':               { en:'{verdict} · {pct}% funded · {depletion}{pension}',
+                                  sv:'{verdict} · {pct}% täckning · {depletion}{pension}' },
+  'ret.sec1.sub.depletes':      { en:'Depletes age {age}',  sv:'Töms vid {age}' },
+  'ret.sec1.sub.neverDepletes': { en:'Never depletes',      sv:'Töms aldrig' },
+  'ret.sec1.sub.pensionShare':  { en:' · Pension {pct}% of need',
+                                  sv:' · Pension {pct}% av behov' },
+  'ret.sec2.sub':               { en:'{need}/mo needed · {cur}→{ret} · {ytr} years away',
+                                  sv:'{need}/mån behövs · {cur}→{ret} · {ytr} år kvar' },
+  'ret.sec3.sub':               { en:'{invested} invested{pension} · {projected} projected in today\u2019s money',
+                                  sv:'{invested} investerat{pension} · {projected} prognostiserat i dagens penningvärde' },
+  'ret.sec3.sub.pension':       { en:' · {amt}/mo pension',
+                                  sv:' · {amt}/mån pension' },
+
   // ── Export slices (data management rows) ───────────────
   'slice.baseline.label':   { en:'Baseline',          sv:'Grunddata' },
   'slice.baseline.sub':     { en:'Income, expenses, savings target',
@@ -3541,6 +3590,27 @@ function panelGroup(p){
 }
 window.panelLabel = panelLabel;
 window.panelGroup = panelGroup;
+
+// Translate a retirement verdict object. Reads nums.verdictKey (set
+// by getRetirementNumbers) and falls back to nums.verdict so pre-key
+// cached snapshots still render correctly.
+function retVerdictText(nums){
+  if(!nums) return '';
+  const k = nums.verdictKey;
+  if(k && STRINGS['ret.verdict.'+k]) return t('ret.verdict.'+k);
+  return nums.verdict || '';
+}
+window.retVerdictText = retVerdictText;
+
+// Translate a retirement scenario key (lean / baseline / comfortable).
+// `plain` drops the emoji decoration for contexts where it would be
+// noisy (e.g. inline prose).
+function scenLabel(sc, plain){
+  const key = 'ret.scen.'+(sc||'baseline')+(plain?'.plain':'');
+  if(STRINGS[key]) return t(key);
+  return t('ret.scen.baseline' + (plain?'.plain':''));
+}
+window.scenLabel = scenLabel;
 
 // Walk the DOM for [data-i18n], [data-i18n-title],
 // [data-i18n-placeholder] markers and paint the current translation
@@ -4469,22 +4539,22 @@ function getRetirementNumbers() {
     // that is authoritative.
     const lifeExp = state.lifeExp || 90;
     const yearsShort = runoutAge ? Math.max(0, lifeExp - runoutAge) : 0;
-    let verdict, verdictIcon, verdictClass;
+    let verdict, verdictIcon, verdictClass, verdictKey;
     if(!runoutAge) {
       // Simulation never depleted the portfolio
-      verdict = 'Well Funded'; verdictIcon = '✅'; verdictClass = 'overfunded';
+      verdict = 'Well Funded'; verdictIcon = '✅'; verdictClass = 'overfunded'; verdictKey = 'wellFunded';
     } else if(runoutAge >= lifeExp) {
       // Portfolio sustains income exactly to life expectancy
-      verdict = 'Fully Funded'; verdictIcon = '✅'; verdictClass = 'overfunded';
+      verdict = 'Fully Funded'; verdictIcon = '✅'; verdictClass = 'overfunded'; verdictKey = 'fullyFunded';
     } else if(yearsShort <= 3) {
       // Depletes within 3 years of life exp — borderline OK
-      verdict = 'Borderline Funded'; verdictIcon = '🎯'; verdictClass = 'ontarget';
+      verdict = 'Borderline Funded'; verdictIcon = '🎯'; verdictClass = 'ontarget'; verdictKey = 'borderline';
     } else if(yearsShort <= 7 && coveragePct >= 90) {
       // Multi-year gap but pension-only years still keep funded-year
       // coverage high — at risk, not on track.
-      verdict = 'At Risk'; verdictIcon = '⚠️'; verdictClass = 'ontarget';
+      verdict = 'At Risk'; verdictIcon = '⚠️'; verdictClass = 'ontarget'; verdictKey = 'atRisk';
     } else {
-      verdict = 'Underfunded'; verdictIcon = '❌'; verdictClass = 'underfunded';
+      verdict = 'Underfunded'; verdictIcon = '❌'; verdictClass = 'underfunded'; verdictKey = 'underfunded';
     }
 
     // Pension contribution surfacing — makes pension's role in the
@@ -4510,7 +4580,7 @@ function getRetirementNumbers() {
     return {
       totalExp, totalGross, pension, pensionAvgMonthly, grossNeeded,
       nestEgg, sustainableMonthly, sustainableAfterTax, totalRetirementIncome,
-      gap, coveragePct, verdict, verdictIcon, verdictClass,
+      gap, coveragePct, verdict, verdictIcon, verdictClass, verdictKey,
       pensionShareOfNeed, portfolioShareOfNeed, pensionMaterial,
       ytr, runoutAge, taxRate, sc, mult, _simResult: simResult,
     };
@@ -8421,20 +8491,48 @@ function renderRetirement() {
   const scenBar = `
     <div class="ret-scen-bar">
       <div class="ret-scen-bar-lbl">
-        <div class="ret-scen-bar-eyebrow">Planning Scenario</div>
-        <div class="ret-scen-bar-title">${esc(scenLabels[sc]||'Baseline')} expenses</div>
+        <div class="ret-scen-bar-eyebrow">${esc2(t('ret.scen.eyebrow'))}</div>
+        <div class="ret-scen-bar-title">${esc2(t('ret.scen.titleExpenses', { scenario: scenLabel(sc) }))}</div>
       </div>
-      <div class="scen-tabs">${Object.keys(RET_SCENARIOS).map(sc2=>`<button class="scen-btn ${sc2===sc?'active':''}" onclick="state.retirementScenario='${sc2}';save();renderRetirement()">${scenLabels[sc2]}</button>`).join('')}</div>
-      <div class="ret-scen-bar-hint">All metrics, charts and summaries below recompute from the selected scenario.</div>
+      <div class="scen-tabs">${Object.keys(RET_SCENARIOS).map(sc2=>`<button class="scen-btn ${sc2===sc?'active':''}" onclick="state.retirementScenario='${sc2}';save();renderRetirement()">${esc2(scenLabel(sc2))}</button>`).join('')}</div>
+      <div class="ret-scen-bar-hint">${esc2(t('ret.scen.hint'))}</div>
     </div>`;
 
+  // Section subtitles use parameterised t() keys so the dynamic
+  // "Depletes age N" / "Never depletes" fragment + pension share
+  // suffix can be translated cleanly instead of concatenated.
+  const sec1Depletion = nums.runoutAge
+    ? t('ret.sec1.sub.depletes', { age: Math.round(nums.runoutAge) })
+    : t('ret.sec1.sub.neverDepletes');
+  const sec1PensionBit = nums.pensionMaterial
+    ? t('ret.sec1.sub.pensionShare', { pct: nums.pensionShareOfNeed.toFixed(0) })
+    : '';
+  const sec1Subtitle = t('ret.sec1.sub', {
+    verdict: retVerdictText(nums),
+    pct:     nums.coveragePct.toFixed(0),
+    depletion: sec1Depletion,
+    pension: sec1PensionBit,
+  });
+  const sec2Subtitle = t('ret.sec2.sub', {
+    need: fmt(nums.totalExp),
+    cur:  state.currentAge,
+    ret:  state.retirementAge,
+    ytr:  nums.ytr,
+  });
+  const sec3Subtitle = t('ret.sec3.sub', {
+    invested: fmt(tBal),
+    pension:  pensions.length > 0
+      ? t('ret.sec3.sub.pension', { amt: fmt(getAllPensionIncome()) })
+      : '',
+    projected: fmt(projReal),
+  });
   document.getElementById('panel-retirement').innerHTML=`
-    <div class="ph"><div class="ph-tag">RETIREMENT PLANNING</div><div class="ph-title">Retirement Plan</div><div class="ph-sub">Three interconnected sections — changes anywhere update everything instantly</div></div>
+    <div class="ph"><div class="ph-tag">${t('ret.page.tag')}</div><div class="ph-title">${esc2(t('ret.page.title'))}</div><div class="ph-sub">${esc2(t('ret.page.sub'))}</div></div>
     ${scenBar}
     ${ireq}
-    ${sectionWrap(1,'📊','Sustainability & Longevity Runway',`${nums.verdict} · ${nums.coveragePct.toFixed(0)}% funded · ${nums.runoutAge?'Depletes age '+Math.round(nums.runoutAge):'Never depletes'}${nums.pensionMaterial?` · Pension ${nums.pensionShareOfNeed.toFixed(0)}% of need`:''}`,s1)}
-    ${sectionWrap(2,'📝','Retirement Expenses & Parameters',`${fmt(nums.totalExp)}/mo needed · ${state.currentAge}→${state.retirementAge} · ${nums.ytr} years away`,s3)}
-    ${sectionWrap(3,'◈','Portfolio & Pension Accounts',`${fmt(tBal)} invested${pensions.length>0?` · ${fmt(getAllPensionIncome())}/mo pension`:''} · ${fmt(projReal)} projected in today's money`,s2)}`;
+    ${sectionWrap(1,'📊',t('ret.sec1.title'),sec1Subtitle,s1)}
+    ${sectionWrap(2,'📝',t('ret.sec2.title'),sec2Subtitle,s3)}
+    ${sectionWrap(3,'◈',t('ret.sec3.title'),sec3Subtitle,s2)}`;
 
   // Render Chart.js runway after DOM settles
   if(window.retSecOpen.s1) setTimeout(renderRunwayChart,80);
