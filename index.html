@@ -4621,8 +4621,10 @@ function _liveSyncCharts(){
     'Savings · running':  () => FE.months.runningSavings(),
     'Fun Fund · running': () => FE.months.runningFunFund(),
   });
-  // Transactions — Next 12 Months spending chart (next scope only)
-  patch('tx', {
+  // Transactions — Next 12 Months forecast chart (right card).
+  // The left Past card reads from a canonical demo array and does
+  // not need a live-sync patch — no state input feeds it.
+  patch('tx-next', {
     'Income':   () => fwd.map(m => m.pureIncome),
     'Expenses': () => fwd.map(m => m.pureExpenses),
     'Savings':  () => fwd.map(m => m.savings),
@@ -6348,21 +6350,25 @@ function renderTransactions() {
       </div>
     </div>
 
-    <!-- Spending chart — focal (hero) chart, takes the newly freed vertical space.
-         Past/Next toggle: Past pulls from historical demo data; Next
-         pulls live from get12Months() so it reflects the user's current
-         Monthly Review state, including the cross-month carry-forward
-         chain. The toggle styling matches .scen-tabs / .ret-scen-bar
-         used on the Retire and Forecast & Review tabs. -->
-    <div class="card">
-      <div class="card-title" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px">
-        <span>📊 12-Month Spending vs Income Trend</span>
-        <div class="scen-tabs" style="margin:0">
-          <button class="scen-btn ${(state.txChartScope||'past')==='past'?'active':''}" onclick="setTxChartScope('past')">Past 12 Months</button>
-          <button class="scen-btn ${(state.txChartScope||'past')==='next'?'active':''}" onclick="setTxChartScope('next')">Next 12 Months</button>
+    <!-- Past / Next 12 Months — two side-by-side charts sharing the
+         exact .two-col layout the Dashboard uses for its 12-Month
+         Cash Flow + Nest Egg Growth Curve pair. Left = actual bank
+         history (Income / Expenses bars + Net Flow line). Right =
+         projected forward 12 months from the live Monthly Review
+         state (Income / Expenses bars + Savings + Fun Fund lines). -->
+    <div class="two-col">
+      <div class="card" data-section="past12">
+        <div class="card-title">📊 Past 12 Months
+          <div class="ct-actions"><span class="conn-badge demo">BANK DATA</span></div>
         </div>
+        <div class="chart-wrap lg"><canvas id="tx-chart-past"></canvas></div>
       </div>
-      <div class="chart-wrap focal"><canvas id="tx-chart"></canvas></div>
+      <div class="card" data-section="next12">
+        <div class="card-title">🔮 Next 12 Months
+          <div class="ct-actions"><span class="conn-badge demo">PROJECTION</span></div>
+        </div>
+        <div class="chart-wrap lg"><canvas id="tx-chart-next"></canvas></div>
+      </div>
     </div>
 
     <!-- AI Patterns -->
@@ -6376,101 +6382,75 @@ function renderTransactions() {
     </div>`;
 
   setTimeout(()=>{
-    destroyChart('tx');
-    const ctx=document.getElementById('tx-chart');
-    if(ctx){
-      const cd=chartDefaults();
-      const scope = state.txChartScope || 'past';
-      let labels, income, expenses, savings, funFund, net;
-      if(scope === 'next'){
-        // Next 12 Months — pulls live from get12Months() so the chart
-        // reflects exactly what the Fun Fund tab, Dashboard, and
-        // Monthly Review tab show. We use the 12 forward months
-        // (skipping the current month at index 0) so "Next" means
-        // strictly future, and we read pureIncome/pureExpenses/
-        // pureFunFund so this chart mirrors the Fun Fund tab's
-        // per-month numbers one-for-one.
-        const all = get12Months();
-        const fwd = all.slice(1);
-        labels   = fwd.map(m => m.short);
-        // Income + Expenses use pure per-month values so the bars
-        // represent actual monthly inflow/outflow. Fun Fund uses the
-        // chained running balance so it matches the Month Summary and
-        // Running Balance table.
-        income   = fwd.map(m => m.pureIncome);
-        expenses = fwd.map(m => m.pureExpenses);
-        savings  = fwd.map(m => m.savings);
-        funFund  = fwd.map(m => m.funFund);
-      } else {
-        // Past 12 Months — demo bank history. This view is a rolling
-        // 12-month retrospective driven by the canonical demo arrays
-        // so the chart always has a full, realistic shape regardless
-        // of how much live transaction data is loaded.
-        const dMonths = [];
-        for(let i = 11; i >= 0; i--){
-          const d = new Date(CY, CM - i, 1);
-          dMonths.push(`${MONTH_NAMES[d.getMonth()]} '${String(d.getFullYear()).slice(2)}`);
-        }
-        labels   = dMonths;
-        income   = [127000,127000,206000,131800,127000,127000,127000,127000,127000,127000,127000,127000];
-        expenses = [132500,178264,88545,91500,103500,91500,108636,63945,81636,91500,56590,107090];
-        net      = income.map((v,i) => v - expenses[i]);
+    destroyChart('tx-past');
+    destroyChart('tx-next');
+    const cd = chartDefaults();
+
+    // ── LEFT · PAST 12 MONTHS ──────────────────────────────────────
+    // Rolling 12-month retrospective driven by a canonical demo
+    // array so the chart always has a full, realistic shape
+    // regardless of how much live transaction data is loaded. Three
+    // series the actual-transaction data can justify:
+    // Income (bars), Expenses (bars), Net Flow (line).
+    const pastCtx = document.getElementById('tx-chart-past');
+    if(pastCtx){
+      const pastLabels = [];
+      for(let i = 11; i >= 0; i--){
+        const d = new Date(CY, CM - i, 1);
+        pastLabels.push(`${MONTH_NAMES[d.getMonth()]} '${String(d.getFullYear()).slice(2)}`);
       }
-      // Focal chart — Next scope keeps the four-series forward overlay
-      // (Income / Expenses / Savings / Fun Fund). Past scope narrows to
-      // the three series the actual-transaction data can justify:
-      // Income (bars), Expenses (bars), Net Flow (line).
-      const datasets = (scope === 'next')
-        ? [
-            {label:'Income',   data:income,   backgroundColor:'#00e8a028', borderColor:'#00e8a0', borderWidth:2,   borderRadius:5, categoryPercentage:0.7, barPercentage:0.85, order:2},
-            {label:'Expenses', data:expenses, backgroundColor:'#ff4d6d22', borderColor:'#ff4d6d', borderWidth:2,   borderRadius:5, categoryPercentage:0.7, barPercentage:0.85, order:2},
-            {label:'Savings',  data:savings,  type:'line', borderColor:'#f5a623', backgroundColor:'transparent', fill:false, tension:0.3, pointRadius:3, pointHoverRadius:5, pointBackgroundColor:'#f5a623', borderWidth:2, order:1},
-            {label:'Fun Fund', data:funFund,  type:'line', borderColor:'#00d4ff', backgroundColor:'transparent', fill:false, tension:0.3, pointRadius:3, pointHoverRadius:5, pointBackgroundColor:'#00d4ff', borderWidth:2, order:1},
-          ]
-        : [
-            {label:'Income',   data:income,   backgroundColor:'#00e8a028', borderColor:'#00e8a0', borderWidth:2, borderRadius:5, categoryPercentage:0.7, barPercentage:0.85, order:2},
-            {label:'Expenses', data:expenses, backgroundColor:'#ff4d6d22', borderColor:'#ff4d6d', borderWidth:2, borderRadius:5, categoryPercentage:0.7, barPercentage:0.85, order:2},
-            {label:'Net Flow', data:net,      type:'line', borderColor:'#4d9fff', backgroundColor:'transparent', fill:false, tension:0.3, pointRadius:3, pointHoverRadius:5, pointBackgroundColor:'#4d9fff', borderWidth:2, order:1},
-          ];
-      charts['tx']=new Chart(ctx.getContext('2d'),{
-        type:'bar',
-        data:{
-          labels,
-          datasets,
+      const pastIncome   = [127000,127000,206000,131800,127000,127000,127000,127000,127000,127000,127000,127000];
+      const pastExpenses = [132500,178264,88545,91500,103500,91500,108636,63945,81636,91500,56590,107090];
+      const pastNet      = pastIncome.map((v,i) => v - pastExpenses[i]);
+      charts['tx-past'] = new Chart(pastCtx.getContext('2d'), {
+        type: 'bar',
+        data: {
+          labels: pastLabels,
+          datasets: [
+            {label:'Income',   data: pastIncome,   backgroundColor:'#00e8a028', borderColor:'#00e8a0', borderWidth:1.75, borderRadius:4, order:2, categoryPercentage:0.7, barPercentage:0.85},
+            {label:'Expenses', data: pastExpenses, backgroundColor:'#ff4d6d22', borderColor:'#ff4d6d', borderWidth:1.75, borderRadius:4, order:2, categoryPercentage:0.7, barPercentage:0.85},
+            {label:'Net Flow', data: pastNet,      type:'line', borderColor:'#4d9fff', backgroundColor:'transparent', fill:false, tension:.3, pointRadius:2, pointHoverRadius:4, pointBackgroundColor:'#4d9fff', borderWidth:1.75, order:1},
+          ],
         },
-        options:chartPreset({
-          layout:{ padding:{ top:10, right:10, bottom:4, left:4 } },
-          plugins:{
-            // Tooltip config omitted so it inherits the unified HTML
-            // renderer from chartPreset. Legend gets a size bump for
-            // the focal chart's larger proportions.
-            legend:{ labels:{ color:cd.legendColor, font:{family:'JetBrains Mono',size:12,weight:'600'}, boxWidth:14, padding:16, usePointStyle:true } },
-          },
-          scales:{
-            x:{
-              ticks:{ color:cd.textColor, font:{family:'JetBrains Mono',size:11}, padding:6 },
-              grid:{ display:false },
-              border:{ color:cd.gridColor }
-            },
-            y:{
-              ticks:{ color:cd.textColor, callback:v=>fmtC(v), font:{family:'JetBrains Mono',size:11}, maxTicksLimit:8, padding:8 },
-              grid:{ display:false },
-              border:{ color:cd.gridColor, dash:[2,3] }
-            }
-          }
-        })
+        options: chartPreset(),
+      });
+    }
+
+    // ── RIGHT · NEXT 12 MONTHS ─────────────────────────────────────
+    // Forward 12-month projection driven live from FinancialEngine
+    // so the chart reflects exactly what the Fun Fund tab, the
+    // Dashboard, and the Monthly Review tab show. Slicing index 1+
+    // skips the current month so "Next" means strictly future.
+    const nextCtx = document.getElementById('tx-chart-next');
+    if(nextCtx){
+      const fwd = FE.months.next12().slice(1);
+      const nextLabels   = fwd.map(m => m.short);
+      const nextIncome   = fwd.map(m => m.pureIncome);
+      const nextExpenses = fwd.map(m => m.pureExpenses);
+      const nextSavings  = fwd.map(m => m.savings);
+      const nextFunFund  = fwd.map(m => m.funFund);
+      charts['tx-next'] = new Chart(nextCtx.getContext('2d'), {
+        type: 'bar',
+        data: {
+          labels: nextLabels,
+          datasets: [
+            {label:'Income',   data: nextIncome,   backgroundColor:'#00e8a028', borderColor:'#00e8a0', borderWidth:1.75, borderRadius:4, order:2, categoryPercentage:0.7, barPercentage:0.85},
+            {label:'Expenses', data: nextExpenses, backgroundColor:'#ff4d6d22', borderColor:'#ff4d6d', borderWidth:1.75, borderRadius:4, order:2, categoryPercentage:0.7, barPercentage:0.85},
+            {label:'Savings',  data: nextSavings,  type:'line', borderColor:'#f5a623', backgroundColor:'transparent', fill:false, tension:.3, pointRadius:2, pointHoverRadius:4, pointBackgroundColor:'#f5a623', borderWidth:1.75, order:1},
+            {label:'Fun Fund', data: nextFunFund,  type:'line', borderColor:'#00d4ff', backgroundColor:'transparent', fill:false, tension:.3, pointRadius:2, pointHoverRadius:4, pointBackgroundColor:'#00d4ff', borderWidth:1.75, borderDash:[4,3], order:1},
+          ],
+        },
+        options: chartPreset(),
       });
     }
   },50);
 }
-window.setTxChartScope = function(scope){
-  if(scope !== 'past' && scope !== 'next') return;
-  state.txChartScope = scope;
-  save();
-  // Full re-render of the panel so the toggle's active-state and the
-  // chart datasource swap atomically. The scen-tabs styling already
-  // handles the visual update on the buttons themselves.
-  renderTransactions();
+// Legacy no-op kept so any persisted command-palette action or
+// external deep link that previously toggled scope still resolves
+// to a callable function. Both charts are now rendered together, so
+// there is no scope to toggle.
+window.setTxChartScope = function(){
+  if(typeof renderTransactions === 'function') renderTransactions();
 };
 
 // ══ MONTHLY ══════════════════════════════════════════════════════════════════
