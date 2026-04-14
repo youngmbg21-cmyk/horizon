@@ -3454,6 +3454,56 @@ const STRINGS = {
   'dash.report.concern':    { en:'Areas of concern',            sv:'Områden att hålla koll på' },
   'dash.report.recs':       { en:'Recommendations',             sv:'Rekommendationer' },
 
+  // ── Retirement · Runway chart SVG + chrome + tooltip ──
+  'runway.empty':           { en:'Set your retirement age and portfolio to see the runway.',
+                              sv:'Ange din pensionsålder och portfölj för att se banan.' },
+  'runway.axis.incomeYr':   { en:'Income/yr',         sv:'Inkomst/år' },
+  'runway.annot.lifeExp':   { en:'Life exp. {age}',   sv:'Förv. livslängd {age}' },
+  'runway.annot.depleted':  { en:'Depleted ~age {age}',
+                              sv:'Töms ~ålder {age}' },
+  'runway.annot.depletedPen':{ en:'Depleted ~age {age} · pension only',
+                              sv:'Töms ~ålder {age} · endast pension' },
+  'runway.annot.shortfall': { en:'Shortfall: {mo}/mo × {yrs}yr',
+                              sv:'Underskott: {mo}/mån × {yrs}år' },
+  'runway.annot.surplus':   { en:'Surplus at age {age}+',
+                              sv:'Överskott vid ålder {age}+' },
+  'runway.annot.retireAge': { en:'Retire age {age}',  sv:'Pensionsålder {age}' },
+  // Subtitle under the runway chart — two templates depending on
+  // whether a pension gap exists between retirement age and the
+  // earliest pension start age.
+  'runway.sub.noGap':       { en:'How long your nest egg lasts on {scenario} expenses ({mo}/mo) — withdrawing {gross}/mo gross at {rate}% real growth · today\u2019s money',
+                              sv:'Hur länge ditt pensionskapital räcker vid {scenario} utgifter ({mo}/mån) — uttag {gross}/mån brutto vid {rate}% reell tillväxt · dagens penningvärde' },
+  'runway.sub.gap':         { en:'How long your nest egg lasts on {scenario} expenses ({mo}/mo) — Phase 1: {gross}/mo (age {a}\u2013{b}), Phase 2: reduced withdrawal + pension (age {c}+) at {rate}% real growth · today\u2019s money',
+                              sv:'Hur länge ditt pensionskapital räcker vid {scenario} utgifter ({mo}/mån) — Fas 1: {gross}/mån (ålder {a}\u2013{b}), Fas 2: minskat uttag + pension (ålder {c}+) vid {rate}% reell tillväxt · dagens penningvärde' },
+  // Age snapshot rows
+  'runway.ms.age':          { en:'Age {age}',         sv:'Ålder {age}' },
+  'runway.ms.depleted':     { en:'Depleted',          sv:'Tömt' },
+  'runway.ms.badge.runout': { en:'Runout',            sv:'Tömning' },
+  'runway.ms.badge.lifeExp':{ en:'Life exp.',         sv:'Livsläng.' },
+  'runway.ms.badge.pension':{ en:'+pension',          sv:'+pension' },
+  // Legend swatches
+  'runway.legend.balance':  { en:'Portfolio balance · today\u2019s money (left axis)',
+                              sv:'Portföljsaldo · dagens penningvärde (vänster axel)' },
+  'runway.legend.withdraw': { en:'Portfolio withdrawal · today\u2019s money/yr',
+                              sv:'Portföljuttag · dagens penningvärde/år' },
+  'runway.legend.pension':  { en:'Pension income · today\u2019s money/yr',
+                              sv:'Pensionsinkomst · dagens penningvärde/år' },
+  'runway.legend.shortfall':{ en:'Shortfall vs need · pension below expenses',
+                              sv:'Underskott mot behov · pension under utgifter' },
+  'runway.legend.gap':      { en:'⚡ Pension starts at age {age} ({yrs}yr gap)',
+                              sv:'⚡ Pension börjar vid ålder {age} ({yrs}år gap)' },
+  // Tooltip rows
+  'runway.tt.title':        { en:'Age {age}',         sv:'Ålder {age}' },
+  'runway.tt.todaysMoney':  { en:'· today\u2019s money',
+                              sv:'· dagens penningvärde' },
+  'runway.tt.depletedBadge':{ en:'· depleted',        sv:'· tömd' },
+  'runway.tt.balance':      { en:'Portfolio balance',  sv:'Portföljsaldo' },
+  'runway.tt.withdrawal':   { en:'Portfolio withdrawal',
+                              sv:'Portföljuttag' },
+  'runway.tt.pension':      { en:'Pension income',    sv:'Pensionsinkomst' },
+  'runway.tt.shortfall':    { en:'Shortfall vs need', sv:'Underskott mot behov' },
+  'runway.tt.need':         { en:'Need {amt}/yr',     sv:'Behov {amt}/år' },
+
   // ── Retirement · s3 Expenses & Parameters ──────────────
   // Monthly Retirement Expenses card
   's3.exp.title':           { en:'Monthly Retirement Expenses',
@@ -8278,7 +8328,6 @@ function renderRetirement() {
   const retExp=state.retirementExpenses||[];
   const r=rate(); const s=sym();
   const sc=state.retirementScenario||'baseline';
-  const scenLabels={lean:'Lean 🌿',baseline:'Baseline ⚖️',comfortable:'Comfortable 🌟'};
   const investments=state.externalAssets.filter(a=>(a.assetType||'investment')==='investment');
   const pensions=getPensionAssets();
   const ytr=Math.max(0,state.retirementAge-state.currentAge);
@@ -8889,7 +8938,7 @@ function renderRunwayChart(){
 
   // ── EMPTY STATE ──────────────────────────────────────────────────────────
   if(!cdata.labels || cdata.labels.length === 0){
-    host.innerHTML = '<div class="runway-empty">Set your retirement age and portfolio to see the runway.</div>';
+    host.innerHTML = `<div class="runway-empty">${esc2(t('runway.empty'))}</div>`;
     // Still update the surrounding chrome so the panel doesn't look broken.
     _runwayUpdateChrome(cdata, nums, lifeExp);
     return;
@@ -9026,7 +9075,7 @@ function renderRunwayChart(){
     const val = maxInc * pct;
     parts.push(`<text x="${pad.l + pw + 8}" y="${y + 3}" text-anchor="start" class="runway-axis-label dim">${_svgEsc(fmtC(val))}</text>`);
   });
-  parts.push(`<text x="${pad.l + pw + 8}" y="${pad.t - 10}" class="runway-axis-title">Income/yr</text>`);
+  parts.push(`<text x="${pad.l + pw + 8}" y="${pad.t - 10}" class="runway-axis-title">${_svgEsc(t('runway.axis.incomeYr'))}</text>`);
 
   // Layer 6: annotations — life exp, runout OR surplus
   //
@@ -9055,7 +9104,7 @@ function renderRunwayChart(){
   if(leIdx >= 0){
     parts.push(`<line x1="${leX}" y1="${pad.t}" x2="${leX}" y2="${pad.t + ph}" class="runway-annot-line life"/>`);
     const { lx, anchor } = sideFor(leX);
-    parts.push(`<text x="${lx}" y="${pad.t + 10}" text-anchor="${anchor}" class="runway-annot-label life">Life exp. ${lifeExp}</text>`);
+    parts.push(`<text x="${lx}" y="${pad.t + 10}" text-anchor="${anchor}" class="runway-annot-label life">${_svgEsc(t('runway.annot.lifeExp', { age: lifeExp }))}</text>`);
   }
   if(hasRunout){
     // When life-exp and runout share the same column, push the runout
@@ -9066,17 +9115,17 @@ function renderRunwayChart(){
     const { lx, anchor } = sideFor(roX);
     const primaryY = horizCollision ? pad.t + 26 : pad.t + 10;
     const primary = hasAnyShortfall
-      ? `Depleted ~age ${runoutAge} · pension only`
-      : `Depleted ~age ${runoutAge}`;
-    parts.push(`<text x="${lx}" y="${primaryY}" text-anchor="${anchor}" class="runway-annot-label runout">${primary}</text>`);
+      ? t('runway.annot.depletedPen', { age: runoutAge })
+      : t('runway.annot.depleted',    { age: runoutAge });
+    parts.push(`<text x="${lx}" y="${primaryY}" text-anchor="${anchor}" class="runway-annot-label runout">${_svgEsc(primary)}</text>`);
     if(hasAnyShortfall){
       const totalShortfall = (cdata.shortfall || []).reduce((a,b) => a + b, 0);
       const shortYears = (cdata.shortfall || []).filter(v => v > 0).length;
       const avgMonthlyShort = shortYears > 0 ? (totalShortfall / shortYears / 12) : 0;
-      parts.push(`<text x="${lx}" y="${primaryY + 14}" text-anchor="${anchor}" class="runway-annot-label runout" style="font-size:9px;font-weight:600">Shortfall: ${_svgEsc(fmtC(avgMonthlyShort))}/mo × ${shortYears}yr</text>`);
+      parts.push(`<text x="${lx}" y="${primaryY + 14}" text-anchor="${anchor}" class="runway-annot-label runout" style="font-size:9px;font-weight:600">${_svgEsc(t('runway.annot.shortfall', { mo: fmtC(avgMonthlyShort), yrs: shortYears }))}</text>`);
     }
   } else {
-    parts.push(`<text x="${pad.l + pw - 4}" y="${pad.t + 12}" text-anchor="end" class="runway-annot-label surplus">Surplus at age ${lifeExp}+</text>`);
+    parts.push(`<text x="${pad.l + pw - 4}" y="${pad.t + 12}" text-anchor="end" class="runway-annot-label surplus">${_svgEsc(t('runway.annot.surplus', { age: lifeExp }))}</text>`);
   }
 
   // Layer 7: x-axis age labels — multiples of 5 only
@@ -9090,7 +9139,7 @@ function renderRunwayChart(){
   const sx = xScale(0);
   const sy = yBal(cdata.balData[0]);
   parts.push(`<circle cx="${sx}" cy="${sy}" r="5" fill="#4d9fff" stroke="var(--bg2)" stroke-width="1.5"/>`);
-  parts.push(`<text x="${sx + 10}" y="${sy + 4}" class="runway-start-label">Retire age ${retAge}</text>`);
+  parts.push(`<text x="${sx + 10}" y="${sy + 4}" class="runway-start-label">${_svgEsc(t('runway.annot.retireAge', { age: retAge }))}</text>`);
 
   // Tooltip hover indicator (hidden by default, moved by JS on mousemove)
   parts.push(`<line id="runway-hover-line" x1="0" y1="${pad.t}" x2="0" y2="${pad.t + ph}" class="runway-hover-line" style="display:none"/>`);
@@ -9170,15 +9219,15 @@ function _attachRunwayHover(host, {cdata, pad, pw, ph, xScale, yBal}){
     hoverDot.style.display = '';
     // Render the floating HTML tooltip — every value is in today's money.
     const depBadge = dep
-      ? `<span style="color:#ff4d6d;font-weight:600">· depleted</span>`
+      ? `<span style="color:#ff4d6d;font-weight:600">${esc2(t('runway.tt.depletedBadge'))}</span>`
       : '';
     tooltip.innerHTML = `
-      <div class="chart-tt-title">Age ${age} <span style="color:var(--text3);font-weight:500">· today&rsquo;s money</span> ${depBadge}</div>
-      <div class="chart-tt-row"><span class="chart-tt-sw" style="background:${dep?'#ff4d6d':'#00e8a0'}"></span><span>Portfolio balance</span><span class="chart-tt-val">${fmt(balance)}</span></div>
-      ${!dep ? `<div class="chart-tt-row"><span class="chart-tt-sw" style="background:#f5a623"></span><span>Portfolio withdrawal</span><span class="chart-tt-val">${fmt(port)}/yr</span></div>` : ''}
-      ${pen > 0 ? `<div class="chart-tt-row"><span class="chart-tt-sw" style="background:#4d9fff"></span><span>Pension income</span><span class="chart-tt-val">${fmt(pen)}/yr</span></div>` : ''}
-      ${short > 0 ? `<div class="chart-tt-row"><span class="chart-tt-sw" style="background:#ff4d6d"></span><span style="color:#ff4d6d">Shortfall vs need</span><span class="chart-tt-val" style="color:#ff4d6d">−${fmt(short)}/yr</span></div>` : ''}
-      ${short > 0 ? `<div class="chart-tt-row" style="color:var(--text3);font-size:10px"><span></span><span>Need ${fmt(needed)}/yr</span><span></span></div>` : ''}
+      <div class="chart-tt-title">${esc2(t('runway.tt.title', { age }))} <span style="color:var(--text3);font-weight:500">${esc2(t('runway.tt.todaysMoney'))}</span> ${depBadge}</div>
+      <div class="chart-tt-row"><span class="chart-tt-sw" style="background:${dep?'#ff4d6d':'#00e8a0'}"></span><span>${esc2(t('runway.tt.balance'))}</span><span class="chart-tt-val">${fmt(balance)}</span></div>
+      ${!dep ? `<div class="chart-tt-row"><span class="chart-tt-sw" style="background:#f5a623"></span><span>${esc2(t('runway.tt.withdrawal'))}</span><span class="chart-tt-val">${fmt(port)}/yr</span></div>` : ''}
+      ${pen > 0 ? `<div class="chart-tt-row"><span class="chart-tt-sw" style="background:#4d9fff"></span><span>${esc2(t('runway.tt.pension'))}</span><span class="chart-tt-val">${fmt(pen)}/yr</span></div>` : ''}
+      ${short > 0 ? `<div class="chart-tt-row"><span class="chart-tt-sw" style="background:#ff4d6d"></span><span style="color:#ff4d6d">${esc2(t('runway.tt.shortfall'))}</span><span class="chart-tt-val" style="color:#ff4d6d">−${fmt(short)}/yr</span></div>` : ''}
+      ${short > 0 ? `<div class="chart-tt-row" style="color:var(--text3);font-size:10px"><span></span><span>${esc2(t('runway.tt.need', { amt: fmt(needed) }))}</span><span></span></div>` : ''}
     `;
     // Position tooltip near cursor, avoiding right/bottom edge clipping
     const margin = 14;
@@ -9210,8 +9259,8 @@ function _runwayUpdateChrome(cdata, nums, lifeExp, lineColor){
   // scenario toggle via renderRetirement → renderRunwayChart, so the
   // balance line, bars, verdict and coverage all stay in lockstep.
   const sc = state.retirementScenario || 'baseline';
-  const modeLabel = ({lean:'Lean 🌿', baseline:'Baseline ⚖️', comfortable:'Comfortable 🌟'})[sc] || 'Baseline ⚖️';
-  const plainModeLabel = ({lean:'Lean', baseline:'Baseline', comfortable:'Comfortable'})[sc] || 'Baseline';
+  const modeLabel      = scenLabel(sc);          // emoji form
+  const plainModeLabel = scenLabel(sc, true);    // plain form for prose
   const modeTag = document.getElementById('runway-mode-tag');
   if(modeTag) modeTag.textContent = modeLabel;
   const modeChip = document.getElementById('runway-mode-chip');
@@ -9223,11 +9272,23 @@ function _runwayUpdateChrome(cdata, nums, lifeExp, lineColor){
   if(sub){
     const realRate = Math.max(0, (state.retirementPostGrowth || 4) - state.inflationRate);
     const hasPenGap = pensions.length > 0 && cdata.earliestPension !== null && cdata.earliestPension > state.retirementAge;
-    const intro = `How long your nest egg lasts on ${plainModeLabel} expenses (${fmt(nums.totalExp)}/mo)`;
     if(hasPenGap){
-      sub.textContent = `${intro} — Phase 1: ${fmt(nums.grossNeeded)}/mo (age ${state.retirementAge}–${cdata.earliestPension - 1}), Phase 2: reduced withdrawal + pension (age ${cdata.earliestPension}+) at ${realRate.toFixed(1)}% real growth · today's money`;
+      sub.textContent = t('runway.sub.gap', {
+        scenario: plainModeLabel,
+        mo: fmt(nums.totalExp),
+        gross: fmt(nums.grossNeeded),
+        a: state.retirementAge,
+        b: cdata.earliestPension - 1,
+        c: cdata.earliestPension,
+        rate: realRate.toFixed(1),
+      });
     } else {
-      sub.textContent = `${intro} — withdrawing ${fmt(nums.grossNeeded)}/mo gross at ${realRate.toFixed(1)}% real growth · today's money`;
+      sub.textContent = t('runway.sub.noGap', {
+        scenario: plainModeLabel,
+        mo: fmt(nums.totalExp),
+        gross: fmt(nums.grossNeeded),
+        rate: realRate.toFixed(1),
+      });
     }
   }
 
@@ -9249,13 +9310,13 @@ function _runwayUpdateChrome(cdata, nums, lifeExp, lineColor){
       const isLifeExp = a === lifeExp;
       const isRunout  = nums.runoutAge && a === nums.runoutAge;
       const tone = bal > 0 ? 'pos' : 'neg';
-      const badge = isRunout ? '<span class="runway-ms-badge neg">Runout</span>'
-                  : isLifeExp ? '<span class="runway-ms-badge info">Life exp.</span>'
-                  : pen > 0 ? '<span class="runway-ms-badge muted">+pension</span>'
+      const badge = isRunout ? `<span class="runway-ms-badge neg">${esc2(t('runway.ms.badge.runout'))}</span>`
+                  : isLifeExp ? `<span class="runway-ms-badge info">${esc2(t('runway.ms.badge.lifeExp'))}</span>`
+                  : pen > 0 ? `<span class="runway-ms-badge muted">${esc2(t('runway.ms.badge.pension'))}</span>`
                   : '';
       return `<div class="runway-ms ${tone}${isLifeExp?' is-lifeexp':''}${isRunout?' is-runout':''}">
-        <div class="runway-ms-age">Age ${a}</div>
-        <div class="runway-ms-val">${bal > 0 ? fmt(bal) : 'Depleted'}</div>
+        <div class="runway-ms-age">${esc2(t('runway.ms.age', { age: a }))}</div>
+        <div class="runway-ms-val">${bal > 0 ? fmt(bal) : esc2(t('runway.ms.depleted'))}</div>
         ${badge}
       </div>`;
     }).join('');
@@ -9264,7 +9325,7 @@ function _runwayUpdateChrome(cdata, nums, lifeExp, lineColor){
   // Verdict chip
   const chip = document.getElementById('runway-verdict-chip');
   if(chip){
-    chip.textContent = nums.verdict;
+    chip.textContent = retVerdictText(nums);
     chip.className = 'runway-chip ' + (nums.verdictClass === 'overfunded' ? 'pos' : nums.verdictClass === 'ontarget' ? 'amb' : 'neg');
   }
 
@@ -9276,16 +9337,16 @@ function _runwayUpdateChrome(cdata, nums, lifeExp, lineColor){
   if(legEl){
     const color = lineColor || (nums.runoutAge ? '#ff4d6d' : '#00e8a0');
     const gap = cdata.earliestPension && cdata.earliestPension > state.retirementAge
-      ? `<span class="runway-legend-gap">⚡ Pension starts at age ${cdata.earliestPension} (${cdata.earliestPension - state.retirementAge}yr gap)</span>`
+      ? `<span class="runway-legend-gap">${t('runway.legend.gap', { age: cdata.earliestPension, yrs: cdata.earliestPension - state.retirementAge })}</span>`
       : '';
     const hasShortfall = (cdata.shortfall || []).some(v => v > 0);
     const shortSwatch = hasShortfall
-      ? `<span class="runway-legend-item"><span class="runway-legend-sq" style="background:repeating-linear-gradient(45deg,#ff4d6d,#ff4d6d 2px,#ff4d6d44 2px,#ff4d6d44 4px);border:1px solid #ff4d6d"></span>Shortfall vs need · pension below expenses</span>`
+      ? `<span class="runway-legend-item"><span class="runway-legend-sq" style="background:repeating-linear-gradient(45deg,#ff4d6d,#ff4d6d 2px,#ff4d6d44 2px,#ff4d6d44 4px);border:1px solid #ff4d6d"></span>${t('runway.legend.shortfall')}</span>`
       : '';
     legEl.innerHTML = `
-      <span class="runway-legend-item"><span class="runway-legend-line" style="background:${color}"></span>Portfolio balance · today&rsquo;s money (left axis)</span>
-      <span class="runway-legend-item"><span class="runway-legend-sq" style="background:#f5a623"></span>Portfolio withdrawal · today&rsquo;s money/yr</span>
-      <span class="runway-legend-item"><span class="runway-legend-sq" style="background:#4d9fff"></span>Pension income · today&rsquo;s money/yr</span>
+      <span class="runway-legend-item"><span class="runway-legend-line" style="background:${color}"></span>${t('runway.legend.balance')}</span>
+      <span class="runway-legend-item"><span class="runway-legend-sq" style="background:#f5a623"></span>${t('runway.legend.withdraw')}</span>
+      <span class="runway-legend-item"><span class="runway-legend-sq" style="background:#4d9fff"></span>${t('runway.legend.pension')}</span>
       ${shortSwatch}
       ${gap}
     `;
