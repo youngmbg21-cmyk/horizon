@@ -3737,6 +3737,13 @@ const FinancialEngine = (() => {
     // Sum of per-month pure Fun Fund allocations over the 12-month
     // window. Used as the headline "12-month Fun Fund" KPI.
     funFundTwelveMoTotal: () => getMonthlyFunFundBalance(),
+    // 12-month aggregate helpers — sum the next 12 months (indices 0-11
+    // of the 13-entry array) for each major cash-flow metric. These
+    // power the Dashboard KPI row so all four top cards share the same
+    // 12-month scope.
+    totalIncome12:   () => get12Months().slice(0,12).reduce((s,m) => s + (m.pureIncome   || 0), 0),
+    totalExpenses12: () => get12Months().slice(0,12).reduce((s,m) => s + (m.pureExpenses || 0), 0),
+    totalSavings12:  () => get12Months().slice(0,12).reduce((s,m) => s + (m.savings      || 0), 0),
     // Deep-clone the current month's expense line items with FRESH
     // ids and every "synthetic" row stripped (carry-forward rollovers,
     // Fun Fund trip expenses). Used by the Retirement Plan tab's
@@ -6083,11 +6090,15 @@ function renderDashboard() {
   const realRetirementIncome = retNums.totalRetirementIncome;
   const ytr                  = FE.retirement.yearsToRetirement();
   // Current-month cash flow (matches Monthly Review Month Summary).
+  const ti12         = FE.months.totalIncome12();
+  const te12         = FE.months.totalExpenses12();
+  const savings12    = FE.months.totalSavings12();
+  const funFundTotal = FE.months.funFundTwelveMoTotal();
+  // Current-month helpers still needed for the welcome/greeting copy.
   const ti          = cm.pureIncome;
   const te          = cm.pureExpenses;
   const curSavings  = cm.savings;
   const curIncomeStreams = (cm.incomeItems || []).filter(it => !it.carryForward).length;
-  const funFundTotal = FE.months.funFundTwelveMoTotal();
   const extBal=state.externalAssets.filter(a=>(a.assetType||'investment')==='investment').reduce((s,a)=>s+a.balance,0);
 
   const el=document.getElementById('panel-dashboard');
@@ -6131,12 +6142,12 @@ function renderDashboard() {
       </div>
     </div>
 
-    <!-- KPI Row 1: Cash Flow (each KPI drills into its owning panel) -->
+    <!-- KPI Row 1: Cash Flow — all four cards span the NEXT 12 MONTHS -->
     ${ui.kpiRow([
-      {icon:'💰', label:'MONTHLY INCOME',   value:fmt(ti),               tone:'pos', sub:`${curIncomeStreams} income streams`,               link:'monthly'},
-      {icon:'📤', label:'MONTHLY EXPENSES', value:fmt(te),               tone:'neg', sub:`${ti>0?Math.round(te/ti*100):0}% of income`,        link:'monthly'},
-      {icon:'🏦', label:'MONTHLY SAVINGS',  value:`<span class="amb">${fmt(curSavings)}</span>`, sub:`${ti>0?Math.round(curSavings/ti*100):0}% savings rate`, link:'monthly'},
-      {icon:'✦', label:'FUN FUND (12MO)',  value:`<span style="color:var(--cyan)">${fmt(funFundTotal)}</span>`, sub:`${fmt(funFundTotal/12)}/mo average`, link:'funfund'},
+      {icon:'💰', label:'INCOME · NEXT 12 MONTHS',   value:fmt(ti12),      tone:'pos', sub:`${fmt(ti12/12)}/mo average · ${curIncomeStreams} income streams`, link:'monthly'},
+      {icon:'📤', label:'EXPENSES · NEXT 12 MONTHS', value:fmt(te12),      tone:'neg', sub:`${fmt(te12/12)}/mo average · ${ti12>0?Math.round(te12/ti12*100):0}% of income`, link:'monthly'},
+      {icon:'🏦', label:'SAVINGS · NEXT 12 MONTHS',  value:`<span class="amb">${fmt(savings12)}</span>`, sub:`${fmt(savings12/12)}/mo average · ${ti12>0?Math.round(savings12/ti12*100):0}% savings rate`, link:'monthly'},
+      {icon:'✦', label:'FUN FUND · NEXT 12 MONTHS', value:`<span style="color:var(--cyan)">${fmt(funFundTotal)}</span>`, sub:`${fmt(funFundTotal/12)}/mo average`, link:'funfund'},
     ])}
 
     <!-- KPI Row 2: Retirement (all values are TODAY'S MONEY / real value) -->
