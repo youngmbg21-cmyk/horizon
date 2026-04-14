@@ -3454,6 +3454,39 @@ const STRINGS = {
   'dash.report.concern':    { en:'Areas of concern',            sv:'Områden att hålla koll på' },
   'dash.report.recs':       { en:'Recommendations',             sv:'Rekommendationer' },
 
+  // ── Monthly Review body ────────────────────────────────
+  'monthly.chart.ie':       { en:'12-Month Income vs Expenses',
+                              sv:'12-månaders inkomst mot utgifter' },
+  'monthly.chart.nf':       { en:'Savings &amp; Fun Fund · Running Net Flow',
+                              sv:'Sparande &amp; Fun Fund · Löpande nettoflöde' },
+  'monthly.override.active':{ en:'✎ CUSTOM OVERRIDE ACTIVE',
+                              sv:'✎ ANPASSAD ÖVERSKRIFT AKTIV' },
+  'monthly.override.reset': { en:'Reset',                  sv:'Återställ' },
+  'monthly.baseline.hint':  { en:'Showing inherited baseline — edit any field to create an override',
+                              sv:'Visar ärvd grunddata — redigera ett fält för att skapa en överskrift' },
+  'monthly.summary.label':  { en:'MONTH SUMMARY — {month}',
+                              sv:'MÅNADSSAMMANFATTNING — {month}' },
+  'monthly.summary.bar.exp':{ en:'Exp {pct}%',             sv:'Utg {pct}%' },
+  'monthly.summary.bar.sav':{ en:'Sav {pct}%',             sv:'Spa {pct}%' },
+  'monthly.summary.bar.fun':{ en:'Fun {pct}%',             sv:'Fun {pct}%' },
+  'monthly.summary.income': { en:'INCOME',                 sv:'INKOMST' },
+  'monthly.summary.expenses':{ en:'EXPENSES',              sv:'UTGIFTER' },
+  'monthly.summary.savings':{ en:'SAVINGS',                sv:'SPARANDE' },
+  'monthly.summary.funFund':{ en:'FUN FUND',               sv:'FUN FUND' },
+  'monthly.card.income':    { en:'Income Streams',         sv:'Inkomstkällor' },
+  'monthly.card.expenses':  { en:'Expenses',               sv:'Utgifter' },
+  'monthly.card.savingsTarget':{ en:'Monthly Savings Target',
+                                 sv:'Månadsmål för sparande' },
+  'monthly.btn.addIncome':  { en:'+ Add Income',           sv:'+ Lägg till inkomst' },
+  'monthly.btn.addExpense': { en:'+ Add Expense',          sv:'+ Lägg till utgift' },
+  // Chart series labels (legend / tooltip)
+  'monthly.series.income':  { en:'Income',                 sv:'Inkomst' },
+  'monthly.series.expenses':{ en:'Expenses',               sv:'Utgifter' },
+  'monthly.series.savingsRunning':{ en:'Savings · running',
+                                    sv:'Sparande · löpande' },
+  'monthly.series.funFundRunning':{ en:'Fun Fund · running',
+                                    sv:'Fun Fund · löpande' },
+
   // ── Forecast & Review · scope chrome ───────────────────
   'review.scope.eyebrow':   { en:'Review Lens',           sv:'Granskningslins' },
   'review.scope.monthly.title': { en:'Monthly Review',    sv:'Månadsgenomgång' },
@@ -7855,12 +7888,12 @@ function renderMonthly() {
          grid keeps them visually balanced and matches the app's
          existing card/chart vocabulary. -->
     <div class="two-col">
-      <div class="card"><div class="card-title">12-Month Income vs Expenses</div><div class="chart-wrap lg"><canvas id="mo-chart-ie"></canvas></div></div>
-      <div class="card"><div class="card-title">Savings &amp; Fun Fund · Running Net Flow</div><div class="chart-wrap lg"><canvas id="mo-chart-nf"></canvas></div></div>
+      <div class="card"><div class="card-title">${esc2(t('monthly.chart.ie'))}</div><div class="chart-wrap lg"><canvas id="mo-chart-ie"></canvas></div></div>
+      <div class="card"><div class="card-title">${t('monthly.chart.nf')}</div><div class="chart-wrap lg"><canvas id="mo-chart-nf"></canvas></div></div>
     </div>
 
     <div class="month-pills">${months.map(m=>`<button class="month-pill ${m.key===selKey?'active':''} ${m.isCurrent?'current':''} ${m.hasOverride?'has-override':''}" onclick="state.selectedMonth='${m.key}';renderMonthly()">${m.short}${m.hasOverride?' ✎':''}</button>`).join('')}</div>
-    ${sel.hasOverride?`<div style="display:inline-flex;align-items:center;gap:8px;margin-bottom:12px"><span style="background:var(--violet-dim);color:var(--violet);padding:3px 9px;border-radius:5px;font-size:11px;font-weight:700;font-family:var(--fm)">✎ CUSTOM OVERRIDE ACTIVE</span><button style="background:none;border:1px solid var(--border);color:var(--text2);padding:3px 9px;border-radius:5px;font-size:11px;cursor:pointer" onclick="delete state.monthlyOverrides['${selKey}'];save();renderMonthly()">Reset</button></div>`:'<div style="margin-bottom:12px;font-size:12px;color:var(--text3)">Showing inherited baseline — edit any field to create an override</div>'}
+    ${sel.hasOverride?`<div style="display:inline-flex;align-items:center;gap:8px;margin-bottom:12px"><span style="background:var(--violet-dim);color:var(--violet);padding:3px 9px;border-radius:5px;font-size:11px;font-weight:700;font-family:var(--fm)">${esc2(t('monthly.override.active'))}</span><button style="background:none;border:1px solid var(--border);color:var(--text2);padding:3px 9px;border-radius:5px;font-size:11px;cursor:pointer" onclick="delete state.monthlyOverrides['${selKey}'];save();renderMonthly()">${esc2(t('monthly.override.reset'))}</button></div>`:`<div style="margin-bottom:12px;font-size:12px;color:var(--text3)">${esc2(t('monthly.baseline.hint'))}</div>`}
 
     <!-- Summary bar. Every live-updating element carries a data-mo-* hook
          so liveSyncMonthlyReview() can patch it in place without a full
@@ -7876,28 +7909,28 @@ function renderMonthly() {
     <div class="card" style="padding:14px 16px;margin-bottom:12px">
       <div style="display:flex;flex-wrap:wrap;gap:20px;align-items:center">
         <div style="flex:1;min-width:180px">
-          <div style="font-size:10px;color:var(--text3);font-family:var(--fm);letter-spacing:.1em;margin-bottom:6px">MONTH SUMMARY — ${sel.label}</div>
+          <div style="font-size:10px;color:var(--text3);font-family:var(--fm);letter-spacing:.1em;margin-bottom:6px">${esc2(t('monthly.summary.label', { month: sel.label }))}</div>
           <div class="cf-bar">
             <div class="cf-bar-exp" data-mo-bar="exp" style="width:${sel.income>0?Math.min(sel.expenses/sel.income*100,100):0}%"></div>
             <div class="cf-bar-sav" data-mo-bar="sav" style="width:${sel.income>0?Math.min(sel.savings/sel.income*100,100):0}%"></div>
             <div class="cf-bar-fun" data-mo-bar="fun" style="width:${sel.income>0?Math.max(sel.funFund/sel.income*100,0):0}%"></div>
           </div>
-          <div class="cf-bar-labels" data-mo-bar-labels><span>Exp ${sel.income>0?Math.round(sel.expenses/sel.income*100):0}%</span><span>Sav ${sel.income>0?Math.round(sel.savings/sel.income*100):0}%</span><span>Fun ${sel.income>0?Math.max(Math.round(sel.funFund/sel.income*100),0):0}%</span></div>
+          <div class="cf-bar-labels" data-mo-bar-labels><span>${t('monthly.summary.bar.exp', { pct: sel.income>0?Math.round(sel.expenses/sel.income*100):0 })}</span><span>${t('monthly.summary.bar.sav', { pct: sel.income>0?Math.round(sel.savings/sel.income*100):0 })}</span><span>${t('monthly.summary.bar.fun', { pct: sel.income>0?Math.max(Math.round(sel.funFund/sel.income*100),0):0 })}</span></div>
         </div>
         <div style="display:flex;gap:20px;flex-wrap:wrap">
-          <div style="text-align:center"><div style="font-size:9px;color:var(--text3);font-family:var(--fm);letter-spacing:.08em">INCOME</div><div data-mo-num="income" style="font-family:var(--fm);font-size:16px;font-weight:700;color:var(--green)">${fmt(sel.income)}</div></div>
-          <div style="text-align:center"><div style="font-size:9px;color:var(--text3);font-family:var(--fm);letter-spacing:.08em">EXPENSES</div><div data-mo-num="expenses" style="font-family:var(--fm);font-size:16px;font-weight:700;color:var(--red)">${fmt(sel.expenses)}</div></div>
-          <div style="text-align:center"><div style="font-size:9px;color:var(--text3);font-family:var(--fm);letter-spacing:.08em">SAVINGS</div><div data-mo-num="savings" style="font-family:var(--fm);font-size:16px;font-weight:700;color:var(--amber)">${fmt(sel.savings)}</div></div>
-          <div style="text-align:center"><div style="font-size:9px;color:var(--text3);font-family:var(--fm);letter-spacing:.08em">FUN FUND</div><div data-mo-num="funFund" style="font-family:var(--fm);font-size:16px;font-weight:700;color:var(--cyan)">${fmt(sel.funFund)}</div></div>
+          <div style="text-align:center"><div style="font-size:9px;color:var(--text3);font-family:var(--fm);letter-spacing:.08em">${esc2(t('monthly.summary.income'))}</div><div data-mo-num="income" style="font-family:var(--fm);font-size:16px;font-weight:700;color:var(--green)">${fmt(sel.income)}</div></div>
+          <div style="text-align:center"><div style="font-size:9px;color:var(--text3);font-family:var(--fm);letter-spacing:.08em">${esc2(t('monthly.summary.expenses'))}</div><div data-mo-num="expenses" style="font-family:var(--fm);font-size:16px;font-weight:700;color:var(--red)">${fmt(sel.expenses)}</div></div>
+          <div style="text-align:center"><div style="font-size:9px;color:var(--text3);font-family:var(--fm);letter-spacing:.08em">${esc2(t('monthly.summary.savings'))}</div><div data-mo-num="savings" style="font-family:var(--fm);font-size:16px;font-weight:700;color:var(--amber)">${fmt(sel.savings)}</div></div>
+          <div style="text-align:center"><div style="font-size:9px;color:var(--text3);font-family:var(--fm);letter-spacing:.08em">${esc2(t('monthly.summary.funFund'))}</div><div data-mo-num="funFund" style="font-family:var(--fm);font-size:16px;font-weight:700;color:var(--cyan)">${fmt(sel.funFund)}</div></div>
         </div>
       </div>
     </div>
 
     <div class="two-col">
-      <div class="card"><div class="card-title">Income Streams</div><div id="mo-inc"></div><button class="btn-add" onclick="addMonthlyItem('${selKey}','income')">+ Add Income</button></div>
-      <div class="card"><div class="card-title">Expenses</div><div id="mo-exp"></div><button class="btn-add" onclick="addMonthlyItem('${selKey}','expenses')">+ Add Expense</button></div>
+      <div class="card"><div class="card-title">${esc2(t('monthly.card.income'))}</div><div id="mo-inc"></div><button class="btn-add" onclick="addMonthlyItem('${selKey}','income')">${esc2(t('monthly.btn.addIncome'))}</button></div>
+      <div class="card"><div class="card-title">${esc2(t('monthly.card.expenses'))}</div><div id="mo-exp"></div><button class="btn-add" onclick="addMonthlyItem('${selKey}','expenses')">${esc2(t('monthly.btn.addExpense'))}</button></div>
       <div class="card" style="grid-column:1/-1">
-        <div class="card-title">Monthly Savings Target</div>
+        <div class="card-title">${esc2(t('monthly.card.savingsTarget'))}</div>
         <div style="display:flex;align-items:center;gap:8px;background:var(--bg3);border-radius:8px;padding:4px 14px;max-width:280px">
           <span style="color:var(--text3);font-size:12px;font-family:var(--fm)">${s}</span>
           <input type="number" value="${Math.round(sel.savings*r)}" style="background:transparent;border:none;color:var(--text);font-family:var(--fm);font-size:20px;font-weight:700;padding:10px 0;outline:none;width:200px" oninput="setMonthSavings('${selKey}',this.value/${r})" onchange="commitRender('renderMonthly')">
@@ -7937,6 +7970,12 @@ function renderMonthly() {
     const savingsRunning = FE.months.runningSavings();
     const funFundRunning = FE.months.runningFunFund();
 
+    // Cache resolved labels so liveSyncMonthlyReview can match
+    // against the same translated strings when patching datasets.
+    const _lblIncome   = t('monthly.series.income');
+    const _lblExpenses = t('monthly.series.expenses');
+    const _lblSavRun   = t('monthly.series.savingsRunning');
+    const _lblFunRun   = t('monthly.series.funFundRunning');
     const ctxIE = document.getElementById('mo-chart-ie');
     if(ctxIE){
       charts['mo-ie'] = new Chart(ctxIE.getContext('2d'), {
@@ -7944,8 +7983,8 @@ function renderMonthly() {
         data:{
           labels,
           datasets:[
-            {label:'Income',   data: all.map(m => m.pureIncome),   backgroundColor:'#00e8a028', borderColor:'#00e8a0', borderWidth:1.75, borderRadius:4, categoryPercentage:0.7, barPercentage:0.85},
-            {label:'Expenses', data: all.map(m => m.pureExpenses), backgroundColor:'#ff4d6d22', borderColor:'#ff4d6d', borderWidth:1.75, borderRadius:4, categoryPercentage:0.7, barPercentage:0.85},
+            {label:_lblIncome,   data: all.map(m => m.pureIncome),   backgroundColor:'#00e8a028', borderColor:'#00e8a0', borderWidth:1.75, borderRadius:4, categoryPercentage:0.7, barPercentage:0.85},
+            {label:_lblExpenses, data: all.map(m => m.pureExpenses), backgroundColor:'#ff4d6d22', borderColor:'#ff4d6d', borderWidth:1.75, borderRadius:4, categoryPercentage:0.7, barPercentage:0.85},
           ]
         },
         options:chartPreset()
@@ -7963,11 +8002,11 @@ function renderMonthly() {
             // user's monthly savings target across the 12-month
             // window. Amber dashed line matches the Savings colour
             // used everywhere else in the app.
-            {label:'Savings · running',   data: savingsRunning,  borderColor:'#f5a623', backgroundColor:'#f5a62318', fill:true,  tension:.3, pointRadius:2, pointHoverRadius:4, borderWidth:2, borderDash:[5,4], order:2},
+            {label:_lblSavRun,   data: savingsRunning,  borderColor:'#f5a623', backgroundColor:'#f5a62318', fill:true,  tension:.3, pointRadius:2, pointHoverRadius:4, borderWidth:2, borderDash:[5,4], order:2},
             // Fun Fund · running net flow — the chained value from
             // get12Months() pass 2 which already IS the running
             // Fun Fund balance (monthly allocation + prior carry).
-            {label:'Fun Fund · running',  data: funFundRunning,  borderColor:'#00d4ff', backgroundColor:'#00d4ff18', fill:true,  tension:.3, pointRadius:2, pointHoverRadius:4, borderWidth:2, order:1},
+            {label:_lblFunRun,   data: funFundRunning,  borderColor:'#00d4ff', backgroundColor:'#00d4ff18', fill:true,  tension:.3, pointRadius:2, pointHoverRadius:4, borderWidth:2, order:1},
           ]
         },
         options:chartPreset()
@@ -8028,7 +8067,7 @@ function liveSyncMonthlyReview(selKey){
   if(barFun) barFun.style.width = pctFun + '%';
   // Summary bar label row (Exp X% · Sav Y% · Fun Z%).
   const lbl = host.querySelector('[data-mo-bar-labels]');
-  if(lbl) lbl.innerHTML = `<span>Exp ${Math.round(pctExp)}%</span><span>Sav ${Math.round(pctSav)}%</span><span>Fun ${Math.round(pctFun)}%</span>`;
+  if(lbl) lbl.innerHTML = `<span>${t('monthly.summary.bar.exp', { pct: Math.round(pctExp) })}</span><span>${t('monthly.summary.bar.sav', { pct: Math.round(pctSav) })}</span><span>${t('monthly.summary.bar.fun', { pct: Math.round(pctFun) })}</span>`;
   // Four numeric readouts — textContent only so the surrounding inline
   // styling (colour, font) is preserved untouched.
   const numIncome  = host.querySelector('[data-mo-num="income"]');
@@ -8042,22 +8081,22 @@ function liveSyncMonthlyReview(selKey){
   // Chart datasets — mutate each Chart.js instance's data arrays
   // and call update('none') for a zero-animation live refresh. No
   // canvas teardown, no destroyChart, no focus loss.
+  // Match datasets by index instead of label since the labels are
+  // now translated and could change between renders. Order is
+  // stable: ie chart = [Income, Expenses]; nf chart = [Savings,
+  // Fun Fund running].
   const ieChart = charts['mo-ie'];
   if(ieChart && ieChart.data && Array.isArray(ieChart.data.datasets)){
-    ieChart.data.datasets.forEach(ds => {
-      if(ds.label === 'Income')        ds.data = months.map(m => m.pureIncome);
-      else if(ds.label === 'Expenses') ds.data = months.map(m => m.pureExpenses);
-    });
+    if(ieChart.data.datasets[0]) ieChart.data.datasets[0].data = months.map(m => m.pureIncome);
+    if(ieChart.data.datasets[1]) ieChart.data.datasets[1].data = months.map(m => m.pureExpenses);
     ieChart.update('none');
   }
   const nfChart = charts['mo-nf'];
   if(nfChart && nfChart.data && Array.isArray(nfChart.data.datasets)){
     const savingsRunning = FE.months.runningSavings();
     const funFundRunning = FE.months.runningFunFund();
-    nfChart.data.datasets.forEach(ds => {
-      if(ds.label === 'Savings · running')       ds.data = savingsRunning;
-      else if(ds.label === 'Fun Fund · running') ds.data = funFundRunning;
-    });
+    if(nfChart.data.datasets[0]) nfChart.data.datasets[0].data = savingsRunning;
+    if(nfChart.data.datasets[1]) nfChart.data.datasets[1].data = funFundRunning;
     nfChart.update('none');
   }
 }
