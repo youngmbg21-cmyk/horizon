@@ -810,6 +810,218 @@ body.light .loc-card:hover { box-shadow:0 5px 14px -8px rgba(60,40,10,0.18); }
   color:var(--text); font-weight:700;
 }
 
+/* ── RETIREMENT · PORTFOLIO / PENSION ACCOUNT ROWS ───────
+   Structured, scannable card per account. Left accent bar
+   colours by type (green = investment, amber = pension).
+   Two-row layout: top row is identity (badge + name +
+   delete), bottom row is a grid of labelled field cells
+   and a projected-value chip on the right. */
+.ret-asset {
+  background:var(--bg2);
+  border:1px solid var(--border);
+  border-left:3px solid var(--green);
+  border-radius:10px;
+  padding:12px 14px;
+  margin-bottom:8px;
+  transition:background .15s, border-color .15s;
+}
+.ret-asset:hover { background:var(--bg3); }
+.ret-asset.is-pension { border-left-color:var(--amber); }
+.ret-asset-top {
+  display:flex; align-items:center; gap:10px;
+  margin-bottom:10px;
+}
+.ret-asset-badge {
+  font-family:var(--fm); font-size:9px; font-weight:700;
+  letter-spacing:.08em; text-transform:uppercase;
+  padding:3px 7px; border-radius:3px;
+  background:rgba(34,197,94,.14); color:var(--green);
+  border:1px solid rgba(34,197,94,.35);
+  white-space:nowrap;
+}
+.ret-asset.is-pension .ret-asset-badge {
+  background:rgba(245,158,11,.14); color:var(--amber);
+  border-color:rgba(245,158,11,.4);
+}
+.ret-asset-name {
+  flex:1; min-width:0;
+  background:transparent; border:none;
+  border-bottom:1px dashed transparent;
+  color:var(--text); font-size:13px; font-weight:700;
+  padding:2px 0; outline:none;
+  transition:border-color .15s;
+}
+.ret-asset-name:hover,
+.ret-asset-name:focus { border-bottom-color:var(--border2); }
+.ret-asset-type {
+  background:var(--bg3); border:1px solid var(--border);
+  border-radius:4px; padding:4px 6px;
+  color:var(--text2); font-size:10px;
+  font-family:var(--fm); outline:none; cursor:pointer;
+}
+.ret-asset-rm {
+  width:26px; height:26px; flex-shrink:0;
+  border-radius:6px;
+  background:transparent; border:1px solid var(--border);
+  color:var(--text3); cursor:pointer;
+  font-size:14px; line-height:1;
+  transition:background .15s, color .15s, border-color .15s;
+}
+.ret-asset-rm:hover {
+  background:rgba(239,68,68,.12);
+  border-color:rgba(239,68,68,.45);
+  color:var(--red);
+}
+.ret-asset-grid {
+  display:grid;
+  grid-template-columns:repeat(3, minmax(0,1fr)) auto;
+  gap:10px;
+  align-items:end;
+}
+.ret-asset.is-pension .ret-asset-grid {
+  grid-template-columns:repeat(2, minmax(0,1fr)) auto;
+}
+.ret-asset-cell {
+  display:flex; flex-direction:column; gap:4px;
+  min-width:0;
+}
+.ret-asset-cell label {
+  font-family:var(--fm); font-size:9px;
+  letter-spacing:.08em; text-transform:uppercase;
+  color:var(--text3); font-weight:600;
+}
+.ret-asset-cell .rac-input-wrap {
+  display:flex; align-items:center; gap:4px;
+  background:var(--bg3); border:1px solid var(--border);
+  border-radius:6px; padding:6px 8px;
+  transition:border-color .15s;
+}
+.ret-asset-cell .rac-input-wrap:focus-within {
+  border-color:var(--text3);
+}
+.ret-asset-cell .rac-prefix,
+.ret-asset-cell .rac-suffix {
+  font-family:var(--fm); font-size:11px;
+  color:var(--text3); flex-shrink:0;
+}
+.ret-asset-cell input[type="number"] {
+  flex:1; min-width:0;
+  background:transparent; border:none;
+  color:var(--text); font-family:var(--fm);
+  font-size:12px; font-weight:600;
+  text-align:right; outline:none;
+  padding:0;
+}
+/* Hide browser spinners for a cleaner look */
+.ret-asset-cell input[type="number"]::-webkit-outer-spin-button,
+.ret-asset-cell input[type="number"]::-webkit-inner-spin-button {
+  -webkit-appearance:none; margin:0;
+}
+.ret-asset-cell input[type="number"] { -moz-appearance:textfield; }
+.ret-asset-proj {
+  display:flex; flex-direction:column; align-items:flex-end;
+  justify-content:flex-end;
+  padding:6px 10px;
+  background:rgba(34,197,94,.08);
+  border:1px solid rgba(34,197,94,.25);
+  border-radius:6px;
+  min-width:110px;
+}
+.ret-asset.is-pension .ret-asset-proj {
+  background:rgba(245,158,11,.08);
+  border-color:rgba(245,158,11,.3);
+}
+.ret-asset-proj-lbl {
+  font-family:var(--fm); font-size:8px;
+  letter-spacing:.1em; text-transform:uppercase;
+  color:var(--text3); font-weight:600;
+  margin-bottom:2px;
+}
+.ret-asset-proj-val {
+  font-family:var(--fm); font-size:14px; font-weight:700;
+  color:var(--green); line-height:1.1;
+}
+.ret-asset.is-pension .ret-asset-proj-val { color:var(--amber); }
+.ret-asset-proj-sub {
+  font-size:9px; color:var(--text3);
+  margin-top:1px; white-space:nowrap;
+}
+
+/* ── RETIREMENT · COLLAPSIBLE SECTION — enhanced affordance
+   Make the expand/collapse behaviour immediately obvious:
+   a hover lift, an explicit "CLICK TO EXPAND / COLLAPSE"
+   hint on the right, and a larger chevron in its own chip
+   so users never wonder if the row is interactive. */
+.ret-sec-header {
+  position:relative;
+  border-left:3px solid var(--amber);
+}
+.ret-sec-header:hover {
+  background:var(--bg4);
+}
+.ret-sec-header:hover .ret-sec-toggle-hint {
+  color:var(--amber);
+}
+.ret-sec-arrow {
+  display:inline-flex; align-items:center; justify-content:center;
+  width:22px !important; height:22px;
+  border-radius:50%;
+  background:var(--bg2);
+  border:1px solid var(--border2);
+  color:var(--amber) !important;
+  font-size:11px !important;
+  font-weight:700;
+  transition:transform .2s, background .15s, border-color .15s;
+}
+.ret-sec-header:hover .ret-sec-arrow {
+  background:var(--amber);
+  color:var(--bg1) !important;
+  border-color:var(--amber);
+}
+.ret-sec-toggle-hint {
+  margin-left:auto;
+  font-family:var(--fm); font-size:9px; font-weight:600;
+  letter-spacing:.08em; text-transform:uppercase;
+  color:var(--text3);
+  display:flex; align-items:center; gap:5px;
+  padding:4px 9px;
+  border:1px solid var(--border);
+  border-radius:12px;
+  background:var(--bg2);
+  transition:color .15s, border-color .15s, background .15s;
+  flex-shrink:0;
+}
+.ret-sec-header:hover .ret-sec-toggle-hint {
+  border-color:var(--amber);
+}
+
+/* ── RETIREMENT · PARAMETER HELP BUTTONS ───────────────
+   Small "?" affordance next to financial parameter labels
+   that opens the AI chatbot with a pre-filled question
+   explaining the term + typical industry benchmarks. */
+.field label.field-label-row,
+label.field-label-row {
+  display:flex; align-items:center; gap:6px;
+}
+.field-help-btn {
+  width:16px; height:16px; padding:0;
+  border-radius:50%;
+  background:var(--bg3);
+  border:1px solid var(--border2);
+  color:var(--text3);
+  font-size:10px; font-weight:700;
+  font-family:var(--fm);
+  line-height:1; cursor:pointer;
+  display:inline-flex; align-items:center; justify-content:center;
+  transition:background .15s, color .15s, border-color .15s, transform .15s;
+}
+.field-help-btn:hover {
+  background:var(--cyan);
+  color:var(--bg1);
+  border-color:var(--cyan);
+  transform:scale(1.1);
+}
+
 /* ── DASHBOARD · WELCOMING AI CARD ─────────────────────
    Sits above the KPI rows. Horizontal layout: icon, body
    (headline + sub-line), and a CTA button that fires the
@@ -6971,23 +7183,74 @@ if(!window.retSecOpen) window.retSecOpen={s1:true,s2:true,s3:true};
 
 function toggleRetSec(n){
   window.retSecOpen['s'+n]=!window.retSecOpen['s'+n];
+  const open = window.retSecOpen['s'+n];
   const body=document.getElementById('ret-sec-body-'+n);
   const arrow=document.getElementById('ret-sec-arrow-'+n);
-  if(body){body.style.display=window.retSecOpen['s'+n]?'block':'none';}
-  if(arrow){arrow.textContent=window.retSecOpen['s'+n]?'▾':'▸';}
-  if(n===1&&window.retSecOpen['s'+n]) setTimeout(renderRunwayChart,60);
+  const hint=document.getElementById('ret-sec-hint-'+n);
+  const header=document.querySelector('#ret-sec-'+n+' .ret-sec-header');
+  if(body){body.style.display=open?'block':'none';}
+  if(arrow){arrow.textContent=open?'▾':'▸';}
+  if(hint){hint.textContent=open?'Click to collapse':'Click to expand';}
+  if(header){
+    header.setAttribute('aria-expanded', open?'true':'false');
+    header.setAttribute('title', open?'Click to collapse':'Click to expand');
+  }
+  if(n===1&&open) setTimeout(renderRunwayChart,60);
 }
+
+// Open the AI chatbot and send a pre-built question explaining a
+// Retirement Plan financial parameter. Used by the small "?" buttons
+// next to Growth Rate / Inflation / Post-Ret Growth / Withdrawal Tax
+// fields so users unfamiliar with the term get instant contextual
+// guidance without leaving the page.
+window.askRetirementParamHelp = function(paramKey){
+  const defs = {
+    growthRate: {
+      name: 'Growth Rate (pre-retirement)',
+      current: (state.growthRate ?? 7) + '%',
+    },
+    inflation: {
+      name: 'Inflation Rate',
+      current: (state.inflationRate ?? 2) + '%',
+    },
+    postGrowth: {
+      name: 'Post-Retirement Growth Rate',
+      current: (state.retirementPostGrowth ?? 4) + '%',
+    },
+    withdrawTax: {
+      name: 'Withdrawal Tax Rate',
+      current: (state.withdrawTaxRate ?? 30) + '%',
+    },
+  };
+  const d = defs[paramKey];
+  if(!d) return;
+  const prompt = `Explain the retirement planning parameter "${d.name}" in plain language: what does it represent, how does it affect my projected nest egg and retirement income, and what is the typical industry benchmark or recommended range? My current value is ${d.current}. Is that reasonable, or should I consider adjusting it?`;
+  // Make sure the AI thread is active, then open the panel and send.
+  if(typeof switchChatThread === 'function' && typeof AI_THREAD_ID !== 'undefined'){
+    try { switchChatThread(AI_THREAD_ID); } catch(e){}
+  }
+  openAIPanel();
+  // Wait a frame so the textarea exists, then populate + send.
+  setTimeout(() => {
+    const ta = document.getElementById('aip-input');
+    if(ta){
+      ta.value = prompt;
+      aipSend();
+    }
+  }, 60);
+};
 
 function sectionWrap(n, icon, title, subtitle, content) {
   const open = window.retSecOpen['s'+n];
   return `<div class="ret-section" id="ret-sec-${n}">
-    <div class="ret-sec-header" onclick="toggleRetSec(${n})">
+    <div class="ret-sec-header" onclick="toggleRetSec(${n})" role="button" tabindex="0" aria-expanded="${open?'true':'false'}" title="Click to ${open?'collapse':'expand'}">
       <span class="ret-sec-arrow" id="ret-sec-arrow-${n}">${open?'▾':'▸'}</span>
       <span class="ret-sec-icon">${icon}</span>
       <div>
         <div class="ret-sec-title">${title}</div>
         <div class="ret-sec-sub">${subtitle}</div>
       </div>
+      <span class="ret-sec-toggle-hint" id="ret-sec-hint-${n}">${open?'Click to collapse':'Click to expand'}</span>
     </div>
     <div class="ret-sec-body" id="ret-sec-body-${n}" style="display:${open?'block':'none'}">${content}</div>
   </div>`;
@@ -7196,34 +7459,54 @@ function renderRetirement() {
     // row-level number always matches the Total Projected card and
     // the Longevity Runway nest egg. No inline inflation math.
     const projR = isInv ? FE.projection.perAccountReal(a.id) : 0;
-    const accentColor=isInv?'var(--green)':'var(--amber)';
-    // inp follows the Monthly Review pattern: oninput only updates state +
-    // saves; onchange (fires on commit — blur, Tab, Enter) re-renders.
-    const inp=(val,handler,w='90px')=>`<input type="number" value="${val}" oninput="${handler}" onchange="commitRender('renderRetirement')" style="background:var(--bg3);border:1px solid var(--border);border-radius:4px;padding:5px 7px;color:var(--text);font-family:var(--fm);font-size:12px;outline:none;width:${w};text-align:right">`;
-    return `<div style="display:grid;grid-template-columns:1fr auto;align-items:center;gap:6px;padding:8px 10px;background:var(--bg2);border:1px solid var(--border);border-left:3px solid ${accentColor};border-radius:8px;margin-bottom:6px">
-      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
-        <input value="${esc(a.name)}" oninput="state.externalAssets[${idx}].name=this.value;save()" onchange="commitRender('renderRetirement')" style="font-size:12px;font-weight:700;background:transparent;border:none;border-bottom:1px solid var(--border);color:var(--text);padding-bottom:1px;width:130px;outline:none">
-        <select onchange="state.externalAssets[${idx}].assetType=this.value;save();renderRetirement()" style="background:var(--bg3);border:1px solid var(--border);border-radius:4px;padding:4px 6px;color:var(--text2);font-size:10px;outline:none">
+    // Structured labelled-cell layout. Each field sits in its own
+    // .ret-asset-cell with a small UPPERCASE label above a bordered
+    // input wrap so the row scans cleanly left-to-right and field
+    // boundaries are unambiguous.
+    const numCell = (label, val, handler, prefix='', suffix='') => `
+      <div class="ret-asset-cell">
+        <label>${label}</label>
+        <div class="rac-input-wrap">
+          ${prefix?`<span class="rac-prefix">${prefix}</span>`:''}
+          <input type="number" value="${val}" oninput="${handler}" onchange="commitRender('renderRetirement')">
+          ${suffix?`<span class="rac-suffix">${suffix}</span>`:''}
+        </div>
+      </div>`;
+    const fields = isInv ? `
+      ${numCell('Balance',      Math.round(a.balance*r),             `state.externalAssets[${idx}].balance=this.value/${r};save()`, s)}
+      ${numCell('Contribution', Math.round(a.monthlyContribution*r), `state.externalAssets[${idx}].monthlyContribution=this.value/${r};save()`, s, '/mo')}
+      ${numCell('Growth rate',  gr,                                  `state.externalAssets[${idx}].growthRate=+this.value;save()`, '', '%')}
+    ` : `
+      ${numCell('Payout',   Math.round((a.monthlyPayout||0)*r), `state.externalAssets[${idx}].monthlyPayout=this.value/${r};save()`, s, '/mo')}
+      ${numCell('From age', a.startAge||state.retirementAge,    `state.externalAssets[${idx}].startAge=+this.value;save()`)}
+    `;
+    const projCell = isInv ? `
+      <div class="ret-asset-proj">
+        <div class="ret-asset-proj-lbl">Projected</div>
+        <div class="ret-asset-proj-val">${fmt(projR)}</div>
+        <div class="ret-asset-proj-sub">today's ${s} at age ${state.retirementAge}</div>
+      </div>
+    ` : `
+      <div class="ret-asset-proj">
+        <div class="ret-asset-proj-lbl">Pension income</div>
+        <div class="ret-asset-proj-val">${fmt(a.monthlyPayout||0)}/mo</div>
+        <div class="ret-asset-proj-sub">today's ${s}</div>
+      </div>
+    `;
+    return `<div class="ret-asset${isInv?'':' is-pension'}">
+      <div class="ret-asset-top">
+        <span class="ret-asset-badge">${isInv?'◈ Investment':'🏛 Pension'}</span>
+        <input class="ret-asset-name" value="${esc(a.name)}" placeholder="Account name" oninput="state.externalAssets[${idx}].name=this.value;save()" onchange="commitRender('renderRetirement')">
+        <select class="ret-asset-type" onchange="state.externalAssets[${idx}].assetType=this.value;save();renderRetirement()" title="Change account type">
           <option value="investment" ${isInv?'selected':''}>Investment</option>
           <option value="pension" ${!isInv?'selected':''}>Pension</option>
         </select>
-        ${isInv?`
-          <span style="font-size:10px;color:var(--text3);font-family:var(--fm)">Bal:</span>
-          ${inp(Math.round(a.balance*r),`state.externalAssets[${idx}].balance=this.value/${r};save()`,'100px')}
-          <span style="font-size:10px;color:var(--text3);font-family:var(--fm)">Contrib:</span>
-          ${inp(Math.round(a.monthlyContribution*r),`state.externalAssets[${idx}].monthlyContribution=this.value/${r};save()`,'80px')}
-          <span style="font-size:10px;color:var(--text3);font-family:var(--fm)">Rate:</span>
-          ${inp(gr,`state.externalAssets[${idx}].growthRate=+this.value;save()`,'50px')}%
-          <span style="font-size:11px;color:var(--text3);margin-left:6px">→ <span style="color:var(--green);font-family:var(--fm);font-weight:700;font-size:13px">${fmt(projR)}</span> <span style="font-size:10px">today's kr</span></span>
-        `:`
-          <span style="font-size:10px;color:var(--text3);font-family:var(--fm)">Payout/mo:</span>
-          ${inp(Math.round((a.monthlyPayout||0)*r),`state.externalAssets[${idx}].monthlyPayout=this.value/${r};save()`,'80px')}
-          <span style="font-size:10px;color:var(--text3);font-family:var(--fm)">From age:</span>
-          ${inp(a.startAge||state.retirementAge,`state.externalAssets[${idx}].startAge=+this.value;save()`,'52px')}
-          <span style="font-size:11px;color:var(--text3);margin-left:6px">→ <span style="color:var(--amber);font-family:var(--fm);font-weight:700;font-size:13px">${fmt((a.monthlyPayout||0))}</span> <span style="font-size:10px">/mo pension · today's kr</span></span>
-        `}
+        <button class="ret-asset-rm" onclick="state.externalAssets.splice(${idx},1);save();renderRetirement()" title="Remove account">×</button>
       </div>
-      <button class="line-rm" onclick="state.externalAssets.splice(${idx},1);save();renderRetirement()" style="align-self:center">×</button>
+      <div class="ret-asset-grid">
+        ${fields}
+        ${projCell}
+      </div>
     </div>`;
   }).join('');
 
@@ -7289,10 +7572,10 @@ function renderRetirement() {
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:7px">
               <div class="field"><label>Current Age</label><input type="number" value="${state.currentAge}" oninput="state.currentAge=+this.value;save()" onchange="commitRender('renderRetirement')"></div>
               <div class="field"><label>Retirement Age</label><input type="number" value="${state.retirementAge}" oninput="state.retirementAge=+this.value;save()" onchange="commitRender('renderRetirement')"></div>
-              <div class="field"><label>Growth Rate %</label><input type="number" value="${state.growthRate}" oninput="state.growthRate=+this.value;save()" onchange="commitRender('renderRetirement')"></div>
-              <div class="field"><label>Inflation %</label><input type="number" value="${state.inflationRate}" oninput="state.inflationRate=+this.value;save()" onchange="commitRender('renderRetirement')"></div>
-              <div class="field"><label>Post-Ret Growth %</label><input type="number" value="${state.retirementPostGrowth||4}" oninput="state.retirementPostGrowth=+this.value;save()" onchange="commitRender('renderRetirement')"></div>
-              <div class="field"><label>Withdrawal Tax %</label><input type="number" value="${state.withdrawTaxRate||30}" oninput="state.withdrawTaxRate=+this.value;save()" onchange="commitRender('renderRetirement')"></div>
+              <div class="field"><label class="field-label-row">Growth Rate %<button type="button" class="field-help-btn" onclick="askRetirementParamHelp('growthRate')" title="Ask Horizon AI what this means">?</button></label><input type="number" value="${state.growthRate}" oninput="state.growthRate=+this.value;save()" onchange="commitRender('renderRetirement')"></div>
+              <div class="field"><label class="field-label-row">Inflation %<button type="button" class="field-help-btn" onclick="askRetirementParamHelp('inflation')" title="Ask Horizon AI what this means">?</button></label><input type="number" value="${state.inflationRate}" oninput="state.inflationRate=+this.value;save()" onchange="commitRender('renderRetirement')"></div>
+              <div class="field"><label class="field-label-row">Post-Ret Growth %<button type="button" class="field-help-btn" onclick="askRetirementParamHelp('postGrowth')" title="Ask Horizon AI what this means">?</button></label><input type="number" value="${state.retirementPostGrowth||4}" oninput="state.retirementPostGrowth=+this.value;save()" onchange="commitRender('renderRetirement')"></div>
+              <div class="field"><label class="field-label-row">Withdrawal Tax %<button type="button" class="field-help-btn" onclick="askRetirementParamHelp('withdrawTax')" title="Ask Horizon AI what this means">?</button></label><input type="number" value="${state.withdrawTaxRate||30}" oninput="state.withdrawTaxRate=+this.value;save()" onchange="commitRender('renderRetirement')"></div>
               <div class="field" style="grid-column:1/-1"><label>Life Expectancy</label><input type="number" value="${state.lifeExp||90}" oninput="state.lifeExp=+this.value;save()" onchange="commitRender('renderRetirement')"></div>
             </div>
           </div>
