@@ -3551,6 +3551,72 @@ const STRINGS = {
   // addLocation defaults
   'ra.new.name':            { en:'New Destination',       sv:'Ny destination' },
 
+  // ── Vault ──────────────────────────────────────────────
+  'vault.page.title':       { en:'Vault',                 sv:'Arkiv' },
+  'vault.page.sub':         { en:'Every saved analysis, Deep Dive, and property report lives here. Filter by category, reopen any report for a full read, or tick multiple rows to compare them side by side.',
+                              sv:'Alla sparade analyser, Deep Dives och fastighetsrapporter samlas här. Filtrera efter kategori, öppna en rapport för fullständig läsning eller bocka i flera rader för att jämföra dem sida vid sida.' },
+  // VAULT_CATEGORIES labels
+  'vault.cat.all':           { en:'All',                  sv:'Alla' },
+  'vault.cat.monthly-analysis': { en:'Monthly analysis',  sv:'Månadsanalys' },
+  'vault.cat.retirement-review':{ en:'Retirement review', sv:'Pensionsgenomgång' },
+  'vault.cat.property-report':  { en:'Property report',   sv:'Fastighetsrapport' },
+  'vault.cat.trip-planning':    { en:'Trip planning',     sv:'Resplanering' },
+  'vault.cat.other':            { en:'Other',             sv:'Övrigt' },
+  // List + empty states
+  'vault.list.empty.title': { en:'No saved reports yet',  sv:'Inga sparade rapporter ännu' },
+  'vault.list.empty.sub':   { en:'Save any AI financial analysis from the <strong>Dashboard</strong>, run a <strong>Deep Dive</strong> in Retire Anywhere, or generate a <strong>Property IQ full report</strong> — everything you save will live here, organised by category, so you can compare summaries month over month.',
+                              sv:'Spara en AI-ekonomianalys från <strong>Översikten</strong>, kör en <strong>Deep Dive</strong> i Pensionera var som helst, eller generera en <strong>Property IQ-fullrapport</strong> — allt du sparar samlas här, kategoriserat så att du kan jämföra sammanfattningar månad för månad.' },
+  'vault.list.empty.cta.dash':{ en:'📊 Open Dashboard',   sv:'📊 Öppna översikten' },
+  'vault.list.empty.cta.ra':{ en:'🌍 Open Retire Anywhere',sv:'🌍 Öppna Pensionera var som helst' },
+  'vault.list.empty.cat':   { en:'No reports in this category yet.',
+                              sv:'Inga rapporter i den här kategorin ännu.' },
+  'vault.list.count':       { en:'{n} report{s}',         sv:'{n} rapporter' },
+  'vault.list.empty.label': { en:'Empty',                 sv:'Tomt' },
+  'vault.list.selected':    { en:'{n} selected for compare',
+                              sv:'{n} valda för jämförelse' },
+  // Type badges
+  'vault.badge.analysis':   { en:'ANALYSIS',              sv:'ANALYS' },
+  'vault.badge.deepdive':   { en:'DEEP DIVE',             sv:'DEEP DIVE' },
+  'vault.badge.piq':        { en:'PROPERTY IQ',           sv:'PROPERTY IQ' },
+  'vault.badge.report':     { en:'REPORT',                sv:'RAPPORT' },
+  // Card actions
+  'vault.card.pdfTitle':    { en:'Download as PDF',       sv:'Ladda ned som PDF' },
+  'vault.card.deleteTitle': { en:'Delete',                sv:'Ta bort' },
+  'vault.card.compareTitle':{ en:'Tick to select for compare',
+                              sv:'Bocka i för att välja för jämförelse' },
+  // Compare view
+  'vault.cmp.tag':          { en:'COMPARE · {n} REPORTS',
+                              sv:'JÄMFÖR · {n} RAPPORTER' },
+  'vault.cmp.title':        { en:'Side-by-side snapshot', sv:'Sida-vid-sida-överblick' },
+  'vault.cmp.sub':          { en:'Untick rows on the left to return to single-report mode.',
+                              sv:'Avmarkera rader till vänster för att återgå till enskilt rapportläge.' },
+  'vault.cmp.clear':        { en:'Clear selection',       sv:'Rensa val' },
+  'vault.cmp.metric':       { en:'Metric',                sv:'Mätvärde' },
+  'vault.cmp.row.income':   { en:'Income',                sv:'Inkomst' },
+  'vault.cmp.row.expenses': { en:'Expenses',              sv:'Utgifter' },
+  'vault.cmp.row.savings':  { en:'Savings',               sv:'Sparande' },
+  'vault.cmp.row.funFund':  { en:'Fun Fund',              sv:'Fun Fund' },
+  'vault.cmp.row.funFund12':{ en:'12mo Fun Fund',         sv:'12-mån Fun Fund' },
+  'vault.cmp.row.coverage': { en:'Retire cvg',            sv:'Pensionstäckn.' },
+  'vault.cmp.row.nestEgg':  { en:'Nest egg',              sv:'Pensionskapital' },
+  'vault.cmp.fallbackTitle':{ en:'Report',                sv:'Rapport' },
+  // Open entry view
+  'vault.open.tag.analysis':{ en:'MONTHLY FINANCIAL ANALYSIS',
+                              sv:'MÅNATLIG EKONOMIANALYS' },
+  'vault.open.tag.piq':     { en:'PROPERTY IQ FULL REPORT',
+                              sv:'PROPERTY IQ FULLSTÄNDIG RAPPORT' },
+  'vault.open.tag.deepdive':{ en:'DEEP DIVE REPORT',      sv:'DEEP DIVE-RAPPORT' },
+  'vault.open.tag.default': { en:'REPORT',                sv:'RAPPORT' },
+  'vault.open.tailored':    { en:' · tailored for {cz} citizen based in {hb}',
+                              sv:' · anpassad för {cz}-medborgare baserad i {hb}' },
+  'vault.open.pdf':         { en:'📄 Download PDF',       sv:'📄 Ladda ned PDF' },
+  'vault.open.empty.right': { en:'Select a report on the left to read it — or tick 2+ rows to compare them side by side.',
+                              sv:'Välj en rapport till vänster för att läsa den — eller bocka i 2+ rader för att jämföra dem sida vid sida.' },
+  // Stale-language chip on cached reports
+  'vault.lang.stale':       { en:'⚠ This report was generated in {other}.',
+                              sv:'⚠ Den här rapporten genererades på {other}.' },
+  'vault.section.fallback': { en:'—',                     sv:'—' },
+
   // ── Property IQ · panel chrome ─────────────────────────
   'piq.page.tag':           { en:'REAL ESTATE INTELLIGENCE',
                               sv:'FASTIGHETSINTELLIGENS' },
@@ -11552,48 +11618,62 @@ function renderVault(){
   const counts = {};
   entries.forEach(e => { counts[e.category] = (counts[e.category] || 0) + 1; });
   counts.all = entries.length;
+  // Resolve a category's display label via t('vault.cat.<key>'),
+  // falling back to the literal label baked into VAULT_CATEGORIES
+  // for any future categories that don't yet have an entry.
+  const catLabelOf = (key, fallback) => {
+    const k = 'vault.cat.'+key;
+    return STRINGS[k] ? t(k) : (fallback || key);
+  };
   const chips = VAULT_CATEGORIES.map(c => {
     const n = counts[c.key] || 0;
     const active = c.key === activeCat ? ' active' : '';
     const dim = (c.key !== 'all' && n === 0) ? ' dim' : '';
     return `<button class="vault-chip${active}${dim}" onclick="setVaultFilter('${c.key}')">
-      <span class="ic">${c.icon}</span><span>${c.label}</span><span class="n">${n}</span>
+      <span class="ic">${c.icon}</span><span>${esc2(catLabelOf(c.key, c.label))}</span><span class="n">${n}</span>
     </button>`;
   }).join('');
+
+  // Locale-aware dates inside the list.
+  const dLocale = state.lang === 'sv' ? 'sv-SE' : undefined;
 
   const list = !hasReports
     ? `<div class="state state-empty" style="margin-top:14px">
         <div class="state-icon">🗄</div>
-        <div class="state-title">No saved reports yet</div>
-        <div class="state-sub">Save any AI financial analysis from the <strong>Dashboard</strong>, run a <strong>Deep Dive</strong> in Retire Anywhere, or generate a <strong>Property IQ full report</strong> — everything you save will live here, organised by category, so you can compare summaries month over month.</div>
+        <div class="state-title">${esc2(t('vault.list.empty.title'))}</div>
+        <div class="state-sub">${t('vault.list.empty.sub')}</div>
         <div class="state-cta">
-          <button class="btn btn-o btn-sm" onclick="nav('dashboard')">📊 Open Dashboard</button>
-          <button class="btn btn-o btn-sm" onclick="nav('retireanywhere')">🌍 Open Retire Anywhere</button>
+          <button class="btn btn-o btn-sm" onclick="nav('dashboard')">${esc2(t('vault.list.empty.cta.dash'))}</button>
+          <button class="btn btn-o btn-sm" onclick="nav('retireanywhere')">${esc2(t('vault.list.empty.cta.ra'))}</button>
         </div>
       </div>`
     : (visible.length === 0
-      ? `<div class="state state-empty" style="margin-top:14px"><div class="state-sub">No reports in this category yet.</div></div>`
+      ? `<div class="state state-empty" style="margin-top:14px"><div class="state-sub">${esc2(t('vault.list.empty.cat'))}</div></div>`
       : visible.map(e => {
           const d = new Date(e.when || Date.now());
-          const dateLabel = d.toLocaleDateString(undefined, {day:'numeric',month:'short',year:'numeric'});
-          const timeLabel = d.toLocaleTimeString(undefined, {hour:'2-digit',minute:'2-digit'});
+          const dateLabel = d.toLocaleDateString(dLocale, {day:'numeric',month:'short',year:'numeric'});
+          const timeLabel = d.toLocaleTimeString(dLocale, {hour:'2-digit',minute:'2-digit'});
           const active = e.id === openId ? ' active' : '';
           const isSel = selectedIds.includes(e.id);
           const selAttr = isSel ? ' checked' : '';
-          const kindBadgeLabel = e.kind === 'analysis' ? 'ANALYSIS' : e.kind === 'piq' ? 'PROPERTY IQ' : e.kind === 'deepdive' ? 'DEEP DIVE' : 'REPORT';
+          const kindBadgeLabel = e.kind === 'analysis' ? t('vault.badge.analysis')
+                              : e.kind === 'piq' ? t('vault.badge.piq')
+                              : e.kind === 'deepdive' ? t('vault.badge.deepdive')
+                              : t('vault.badge.report');
           const kindBadgeCls = e.kind === 'analysis' ? 'analysis' : e.kind === 'piq' ? 'piq' : 'deepdive';
           const catMeta = VAULT_CATEGORIES.find(c => c.key === e.category) || { label: e.category || 'Other', icon: '🔖' };
+          const catLabel = catLabelOf(catMeta.key || e.category, catMeta.label);
           return `<div class="vault-card${active}${isSel?' selected':''}" onclick="openVaultEntry('${e.id}')">
-            <label class="vault-card-sel" onclick="event.stopPropagation()" title="Tick to select for compare">
+            <label class="vault-card-sel" onclick="event.stopPropagation()" title="${esc2(t('vault.card.compareTitle'))}">
               <input type="checkbox" ${selAttr} onchange="toggleVaultSelect('${e.id}',this.checked)">
               <span aria-hidden="true"></span>
             </label>
             <div class="vault-card-icon">${e.icon}</div>
             <div class="vault-card-body">
-              <div class="vault-card-kind"><span class="vault-type-badge ${kindBadgeCls}">${kindBadgeLabel}</span></div>
+              <div class="vault-card-kind"><span class="vault-type-badge ${kindBadgeCls}">${esc2(kindBadgeLabel)}</span></div>
               <div class="vault-card-title">${esc2(e.title)}</div>
               <div class="vault-card-meta">
-                <span class="vault-card-cat"><span class="ic">${catMeta.icon}</span>${esc2(catMeta.label)}</span>
+                <span class="vault-card-cat"><span class="ic">${catMeta.icon}</span>${esc2(catLabel)}</span>
                 <span class="vault-card-dot" aria-hidden="true">·</span>
                 <span class="vault-card-date">${esc2(dateLabel)}</span>
                 <span class="vault-card-dot" aria-hidden="true">·</span>
@@ -11601,8 +11681,8 @@ function renderVault(){
               </div>
             </div>
             <div class="vault-card-actions" onclick="event.stopPropagation()">
-              ${e.markdown ? `<button class="vault-card-act" onclick="exportVaultEntryPdf('${e.id}')" title="Download as PDF">📄</button>` : ''}
-              <button class="vault-card-act danger" onclick="deleteVaultEntry('${e.id}')" title="Delete">✕</button>
+              ${e.markdown ? `<button class="vault-card-act" onclick="exportVaultEntryPdf('${e.id}')" title="${esc2(t('vault.card.pdfTitle'))}">📄</button>` : ''}
+              <button class="vault-card-act danger" onclick="deleteVaultEntry('${e.id}')" title="${esc2(t('vault.card.deleteTitle'))}">✕</button>
             </div>
           </div>`;
         }).join(''));
@@ -11619,34 +11699,39 @@ function renderVault(){
       const snaps = compareEntries.filter(e => e.snapshot);
       if(snaps.length === 0) return '';
       const headers = snaps.map(e => `<th>${esc2(e.snapshot.month || _fmtWhen(e.when))}</th>`).join('');
-      const row = (label, pick, fmtFn) => `<tr><td>${label}</td>${snaps.map(e=>`<td>${fmtFn((e.snapshot||{})[pick])}</td>`).join('')}</tr>`;
+      const row = (label, pick, fmtFn) => `<tr><td>${esc2(label)}</td>${snaps.map(e=>`<td>${fmtFn((e.snapshot||{})[pick])}</td>`).join('')}</tr>`;
+      const dash = t('vault.section.fallback');
       return `<div class="vault-compare-snap">
         <table class="vault-compare-tbl">
-          <thead><tr><th>Metric</th>${headers}</tr></thead>
+          <thead><tr><th>${esc2(t('vault.cmp.metric'))}</th>${headers}</tr></thead>
           <tbody>
-            ${row('Income',     'income',     v => v!=null?fmt(v):'—')}
-            ${row('Expenses',   'expenses',   v => v!=null?fmt(v):'—')}
-            ${row('Savings',    'savings',    v => v!=null?fmt(v):'—')}
-            ${row('Fun Fund',   'funFund',    v => v!=null?fmt(v):'—')}
-            ${row('12mo Fun Fund','funFund12mo', v => v!=null?fmt(v):'—')}
-            ${row('Retire cvg', 'coveragePct', v => v!=null?v.toFixed(0)+'%':'—')}
-            ${row('Nest egg',   'nestEgg',    v => v!=null?fmt(v):'—')}
+            ${row(t('vault.cmp.row.income'),    'income',      v => v!=null?fmt(v):dash)}
+            ${row(t('vault.cmp.row.expenses'),  'expenses',    v => v!=null?fmt(v):dash)}
+            ${row(t('vault.cmp.row.savings'),   'savings',     v => v!=null?fmt(v):dash)}
+            ${row(t('vault.cmp.row.funFund'),   'funFund',     v => v!=null?fmt(v):dash)}
+            ${row(t('vault.cmp.row.funFund12'), 'funFund12mo', v => v!=null?fmt(v):dash)}
+            ${row(t('vault.cmp.row.coverage'),  'coveragePct', v => v!=null?v.toFixed(0)+'%':dash)}
+            ${row(t('vault.cmp.row.nestEgg'),   'nestEgg',     v => v!=null?fmt(v):dash)}
           </tbody>
         </table>
       </div>`;
     })();
     // Section-by-section grid — one column per selected report.
+    // Section titles flip via t('dash.report.<key>') so they
+    // match the live Dashboard cards in whichever language the
+    // user is in.
+    const dash = t('vault.section.fallback');
     const cols = compareEntries.map(e => {
       const secs = e.sections;
       const when = _fmtWhen(e.when);
       const bodies = secs
         ? DASH_REPORT_SECTIONS.map(s => `
             <div class="vault-cmp-sec">
-              <div class="vault-cmp-sec-hd">${s.icon} ${s.title}</div>
-              ${secs[s.key] ? _renderAISectionBody(secs[s.key]) : '<div class="md" style="color:var(--text3);font-style:italic">—</div>'}
+              <div class="vault-cmp-sec-hd">${s.icon} ${esc2(t('dash.report.'+s.key))}</div>
+              ${secs[s.key] ? _renderAISectionBody(secs[s.key]) : `<div class="md" style="color:var(--text3);font-style:italic">${dash}</div>`}
             </div>
           `).join('')
-        : `<div class="vault-cmp-sec"><div class="vault-cmp-sec-hd">Report</div>${mdParse(e.markdown || '')}</div>`;
+        : `<div class="vault-cmp-sec"><div class="vault-cmp-sec-hd">${esc2(t('vault.cmp.fallbackTitle'))}</div>${mdParse(e.markdown || '')}</div>`;
       return `<div class="vault-cmp-col">
         <div class="vault-cmp-col-hd">
           <div class="vault-cmp-col-title">${esc2(e.title)}</div>
@@ -11658,60 +11743,76 @@ function renderVault(){
     rightPane = `<div class="vault-compare">
       <div class="vault-compare-head">
         <div>
-          <div class="vault-open-tag">COMPARE · ${compareEntries.length} REPORTS</div>
-          <div class="vault-open-title">Side-by-side snapshot</div>
-          <div class="vault-open-sub">Untick rows on the left to return to single-report mode.</div>
+          <div class="vault-open-tag">${esc2(t('vault.cmp.tag', { n: compareEntries.length }))}</div>
+          <div class="vault-open-title">${esc2(t('vault.cmp.title'))}</div>
+          <div class="vault-open-sub">${esc2(t('vault.cmp.sub'))}</div>
         </div>
-        <button class="btn btn-o btn-sm" onclick="clearVaultSelection()">Clear selection</button>
+        <button class="btn btn-o btn-sm" onclick="clearVaultSelection()">${esc2(t('vault.cmp.clear'))}</button>
       </div>
       ${snapRow}
       <div class="vault-compare-grid">${cols}</div>
     </div>`;
   } else if(open){
-    const catLabel = (VAULT_CATEGORIES.find(c => c.key === open.category) || {}).label || open.category;
-    const openTag = open.kind === 'analysis' ? 'MONTHLY FINANCIAL ANALYSIS'
-                  : open.kind === 'piq' ? 'PROPERTY IQ FULL REPORT'
-                  : open.kind === 'deepdive' ? 'DEEP DIVE REPORT' : 'REPORT';
+    const catMeta = VAULT_CATEGORIES.find(c => c.key === open.category) || {};
+    const catLabel = catLabelOf(catMeta.key || open.category, catMeta.label || open.category);
+    const openTag = open.kind === 'analysis' ? t('vault.open.tag.analysis')
+                  : open.kind === 'piq' ? t('vault.open.tag.piq')
+                  : open.kind === 'deepdive' ? t('vault.open.tag.deepdive')
+                  : t('vault.open.tag.default');
     const tailored = open.raw && open.raw.citizenship
-      ? ` · tailored for ${esc2((countryInfo(open.raw.citizenship)||{}).name||open.raw.citizenship)} citizen based in ${esc2((countryInfo(open.raw.homeBase)||{}).name||open.raw.homeBase||'')}`
+      ? t('vault.open.tailored', {
+          cz: esc2((countryInfo(open.raw.citizenship)||{}).name||open.raw.citizenship),
+          hb: esc2((countryInfo(open.raw.homeBase)||{}).name||open.raw.homeBase||''),
+        })
+      : '';
+    // Stale-language banner — surfaces when the cached report's
+    // language doesn't match the current UI language so the user
+    // knows the prose inside is in a different language. Not a
+    // blocker — Phase 4's Dashboard chip already provides the
+    // regenerate path.
+    const reportLang = open.raw && open.raw.lang;
+    const langStaleHtml = (reportLang && reportLang !== state.lang)
+      ? `<div class="dash-ai-lang-stale" style="margin:10px 0;padding:8px 12px;background:rgba(245,158,11,.10);border:1px solid rgba(245,158,11,.35);border-radius:8px;font-size:11px;color:var(--text2)">${t('vault.lang.stale', { other: t('lang.label.'+reportLang) })}</div>`
       : '';
     // For analyses, render the four structured sections. For deep
     // dives / PIQ, keep the existing full-markdown body.
+    const dash = t('vault.section.fallback');
     const body = (open.kind === 'analysis' && open.sections)
       ? DASH_REPORT_SECTIONS.map(s => `
           <div class="dash-ai-sec ${s.cls}" style="margin-bottom:12px">
-            <div class="dash-ai-sec-hd"><span class="ic">${s.icon}</span><span>${s.title}</span></div>
-            ${open.sections[s.key] ? _renderAISectionBody(open.sections[s.key]) : '<div class="md" style="color:var(--text3);font-style:italic">—</div>'}
+            <div class="dash-ai-sec-hd"><span class="ic">${s.icon}</span><span>${esc2(t('dash.report.'+s.key))}</span></div>
+            ${open.sections[s.key] ? _renderAISectionBody(open.sections[s.key]) : `<div class="md" style="color:var(--text3);font-style:italic">${dash}</div>`}
           </div>
         `).join('')
       : mdParse(open.markdown || '');
     rightPane = `<div class="vault-open">
       <div class="vault-open-head">
         <div>
-          <div class="vault-open-tag">${openTag} · ${esc2(catLabel)}</div>
+          <div class="vault-open-tag">${esc2(openTag)} · ${esc2(catLabel)}</div>
           <div class="vault-open-title">${esc2(open.title)}</div>
           <div class="vault-open-sub">${esc2(_fmtWhen(open.when))}${tailored}</div>
         </div>
         <div class="vault-open-actions">
-          ${open.markdown ? `<button class="btn btn-g btn-sm" onclick="exportVaultEntryPdf('${open.id}')">📄 Download PDF</button>` : ''}
+          ${open.markdown ? `<button class="btn btn-g btn-sm" onclick="exportVaultEntryPdf('${open.id}')">${esc2(t('vault.open.pdf'))}</button>` : ''}
         </div>
       </div>
+      ${langStaleHtml}
       <div class="vault-open-body">${body}</div>
     </div>`;
   } else {
     rightPane = hasReports
-      ? `<div class="state state-empty"><div class="state-sub">Select a report on the left to read it — or tick 2+ rows to compare them side by side.</div></div>`
+      ? `<div class="state state-empty"><div class="state-sub">${esc2(t('vault.open.empty.right'))}</div></div>`
       : '';
   }
 
   el.innerHTML = `
-    ${ui.ph({tag:'LIBRARY', title:'Vault', sub:'Every saved analysis, Deep Dive, and property report lives here. Filter by category, reopen any report for a full read, or tick multiple rows to compare them side by side.'})}
+    ${ui.ph({tag:t('sb.group.library'), title:t('vault.page.title'), sub:t('vault.page.sub')})}
     <div class="vault-chips">${chips}</div>
     <div class="vault-grid">
       <div class="vault-list-wrap">
         <div class="vault-list-head">
-          ${visible.length ? `${visible.length} report${visible.length===1?'':'s'}` : 'Empty'}
-          ${selectedIds.length >= 2 ? `<span class="vault-list-sel">${selectedIds.length} selected for compare</span>` : ''}
+          ${visible.length ? esc2(t('vault.list.count', { n: visible.length, s: visible.length===1?'':'s' })) : esc2(t('vault.list.empty.label'))}
+          ${selectedIds.length >= 2 ? `<span class="vault-list-sel">${esc2(t('vault.list.selected', { n: selectedIds.length }))}</span>` : ''}
         </div>
         <div class="vault-list">${list}</div>
       </div>
