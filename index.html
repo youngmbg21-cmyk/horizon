@@ -3454,6 +3454,72 @@ const STRINGS = {
   'dash.report.concern':    { en:'Areas of concern',            sv:'Områden att hålla koll på' },
   'dash.report.recs':       { en:'Recommendations',             sv:'Rekommendationer' },
 
+  // ── Retirement · Income Requirements (top block) ──────
+  'ireq.title':             { en:'Income Requirements',
+                              sv:'Inkomstbehov' },
+  'ireq.sub':               { en:'What your retirement expenses demand from your portfolio ({scenario}) · all values in <strong>today\u2019s money</strong>',
+                              sv:'Vad dina pensionsutgifter kräver av din portfölj ({scenario}) · alla värden i <strong>dagens penningvärde</strong>' },
+  'ireq.kpi.expensesAfterTax': { en:'Expenses (after tax)',
+                                 sv:'Utgifter (efter skatt)' },
+  'ireq.kpi.expensesSub':   { en:'{yr}/yr · today\u2019s money',
+                              sv:'{yr}/år · dagens penningvärde' },
+  'ireq.kpi.grossNeeded':   { en:'Total gross income needed',
+                              sv:'Total bruttoinkomst som behövs' },
+  'ireq.kpi.grossSub':      { en:'{yr}/yr · \u00f7(1\u2212{pct}% tax) · today\u2019s money',
+                              sv:'{yr}/år · \u00f7(1\u2212{pct}% skatt) · dagens penningvärde' },
+  'ireq.kpi.pensionCovers': { en:'Pension covers',
+                              sv:'Pensionen täcker' },
+  'ireq.kpi.pensionSub':    { en:'{pct}% of need · avg across retirement',
+                              sv:'{pct}% av behov · snitt över pension' },
+  'ireq.kpi.avgWithdrawal': { en:'Avg portfolio withdrawal',
+                              sv:'Snittuttag ur portfölj' },
+  'ireq.kpi.avgSub.withPension': { en:'{yr}/yr · after pension offset · today\u2019s money',
+                                   sv:'{yr}/år · efter pensionsavdrag · dagens penningvärde' },
+  'ireq.kpi.avgSub.weighted':    { en:'{yr}/yr · weighted across phases · today\u2019s money',
+                                   sv:'{yr}/år · viktat över faser · dagens penningvärde' },
+  'ireq.kpi.avgRate':       { en:'Avg withdrawal rate',
+                              sv:'Genomsnittlig uttagsgrad' },
+  'ireq.kpi.avgRate.above': { en:'Above the 4% safe rate',
+                              sv:'Över den säkra 4%-grensen' },
+  'ireq.kpi.avgRate.within':{ en:'Within the 4% safe rate',
+                              sv:'Inom den säkra 4%-grensen' },
+  'ireq.kpi.depletion':     { en:'Fund depletion',
+                              sv:'Portföljens tömning' },
+  'ireq.kpi.depletion.age': { en:'Age {age}',             sv:'Ålder {age}' },
+  'ireq.kpi.depletion.never':{en:'Never',                 sv:'Aldrig' },
+  'ireq.kpi.depletion.runs': { en:'Runs out before life exp.',
+                              sv:'Tar slut före förväntad livslängd' },
+  'ireq.kpi.depletion.surplus':{ en:'Surplus at {age}+',
+                                 sv:'Överskott vid {age}+' },
+
+  // Formula line
+  'ireq.formula.expenses':  { en:'<strong>{mo}/mo</strong> expenses',
+                              sv:'<strong>{mo}/mån</strong> utgifter' },
+  'ireq.formula.grossNeeded':{en:'= <strong>{mo}</strong> gross needed',
+                              sv:'= <strong>{mo}</strong> brutto som behövs' },
+  'ireq.formula.pension':   { en:'<strong>{mo}/mo</strong> pension',
+                              sv:'<strong>{mo}/mån</strong> pension' },
+  'ireq.formula.portBurden':{ en:'<strong>{mo}/mo</strong> portfolio burden',
+                              sv:'<strong>{mo}/mån</strong> portföljbörda' },
+  'ireq.formula.portAvg':   { en:'<strong>{mo}/mo</strong> avg from portfolio',
+                              sv:'<strong>{mo}/mån</strong> snitt ur portfölj' },
+  'ireq.formula.nestEgg':   { en:'<strong>{amt}</strong> nest egg',
+                              sv:'<strong>{amt}</strong> pensionskapital' },
+  'ireq.formula.avgRate':   { en:'<strong>{pct}%</strong> avg withdrawal rate',
+                              sv:'<strong>{pct}%</strong> snittuttagsgrad' },
+
+  // Phase split cards
+  'ireq.phase1.label':      { en:'PHASE 1: AGE {a}\u2013{b} ({years} year{s}, no pension)',
+                              sv:'FAS 1: ÅLDER {a}\u2013{b} ({years} år, ingen pension)' },
+  'ireq.phase2.label':      { en:'PHASE 2: AGE {age}+ (pension active)',
+                              sv:'FAS 2: ÅLDER {age}+ (pension aktiv)' },
+  'ireq.phase.portWithdraw':{ en:'Portfolio withdrawal',
+                              sv:'Portföljuttag' },
+  'ireq.phase.pensionIncome':{en:'Pension income',
+                              sv:'Pensionsinkomst' },
+  'ireq.phase.withdrawRate':{ en:'Withdrawal rate',
+                              sv:'Uttagsgrad' },
+
   // ── Retirement · s1 Sustainability & Runway block ─────
   's1.eyebrow':             { en:'RETIREMENT SUSTAINABILITY',
                               sv:'PENSIONENS HÅLLBARHET' },
@@ -8138,7 +8204,10 @@ function renderRetirement() {
     const p1PortAnnual = grossAnnual; // no pension offset in this period
     const p1Rate = nums.nestEgg > 0 ? (p1PortAnnual / nums.nestEgg) * 100 : 0;
     phase1 = {
-      label: `PHASE 1: AGE ${p1Start}–${p1EndExclusive - 1} (${p1Years} year${p1Years!==1?'s':''}, no pension)`,
+      label: t('ireq.phase1.label', {
+        a: p1Start, b: p1EndExclusive - 1,
+        years: p1Years, s: p1Years !== 1 ? 's' : '',
+      }),
       portMonthly: grossMonthly,
       pensionMonthly: 0,
       withdrawalRate: p1Rate,
@@ -8149,15 +8218,19 @@ function renderRetirement() {
     const p2PortAvgAnnual  = p2Years > 0 ? cdataReq.portWithdrawal.slice(p2Idx).reduce((a,b)=>a+b,0)/p2Years : 0;
     const p2PenAvgAnnual   = p2Years > 0 ? cdataReq.pensionData.slice(p2Idx).reduce((a,b)=>a+b,0)/p2Years    : 0;
     phase2 = {
-      label: `PHASE 2: AGE ${earliestPension}+ (pension active)`,
+      label: t('ireq.phase2.label', { age: earliestPension }),
       portMonthly: p2PortAvgAnnual / 12,
       pensionMonthly: p2PenAvgAnnual / 12,
       withdrawalRate: nums.nestEgg > 0 ? (p2PortAvgAnnual / nums.nestEgg) * 100 : 0,
     };
   }
-  const fundDepletionLabel = nums.runoutAge ? `Age ${Math.round(nums.runoutAge)}` : 'Never';
+  const fundDepletionLabel = nums.runoutAge
+    ? t('ireq.kpi.depletion.age', { age: Math.round(nums.runoutAge) })
+    : t('ireq.kpi.depletion.never');
   const fundDepletionTone  = nums.runoutAge ? 'neg' : 'pos';
-  const fundDepletionSub   = nums.runoutAge ? `Runs out before life exp.` : `Surplus at ${lifeExpReq}+`;
+  const fundDepletionSub   = nums.runoutAge
+    ? t('ireq.kpi.depletion.runs')
+    : t('ireq.kpi.depletion.surplus', { age: lifeExpReq });
 
   // ── SECTION 1: SUSTAINABILITY & RUNWAY ──────────────────────────────────────
   // Dynamic fragments for the verdict summary line — each one
@@ -8467,73 +8540,75 @@ function renderRetirement() {
     </div>`;
 
   // ── INCOME REQUIREMENTS SECTION (top of the tab) ────────────────────────
+  const avgSubKey = nums.pensionAvgMonthly > 0 ? 'ireq.kpi.avgSub.withPension' : 'ireq.kpi.avgSub.weighted';
+  const avgRateSub = avgWithdrawalRate > 4 ? t('ireq.kpi.avgRate.above') : t('ireq.kpi.avgRate.within');
   const ireq = `
     <div class="card ireq-card">
       <div class="ireq-head">
-        <div class="ireq-title">Income Requirements</div>
-        <div class="ireq-sub">What your retirement expenses demand from your portfolio (${esc(scenLabels[sc]||'Baseline')}) · all values in <strong>today&rsquo;s money</strong></div>
+        <div class="ireq-title">${esc2(t('ireq.title'))}</div>
+        <div class="ireq-sub">${t('ireq.sub', { scenario: esc2(scenLabel(sc)) })}</div>
       </div>
       <div class="ireq-kpi-row">
         <div class="ireq-kpi">
-          <div class="ireq-kpi-lbl">Expenses (after tax)</div>
+          <div class="ireq-kpi-lbl">${esc2(t('ireq.kpi.expensesAfterTax'))}</div>
           <div class="ireq-kpi-val">${fmt(expensesMonthly)}</div>
-          <div class="ireq-kpi-sub">${fmt(expensesAnnual)}/yr · today&rsquo;s money</div>
+          <div class="ireq-kpi-sub">${t('ireq.kpi.expensesSub', { yr: fmt(expensesAnnual) })}</div>
         </div>
         <div class="ireq-kpi">
-          <div class="ireq-kpi-lbl">Total gross income needed</div>
+          <div class="ireq-kpi-lbl">${esc2(t('ireq.kpi.grossNeeded'))}</div>
           <div class="ireq-kpi-val">${fmt(grossMonthly)}</div>
-          <div class="ireq-kpi-sub">${fmt(grossAnnual)}/yr · ÷(1−${taxPct}% tax) · today&rsquo;s money</div>
+          <div class="ireq-kpi-sub">${t('ireq.kpi.grossSub', { yr: fmt(grossAnnual), pct: taxPct })}</div>
         </div>
         ${nums.pensionAvgMonthly > 0 ? `
         <div class="ireq-kpi">
-          <div class="ireq-kpi-lbl">Pension covers</div>
+          <div class="ireq-kpi-lbl">${esc2(t('ireq.kpi.pensionCovers'))}</div>
           <div class="ireq-kpi-val ireq-blue">${fmt(nums.pensionAvgMonthly)}</div>
-          <div class="ireq-kpi-sub">${nums.pensionShareOfNeed.toFixed(0)}% of need · avg across retirement</div>
+          <div class="ireq-kpi-sub">${t('ireq.kpi.pensionSub', { pct: nums.pensionShareOfNeed.toFixed(0) })}</div>
         </div>` : ''}
         <div class="ireq-kpi">
-          <div class="ireq-kpi-lbl">Avg portfolio withdrawal</div>
+          <div class="ireq-kpi-lbl">${esc2(t('ireq.kpi.avgWithdrawal'))}</div>
           <div class="ireq-kpi-val ireq-amber">${fmt(avgPortMonthly)}</div>
-          <div class="ireq-kpi-sub">${fmt(avgPortAnnual)}/yr · ${nums.pensionAvgMonthly > 0 ? 'after pension offset' : 'weighted across phases'} · today&rsquo;s money</div>
+          <div class="ireq-kpi-sub">${t(avgSubKey, { yr: fmt(avgPortAnnual) })}</div>
         </div>
         <div class="ireq-kpi">
-          <div class="ireq-kpi-lbl">Avg withdrawal rate</div>
+          <div class="ireq-kpi-lbl">${esc2(t('ireq.kpi.avgRate'))}</div>
           <div class="ireq-kpi-val ${avgWithdrawalRate>4?'ireq-red':'ireq-green'}">${avgWithdrawalRate.toFixed(1)}%</div>
-          <div class="ireq-kpi-sub">${avgWithdrawalRate>4?'Above':'Within'} the 4% safe rate</div>
+          <div class="ireq-kpi-sub">${esc2(avgRateSub)}</div>
         </div>
         <div class="ireq-kpi">
-          <div class="ireq-kpi-lbl">Fund depletion</div>
-          <div class="ireq-kpi-val ${fundDepletionTone==='neg'?'ireq-red':'ireq-green'}">${fundDepletionLabel}</div>
-          <div class="ireq-kpi-sub">${fundDepletionSub}</div>
+          <div class="ireq-kpi-lbl">${esc2(t('ireq.kpi.depletion'))}</div>
+          <div class="ireq-kpi-val ${fundDepletionTone==='neg'?'ireq-red':'ireq-green'}">${esc2(fundDepletionLabel)}</div>
+          <div class="ireq-kpi-sub">${esc2(fundDepletionSub)}</div>
         </div>
       </div>
       <div class="ireq-formula">
-        <span><strong>${fmt(expensesMonthly)}/mo</strong> expenses</span>
+        <span>${t('ireq.formula.expenses', { mo: fmt(expensesMonthly) })}</span>
         <span class="ireq-formula-op">÷ ${(1-nums.taxRate).toFixed(2)}</span>
-        <span>= <strong>${fmt(grossMonthly)}</strong> gross needed</span>
+        <span>${t('ireq.formula.grossNeeded', { mo: fmt(grossMonthly) })}</span>
         ${nums.pensionAvgMonthly > 0 ? `
           <span class="ireq-formula-op">−</span>
-          <span class="ireq-blue"><strong>${fmt(nums.pensionAvgMonthly)}/mo</strong> pension</span>
+          <span class="ireq-blue">${t('ireq.formula.pension', { mo: fmt(nums.pensionAvgMonthly) })}</span>
         ` : ''}
         <span class="ireq-formula-op">=</span>
-        <span class="ireq-amber"><strong>${fmt(avgPortMonthly)}/mo</strong> ${nums.pensionAvgMonthly > 0 ? 'portfolio burden' : 'avg from portfolio'}</span>
+        <span class="ireq-amber">${t(nums.pensionAvgMonthly > 0 ? 'ireq.formula.portBurden' : 'ireq.formula.portAvg', { mo: fmt(avgPortMonthly) })}</span>
         <span class="ireq-formula-op">→ ÷</span>
-        <span><strong>${fmt(nums.nestEgg)}</strong> nest egg</span>
+        <span>${t('ireq.formula.nestEgg', { amt: fmt(nums.nestEgg) })}</span>
         <span class="ireq-formula-op">=</span>
-        <span class="${avgWithdrawalRate>4?'ireq-red':'ireq-green'}"><strong>${avgWithdrawalRate.toFixed(1)}%</strong> avg withdrawal rate</span>
+        <span class="${avgWithdrawalRate>4?'ireq-red':'ireq-green'}">${t('ireq.formula.avgRate', { pct: avgWithdrawalRate.toFixed(1) })}</span>
       </div>
       ${hasPhaseSplit ? `
       <div class="ireq-phases">
         <div class="ireq-phase ireq-phase-1">
           <div class="ireq-phase-lbl">${esc(phase1.label)}</div>
-          <div class="ireq-phase-row"><span>Portfolio withdrawal</span><span class="ireq-amber">${fmt(phase1.portMonthly)}/mo</span></div>
-          <div class="ireq-phase-row"><span>Pension income</span><span>${fmt(phase1.pensionMonthly)}</span></div>
-          <div class="ireq-phase-row"><span>Withdrawal rate</span><span class="${phase1.withdrawalRate>4?'ireq-red':'ireq-green'}">${phase1.withdrawalRate.toFixed(1)}%</span></div>
+          <div class="ireq-phase-row"><span>${t('ireq.phase.portWithdraw')}</span><span class="ireq-amber">${fmt(phase1.portMonthly)}/mo</span></div>
+          <div class="ireq-phase-row"><span>${t('ireq.phase.pensionIncome')}</span><span>${fmt(phase1.pensionMonthly)}</span></div>
+          <div class="ireq-phase-row"><span>${t('ireq.phase.withdrawRate')}</span><span class="${phase1.withdrawalRate>4?'ireq-red':'ireq-green'}">${phase1.withdrawalRate.toFixed(1)}%</span></div>
         </div>
         <div class="ireq-phase ireq-phase-2">
           <div class="ireq-phase-lbl">${esc(phase2.label)}</div>
-          <div class="ireq-phase-row"><span>Portfolio withdrawal</span><span class="ireq-amber">${fmt(phase2.portMonthly)}/mo</span></div>
-          <div class="ireq-phase-row"><span>Pension income</span><span class="ireq-blue">${fmt(phase2.pensionMonthly)}/mo</span></div>
-          <div class="ireq-phase-row"><span>Withdrawal rate</span><span class="${phase2.withdrawalRate>4?'ireq-red':'ireq-green'}">${phase2.withdrawalRate.toFixed(1)}%</span></div>
+          <div class="ireq-phase-row"><span>${t('ireq.phase.portWithdraw')}</span><span class="ireq-amber">${fmt(phase2.portMonthly)}/mo</span></div>
+          <div class="ireq-phase-row"><span>${t('ireq.phase.pensionIncome')}</span><span class="ireq-blue">${fmt(phase2.pensionMonthly)}/mo</span></div>
+          <div class="ireq-phase-row"><span>${t('ireq.phase.withdrawRate')}</span><span class="${phase2.withdrawalRate>4?'ireq-red':'ireq-green'}">${phase2.withdrawalRate.toFixed(1)}%</span></div>
         </div>
       </div>
       ` : ''}
