@@ -7427,7 +7427,7 @@ function renderLineItems(containerId, items, stateKey, readOnly, showPaid) {
     return `<div class="line-item${paidClass}">
       ${paidBox}
       <input class="line-name" value="${esc(it.name)}" placeholder="${esc2(t('li.placeholder.name'))}" ${readOnly?'disabled':''} oninput="updateLineItem('${stateKey}','${it.id}','name',this.value)">
-      <div class="line-amt-wrap"><span class="line-cur">${s}</span><input class="line-amt" type="number" value="${Math.round(it.amount*r)}" ${readOnly?'disabled':''} oninput="updateLineItem('${stateKey}','${it.id}','amount',this.value/${r})"></div>
+      <div class="line-amt-wrap"><span class="line-cur">${s}</span><input class="line-amt" type="text" inputmode="decimal" data-lang-num="1" value="${Math.round(it.amount*r)}" ${readOnly?'disabled':''} oninput="updateLineItem('${stateKey}','${it.id}','amount',parseNum(this.value)/${r})"></div>
       <select class="line-type" ${readOnly?'disabled':''} onchange="updateLineItem('${stateKey}','${it.id}','type',this.value)">
         <option value="fixed" ${it.type==='fixed'?'selected':''}>${esc2(t('li.type.fixed'))}</option>
         <option value="variable" ${it.type==='variable'?'selected':''}>${esc2(t('li.type.variable'))}</option>
@@ -7451,7 +7451,10 @@ function esc(str){const d=document.createElement('div');d.textContent=str;return
 function updateLineItem(key,id,field,val) {
   const arr=resolveKey(key); if(!arr) return;
   const item=arr.find(i=>i.id===id); if(!item) return;
-  item[field]=field==='amount'?+val:val;
+  // parseNum tolerates Swedish decimal commas + thousand-separator
+  // spaces. Inline oninput handlers pass the raw input string here
+  // so the conversion happens in one place.
+  item[field]=field==='amount'?parseNum(val):val;
   save();
 }
 // Rollover carry-forward overrides. state.carryOverrides is a map of
@@ -8560,7 +8563,7 @@ function renderMonthly() {
         <div class="card-title">${esc2(t('monthly.card.savingsTarget'))}</div>
         <div style="display:flex;align-items:center;gap:8px;background:var(--bg3);border-radius:8px;padding:4px 14px;max-width:280px">
           <span style="color:var(--text3);font-size:12px;font-family:var(--fm)">${s}</span>
-          <input type="number" value="${Math.round(sel.savings*r)}" style="background:transparent;border:none;color:var(--text);font-family:var(--fm);font-size:20px;font-weight:700;padding:10px 0;outline:none;width:200px" oninput="setMonthSavings('${selKey}',this.value/${r})" onchange="commitRender('renderMonthly')">
+          <input type="text" inputmode="decimal" data-lang-num="1" value="${Math.round(sel.savings*r)}" style="background:transparent;border:none;color:var(--text);font-family:var(--fm);font-size:20px;font-weight:700;padding:10px 0;outline:none;width:200px" oninput="setMonthSavings('${selKey}',parseNum(this.value)/${r})" onchange="commitRender('renderMonthly')">
         </div>
       </div>
     </div>`;
@@ -8818,7 +8821,7 @@ function renderYearly() {
         <div class="card-title">${esc2(t('yearly.card.savingsTarget', { year: clampedYr }))}</div>
         <div style="display:flex;align-items:center;gap:8px;background:var(--bg3);border-radius:8px;padding:4px 14px;max-width:320px">
           <span style="color:var(--text3);font-size:12px;font-family:var(--fm)">${s}</span>
-          <input type="number" value="${Math.round(savAnnual*r)}" style="background:transparent;border:none;color:var(--text);font-family:var(--fm);font-size:20px;font-weight:700;padding:10px 0;outline:none;width:200px" oninput="setYearlySavings(this.value/${r}/12)">
+          <input type="text" inputmode="decimal" data-lang-num="1" value="${Math.round(savAnnual*r)}" style="background:transparent;border:none;color:var(--text);font-family:var(--fm);font-size:20px;font-weight:700;padding:10px 0;outline:none;width:200px" oninput="setYearlySavings(parseNum(this.value)/${r}/12)">
           <span style="font-size:11px;color:var(--text3);font-family:var(--fm)">/yr</span>
         </div>
         <div style="font-size:10px;color:var(--text3);margin-top:4px;font-family:var(--fm)">${esc2(t('yearly.card.savingsHint', { mo: fmt(sav), year: clampedYr }))}</div>
@@ -8839,7 +8842,7 @@ function renderYearlyLineItems(cid,items,field){
   const r=rate(); const s=sym();
   el.innerHTML=items.map(it=>`<div class="line-item">
     <input class="line-name" value="${esc(it.name)}" placeholder="${esc2(t('li.placeholder.name'))}" oninput="updateYrItem('${field}','${it.id}','name',this.value)">
-    <div class="line-amt-wrap"><span class="line-cur">${s}</span><input class="line-amt" type="number" value="${Math.round(it.amount*12*r)}" oninput="updateYrItem('${field}','${it.id}','amount',this.value/${r}/12)"><span style="font-size:10px;color:var(--text3);font-family:var(--fm);padding-right:4px">/yr</span></div>
+    <div class="line-amt-wrap"><span class="line-cur">${s}</span><input class="line-amt" type="text" inputmode="decimal" data-lang-num="1" value="${Math.round(it.amount*12*r)}" oninput="updateYrItem('${field}','${it.id}','amount',parseNum(this.value)/${r}/12)"><span style="font-size:10px;color:var(--text3);font-family:var(--fm);padding-right:4px">/yr</span></div>
     <select class="line-type" onchange="updateYrItem('${field}','${it.id}','type',this.value)">
       <option value="fixed" ${it.type==='fixed'?'selected':''}>${esc2(t('li.type.fixed'))}</option>
       <option value="variable" ${it.type==='variable'?'selected':''}>${esc2(t('li.type.variable'))}</option>
@@ -11458,14 +11461,14 @@ function renderSettings() {
         <div class="card-title">${esc2(t('settings.savings.title'))}</div>
         <div style="display:flex;align-items:center;gap:8px;background:var(--bg3);border-radius:8px;padding:4px 14px;max-width:260px">
           <span style="color:var(--text3);font-size:12px;font-family:var(--fm)">${s}</span>
-          <input type="number" value="${Math.round(state.baseSavings*r)}" style="background:transparent;border:none;color:var(--text);font-family:var(--fm);font-size:20px;font-weight:700;padding:10px 0;outline:none;width:180px" oninput="state.baseSavings=this.value/${r};save()">
+          <input type="text" inputmode="decimal" data-lang-num="1" value="${Math.round(state.baseSavings*r)}" style="background:transparent;border:none;color:var(--text);font-family:var(--fm);font-size:20px;font-weight:700;padding:10px 0;outline:none;width:180px" oninput="state.baseSavings=parseNum(this.value)/${r};save()">
         </div>
       </div>
       <!-- Exchange rates -->
       <div class="card">
         <div class="card-title">${esc2(t('settings.rates.title'))}</div>
         <div style="display:flex;flex-direction:column;gap:8px;font-size:13px">
-          ${['USD','EUR','KES'].map(cur=>`<div style="display:flex;align-items:center;gap:10px"><span style="font-family:var(--fm);min-width:50px;font-weight:600">${CURRENCY_SYMBOLS[cur]} ${cur}</span><span style="color:var(--text2)">${esc2(t('settings.rates.oneSekEquals'))}</span><div style="display:flex;align-items:center;gap:3px;background:var(--bg3);border:1px solid var(--border);border-radius:6px;padding:0 10px;flex:1;max-width:140px"><input type="number" style="background:transparent;border:none;color:var(--text);font-family:var(--fm);font-size:13px;padding:6px 0;outline:none;width:100%" value="${state.exchangeRates[cur]||DEFAULT_RATES[cur]}" oninput="state.exchangeRates['${cur}']=+this.value;save()" onchange="commitRender('renderAll')"></div><span style="font-size:11px;color:var(--text3)">≈ ${Math.round(1/(state.exchangeRates[cur]||DEFAULT_RATES[cur]))} SEK/${cur==='KES'?'KSh':cur==='EUR'?'€':'$'}</span></div>`).join('')}
+          ${['USD','EUR','KES'].map(cur=>`<div style="display:flex;align-items:center;gap:10px"><span style="font-family:var(--fm);min-width:50px;font-weight:600">${CURRENCY_SYMBOLS[cur]} ${cur}</span><span style="color:var(--text2)">${esc2(t('settings.rates.oneSekEquals'))}</span><div style="display:flex;align-items:center;gap:3px;background:var(--bg3);border:1px solid var(--border);border-radius:6px;padding:0 10px;flex:1;max-width:140px"><input type="text" inputmode="decimal" data-lang-num="1" style="background:transparent;border:none;color:var(--text);font-family:var(--fm);font-size:13px;padding:6px 0;outline:none;width:100%" value="${state.exchangeRates[cur]||DEFAULT_RATES[cur]}" oninput="state.exchangeRates['${cur}']=parseNum(this.value);save()" onchange="commitRender('renderAll')"></div><span style="font-size:11px;color:var(--text3)">≈ ${Math.round(1/(state.exchangeRates[cur]||DEFAULT_RATES[cur]))} SEK/${cur==='KES'?'KSh':cur==='EUR'?'€':'$'}</span></div>`).join('')}
         </div>
       </div>
       <!-- AI Keys -->
