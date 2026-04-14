@@ -3090,7 +3090,7 @@ body.light .piq-country-menu { box-shadow:0 12px 28px -10px rgba(60,40,10,0.22);
 
 <!-- Retire Anywhere — Location Analysis slide-over panel -->
 <div class="retire-slideover-backdrop" id="retire-slideover-backdrop"></div>
-<div class="retire-slideover" id="retire-slideover" aria-hidden="true" role="dialog" aria-label="Location analysis">
+<div class="retire-slideover" id="retire-slideover" aria-hidden="true" role="dialog" data-i18n-aria-label="ra.so.dialogLabel" aria-label="Location analysis">
   <div class="retire-so-head" id="retire-so-head">
     <div class="retire-so-head-main">
       <div class="retire-so-flag" id="retire-so-flag">🌍</div>
@@ -3099,11 +3099,11 @@ body.light .piq-country-menu { box-shadow:0 12px 28px -10px rgba(60,40,10,0.22);
         <div class="retire-so-sub" id="retire-so-sub">—</div>
       </div>
     </div>
-    <button class="retire-so-close" onclick="closeLocAnalysis()" title="Close" aria-label="Close panel">✕</button>
+    <button class="retire-so-close" onclick="closeLocAnalysis()" data-i18n-title="ra.so.closeTitle" data-i18n-aria-label="ra.so.closeAria" title="Close" aria-label="Close panel">✕</button>
   </div>
   <div class="retire-so-body" id="retire-so-body"></div>
   <div class="retire-so-footer">
-    <div class="retire-so-footer-hint" id="retire-so-footer-hint">This panel stays open while you browse — close it with ✕ when you're done.</div>
+    <div class="retire-so-footer-hint" id="retire-so-footer-hint" data-i18n="ra.so.staticHint">This panel stays open while you browse — close it with ✕ when you're done.</div>
     <div class="retire-so-footer-actions">
       <button class="btn btn-o btn-sm" id="retire-so-save-btn" onclick="slideoverSaveToVault()" disabled>🗄 Save to Vault</button>
       <button class="btn btn-g btn-sm" id="retire-so-pdf-btn" onclick="slideoverExportPdf()" disabled>📄 Download PDF</button>
@@ -3453,6 +3453,54 @@ const STRINGS = {
   'dash.report.good':       { en:'What is going well',          sv:'Vad som går bra' },
   'dash.report.concern':    { en:'Areas of concern',            sv:'Områden att hålla koll på' },
   'dash.report.recs':       { en:'Recommendations',             sv:'Rekommendationer' },
+
+  // ── Retire Anywhere · location analysis slideover ─────
+  'ra.so.closeTitle':       { en:'Close',                 sv:'Stäng' },
+  'ra.so.closeAria':        { en:'Close panel',           sv:'Stäng panel' },
+  'ra.so.dialogLabel':      { en:'Location analysis',     sv:'Platsanalys' },
+  'ra.so.staticHint':       { en:"This panel stays open while you browse — close it with ✕ when you're done.",
+                              sv:'Panelen är öppen medan du bläddrar — stäng den med ✕ när du är klar.' },
+  'ra.so.saveBtn':          { en:'🗄 Save to Vault',      sv:'🗄 Spara till arkiv' },
+  'ra.so.savedBtn':         { en:'🗄 Saved to Vault ✓',   sv:'🗄 Sparat till arkiv ✓' },
+  'ra.so.pdfBtn':           { en:'📄 Download PDF',       sv:'📄 Ladda ned PDF' },
+  'ra.so.affordable':       { en:'{pct}% affordable',     sv:'{pct}% överkomlig' },
+  'ra.so.reportGenerated':  { en:'Report generated {when}',
+                              sv:'Rapporten genererad {when}' },
+  'ra.so.footerNoReport':   { en:'Run an analysis to enable Save to Vault and PDF export.',
+                              sv:'Kör en analys för att aktivera Spara till arkiv och PDF-export.' },
+  'ra.so.footerTailored':   { en:'Report tailored for {cz} citizen from {hb}',
+                              sv:'Rapport anpassad för {cz}-medborgare från {hb}' },
+  'ra.so.facts.title':      { en:'Quick Facts · all monetary figures in today\u2019s money',
+                              sv:'Snabbfakta · alla värden i dagens penningvärde' },
+  'ra.so.facts.cost':       { en:'Monthly cost of living', sv:'Månatlig levnadskostnad' },
+  'ra.so.facts.income':     { en:'Your retirement income', sv:'Din pensionsinkomst' },
+  'ra.so.facts.surplus':    { en:'Monthly surplus',        sv:'Månatligt överskott' },
+  'ra.so.facts.tax':        { en:'Local income tax',       sv:'Lokal inkomstskatt' },
+  'ra.so.facts.climate':    { en:'Climate',                sv:'Klimat' },
+  'ra.so.facts.healthcare': { en:'Healthcare',             sv:'Sjukvård' },
+  'ra.so.edit.title':       { en:'Editable Details',       sv:'Redigerbara detaljer' },
+  'ra.so.edit.cost':        { en:'Monthly Cost of Living ({s})',
+                              sv:'Månatlig levnadskostnad ({s})' },
+  'ra.so.edit.tax':         { en:'Local Tax Rate (%)',     sv:'Lokal skattesats (%)' },
+  'ra.so.edit.notes':       { en:'Notes',                  sv:'Anteckningar' },
+  'ra.so.edit.removeBtn':   { en:'🗑 Remove location',     sv:'🗑 Ta bort plats' },
+  'ra.so.edit.removeConfirm':{en:'Remove this location?', sv:'Ta bort denna plats?' },
+  'ra.so.analysis.title':   { en:'AI Deep Dive Report',    sv:'AI Deep Dive-rapport' },
+  'ra.so.analysis.empty.title':{ en:'No analysis yet',     sv:'Ingen analys ännu' },
+  'ra.so.analysis.empty.sub':  { en:'Run an AI Deep Dive to generate a structured report covering cost of living, healthcare, visa &amp; residency, tax implications, climate, real estate, and pros &amp; cons — tailored to your citizenship and home base.',
+                                 sv:'Kör en AI Deep Dive för att generera en strukturerad rapport som täcker levnadskostnad, sjukvård, visum & uppehåll, skatteimplikationer, klimat, fastigheter och för- & nackdelar — anpassad efter ditt medborgarskap och din hemvist.' },
+  'ra.so.analysis.runBtn':  { en:'🔬 Run AI Analysis',     sv:'🔬 Kör AI-analys' },
+  'ra.so.analysis.loading': { en:'Generating Deep Dive report for <strong style="color:var(--text)">{name}</strong>… this takes 20–40 seconds. You can close the panel and come back — the result is cached.',
+                              sv:'Genererar Deep Dive-rapport för <strong style="color:var(--text)">{name}</strong>… det tar 20–40 sekunder. Du kan stänga panelen och komma tillbaka — resultatet cachas.' },
+  'ra.so.analysis.failTitle':{ en:'Analysis failed',       sv:'Analysen misslyckades' },
+  'ra.so.analysis.retry':   { en:'Retry',                  sv:'Försök igen' },
+  'ra.so.analysis.noKey':   { en:'Add your Claude API key in Settings → AI Keys to run the analysis.',
+                              sv:'Lägg till din Claude API-nyckel i Inställningar → AI-nycklar för att köra analysen.' },
+  'ra.so.analysis.noContext':{ en:'Please complete Citizenship and Home Base in Settings first — analyses are tailored to your personal context.',
+                              sv:'Slutför Medborgarskap och Hemvist i Inställningar först — analyser anpassas efter din personliga kontext.' },
+  'ra.so.analysis.noReport':{ en:'No report available yet — run the analysis first.',
+                              sv:'Ingen rapport tillgänglig ännu — kör analysen först.' },
+  'ra.so.unknown':          { en:'—',                     sv:'—' },
 
   // ── Retire Anywhere ────────────────────────────────────
   'ra.page.tag':            { en:'RETIRE ANYWHERE',       sv:'PENSIONERA VAR SOM HELST' },
@@ -10117,34 +10165,43 @@ function renderLocAnalysisSlideover(opts){
   // Header
   document.getElementById('retire-so-flag').textContent  = loc.flag || '🌍';
   document.getElementById('retire-so-title').textContent = `${loc.name}${loc.country?', '+loc.country:''}`;
-  const subParts = [`${loc.label}`, `${Math.round(loc.affordabilityScore*100)}% affordable`];
-  if(cached) subParts.push(`Report generated ${new Date(cached.date).toLocaleString(undefined,{day:'numeric',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'})}`);
+  // Translate the verdict label and the affordable indicator;
+  // skip locale on the date so it picks up the Swedish format
+  // when the user is in SV mode.
+  const verdictText = STRINGS['ra.verdict.'+loc.verdict] ? t('ra.verdict.'+loc.verdict) : loc.label;
+  const subParts = [verdictText, t('ra.so.affordable', { pct: Math.round(loc.affordabilityScore*100) })];
+  if(cached){
+    const dateLocale = state.lang === 'sv' ? 'sv-SE' : undefined;
+    const when = new Date(cached.date).toLocaleString(dateLocale, {day:'numeric',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'});
+    subParts.push(t('ra.so.reportGenerated', { when }));
+  }
   document.getElementById('retire-so-sub').textContent = subParts.join(' · ');
 
   // Body
   const body = document.getElementById('retire-so-body');
+  const dash = t('ra.so.unknown');
   const factsHtml = `
     <div class="retire-so-section">
-      <div class="retire-so-section-hd">Quick Facts · all monetary figures in today&rsquo;s money</div>
+      <div class="retire-so-section-hd">${esc2(t('ra.so.facts.title'))}</div>
       <div class="retire-so-fact-grid">
-        <div class="retire-so-fact"><div class="retire-so-fact-lbl">Monthly cost of living</div><div class="retire-so-fact-val">${fmt(loc.costOfLiving)}</div></div>
-        <div class="retire-so-fact"><div class="retire-so-fact-lbl">Your retirement income</div><div class="retire-so-fact-val pos">${fmt(monthlyIncome)}</div></div>
-        <div class="retire-so-fact"><div class="retire-so-fact-lbl">Monthly surplus</div><div class="retire-so-fact-val ${loc.surplus>=0?'pos':'neg'}">${fmt(loc.surplus)}</div></div>
-        <div class="retire-so-fact"><div class="retire-so-fact-lbl">Local income tax</div><div class="retire-so-fact-val">${loc.taxRate}%</div></div>
-        <div class="retire-so-fact"><div class="retire-so-fact-lbl">Climate</div><div class="retire-so-fact-val" style="font-size:12px">${esc(loc.climate||'—')}</div></div>
-        <div class="retire-so-fact"><div class="retire-so-fact-lbl">Healthcare</div><div class="retire-so-fact-val" style="font-size:12px">${esc(loc.healthcare||'—')}</div></div>
+        <div class="retire-so-fact"><div class="retire-so-fact-lbl">${esc2(t('ra.so.facts.cost'))}</div><div class="retire-so-fact-val">${fmt(loc.costOfLiving)}</div></div>
+        <div class="retire-so-fact"><div class="retire-so-fact-lbl">${esc2(t('ra.so.facts.income'))}</div><div class="retire-so-fact-val pos">${fmt(monthlyIncome)}</div></div>
+        <div class="retire-so-fact"><div class="retire-so-fact-lbl">${esc2(t('ra.so.facts.surplus'))}</div><div class="retire-so-fact-val ${loc.surplus>=0?'pos':'neg'}">${fmt(loc.surplus)}</div></div>
+        <div class="retire-so-fact"><div class="retire-so-fact-lbl">${esc2(t('ra.so.facts.tax'))}</div><div class="retire-so-fact-val">${loc.taxRate}%</div></div>
+        <div class="retire-so-fact"><div class="retire-so-fact-lbl">${esc2(t('ra.so.facts.climate'))}</div><div class="retire-so-fact-val" style="font-size:12px">${esc(loc.climate||dash)}</div></div>
+        <div class="retire-so-fact"><div class="retire-so-fact-lbl">${esc2(t('ra.so.facts.healthcare'))}</div><div class="retire-so-fact-val" style="font-size:12px">${esc(loc.healthcare||dash)}</div></div>
       </div>
     </div>`;
   const editHtml = `
     <div class="retire-so-section">
-      <div class="retire-so-section-hd">Editable Details</div>
+      <div class="retire-so-section-hd">${esc2(t('ra.so.edit.title'))}</div>
       <div class="retire-so-edit-row">
-        <div class="field"><label>Monthly Cost of Living (${s})</label><input type="number" value="${Math.round(loc.costOfLiving*r)}" oninput="updateLocCost('${loc.id}',this.value/${r})" onchange="commitRender('renderLocAnalysisSlideover')"></div>
-        <div class="field"><label>Local Tax Rate (%)</label><input type="number" value="${loc.taxRate}" oninput="updateLocTax('${loc.id}',+this.value)" onchange="commitRender('renderLocAnalysisSlideover')"></div>
-        <div class="field retire-so-notes"><label>Notes</label><input value="${esc(loc.notes||'')}" oninput="updateLocNotes('${loc.id}',this.value)"></div>
+        <div class="field"><label>${esc2(t('ra.so.edit.cost', { s }))}</label><input type="number" value="${Math.round(loc.costOfLiving*r)}" oninput="updateLocCost('${loc.id}',this.value/${r})" onchange="commitRender('renderLocAnalysisSlideover')"></div>
+        <div class="field"><label>${esc2(t('ra.so.edit.tax'))}</label><input type="number" value="${loc.taxRate}" oninput="updateLocTax('${loc.id}',+this.value)" onchange="commitRender('renderLocAnalysisSlideover')"></div>
+        <div class="field retire-so-notes"><label>${esc2(t('ra.so.edit.notes'))}</label><input value="${esc(loc.notes||'')}" oninput="updateLocNotes('${loc.id}',this.value)"></div>
       </div>
       <div style="margin-top:10px;display:flex;gap:8px">
-        <button class="btn btn-danger btn-sm" onclick="if(confirm('Remove this location?')){removeLoc('${loc.id}');closeLocAnalysis();}">🗑 Remove location</button>
+        <button class="btn btn-danger btn-sm" onclick="if(confirm(t('ra.so.edit.removeConfirm'))){removeLoc('${loc.id}');closeLocAnalysis();}">${esc2(t('ra.so.edit.removeBtn'))}</button>
       </div>
     </div>`;
 
@@ -10154,7 +10211,7 @@ function renderLocAnalysisSlideover(opts){
   if(cached && !(opts && opts.rerunIfCached)){
     analysisHtml = `
       <div class="retire-so-section">
-        <div class="retire-so-section-hd">AI Deep Dive Report</div>
+        <div class="retire-so-section-hd">${esc2(t('ra.so.analysis.title'))}</div>
         <div class="card" style="padding:18px 20px">
           ${mdParse(cached.markdown||'')}
         </div>
@@ -10162,12 +10219,12 @@ function renderLocAnalysisSlideover(opts){
   } else {
     analysisHtml = `
       <div class="retire-so-section">
-        <div class="retire-so-section-hd">AI Deep Dive Report</div>
+        <div class="retire-so-section-hd">${esc2(t('ra.so.analysis.title'))}</div>
         <div class="retire-so-empty-cta" id="retire-so-analysis-cta">
           <div class="retire-so-empty-icon">🔬</div>
-          <div class="retire-so-empty-t">No analysis yet</div>
-          <div class="retire-so-empty-s">Run an AI Deep Dive to generate a structured report covering cost of living, healthcare, visa &amp; residency, tax implications, climate, real estate, and pros &amp; cons — tailored to your citizenship and home base.</div>
-          <button class="btn btn-g" onclick="runLocAnalysis('${loc.id}')">🔬 Run AI Analysis</button>
+          <div class="retire-so-empty-t">${esc2(t('ra.so.analysis.empty.title'))}</div>
+          <div class="retire-so-empty-s">${t('ra.so.analysis.empty.sub')}</div>
+          <button class="btn btn-g" onclick="runLocAnalysis('${loc.id}')">${esc2(t('ra.so.analysis.runBtn'))}</button>
         </div>
       </div>`;
   }
@@ -10179,13 +10236,13 @@ function renderLocAnalysisSlideover(opts){
   const pdfBtn  = document.getElementById('retire-so-pdf-btn');
   const hint    = document.getElementById('retire-so-footer-hint');
   if(cached && !(opts && opts.rerunIfCached)){
-    if(saveBtn) { saveBtn.disabled = false; saveBtn.textContent = '🗄 Saved to Vault ✓'; saveBtn.classList.add('btn-g'); saveBtn.classList.remove('btn-o'); }
+    if(saveBtn) { saveBtn.disabled = false; saveBtn.textContent = t('ra.so.savedBtn'); saveBtn.classList.add('btn-g'); saveBtn.classList.remove('btn-o'); }
     if(pdfBtn)  pdfBtn.disabled = false;
-    if(hint)    hint.textContent = `Report tailored for ${(countryInfo(cached.citizenship)||{}).name||'—'} citizen from ${(countryInfo(cached.homeBase)||{}).name||'—'}`;
+    if(hint)    hint.textContent = t('ra.so.footerTailored', { cz: (countryInfo(cached.citizenship)||{}).name||dash, hb: (countryInfo(cached.homeBase)||{}).name||dash });
   } else {
-    if(saveBtn) { saveBtn.disabled = true; saveBtn.textContent = '🗄 Save to Vault'; saveBtn.classList.remove('btn-g'); saveBtn.classList.add('btn-o'); }
+    if(saveBtn) { saveBtn.disabled = true; saveBtn.textContent = t('ra.so.saveBtn'); saveBtn.classList.remove('btn-g'); saveBtn.classList.add('btn-o'); }
     if(pdfBtn)  pdfBtn.disabled = true;
-    if(hint)    hint.textContent = 'Run an analysis to enable Save to Vault and PDF export.';
+    if(hint)    hint.textContent = t('ra.so.footerNoReport');
   }
 }
 window.renderLocAnalysisSlideover = renderLocAnalysisSlideover;
@@ -10197,9 +10254,9 @@ window.runLocAnalysis = function(id, opts){
   const loc = state.places.find(l => l.id === id);
   if(!loc) return;
   const key = state.aiKeys?.claude;
-  if(!key){ alert('Add your Claude API key in Settings → AI Keys to run the analysis.'); return; }
+  if(!key){ alert(t('ra.so.analysis.noKey')); return; }
   if(!state.citizenship || !state.homeBase){
-    alert('Please complete Citizenship and Home Base in Settings first — analyses are tailored to your personal context.');
+    alert(t('ra.so.analysis.noContext'));
     nav('settings');
     return;
   }
@@ -10218,7 +10275,7 @@ window.runLocAnalysis = function(id, opts){
   if(cta) cta.outerHTML = `
     <div class="retire-so-loading" id="retire-so-analysis-cta">
       <span class="state-spinner" style="width:18px;height:18px;border-width:2px"></span>
-      <span>Generating Deep Dive report for <strong style="color:var(--text)">${esc(loc.name)}</strong>… this takes 20–40 seconds. You can close the panel and come back — the result is cached.</span>
+      <span>${t('ra.so.analysis.loading', { name: esc(loc.name) })}</span>
     </div>`;
   const ctx = buildPersonalContext();
   const prompt = `${ctx}
@@ -10301,9 +10358,9 @@ One paragraph. Recommendation: "proceed", "proceed with caveats", or "reconsider
       if(cta2) cta2.outerHTML = `
         <div class="state state-error" id="retire-so-analysis-cta">
           <div class="state-icon">⚠</div>
-          <div class="state-title">Analysis failed</div>
+          <div class="state-title">${esc2(t('ra.so.analysis.failTitle'))}</div>
           <div class="state-sub">${esc(e.message||String(e))}</div>
-          <div class="state-cta"><button class="btn btn-o btn-sm" onclick="runLocAnalysis('${id}')">Retry</button></div>
+          <div class="state-cta"><button class="btn btn-o btn-sm" onclick="runLocAnalysis('${id}')">${esc2(t('ra.so.analysis.retry'))}</button></div>
         </div>`;
     }
   })();
@@ -10318,7 +10375,7 @@ window.slideoverSaveToVault = function(){
 window.slideoverExportPdf = function(){
   const id = _slideoverLocId; if(!id) return;
   const cached = (state.vault||[]).find(v => v.type==='deepdive' && v.locationId===id);
-  if(!cached){ alert('No report available yet — run the analysis first.'); return; }
+  if(!cached){ alert(t('ra.so.analysis.noReport')); return; }
   exportVaultEntryPdf(cached.id);
 };
 
