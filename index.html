@@ -3454,6 +3454,49 @@ const STRINGS = {
   'dash.report.concern':    { en:'Areas of concern',            sv:'Områden att hålla koll på' },
   'dash.report.recs':       { en:'Recommendations',             sv:'Rekommendationer' },
 
+  // ── Retirement · s1 Sustainability & Runway block ─────
+  's1.eyebrow':             { en:'RETIREMENT SUSTAINABILITY',
+                              sv:'PENSIONENS HÅLLBARHET' },
+  's1.pensionSupported':    { en:'Pension-supported',
+                              sv:'Pensionsstödd' },
+  's1.summary.depletes':    { en:'Portfolio depletes at age <strong style="color:var(--red)">~{age}</strong>',
+                              sv:'Portföljen töms vid ålder <strong style="color:var(--red)">~{age}</strong>' },
+  's1.summary.neverDepletes':{en:'Portfolio <strong style="color:var(--green)">never depletes</strong>',
+                              sv:'Portföljen <strong style="color:var(--green)">töms aldrig</strong>' },
+  's1.summary.coverage':    { en:'Coverage: <strong>{pct}%</strong>',
+                              sv:'Täckning: <strong>{pct}%</strong>' },
+  's1.summary.surplus':     { en:'Surplus <strong style="color:var(--green)">{amt}/mo</strong>',
+                              sv:'Överskott <strong style="color:var(--green)">{amt}/mån</strong>' },
+  's1.summary.shortfall':   { en:'Shortfall <strong style="color:var(--red)">{amt}/mo</strong>',
+                              sv:'Underskott <strong style="color:var(--red)">{amt}/mån</strong>' },
+  's1.summary.pensionShare':{ en:'<strong style="color:#4d9fff">Pension {pct}% of need</strong>',
+                              sv:'<strong style="color:#4d9fff">Pension {pct}% av behov</strong>' },
+  's1.bar.pensionLegend':   { en:'Pension {pct}%',             sv:'Pension {pct}%' },
+  's1.bar.portfolioLegend': { en:'Portfolio {pct}%',           sv:'Portfölj {pct}%' },
+  's1.bar.totalCoverage':   { en:'Total coverage: {pct}%',     sv:'Total täckning: {pct}%' },
+  's1.bar.coverage':        { en:'Coverage: {pct}%',           sv:'Täckning: {pct}%' },
+  's1.num.nestEgg':         { en:'Nest Egg · today\u2019s money',
+                              sv:'Pensionskapital · dagens penningvärde' },
+  's1.num.portfolioSustains':{en:'Portfolio sustains · today\u2019s money',
+                              sv:'Portföljen håller · dagens penningvärde' },
+  's1.num.pensionCovers':   { en:'Pension covers · today\u2019s money',
+                              sv:'Pensionen täcker · dagens penningvärde' },
+  's1.num.pensionShareOfNeed':{en:'{pct}% of need',           sv:'{pct}% av behov' },
+  's1.num.youNeed':         { en:'You need · today\u2019s money',
+                              sv:'Du behöver · dagens penningvärde' },
+  's1.num.depletionAge':    { en:'Depletion age',             sv:'Tömningsålder' },
+  's1.num.ageValue':        { en:'Age {age}',                 sv:'Ålder {age}' },
+  's1.num.never':           { en:'Never',                     sv:'Aldrig' },
+  // Runway chart card header (SVG renderer body stays English
+  // until Batch 6, but the card's static title/sub/chips live
+  // in s1 and migrate now).
+  's1.runway.title':        { en:'Longevity Runway',          sv:'Livslängdsbana' },
+  's1.runway.sub':          { en:'How long your nest egg lasts on {scenario} expenses',
+                              sv:'Hur länge ditt pensionskapital räcker vid {scenario} utgifter' },
+  's1.runway.lifeExpChip':  { en:'Life exp. {age}',           sv:'Förv. livslängd {age}' },
+  's1.runway.ageSnapshots': { en:'Age snapshots · today\u2019s money',
+                              sv:'Åldersnedslag · dagens penningvärde' },
+
   // ── Retirement · page header + scenario bar ────────────
   'ret.page.tag':           { en:'RETIREMENT PLANNING',    sv:'PENSIONSPLANERING' },
   'ret.page.title':         { en:'Retirement Plan',        sv:'Pensionsplan' },
@@ -8117,58 +8160,72 @@ function renderRetirement() {
   const fundDepletionSub   = nums.runoutAge ? `Runs out before life exp.` : `Surplus at ${lifeExpReq}+`;
 
   // ── SECTION 1: SUSTAINABILITY & RUNWAY ──────────────────────────────────────
+  // Dynamic fragments for the verdict summary line — each one
+  // is a small parameterised key so the concatenation logic
+  // stays intact but the visible text flips with the language.
+  const s1SummaryPortfolio = nums.runoutAge
+    ? t('s1.summary.depletes', { age: Math.round(nums.runoutAge) })
+    : t('s1.summary.neverDepletes');
+  const s1SummaryCoverage = t('s1.summary.coverage', { pct: nums.coveragePct.toFixed(0) });
+  const s1SummaryGap = nums.gap >= 0
+    ? t('s1.summary.surplus',   { amt: fmt(nums.gap) })
+    : t('s1.summary.shortfall', { amt: fmt(Math.abs(nums.gap)) });
+  const s1SummaryPension = nums.pensionMaterial
+    ? ' · ' + t('s1.summary.pensionShare', { pct: nums.pensionShareOfNeed.toFixed(0) })
+    : '';
+  const s1BarColor = nums.verdictClass==='overfunded' ? 'var(--green)' : nums.verdictClass==='ontarget' ? 'var(--amber)' : 'var(--red)';
   const s1 = `
     <div class="sust-card" data-section="runway" style="margin-bottom:0;border:none;padding:14px 16px 10px">
       <div class="sust-verdict" style="margin-bottom:10px">
         <div class="sust-verdict-icon">${nums.verdictIcon}</div>
         <div>
-          <div style="font-size:9px;color:var(--text2);font-family:var(--fm);letter-spacing:.12em;margin-bottom:2px">RETIREMENT SUSTAINABILITY</div>
-          <div class="sust-verdict-text ${nums.verdictClass}">${nums.verdict}${nums.pensionMaterial?` <span style="font-size:10px;font-weight:600;color:#4d9fff;letter-spacing:.02em;text-transform:uppercase;vertical-align:middle;margin-left:6px;padding:2px 6px;border:1px solid rgba(77,159,255,.4);border-radius:3px;font-family:var(--fm)">Pension-supported</span>`:''}</div>
+          <div style="font-size:9px;color:var(--text2);font-family:var(--fm);letter-spacing:.12em;margin-bottom:2px">${t('s1.eyebrow')}</div>
+          <div class="sust-verdict-text ${nums.verdictClass}">${esc2(retVerdictText(nums))}${nums.pensionMaterial?` <span style="font-size:10px;font-weight:600;color:#4d9fff;letter-spacing:.02em;text-transform:uppercase;vertical-align:middle;margin-left:6px;padding:2px 6px;border:1px solid rgba(77,159,255,.4);border-radius:3px;font-family:var(--fm)">${esc2(t('s1.pensionSupported'))}</span>`:''}</div>
         </div>
         <div style="margin-left:auto;text-align:right;font-size:11px;color:var(--text2);line-height:1.6">
-          Portfolio ${nums.runoutAge?`depletes at age <strong style="color:var(--red)">~${Math.round(nums.runoutAge)}</strong>`:`<strong style="color:var(--green)">never depletes</strong>`} · Coverage: <strong>${nums.coveragePct.toFixed(0)}%</strong><br>${nums.gap>=0?`Surplus <strong style="color:var(--green)">${fmt(nums.gap)}/mo</strong>`:`Shortfall <strong style="color:var(--red)">${fmt(Math.abs(nums.gap))}/mo</strong>`}${nums.pensionMaterial?` · <strong style="color:#4d9fff">Pension ${nums.pensionShareOfNeed.toFixed(0)}% of need</strong>`:''}
+          ${s1SummaryPortfolio} · ${s1SummaryCoverage}<br>${s1SummaryGap}${s1SummaryPension}
         </div>
       </div>
       ${nums.pensionMaterial ? `
       <div class="sust-bar-track" style="margin-bottom:3px;position:relative;display:flex">
-        <div style="width:${nums.pensionShareOfNeed}%;background:#4d9fff;border-radius:3px 0 0 3px" title="Pension: ${nums.pensionShareOfNeed.toFixed(0)}% of need"></div>
-        <div style="width:${nums.portfolioShareOfNeed}%;background:${nums.verdictClass==='overfunded'?'var(--green)':nums.verdictClass==='ontarget'?'var(--amber)':'var(--red)'}" title="Portfolio: ${nums.portfolioShareOfNeed.toFixed(0)}% of need"></div>
+        <div style="width:${nums.pensionShareOfNeed}%;background:#4d9fff;border-radius:3px 0 0 3px" title="${esc2(t('s1.bar.pensionLegend', { pct: nums.pensionShareOfNeed.toFixed(0) }))}"></div>
+        <div style="width:${nums.portfolioShareOfNeed}%;background:${s1BarColor}" title="${esc2(t('s1.bar.portfolioLegend', { pct: nums.portfolioShareOfNeed.toFixed(0) }))}"></div>
       </div>
       <div style="display:flex;justify-content:space-between;font-size:9px;color:var(--text3);font-family:var(--fm);margin-bottom:10px">
-        <span><span style="display:inline-block;width:8px;height:8px;background:#4d9fff;border-radius:2px;margin-right:4px;vertical-align:middle"></span>Pension ${nums.pensionShareOfNeed.toFixed(0)}% · <span style="display:inline-block;width:8px;height:8px;background:${nums.verdictClass==='overfunded'?'var(--green)':nums.verdictClass==='ontarget'?'var(--amber)':'var(--red)'};border-radius:2px;margin:0 4px 0 6px;vertical-align:middle"></span>Portfolio ${nums.portfolioShareOfNeed.toFixed(0)}%</span>
-        <span style="color:${nums.coveragePct>=100?'var(--green)':'var(--amber)'}">Total coverage: ${nums.coveragePct.toFixed(0)}%</span>
+        <span><span style="display:inline-block;width:8px;height:8px;background:#4d9fff;border-radius:2px;margin-right:4px;vertical-align:middle"></span>${t('s1.bar.pensionLegend', { pct: nums.pensionShareOfNeed.toFixed(0) })} · <span style="display:inline-block;width:8px;height:8px;background:${s1BarColor};border-radius:2px;margin:0 4px 0 6px;vertical-align:middle"></span>${t('s1.bar.portfolioLegend', { pct: nums.portfolioShareOfNeed.toFixed(0) })}</span>
+        <span style="color:${nums.coveragePct>=100?'var(--green)':'var(--amber)'}">${t('s1.bar.totalCoverage', { pct: nums.coveragePct.toFixed(0) })}</span>
         <span>100%</span>
       </div>
       ` : `
-      <div class="sust-bar-track" style="margin-bottom:3px"><div class="sust-bar-fill" style="width:${Math.min(nums.coveragePct,100)}%;background:${nums.verdictClass==='overfunded'?'var(--green)':nums.verdictClass==='ontarget'?'var(--amber)':'var(--red)'}"></div></div>
+      <div class="sust-bar-track" style="margin-bottom:3px"><div class="sust-bar-fill" style="width:${Math.min(nums.coveragePct,100)}%;background:${s1BarColor}"></div></div>
       <div style="display:flex;justify-content:space-between;font-size:9px;color:var(--text3);font-family:var(--fm);margin-bottom:10px">
-        <span>0%</span><span style="color:${nums.coveragePct>=100?'var(--green)':'var(--amber)'}">Coverage: ${nums.coveragePct.toFixed(0)}%</span><span>100%</span>
+        <span>0%</span><span style="color:${nums.coveragePct>=100?'var(--green)':'var(--amber)'}">${t('s1.bar.coverage', { pct: nums.coveragePct.toFixed(0) })}</span><span>100%</span>
       </div>
       `}
       <div class="sust-nums" style="margin-bottom:14px">
-        <div class="sust-num"><div class="sust-num-lbl">Nest Egg · today&rsquo;s money</div><div class="sust-num-val">${fmt(nums.nestEgg)}</div></div>
-        <div class="sust-num"><div class="sust-num-lbl">Portfolio sustains · today&rsquo;s money</div><div class="sust-num-val pos">${fmt(nums.sustainableAfterTax)}/mo</div></div>
-        ${nums.pensionAvgMonthly > 0 ? `<div class="sust-num"><div class="sust-num-lbl">Pension covers · today&rsquo;s money</div><div class="sust-num-val" style="color:#4d9fff">${fmt(nums.pensionAvgMonthly)}/mo</div><div style="font-size:9px;color:var(--text3);margin-top:2px;font-family:var(--fm)">${nums.pensionShareOfNeed.toFixed(0)}% of need</div></div>` : ''}
-        <div class="sust-num"><div class="sust-num-lbl">You need · today&rsquo;s money</div><div class="sust-num-val">${fmt(nums.totalExp)}/mo</div></div>
-        <div class="sust-num"><div class="sust-num-lbl">Depletion age</div><div class="sust-num-val ${nums.runoutAge?'neg':'pos'}">${nums.runoutAge?`Age ${Math.round(nums.runoutAge)}`:'Never'}</div></div>
+        <div class="sust-num"><div class="sust-num-lbl">${t('s1.num.nestEgg')}</div><div class="sust-num-val">${fmt(nums.nestEgg)}</div></div>
+        <div class="sust-num"><div class="sust-num-lbl">${t('s1.num.portfolioSustains')}</div><div class="sust-num-val pos">${fmt(nums.sustainableAfterTax)}/mo</div></div>
+        ${nums.pensionAvgMonthly > 0 ? `<div class="sust-num"><div class="sust-num-lbl">${t('s1.num.pensionCovers')}</div><div class="sust-num-val" style="color:#4d9fff">${fmt(nums.pensionAvgMonthly)}/mo</div><div style="font-size:9px;color:var(--text3);margin-top:2px;font-family:var(--fm)">${t('s1.num.pensionShareOfNeed', { pct: nums.pensionShareOfNeed.toFixed(0) })}</div></div>` : ''}
+        <div class="sust-num"><div class="sust-num-lbl">${t('s1.num.youNeed')}</div><div class="sust-num-val">${fmt(nums.totalExp)}/mo</div></div>
+        <div class="sust-num"><div class="sust-num-lbl">${t('s1.num.depletionAge')}</div><div class="sust-num-val ${nums.runoutAge?'neg':'pos'}">${nums.runoutAge?t('s1.num.ageValue', { age: Math.round(nums.runoutAge) }):t('s1.num.never')}</div></div>
       </div>
       <!-- Runway Chart.js (feature #4) -->
       <div class="runway-wrap" data-section="runway">
         <div class="runway-hd">
           <div>
-            <div class="runway-title">Longevity Runway · <span id="runway-mode-tag">${esc(scenLabels[sc]||'Baseline')}</span></div>
-            <div class="runway-sub" id="runway-subtitle">How long your nest egg lasts on ${esc(scenLabels[sc]||'Baseline')} expenses</div>
+            <div class="runway-title">${t('s1.runway.title')} · <span id="runway-mode-tag">${esc2(scenLabel(sc))}</span></div>
+            <div class="runway-sub" id="runway-subtitle">${esc2(t('s1.runway.sub', { scenario: scenLabel(sc, true) }))}</div>
           </div>
           <div class="runway-hd-meta">
-            <span class="runway-chip" id="runway-verdict-chip">${nums.verdict}</span>
-            <span class="runway-chip" id="runway-mode-chip">${esc(scenLabels[sc]||'Baseline')}</span>
-            <span class="runway-chip muted">Life exp. ${state.lifeExp||90}</span>
+            <span class="runway-chip" id="runway-verdict-chip">${esc2(retVerdictText(nums))}</span>
+            <span class="runway-chip" id="runway-mode-chip">${esc2(scenLabel(sc))}</span>
+            <span class="runway-chip muted">${t('s1.runway.lifeExpChip', { age: state.lifeExp||90 })}</span>
           </div>
         </div>
         <div class="runway-svg-host" id="runway-svg-host"></div>
         <div class="runway-legend" id="runway-legend"></div>
         <div class="runway-milestones-wrap">
-          <div class="runway-ms-hd">Age snapshots · today&rsquo;s money</div>
+          <div class="runway-ms-hd">${t('s1.runway.ageSnapshots')}</div>
           <div class="runway-milestones" id="runway-milestones"></div>
         </div>
       </div>
