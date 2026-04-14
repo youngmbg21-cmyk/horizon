@@ -1836,6 +1836,87 @@ body.light .retire-slideover { box-shadow:-10px 0 32px -10px rgba(60,40,10,0.25)
 
 /* ── ONBOARDING BLOCK (mandatory citizenship + home base) ──────────── */
 .modal.onboarding-modal { max-width:520px; text-align:center; padding:30px 28px; }
+/* ── Welcome onboarding modal ─────────────────────────
+   3-step fresh-install flow. Shown once, captures name +
+   ages + cashflow baseline, then drops the user on a
+   personalised Dashboard. Styled as a sibling of the
+   existing onboarding-modal so the whole onboarding path
+   reads as one visual family. */
+.modal.welcome-modal {
+  max-width:480px;
+  padding:28px 32px 24px;
+  text-align:left;
+}
+.welcome-progress {
+  display:flex; gap:6px; justify-content:center;
+  margin-bottom:20px;
+}
+.welcome-dot {
+  width:22px; height:4px; border-radius:2px;
+  background:var(--border);
+  transition:background .2s;
+}
+.welcome-dot.active { background:var(--green); }
+.welcome-icon {
+  font-size:36px; text-align:center; margin-bottom:8px; line-height:1;
+}
+.welcome-title {
+  font-family:var(--ff); font-size:20px; font-weight:800;
+  color:var(--text); text-align:center;
+  letter-spacing:-.01em; margin-bottom:8px;
+}
+.welcome-sub {
+  font-size:12.5px; color:var(--text2); line-height:1.6;
+  text-align:center; margin-bottom:18px;
+}
+.welcome-field { margin-bottom:12px; }
+.welcome-field label {
+  display:block;
+  font-family:var(--fm); font-size:9px; font-weight:700;
+  letter-spacing:.08em; text-transform:uppercase;
+  color:var(--text3); margin-bottom:4px;
+}
+.welcome-input {
+  width:100%;
+  background:var(--bg3);
+  border:1px solid var(--border);
+  border-radius:6px;
+  padding:10px 12px;
+  color:var(--text);
+  font-family:var(--ff); font-size:14px;
+  outline:none;
+  transition:border-color .15s;
+}
+.welcome-input:focus { border-color:var(--green); }
+.welcome-input-wrap {
+  display:flex; align-items:center;
+  background:var(--bg3);
+  border:1px solid var(--border);
+  border-radius:6px;
+  padding:0 12px;
+  transition:border-color .15s;
+}
+.welcome-input-wrap:focus-within { border-color:var(--green); }
+.welcome-input-cur {
+  font-family:var(--fm); font-size:11px; color:var(--text3);
+  margin-right:6px;
+}
+.welcome-input-amt {
+  background:transparent; border:none; padding:10px 0;
+  flex:1; min-width:0;
+}
+.welcome-field-row {
+  display:grid; grid-template-columns:1fr 1fr; gap:10px;
+}
+.welcome-hint {
+  font-size:11px; color:var(--text3);
+  margin-top:4px; line-height:1.5;
+}
+.welcome-hint strong { color:var(--text); font-weight:700; }
+.welcome-actions {
+  display:flex; justify-content:space-between; align-items:center;
+  gap:8px; margin-top:22px;
+}
 .onboarding-icon { font-size:44px; margin-bottom:10px; }
 .onboarding-title { font-family:var(--ff); font-size:22px; font-weight:800; color:var(--text); margin-bottom:10px; letter-spacing:-.01em; }
 .onboarding-sub { font-size:13px; color:var(--text2); line-height:1.6; margin-bottom:22px; }
@@ -2490,6 +2571,21 @@ body.light .piq-country-menu { box-shadow:0 12px 28px -10px rgba(60,40,10,0.22);
 </div>
 
 <!-- Onboarding block (mandatory citizenship + home base) -->
+<!-- 3-step welcome onboarding for genuinely fresh installs. Runs
+     BEFORE the citizenship/home-base onboarding above, so new users
+     land on a configured Dashboard instead of pre-seeded demo
+     numbers. State flag: state.welcomeComplete. -->
+<div class="modal-backdrop" id="welcome-modal">
+  <div class="modal welcome-modal">
+    <div class="welcome-progress" id="welcome-progress">
+      <span class="welcome-dot active"></span>
+      <span class="welcome-dot"></span>
+      <span class="welcome-dot"></span>
+    </div>
+    <div class="welcome-body" id="welcome-body"></div>
+  </div>
+</div>
+
 <div class="modal-backdrop" id="onboarding-modal">
   <div class="modal onboarding-modal">
     <div class="onboarding-icon">🪪</div>
@@ -2696,6 +2792,13 @@ function defaultState() {
     // on first load via _seedDemoChatThreads().
     chatThreads:{},
     activeChatThreadId:'ai:horizon',
+    // 3-step welcome onboarding — shown once on first load of a
+    // fresh install, then the user is dropped on the Dashboard with
+    // their own baseline values already in state. Existing users
+    // skip it via the v10 → v11 migration so the welcome screen
+    // never retroactively appears on a populated install.
+    welcomeComplete:false,
+    userName:'',
     // Contacts list powering friend threads. Seeded with one demo
     // friend (Sara) so the feature is previewable out of the box.
     contacts:[
@@ -2848,7 +2951,7 @@ window.dr = function(name){ return window.commitRender(name); };
 // ─── PERSISTENCE ────────────────────────────────────────────────────────────
 // State schema version. Bump this and add a branch to migrate() whenever the
 // shape of `state` changes in a backwards-incompatible way.
-const STATE_VERSION = 10;
+const STATE_VERSION = 11;
 function migrate(s) {
   const from = s.version || 1;
   if(from >= STATE_VERSION) { s.version = STATE_VERSION; return s; }
@@ -2938,6 +3041,13 @@ function migrate(s) {
       ];
     }
     if(!s.activeChatThreadId) s.activeChatThreadId = 'ai:horizon';
+  }
+  // v10 → v11: 3-step welcome onboarding. Existing users skip it by
+  // default (they've already lived with the app long enough to have
+  // state that clearly wasn't seeded by the welcome flow) — we only
+  // show the welcome to genuinely fresh installs.
+  if(from < 11) {
+    if(s.welcomeComplete === undefined) s.welcomeComplete = true;
   }
   s.version = STATE_VERSION;
   return s;
@@ -3779,6 +3889,156 @@ function hideOnboardingBlock(){
   const m = document.getElementById('onboarding-modal');
   if(m) m.classList.remove('open');
 }
+
+// ── Welcome onboarding (3-step fresh-install flow) ──────────────────
+// Shown only on genuinely fresh installs — state.welcomeComplete
+// is true for upgraded users via the v10 → v11 migration. The flow
+// captures the minimum baseline needed to produce useful numbers
+// on the Dashboard: name (optional), current age + retirement age,
+// and a rough current-month income + expenses pair. Everything the
+// user enters lands directly in state so the first view after
+// closing the modal reflects their own situation, not the demo
+// seed values.
+let _welcomeStep = 0;
+const _welcomeDraft = { name:'', currentAge:30, retirementAge:65, income:0, expenses:0 };
+function showWelcomeModal(){
+  const m = document.getElementById('welcome-modal');
+  if(!m) return;
+  _welcomeStep = 0;
+  _welcomeDraft.name        = state.userName || '';
+  _welcomeDraft.currentAge  = state.currentAge  || 30;
+  _welcomeDraft.retirementAge = state.retirementAge || 65;
+  // Pre-fill from the existing baseline totals so a user who
+  // switches devices mid-onboarding doesn't have to retype.
+  _welcomeDraft.income   = Math.round(sumArr(state.baseIncome || [], 'amount')) || 0;
+  _welcomeDraft.expenses = Math.round(sumArr(state.baseExpenses || [], 'amount')) || 0;
+  m.classList.add('open');
+  renderWelcomeStep();
+}
+function renderWelcomeStep(){
+  const body = document.getElementById('welcome-body');
+  const dots = document.querySelectorAll('#welcome-progress .welcome-dot');
+  if(!body) return;
+  dots.forEach((d,i) => d.classList.toggle('active', i <= _welcomeStep));
+  const step = _welcomeStep;
+  if(step === 0){
+    body.innerHTML = `
+      <div class="welcome-icon">✦</div>
+      <div class="welcome-title">Welcome to Horizon</div>
+      <div class="welcome-sub">A calm place to plan your money — from this month's Fun Fund to the decade you retire in. Let's set you up with the basics. It takes under a minute.</div>
+      <div class="welcome-field">
+        <label>What should I call you?</label>
+        <input class="welcome-input" id="w-name" type="text" placeholder="e.g. Alex" value="${esc2(_welcomeDraft.name)}" oninput="_welcomeDraft.name=this.value">
+        <div class="welcome-hint">Optional — used for the Dashboard greeting.</div>
+      </div>
+      <div class="welcome-actions">
+        <button class="btn btn-o btn-sm" onclick="dismissWelcome()">Skip setup</button>
+        <button class="btn btn-g" onclick="welcomeNext()">Next →</button>
+      </div>`;
+    return;
+  }
+  if(step === 1){
+    body.innerHTML = `
+      <div class="welcome-icon">🗓</div>
+      <div class="welcome-title">Your timeline</div>
+      <div class="welcome-sub">These anchor every projection — retirement runway, nest egg curves, yearly forecast. You can change them anytime in Settings.</div>
+      <div class="welcome-field-row">
+        <div class="welcome-field">
+          <label>Current age</label>
+          <input class="welcome-input" id="w-age" type="number" min="18" max="100" value="${_welcomeDraft.currentAge}" oninput="_welcomeDraft.currentAge=+this.value||30">
+        </div>
+        <div class="welcome-field">
+          <label>Retirement age</label>
+          <input class="welcome-input" id="w-retage" type="number" min="40" max="100" value="${_welcomeDraft.retirementAge}" oninput="_welcomeDraft.retirementAge=+this.value||65">
+        </div>
+      </div>
+      <div class="welcome-hint" style="margin-top:6px">That's <strong id="w-years-span">${Math.max(0, _welcomeDraft.retirementAge - _welcomeDraft.currentAge)} years</strong> of compounding ahead.</div>
+      <div class="welcome-actions">
+        <button class="btn btn-o btn-sm" onclick="welcomeBack()">← Back</button>
+        <button class="btn btn-g" onclick="welcomeNext()">Next →</button>
+      </div>`;
+    // Live-update the "N years" hint as the user types.
+    const sync = () => {
+      const s = document.getElementById('w-years-span');
+      if(s) s.innerHTML = Math.max(0, _welcomeDraft.retirementAge - _welcomeDraft.currentAge) + ' years';
+    };
+    document.getElementById('w-age')?.addEventListener('input', sync);
+    document.getElementById('w-retage')?.addEventListener('input', sync);
+    return;
+  }
+  if(step === 2){
+    const s = sym();
+    const r = rate();
+    body.innerHTML = `
+      <div class="welcome-icon">💰</div>
+      <div class="welcome-title">A quick cashflow baseline</div>
+      <div class="welcome-sub">Rough monthly numbers for your current life. No line items yet — you can break them down and refine in the Monthly Review tab once you're in.</div>
+      <div class="welcome-field">
+        <label>Monthly take-home income</label>
+        <div class="welcome-input-wrap"><span class="welcome-input-cur">${s}</span><input class="welcome-input welcome-input-amt" id="w-inc" type="number" min="0" placeholder="e.g. 80000" value="${_welcomeDraft.income ? Math.round(_welcomeDraft.income * r) : ''}" oninput="_welcomeDraft.income=(+this.value||0)/${r}"></div>
+      </div>
+      <div class="welcome-field">
+        <label>Monthly expenses (rough total)</label>
+        <div class="welcome-input-wrap"><span class="welcome-input-cur">${s}</span><input class="welcome-input welcome-input-amt" id="w-exp" type="number" min="0" placeholder="e.g. 45000" value="${_welcomeDraft.expenses ? Math.round(_welcomeDraft.expenses * r) : ''}" oninput="_welcomeDraft.expenses=(+this.value||0)/${r}"></div>
+      </div>
+      <div class="welcome-hint">These become single placeholder line items in Monthly Review — edit, split, or delete them whenever you like.</div>
+      <div class="welcome-actions">
+        <button class="btn btn-o btn-sm" onclick="welcomeBack()">← Back</button>
+        <button class="btn btn-g" onclick="welcomeFinish()">Finish setup ✓</button>
+      </div>`;
+    return;
+  }
+}
+window.welcomeNext = function(){
+  if(_welcomeStep < 2){ _welcomeStep++; renderWelcomeStep(); }
+};
+window.welcomeBack = function(){
+  if(_welcomeStep > 0){ _welcomeStep--; renderWelcomeStep(); }
+};
+window.dismissWelcome = function(){
+  // "Skip setup" leaves state as-is but still flags completion so
+  // the user isn't nagged on every reload. They can always edit
+  // everything from Settings / Monthly Review later.
+  state.welcomeComplete = true;
+  save();
+  const m = document.getElementById('welcome-modal');
+  if(m) m.classList.remove('open');
+  // If the mandatory citizenship onboarding is still incomplete,
+  // hand off to its modal now that welcome is dismissed.
+  if(typeof onboardingComplete === 'function' && !onboardingComplete()){
+    showOnboardingBlock();
+  }
+};
+window.welcomeFinish = function(){
+  state.userName = String(_welcomeDraft.name || '').trim();
+  state.currentAge    = Math.max(18, Math.min(100, +_welcomeDraft.currentAge || 30));
+  state.retirementAge = Math.max(state.currentAge + 1, Math.min(100, +_welcomeDraft.retirementAge || 65));
+  // Replace the baseline with a single placeholder line item each,
+  // sized from the user's entered totals. They can break them up
+  // in Monthly Review later — but the Dashboard will already show
+  // real numbers instead of the demo seed on first paint.
+  if(_welcomeDraft.income > 0){
+    state.baseIncome = [{ id: genId(), name: 'Take-home pay', amount: Math.round(_welcomeDraft.income), type: 'fixed' }];
+  }
+  if(_welcomeDraft.expenses > 0){
+    state.baseExpenses = [{ id: genId(), name: 'Monthly expenses', amount: Math.round(_welcomeDraft.expenses), type: 'variable', icon: '💸' }];
+  }
+  state.welcomeComplete = true;
+  // Drop the user on the Dashboard so their first view is the
+  // personalised snapshot the flow just built.
+  state.activePanel = 'dashboard';
+  save();
+  invalidateSelectors();
+  const m = document.getElementById('welcome-modal');
+  if(m) m.classList.remove('open');
+  renderAll();
+  // If citizenship/home-base onboarding is still incomplete, it'll
+  // take over here — the welcome flow does NOT cover those because
+  // they're a separate "mandatory personal context" gate.
+  if(typeof onboardingComplete === 'function' && !onboardingComplete()){
+    showOnboardingBlock();
+  }
+};
 
 function nav(panel, opts) {
   if(!VALID_PANELS.includes(panel)) return;
@@ -11078,7 +11338,13 @@ if(typeof onboardingComplete === 'function' && !onboardingComplete()) {
   state.activePanel = 'settings';
 }
 renderAll();
-if(typeof onboardingComplete === 'function' && !onboardingComplete()) {
+// Fresh-install welcome flow takes priority over the citizenship
+// gate. If welcome is still pending, show it first; its Finish /
+// Skip handlers will hand off to showOnboardingBlock() if the
+// citizenship context is also missing.
+if(!state.welcomeComplete) {
+  showWelcomeModal();
+} else if(typeof onboardingComplete === 'function' && !onboardingComplete()) {
   showOnboardingBlock();
 }
 if(state.activeSection) setTimeout(()=>pulseSection(state.activeSection), 200);
