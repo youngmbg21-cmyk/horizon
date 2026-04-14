@@ -3454,6 +3454,47 @@ const STRINGS = {
   'dash.report.concern':    { en:'Areas of concern',            sv:'Områden att hålla koll på' },
   'dash.report.recs':       { en:'Recommendations',             sv:'Rekommendationer' },
 
+  // ── Retire Anywhere ────────────────────────────────────
+  'ra.page.tag':            { en:'RETIRE ANYWHERE',       sv:'PENSIONERA VAR SOM HELST' },
+  'ra.page.title':          { en:'Where Can You Retire?', sv:'Var kan du gå i pension?' },
+  'ra.page.sub':            { en:'AI-powered analysis — your <strong>{income}/mo</strong> retirement income (today\u2019s money) vs. global cost of living',
+                              sv:'AI-driven analys — din <strong>{income}/mån</strong> pensionsinkomst (dagens penningvärde) mot global levnadskostnad' },
+  'ra.callout':             { en:'<strong>Your Retirement Income: {income}/mo</strong> ({port}/mo from portfolio + {pen}/mo avg pension) — all values in <strong>today\u2019s money</strong>, the inflation-adjusted real purchasing power your nest egg can sustain.<br>Destinations are rated by whether your real income can comfortably cover local cost of living, after accounting for local tax.',
+                              sv:'<strong>Din pensionsinkomst: {income}/mån</strong> ({port}/mån från portfölj + {pen}/mån snittpension) — alla värden i <strong>dagens penningvärde</strong>, den inflationsjusterade reella köpkraft som ditt pensionskapital kan upprätthålla.<br>Destinationer rankas efter om din reella inkomst bekvämt kan täcka lokala levnadskostnader, efter att lokal skatt räknats av.' },
+  // KPI row
+  'ra.kpi.feasible':        { en:'FEASIBLE DESTINATIONS', sv:'GENOMFÖRBARA DESTINATIONER' },
+  'ra.kpi.feasible.sub':    { en:'Income > 100% of costs',
+                              sv:'Inkomst > 100% av kostnader' },
+  'ra.kpi.conditional':     { en:'CONDITIONAL',           sv:'VILLKORLIGT' },
+  'ra.kpi.conditional.sub': { en:'Income 80–100% of costs',
+                              sv:'Inkomst 80–100% av kostnader' },
+  'ra.kpi.income':          { en:'YOUR MONTHLY INCOME · TODAY\u2019S MONEY',
+                              sv:'DIN MÅNADSINKOMST · DAGENS PENNINGVÄRDE' },
+  'ra.kpi.income.sub':      { en:'At retirement age {age} · real value',
+                              sv:'Vid pensionsålder {age} · reellt värde' },
+  // Verdict pill labels (data layer keeps English; we translate at read)
+  'ra.verdict.feasible':    { en:'FEASIBLE',              sv:'GENOMFÖRBAR' },
+  'ra.verdict.conditional': { en:'CONDITIONAL',           sv:'VILLKORLIG' },
+  'ra.verdict.infeasible':  { en:'INFEASIBLE',            sv:'EJ GENOMFÖRBAR' },
+  // Location card body
+  'ra.card.affordable':     { en:'{pct}% affordable',     sv:'{pct}% överkomlig' },
+  'ra.card.cost':           { en:'Monthly cost of living',sv:'Månatlig levnadskostnad' },
+  'ra.card.income':         { en:'Your retirement income · today\u2019s money',
+                              sv:'Din pensionsinkomst · dagens penningvärde' },
+  'ra.card.surplus':        { en:'Monthly surplus · today\u2019s money',
+                              sv:'Månatligt överskott · dagens penningvärde' },
+  'ra.card.tax':            { en:'Local tax rate',        sv:'Lokal skattesats' },
+  'ra.card.climate':        { en:'Climate',               sv:'Klimat' },
+  'ra.card.cta.view':       { en:'📄 View Report',        sv:'📄 Visa rapport' },
+  'ra.card.cta.run':        { en:'🔬 Run AI Analysis',    sv:'🔬 Kör AI-analys' },
+  'ra.card.rerunTitle':     { en:'Re-run analysis',       sv:'Kör analysen igen' },
+  // Bottom action buttons
+  'ra.btn.addLocation':     { en:'+ Add Location',        sv:'+ Lägg till plats' },
+  'ra.btn.aiRecommend':     { en:'🤖 AI: Recommend destinations for me',
+                              sv:'🤖 AI: Föreslå destinationer åt mig' },
+  // addLocation defaults
+  'ra.new.name':            { en:'New Destination',       sv:'Ny destination' },
+
   // ── Bank & Transactions ────────────────────────────────
   'tx.page.title':          { en:'Bank & Transactions',   sv:'Bank & transaktioner' },
   'tx.page.sub.empty':      { en:'Connect your bank account to view real transaction data and spending patterns',
@@ -9914,46 +9955,49 @@ function renderRetireAnywhere() {
     // If so the primary CTA flips to "View Report" + shows a small "Re-run"
     // icon button so the user can refresh without losing the cached one.
     const cached = (state.vault||[]).find(v => v.type==='deepdive' && v.locationId===loc.id);
-    const primaryLabel = cached ? '📄 View Report' : '🔬 Run AI Analysis';
+    const primaryLabel = cached ? t('ra.card.cta.view') : t('ra.card.cta.run');
     const primaryClass = cached ? 'btn btn-o' : 'btn btn-g';
     const rerunBtn = cached
-      ? `<button class="loc-card-rerun" onclick="event.stopPropagation();openLocAnalysis('${loc.id}',{rerun:true})" title="Re-run analysis">↻</button>`
+      ? `<button class="loc-card-rerun" onclick="event.stopPropagation();openLocAnalysis('${loc.id}',{rerun:true})" title="${esc2(t('ra.card.rerunTitle'))}">↻</button>`
       : '';
+    // Verdict label translates via ra.verdict.<verdict>; the
+    // English `loc.label` from scoreLocation() stays the canonical
+    // source of truth (still used by AI prompts that read it).
+    const verdictText = STRINGS['ra.verdict.'+loc.verdict] ? t('ra.verdict.'+loc.verdict) : loc.label;
     return `<div class="loc-card ${loc.verdict}">
       <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:6px">
         <div>
           <div class="loc-name">${loc.flag} ${esc(loc.name)}</div>
           <div class="loc-country">${esc(loc.country)}</div>
         </div>
-        <span class="loc-verdict ${loc.verdict}">${loc.label}</span>
+        <span class="loc-verdict ${loc.verdict}">${esc2(verdictText)}</span>
       </div>
       <div class="loc-affordability-bar"><div class="loc-affordability-fill" style="width:${Math.round(loc.affordabilityScore*100)}%;background:${loc.verdict==='feasible'?'var(--green)':loc.verdict==='conditional'?'var(--amber)':'var(--red)'}"></div></div>
-      <div style="font-size:10px;color:var(--text3);font-family:var(--fm);margin-bottom:10px">${Math.round(loc.affordabilityScore*100)}% affordable</div>
-      <div class="loc-stat"><span class="loc-stat-lbl">Monthly cost of living</span><span class="loc-stat-val">${fmt(loc.costOfLiving)}</span></div>
-      <div class="loc-stat"><span class="loc-stat-lbl">Your retirement income · today&rsquo;s money</span><span class="loc-stat-val pos">${fmt(monthlyIncome)}</span></div>
-      <div class="loc-stat"><span class="loc-stat-lbl">Monthly surplus · today&rsquo;s money</span><span class="loc-stat-val ${loc.surplus>=0?'pos':'neg'}">${fmt(loc.surplus)}</span></div>
-      <div class="loc-stat"><span class="loc-stat-lbl">Local tax rate</span><span class="loc-stat-val">${loc.taxRate}%</span></div>
-      <div class="loc-stat"><span class="loc-stat-lbl">Climate</span><span class="loc-stat-val muted">${loc.climate}</span></div>
+      <div style="font-size:10px;color:var(--text3);font-family:var(--fm);margin-bottom:10px">${esc2(t('ra.card.affordable', { pct: Math.round(loc.affordabilityScore*100) }))}</div>
+      <div class="loc-stat"><span class="loc-stat-lbl">${esc2(t('ra.card.cost'))}</span><span class="loc-stat-val">${fmt(loc.costOfLiving)}</span></div>
+      <div class="loc-stat"><span class="loc-stat-lbl">${esc2(t('ra.card.income'))}</span><span class="loc-stat-val pos">${fmt(monthlyIncome)}</span></div>
+      <div class="loc-stat"><span class="loc-stat-lbl">${esc2(t('ra.card.surplus'))}</span><span class="loc-stat-val ${loc.surplus>=0?'pos':'neg'}">${fmt(loc.surplus)}</span></div>
+      <div class="loc-stat"><span class="loc-stat-lbl">${esc2(t('ra.card.tax'))}</span><span class="loc-stat-val">${loc.taxRate}%</span></div>
+      <div class="loc-stat"><span class="loc-stat-lbl">${esc2(t('ra.card.climate'))}</span><span class="loc-stat-val muted">${esc(loc.climate||'')}</span></div>
       <div class="loc-card-actions">
-        <button class="${primaryClass} loc-card-cta" onclick="openLocAnalysis('${loc.id}')">${primaryLabel}</button>
+        <button class="${primaryClass} loc-card-cta" onclick="openLocAnalysis('${loc.id}')">${esc2(primaryLabel)}</button>
         ${rerunBtn}
       </div>
     </div>`;
   }).join('');
 
   document.getElementById('panel-retireanywhere').innerHTML=`
-    <div class="ph"><div class="ph-tag">RETIRE ANYWHERE</div><div class="ph-title">Where Can You Retire?</div><div class="ph-sub">AI-powered analysis — your <strong>${fmt(monthlyIncome)}/mo</strong> retirement income (today&rsquo;s money) vs. global cost of living</div></div>
+    <div class="ph"><div class="ph-tag">${t('ra.page.tag')}</div><div class="ph-title">${esc2(t('ra.page.title'))}</div><div class="ph-sub">${t('ra.page.sub', { income: fmt(monthlyIncome) })}</div></div>
 
     <div class="callout">
       <span>💡</span>
-      <div><strong>Your Retirement Income: ${fmt(monthlyIncome)}/mo</strong> (${fmt(nums.sustainableAfterTax)}/mo from portfolio + ${fmt(nums.pensionAvgMonthly)}/mo avg pension) — all values in <strong>today&rsquo;s money</strong>, the inflation-adjusted real purchasing power your nest egg can sustain.
-      <br>Destinations are rated by whether your real income can comfortably cover local cost of living, after accounting for local tax.</div>
+      <div>${t('ra.callout', { income: fmt(monthlyIncome), port: fmt(nums.sustainableAfterTax), pen: fmt(nums.pensionAvgMonthly) })}</div>
     </div>
 
     ${ui.kpiRow([
-      {icon:'✅', label:'FEASIBLE DESTINATIONS', value:scored.filter(l=>l.verdict==='feasible').length, tone:'pos', sub:'Income > 100% of costs'},
-      {icon:'🎯', label:'CONDITIONAL',           value:`<span class="amb">${scored.filter(l=>l.verdict==='conditional').length}</span>`, sub:'Income 80–100% of costs'},
-      {icon:'💰', label:"YOUR MONTHLY INCOME · TODAY&rsquo;S MONEY",   value:fmt(monthlyIncome), sub:`At retirement age ${state.retirementAge} · real value`, link:'retirement', section:'runway'},
+      {icon:'✅', label:t('ra.kpi.feasible'),    value:scored.filter(l=>l.verdict==='feasible').length, tone:'pos', sub:t('ra.kpi.feasible.sub')},
+      {icon:'🎯', label:t('ra.kpi.conditional'), value:`<span class="amb">${scored.filter(l=>l.verdict==='conditional').length}</span>`, sub:t('ra.kpi.conditional.sub')},
+      {icon:'💰', label:t('ra.kpi.income'),      value:fmt(monthlyIncome), sub:t('ra.kpi.income.sub', { age: state.retirementAge }), link:'retirement', section:'runway'},
     ])}
 
     <div id="retire-map" data-section="map"></div>
@@ -9961,8 +10005,8 @@ function renderRetireAnywhere() {
     <div class="loc-grid">${locCards}</div>
 
     <div style="display:flex;gap:10px;margin-bottom:14px;flex-wrap:wrap">
-      <button class="btn btn-g" onclick="addLocation()">+ Add Location</button>
-      <button class="btn btn-o" onclick="aiAnalyzeLocations()">🤖 AI: Recommend destinations for me</button>
+      <button class="btn btn-g" onclick="addLocation()">${esc2(t('ra.btn.addLocation'))}</button>
+      <button class="btn btn-o" onclick="aiAnalyzeLocations()">${esc2(t('ra.btn.aiRecommend'))}</button>
     </div>
 
     <div id="ai-loc-output" style="display:none" class="card"></div>`;
