@@ -3551,6 +3551,59 @@ const STRINGS = {
   // addLocation defaults
   'ra.new.name':            { en:'New Destination',       sv:'Ny destination' },
 
+  // ── Property IQ · panel chrome ─────────────────────────
+  'piq.page.tag':           { en:'REAL ESTATE INTELLIGENCE',
+                              sv:'FASTIGHETSINTELLIGENS' },
+  'piq.page.title':         { en:'Property IQ',           sv:'Fastighets-IQ' },
+  'piq.page.sub':           { en:'AI-powered analysis · Live signals · Mortgage calculator · Legal risk scoring',
+                              sv:'AI-driven analys · Livesignaler · Bolånekalkylator · Juridisk riskbedömning' },
+  'piq.country.searchPlaceholder':{ en:'Type to search countries…',
+                                    sv:'Skriv för att söka länder…' },
+  'piq.country.noMatches':  { en:'No matches. Try a different spelling.',
+                              sv:'Inga träffar. Prova en annan stavning.' },
+  'piq.disclaimer':         { en:'⚠ AI-generated analysis only. Not financial or legal advice. Always verify with a licensed professional before any property purchase decision.',
+                              sv:'⚠ Endast AI-genererad analys. Inte finansiell eller juridisk rådgivning. Verifiera alltid med en licensierad expert innan ett fastighetsköp.' },
+  'piq.hist.title':         { en:'Search History',        sv:'Sökhistorik' },
+  'piq.hist.empty':         { en:'No searches yet.<br>Results saved here automatically.',
+                              sv:'Inga sökningar ännu.<br>Resultat sparas här automatiskt.' },
+  'piq.hist.clear':         { en:'Clear history',         sv:'Rensa historik' },
+  'piq.hist.confirmClear':  { en:'Clear all Property IQ search history?',
+                              sv:'Rensa all Property IQ-sökhistorik?' },
+  'piq.search.btn.idle':    { en:'Analyse',               sv:'Analysera' },
+  'piq.search.btn.running': { en:'Analysing…',            sv:'Analyserar…' },
+  'piq.empty.title':        { en:'Search a location to begin',
+                              sv:'Sök en plats för att börja' },
+  'piq.empty.country.title':{ en:'Search a {country} location to begin',
+                              sv:'Sök en plats i {country} för att börja' },
+  'piq.empty.sub':          { en:'PropIQ fetches live signals, generates an investment thesis, calculates mortgage payments, and flags legal risks.',
+                              sv:'PropIQ hämtar livesignaler, genererar en investeringstes, beräknar bolånebetalningar och flaggar juridiska risker.' },
+  'piq.empty.sub.compact':  { en:'Live signals · Investment analysis · Mortgage calculator · Legal risk',
+                              sv:'Livesignaler · Investeringsanalys · Bolånekalkylator · Juridisk risk' },
+  'piq.loading.msg':        { en:'Analysing {q} in {country}… you can switch tabs and come back.',
+                              sv:'Analyserar {q} i {country}… du kan byta flik och komma tillbaka.' },
+  'piq.loading.msg.noQuery':{ en:'Analysing {country}… you can switch tabs and come back.',
+                              sv:'Analyserar {country}… du kan byta flik och komma tillbaka.' },
+  'piq.error.title':        { en:'Analysis failed',       sv:'Analysen misslyckades' },
+  'piq.error.retry':        { en:'Retry',                 sv:'Försök igen' },
+  'piq.alert.noKey':        { en:'Add your Anthropic API key in Settings → AI Keys to use Property IQ.',
+                              sv:'Lägg till din Anthropic API-nyckel i Inställningar → AI-nycklar för att använda Property IQ.' },
+  'piq.callout.noKey':      { en:'No Claude API key found.',
+                              sv:'Ingen Claude API-nyckel hittades.' },
+  'piq.callout.noKeyLink':  { en:'Go to Settings → AI Keys',
+                              sv:'Gå till Inställningar → AI-nycklar' },
+  'piq.callout.noKeyTail':  { en:'to add your Anthropic key and unlock Property IQ analysis.',
+                              sv:'för att lägga till din Anthropic-nyckel och låsa upp Property IQ-analys.' },
+  'piq.progress.complete':  { en:'Analysis complete',     sv:'Analysen klar' },
+  // PIQ_STEPS labels (4 entries)
+  'piq.step.signals':       { en:'Fetching live signals',
+                              sv:'Hämtar livesignaler' },
+  'piq.step.market':        { en:'Analysing market data',
+                              sv:'Analyserar marknadsdata' },
+  'piq.step.thesis':        { en:'Generating investment thesis',
+                              sv:'Genererar investeringstes' },
+  'piq.step.legal':         { en:'Scoring legal risks',
+                              sv:'Bedömer juridiska risker' },
+
   // ── Bank & Transactions ────────────────────────────────
   'tx.page.title':          { en:'Bank & Transactions',   sv:'Bank & transaktioner' },
   'tx.page.sub.empty':      { en:'Connect your bank account to view real transaction data and spending patterns',
@@ -13932,7 +13985,13 @@ const PIQ_MC = new Proxy({}, {
   get(_target, key){ return (typeof key === 'string') ? piq_getConfig(key) : undefined; }
 });
 
-const PIQ_STEPS=['Fetching live signals','Analysing market data','Generating investment thesis','Scoring legal risks'];
+// PIQ_STEPS is a getter (function call) so the labels rebind to
+// the active language each time the progress panel pulls them.
+// Call sites that previously accessed PIQ_STEPS[i] now call
+// PIQ_STEPS()[i] — language flips mid-session pick up immediately
+// on the next analysis run.
+const PIQ_STEP_KEYS = ['piq.step.signals','piq.step.market','piq.step.thesis','piq.step.legal'];
+function PIQ_STEPS(){ return PIQ_STEP_KEYS.map(k => t(k)); }
 
 function piq_getAnthropicKey(){ return state.aiKeys?.claude||''; }
 function piq_getPerplexityKey(){ return state.aiKeys?.perplexity||''; }
@@ -13966,10 +14025,11 @@ function piq_cleanKpi(v){
 function renderPropIQ(){
   const cfg = piq_getConfig(piq_country);
   const histHtml = piq_history.length === 0
-    ? `<div class="piq-hist-empty">No searches yet.<br>Results saved here automatically.</div>`
+    ? `<div class="piq-hist-empty">${t('piq.hist.empty')}</div>`
     : piq_history.map((h,i)=>{
         const vCls=h.verdict==='BUY'?'piq-hv-buy':h.verdict==='AVOID'?'piq-hv-avoid':'piq-hv-hold';
-        const time=new Date(h.timestamp).toLocaleDateString('en-GB',{day:'numeric',month:'short'});
+        const dateLocale = state.lang === 'sv' ? 'sv-SE' : 'en-GB';
+        const time=new Date(h.timestamp).toLocaleDateString(dateLocale,{day:'numeric',month:'short'});
         const hCfg = piq_getConfig(h.market || h.country || 'KE');
         return `<div class="piq-hist-item${i===0&&piq_currentResult?' active':''}" onclick="piq_loadHistory(${i})">
           <div class="piq-hi-q">${h.query}</div>
@@ -13978,17 +14038,17 @@ function renderPropIQ(){
       }).join('');
 
   const clearBtn = piq_history.length > 0
-    ? `<button class="piq-hist-clear" onclick="piq_clearHistory()">Clear history</button>` : '';
+    ? `<button class="piq-hist-clear" onclick="piq_clearHistory()">${esc2(t('piq.hist.clear'))}</button>` : '';
 
-  const qtags = cfg.tags.map(t=>`<span class="piq-qtag" onclick="piq_quickSearch('${t.replace(/'/g,"\\'")}')">${esc2(t)}</span>`).join('');
+  const qtags = cfg.tags.map(tag=>`<span class="piq-qtag" onclick="piq_quickSearch('${tag.replace(/'/g,"\\'")}')">${esc2(tag)}</span>`).join('');
 
   document.getElementById('panel-propiq').innerHTML = `
     <div class="piq">
       ${(typeof ui!=='undefined'&&ui.ph)?ui.ph({
-        tag:'REAL ESTATE INTELLIGENCE',
-        titleHtml:`Property IQ <span id="piq-country-sub" style="font-size:13px;font-weight:400;color:var(--text2)">${esc2(cfg.name)}</span>`,
-        sub:'AI-powered analysis · Live signals · Mortgage calculator · Legal risk scoring'
-      }):`<div class="ph"><div class="ph-tag">REAL ESTATE INTELLIGENCE</div><div class="ph-title">Property IQ</div><div class="ph-sub">AI-powered analysis</div></div>`}
+        tag:t('piq.page.tag'),
+        titleHtml:`${esc2(t('piq.page.title'))} <span id="piq-country-sub" style="font-size:13px;font-weight:400;color:var(--text2)">${esc2(cfg.name)}</span>`,
+        sub:t('piq.page.sub')
+      }):`<div class="ph"><div class="ph-tag">${t('piq.page.tag')}</div><div class="ph-title">${esc2(t('piq.page.title'))}</div><div class="ph-sub">${esc2(t('piq.page.sub'))}</div></div>`}
 
       <!-- Country selector (searchable dropdown) + market context pill -->
       <div class="piq-country-row">
@@ -14001,7 +14061,7 @@ function renderPropIQ(){
           <div class="piq-country-menu" id="piq-country-menu">
             <div class="piq-country-search-wrap">
               <span class="piq-country-search-icon">🔍</span>
-              <input type="text" class="piq-country-search" id="piq-country-search" placeholder="Type to search countries…" autocomplete="off" oninput="piq_filterCountryMenu(this.value)" onkeydown="piq_countryMenuKeydown(event)">
+              <input type="text" class="piq-country-search" id="piq-country-search" placeholder="${esc2(t('piq.country.searchPlaceholder'))}" autocomplete="off" oninput="piq_filterCountryMenu(this.value)" onkeydown="piq_countryMenuKeydown(event)">
             </div>
             <div class="piq-country-results" id="piq-country-results"></div>
           </div>
@@ -14009,12 +14069,12 @@ function renderPropIQ(){
         <div class="piq-banner" id="piq-banner">${esc2(cfg.banner)}</div>
       </div>
 
-      <div class="piq-disclaimer">⚠ AI-generated analysis only. Not financial or legal advice. Always verify with a licensed professional before any property purchase decision.</div>
+      <div class="piq-disclaimer">${t('piq.disclaimer')}</div>
 
       <div class="piq-body">
         <!-- History sidebar -->
         <div class="piq-hist">
-          <div class="piq-hist-hd">Search History</div>
+          <div class="piq-hist-hd">${esc2(t('piq.hist.title'))}</div>
           <div id="piq-hist-list">${histHtml}</div>
           ${clearBtn}
         </div>
@@ -14023,12 +14083,12 @@ function renderPropIQ(){
         <div class="piq-main">
           <div class="piq-search-row">
             <input class="piq-search-input" id="piq-search-input" placeholder="${cfg.placeholder}" onkeydown="if(event.key==='Enter')piq_runSearch()">
-            <button class="piq-search-btn" id="piq-search-btn" onclick="piq_runSearch()">Analyse</button>
+            <button class="piq-search-btn" id="piq-search-btn" onclick="piq_runSearch()">${esc2(t('piq.search.btn.idle'))}</button>
           </div>
           <div class="piq-qtags">${qtags}</div>
 
           <div class="piq-progress" id="piq-progress">
-            <div class="piq-prog-label" id="piq-prog-label">Fetching live signals...</div>
+            <div class="piq-prog-label" id="piq-prog-label">${esc2(t('piq.step.signals'))}...</div>
             <div class="piq-prog-track"><div class="piq-prog-fill" id="piq-prog-fill"></div></div>
             <div class="piq-prog-steps" id="piq-prog-steps"></div>
           </div>
@@ -14036,14 +14096,14 @@ function renderPropIQ(){
           <div id="piq-results">
             ${(typeof ui!=='undefined'&&ui.empty)?ui.empty({
               icon:'🏠',
-              title:'Search a location to begin',
-              sub:'PropIQ fetches live signals, generates an investment thesis, calculates mortgage payments, and flags legal risks.'
-            }):`<div class="piq-empty"><div class="piq-empty-t">Search a location to begin</div><div class="piq-empty-s">PropIQ fetches live signals and analyses mortgages.</div></div>`}
+              title:t('piq.empty.title'),
+              sub:t('piq.empty.sub')
+            }):`<div class="piq-empty"><div class="piq-empty-t">${esc2(t('piq.empty.title'))}</div><div class="piq-empty-s">${esc2(t('piq.empty.sub'))}</div></div>`}
           </div>
         </div>
       </div>
 
-      ${!piq_getAnthropicKey()?`<div class="callout callout-warn" style="margin-top:12px">⚠ <div>No Claude API key found. <a href="#" onclick="nav('settings');return false" style="color:var(--green)">Go to Settings → AI Keys</a> to add your Anthropic key and unlock Property IQ analysis.</div></div>`:''}
+      ${!piq_getAnthropicKey()?`<div class="callout callout-warn" style="margin-top:12px">⚠ <div>${esc2(t('piq.callout.noKey'))} <a href="#" onclick="nav('settings');return false" style="color:var(--green)">${esc2(t('piq.callout.noKeyLink'))}</a> ${esc2(t('piq.callout.noKeyTail'))}</div></div>`:''}
     </div>`;
   // After the panel is in the DOM, rehydrate any background-task state
   // (running spinner or cached result) for this market, and attach the
@@ -14120,9 +14180,11 @@ function piq_setCountry(code){
   } else {
     const resultsEl = document.getElementById('piq-results');
     if(resultsEl) {
+      const title = t('piq.empty.country.title', { country: cfg.name });
+      const sub = t('piq.empty.sub.compact');
       resultsEl.innerHTML = (typeof ui!=='undefined' && ui.empty)
-        ? ui.empty({icon:'🏠', title:`Search a ${cfg.name} location to begin`, sub:'Live signals · Investment analysis · Mortgage calculator · Legal risk'})
-        : `<div class="piq-empty"><div class="piq-empty-t">Search a ${cfg.name} location to begin</div><div class="piq-empty-s">Live signals · Investment analysis · Mortgage calculator · Legal risk</div></div>`;
+        ? ui.empty({icon:'🏠', title, sub})
+        : `<div class="piq-empty"><div class="piq-empty-t">${esc2(title)}</div><div class="piq-empty-s">${esc2(sub)}</div></div>`;
     }
   }
 }
@@ -14223,7 +14285,7 @@ function piq_loadHistory(i){
 }
 
 function piq_clearHistory(){
-  if(!confirm('Clear all Property IQ search history?')) return;
+  if(!confirm(t('piq.hist.confirmClear'))) return;
   piq_history=[];piq_currentResult=null;piq_saveHistLS();
   renderPropIQ();
 }
@@ -14242,9 +14304,10 @@ function piq_startProgress(){
   if(!wrap) return;
   wrap.classList.add('on');
   if(fill)  fill.style.width='0%';
-  if(steps) steps.innerHTML=PIQ_STEPS.map((s,i)=>`<div class="piq-pstep${i===0?' active':''}" id="piq-pstep-${i}"><div class="piq-pstep-dot"></div>${s}</div>`).join('');
+  const _steps = PIQ_STEPS();
+  if(steps) steps.innerHTML=_steps.map((s,i)=>`<div class="piq-pstep${i===0?' active':''}" id="piq-pstep-${i}"><div class="piq-pstep-dot"></div>${esc2(s)}</div>`).join('');
   let pct=0,step=0;
-  if(label) label.textContent=PIQ_STEPS[0]+'...';
+  if(label) label.textContent=_steps[0]+'...';
   piq_progressTimer=setInterval(()=>{
     // Re-resolve every time in case the DOM was replaced mid-flight.
     const f=document.getElementById('piq-prog-fill');
@@ -14254,7 +14317,7 @@ function piq_startProgress(){
     const ns=pct<30?0:pct<55?1:pct<78?2:3;
     if(ns!==step){ document.getElementById('piq-pstep-'+step)?.classList.replace('active','done'); step=ns;
       const el=document.getElementById('piq-pstep-'+step);
-      if(el){el.classList.add('active'); if(l) l.textContent=PIQ_STEPS[step]+'...';} }
+      if(el){el.classList.add('active'); if(l) l.textContent=PIQ_STEPS()[step]+'...';} }
   },400);
 }
 
@@ -14263,8 +14326,8 @@ function piq_finishProgress(){
   const fill=document.getElementById('piq-prog-fill');
   const label=document.getElementById('piq-prog-label');
   if(fill) fill.style.width='100%';
-  if(label) label.textContent='Analysis complete';
-  PIQ_STEPS.forEach((_,i)=>document.getElementById('piq-pstep-'+i)?.classList.replace('active','done'));
+  if(label) label.textContent=t('piq.progress.complete');
+  PIQ_STEPS().forEach((_,i)=>document.getElementById('piq-pstep-'+i)?.classList.replace('active','done'));
   setTimeout(()=>document.getElementById('piq-progress')?.classList.remove('on'),800);
 }
 
@@ -14277,7 +14340,7 @@ function piq_bgKey(){ return 'piq:'+piq_market; }
 async function piq_runSearch(){
   const q=document.getElementById('piq-search-input')?.value.trim(); if(!q) return;
   const key=piq_getAnthropicKey();
-  if(!key){ alert('Add your Anthropic API key in Settings → AI Keys to use Property IQ.'); nav('settings'); return; }
+  if(!key){ alert(t('piq.alert.noKey')); nav('settings'); return; }
   piq_lastQuery=q;
   const cfg=PIQ_MC[piq_market];
   const bgKey = piq_bgKey();
@@ -14305,7 +14368,7 @@ function piq_renderBgSearchUI(){
   const status = bgTaskStatus(bgKey);
   const cfg = PIQ_MC[piq_market];
   if(status === 'running') {
-    if(btn) { btn.disabled = true; btn.textContent = 'Analysing…'; }
+    if(btn) { btn.disabled = true; btn.textContent = t('piq.search.btn.running'); }
     // Replace whatever's in #piq-results (usually the empty-state
     // placeholder that renderPropIQ just injected) with a dedicated
     // loading card so the user's return to a mid-flight analysis is
@@ -14313,17 +14376,20 @@ function piq_renderBgSearchUI(){
     // result just isn't ready yet.
     const meta = state.searchCache && state.searchCache[bgKey] && state.searchCache[bgKey].meta;
     const q = (meta && meta.query) || piq_lastQuery || '';
+    const loadingMsg = q
+      ? t('piq.loading.msg',         { q: esc(q), country: cfg.name })
+      : t('piq.loading.msg.noQuery', { country: cfg.name });
     resultsEl.innerHTML = (typeof ui!=='undefined' && ui.loading)
-      ? ui.loading(`Analysing ${q?esc(q)+' in ':''}${cfg.name}… you can switch tabs and come back.`)
-      : `<div class="piq-loading">Analysing… you can switch tabs and come back.</div>`;
+      ? ui.loading(loadingMsg)
+      : `<div class="piq-loading">${loadingMsg}</div>`;
     if(!document.getElementById('piq-progress')?.classList.contains('on')) piq_startProgress();
     return;
   }
-  if(btn) { btn.disabled = false; btn.textContent = 'Analyse'; }
+  if(btn) { btn.disabled = false; btn.textContent = t('piq.search.btn.idle'); }
   piq_finishProgress();
   const err = bgTaskError(bgKey);
   if(err) {
-    resultsEl.innerHTML = `<div class="piq-error"><div class="piq-error-t">Analysis failed</div><div class="piq-error-m">${esc(err.message||String(err))}</div><button class="piq-retry" onclick="piq_runSearch()">Retry</button></div>`;
+    resultsEl.innerHTML = `<div class="piq-error"><div class="piq-error-t">${esc2(t('piq.error.title'))}</div><div class="piq-error-m">${esc(err.message||String(err))}</div><button class="piq-retry" onclick="piq_runSearch()">${esc2(t('piq.error.retry'))}</button></div>`;
     return;
   }
   const cached = state.searchCache && state.searchCache[bgKey];
