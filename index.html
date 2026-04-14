@@ -7879,9 +7879,14 @@ function renderFunFund() {
   // list, and the headline KPIs all mirror exactly what the user typed
   // into each Monthly Review row — a single source of truth.
   const allMonths = FE.months.next12();
-  // 12 forward months, starting at the current month (same window the
-  // Forecast & Review → Monthly tab shows).
-  const months = allMonths.slice(0,12);
+  // Full 13-entry window (current month + 12 forward) — matches
+  // the window every other tab uses (Dashboard cash flow, Monthly
+  // Review forward charts, Transactions Next, etc.) so the Fun
+  // Fund tab's chart and running-balance table end at the same
+  // last month as the rest of the app. The headline 12-month Fun
+  // Fund KPI below still comes from funFundTwelveMoTotal() which
+  // is explicitly scoped to 12 months by definition.
+  const months = allMonths;
   // Headline Fun Fund total — always via FinancialEngine so it stays
   // identical to the Dashboard KPI + any other 12-month Fun Fund read.
   const totalFF = FE.months.funFundTwelveMoTotal();
