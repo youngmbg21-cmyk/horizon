@@ -2502,6 +2502,12 @@ body.light .piq-country-menu { box-shadow:0 12px 28px -10px rgba(60,40,10,0.22);
 // ═══════════════════════════════════════════════════════════════════════════════
 
 const STORAGE_KEY = 'horizon-finance-os-v1';
+// Vault (saved reports) persists to its own localStorage key so the
+// main save() path never has to stringify heavy Deep Dive markdown
+// on keystrokes. See save() + saveVault() + loadState() for the
+// full split. Keeping a separate key also lets a future IndexedDB
+// migration replace just this slice without touching anything else.
+const VAULT_STORAGE_KEY = STORAGE_KEY + ':vault';
 const MONTH_NAMES = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 const CURRENCY_SYMBOLS = { SEK:'kr', USD:'$', EUR:'€', KES:'KSh' };
 const DEFAULT_RATES = { SEK:1, USD:0.11, EUR:0.09, KES:14.27 };
@@ -2889,6 +2895,36 @@ function loadState() {
       state.version = STATE_VERSION;
     }
   } catch(e) { console.warn('loadState failed:', e); }
+  // Vault lives in its own localStorage key so heavy Deep Dive
+  // markdown never rides the main save() path. We load it AFTER the
+  // main state so legacy states that still embed `vault` inline
+  // get migrated: if the vault key is missing and main state has a
+  // non-empty vault, copy it across and strip it from main storage
+  // on the next save.
+  try {
+    const vraw = localStorage.getItem(VAULT_STORAGE_KEY);
+    if(vraw){
+      const v = JSON.parse(vraw);
+      if(Array.isArray(v)) state.vault = v;
+    } else if(Array.isArray(state.vault) && state.vault.length){
+      // Legacy path — vault was embedded in the main state blob.
+      // Write it to its own key immediately so the next save() can
+      // drop it from the main payload. No data loss: state.vault
+      // already points at the array.
+      try { localStorage.setItem(VAULT_STORAGE_KEY, JSON.stringify(state.vault)); } catch(_){}
+    }
+  } catch(e){ console.warn('loadVault failed:', e); }
+  if(!Array.isArray(state.vault)) state.vault = [];
+}
+// Persist the vault to its own key. Called explicitly from the
+// small set of places that mutate state.vault (save/delete/category
+// change) so the main save() path can stay vault-free.
+function saveVault(){
+  try {
+    localStorage.setItem(VAULT_STORAGE_KEY, JSON.stringify(state.vault || []));
+  } catch(e){
+    console.warn('saveVault failed:', e);
+  }
 }
 function save() {
   clearTimeout(saveTimer);
@@ -2898,7 +2934,19 @@ function save() {
   // Notify subscribers before the debounced write, so UI reacts instantly.
   if(typeof bus!=='undefined') bus.emit('state:changed', {panel: state.activePanel});
   saveTimer = setTimeout(() => {
-    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch(e) {}
+    try {
+      // Strip vault before stringifying the main state blob. The
+      // vault has its own storage key (see saveVault + loadState).
+      // This keeps per-keystroke save payloads small and stops the
+      // main state from bumping into the 5–10 MB localStorage cap
+      // as the user accumulates Deep Dive / Monthly Analysis
+      // reports. Restore the reference immediately so in-memory
+      // reads via state.vault keep working.
+      const vaultRef = state.vault;
+      state.vault = undefined;
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+      state.vault = vaultRef;
+    } catch(e) {}
   }, 400);
 }
 // Save confirmation badge removed — auto-save is now silent. This
@@ -4471,10 +4519,16 @@ window.applyCurrency = function(c){
       });
     } catch(e){ console.warn('applyCurrency render failed', e); }
   });
-  // 4) Persist directly — no bus, no double render.
+  // 4) Persist directly — no bus, no double render. Strip the vault
+  // before stringifying (same contract as save()) so this direct
+  // write path can't accidentally bring the heavy vault payload
+  // back into the main state blob.
   try {
     state.version = STATE_VERSION;
+    const vaultRef = state.vault;
+    state.vault = undefined;
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    state.vault = vaultRef;
   } catch(_e){}
 };
 
@@ -5204,7 +5258,7 @@ window.saveDashboardReportToVault = function(){
   state.vault.unshift(entry);
   // Cap at 100 so the newer analysis vault doesn't grow unbounded.
   if(state.vault.length > 100) state.vault = state.vault.slice(0, 100);
-  save();
+  saveVault(); save();
   // Tiny inline toast on the button
   try {
     const btn = document.querySelector('#dash-ai-report .dash-ai-actions .btn');
@@ -7547,6 +7601,7 @@ window.runLocAnalysis = function(id, opts){
   // If rerun, strip the previous cached entry so the new one replaces it
   if(opts && opts.force){
     state.vault = (state.vault||[]).filter(v => !(v.type==='deepdive' && v.locationId===id));
+    saveVault();
   }
   // Show the loading state in the analysis section of the slide-over
   const body = document.getElementById('retire-so-body');
@@ -7626,7 +7681,7 @@ One paragraph. Recommendation: "proceed", "proceed with caveats", or "reconsider
       if(!Array.isArray(state.vault)) state.vault = [];
       state.vault.unshift(entry);
       if(state.vault.length > 50) state.vault = state.vault.slice(0, 50);
-      save();
+      saveVault(); save();
       // Re-render the slide-over so the cached report appears in the
       // analysis section and the footer buttons enable.
       renderLocAnalysisSlideover();
@@ -8352,7 +8407,7 @@ One paragraph. Recommendation: "proceed", "proceed with caveats", or "reconsider
       if(!Array.isArray(state.vault)) state.vault = [];
       state.vault.unshift(entry);
       if(state.vault.length > 50) state.vault = state.vault.slice(0, 50);
-      save();
+      saveVault(); save();
       // Render inline
       if(el) {
         el.innerHTML = `
@@ -8472,7 +8527,7 @@ function renderSettings() {
           `).join('')}
         </div>
         <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:14px;padding-top:12px;border-top:1px solid var(--border)">
-          <button class="btn btn-danger" onclick="if(confirm('Reset all data? This cannot be undone.')){localStorage.removeItem('${STORAGE_KEY}');location.reload()}">⚠ Reset All</button>
+          <button class="btn btn-danger" onclick="if(confirm('Reset all data? This cannot be undone.')){localStorage.removeItem('${STORAGE_KEY}');localStorage.removeItem('${VAULT_STORAGE_KEY}');location.reload()}">⚠ Reset All</button>
         </div>
       </div>
     </div>`;
@@ -8791,7 +8846,7 @@ window.setVaultEntryCategory = function(id, cat){
   const v = (state.vault || []).find(x => x.id === id);
   if(!v) return;
   v.category = cat;
-  save();
+  saveVault(); save();
   renderVault();
 };
 window.toggleVaultSelect = function(id, checked){
@@ -8816,7 +8871,7 @@ window.deleteVaultEntry = function(id){
   state.vault = (state.vault || []).filter(v => v.id !== id);
   if(state.vaultOpenId === id) state.vaultOpenId = null;
   if(Array.isArray(state.vaultSelected)) state.vaultSelected = state.vaultSelected.filter(x => x !== id);
-  save();
+  saveVault(); save();
   renderVault();
 };
 // Export a saved Vault entry as a print-ready PDF by opening a new
@@ -8993,7 +9048,13 @@ window.importData=function(input){
   reader.onload=e=>{
     try{
       const d=JSON.parse(e.target.result);
-      Object.assign(state,d); migrate(state); invalidateSelectors(); save(); renderAll();
+      Object.assign(state,d); migrate(state); invalidateSelectors();
+      // Imported backups may embed the vault inline — persist it to
+      // its own key so subsequent saves don't rewrite it on every
+      // keystroke. saveVault() reads from state.vault which is
+      // already populated by the Object.assign above.
+      if(Array.isArray(state.vault)) saveVault();
+      save(); renderAll();
     }catch(e){alert('Invalid backup file: '+e.message);}
   };
   reader.readAsText(file);
