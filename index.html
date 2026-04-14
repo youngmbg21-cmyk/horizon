@@ -3454,6 +3454,59 @@ const STRINGS = {
   'dash.report.concern':    { en:'Areas of concern',            sv:'Områden att hålla koll på' },
   'dash.report.recs':       { en:'Recommendations',             sv:'Rekommendationer' },
 
+  // ── Retirement · s3 Expenses & Parameters ──────────────
+  // Monthly Retirement Expenses card
+  's3.exp.title':           { en:'Monthly Retirement Expenses',
+                              sv:'Månatliga pensionsutgifter' },
+  's3.exp.titleSub':        { en:'(today\u2019s money)',
+                              sv:'(dagens penningvärde)' },
+  's3.exp.copyBtn':         { en:'📋 Copy from current budget',
+                              sv:'📋 Kopiera från nuvarande budget' },
+  's3.exp.copyTitle':       { en:'Replace this list with a snapshot of your current monthly expenses',
+                              sv:'Ersätt listan med en ögonblicksbild av dina nuvarande månadsutgifter' },
+  's3.exp.addExpense':      { en:'+ Add Expense',       sv:'+ Lägg till utgift' },
+  's3.exp.newExpenseName':  { en:'New Expense',         sv:'Ny utgift' },
+  's3.exp.inflationHint':   { en:'💡 Enter in today\u2019s purchasing power. At {rate}% inflation over {yrs} years, {today} today = {future} at retirement.',
+                              sv:'💡 Ange i dagens köpkraft. Vid {rate}% inflation över {yrs} år blir {today} idag = {future} vid pension.' },
+  // Seeded-from banner (shown after the user clicks Copy)
+  's3.seed.title':          { en:'Seeded from <strong>{month}</strong>',
+                              sv:'Skapad från <strong>{month}</strong>' },
+  's3.seed.monthFallback':  { en:'current budget',      sv:'nuvarande budget' },
+  's3.seed.sub':            { en:'One-shot snapshot — adjust anything you expect to change in retirement. Future edits to Monthly Review stay independent.',
+                              sv:'Engångsögonblick — justera det du förväntar dig ändras vid pensionen. Framtida ändringar i Månadsgenomgång förblir oberoende.' },
+  's3.seed.dismiss':        { en:'Dismiss',             sv:'Stäng' },
+  // All Parameters card
+  's3.params.title':        { en:'All Parameters',      sv:'Alla parametrar' },
+  's3.params.currentAge':   { en:'Current Age',         sv:'Nuvarande ålder' },
+  's3.params.retirementAge':{ en:'Retirement Age',      sv:'Pensionsålder' },
+  's3.params.growthRate':   { en:'Growth Rate %',       sv:'Tillväxttakt %' },
+  's3.params.inflation':    { en:'Inflation %',         sv:'Inflation %' },
+  's3.params.postRetGrowth':{ en:'Post-Ret Growth %',   sv:'Tillväxt efter pension %' },
+  's3.params.withdrawalTax':{ en:'Withdrawal Tax %',    sv:'Uttagsskatt %' },
+  's3.params.lifeExp':      { en:'Life Expectancy',     sv:'Förväntad livslängd' },
+  's3.params.helpTitle':    { en:'Ask Horizon AI what this means',
+                              sv:'Fråga Horizon AI vad detta betyder' },
+  // Income Requirements (right-hand card inside s3)
+  's3.ireq.title':          { en:'Income Requirements',
+                              sv:'Inkomstbehov' },
+  's3.ireq.afterTax':       { en:'After-tax expenses needed',
+                              sv:'Utgifter efter skatt som behövs' },
+  's3.ireq.grossNeeded':    { en:'Gross needed (\u00f7{f})',
+                              sv:'Brutto som behövs (\u00f7{f})' },
+  's3.ireq.pensionOffset':  { en:'Pension income offset',
+                              sv:'Pensionsinkomstavdrag' },
+  's3.ireq.avg':            { en:'(avg)',               sv:'(snitt)' },
+  's3.ireq.portWithdraw':   { en:'Portfolio withdrawal needed',
+                              sv:'Nödvändigt portföljuttag' },
+  's3.ireq.portSustain':    { en:'Portfolio can sustain',
+                              sv:'Portföljen kan hålla' },
+  's3.ireq.afterTaxSuffix': { en:'/mo after tax',       sv:'/mån efter skatt' },
+  // copyBaselineToRetirementExpenses alerts
+  's3.copy.noMonthlyYet':   { en:'No monthly expenses to copy yet — add at least one line item on the Monthly Review tab first.',
+                              sv:'Inga månadsutgifter att kopiera ännu — lägg till minst en rad i Månadsgenomgång-fliken först.' },
+  's3.copy.confirm':        { en:'This will replace your {n} existing retirement expense{s} with a snapshot of your current monthly budget.\n\nThis is a one-shot copy — you can adjust the retirement list afterwards without affecting your Monthly Review. Continue?',
+                              sv:'Detta kommer ersätta dina {n} befintliga pensionsutgifter med en ögonblicksbild av din nuvarande månadsbudget.\n\nDet är en engångskopia — du kan justera pensionslistan i efterhand utan att påverka Månadsgenomgång. Fortsätta?' },
+
   // ── Retirement · s2 Portfolio & Pension ────────────────
   // KPI row above the two-column card grid.
   's2.kpi.totalBalance':    { en:'TOTAL INVESTMENT BALANCE',
@@ -8202,12 +8255,12 @@ function sectionWrap(n, icon, title, subtitle, content) {
 window.copyBaselineToRetirementExpenses = function(){
   const snapshot = FE.months.currentExpensesSnapshot();
   if(!snapshot.length){
-    alert('No monthly expenses to copy yet — add at least one line item on the Monthly Review tab first.');
+    alert(t('s3.copy.noMonthlyYet'));
     return;
   }
   const existing = (state.retirementExpenses || []).length;
   if(existing > 0){
-    const proceed = confirm(`This will replace your ${existing} existing retirement expense${existing===1?'':'s'} with a snapshot of your current monthly budget.\n\nThis is a one-shot copy — you can adjust the retirement list afterwards without affecting your Monthly Review. Continue?`);
+    const proceed = confirm(t('s3.copy.confirm', { n: existing, s: existing === 1 ? '' : 's' }));
     if(!proceed) return;
   }
   state.retirementExpenses = snapshot;
@@ -8583,48 +8636,55 @@ function renderRetirement() {
     <div class="ret-seed-banner">
       <span class="ret-seed-icon">📋</span>
       <div class="ret-seed-body">
-        <div class="ret-seed-title">Seeded from <strong>${esc2(seededFrom.month || 'current budget')}</strong></div>
-        <div class="ret-seed-sub">One-shot snapshot — adjust anything you expect to change in retirement. Future edits to Monthly Review stay independent.</div>
+        <div class="ret-seed-title">${t('s3.seed.title', { month: esc2(seededFrom.month || t('s3.seed.monthFallback')) })}</div>
+        <div class="ret-seed-sub">${esc2(t('s3.seed.sub'))}</div>
       </div>
-      <button class="ret-seed-x" onclick="delete state.retirementExpensesSeededFrom;save();renderRetirement()" title="Dismiss">×</button>
+      <button class="ret-seed-x" onclick="delete state.retirementExpensesSeededFrom;save();renderRetirement()" title="${esc2(t('s3.seed.dismiss'))}">×</button>
     </div>
   ` : '';
+  const newExpenseName = t('s3.exp.newExpenseName').replace(/'/g, "\\'");
+  const inflationHint = t('s3.exp.inflationHint', {
+    rate: state.inflationRate,
+    yrs:  nums.ytr,
+    today:  fmt(1000),
+    future: fmt(Math.round(1000 * Math.pow(1 + state.inflationRate/100, nums.ytr))),
+  });
   const s3 = `
     <div style="padding:0 14px 14px">
       <div class="two-col">
         <div class="card">
           <div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap">
-            <span>Monthly Retirement Expenses <span style="font-size:9px;color:var(--text2);font-weight:400;text-transform:none">(today's money)</span></span>
-            <button class="btn btn-o btn-xs" onclick="copyBaselineToRetirementExpenses()" title="Replace this list with a snapshot of your current monthly expenses">📋 Copy from current budget</button>
+            <span>${esc2(t('s3.exp.title'))} <span style="font-size:9px;color:var(--text2);font-weight:400;text-transform:none">${esc2(t('s3.exp.titleSub'))}</span></span>
+            <button class="btn btn-o btn-xs" onclick="copyBaselineToRetirementExpenses()" title="${esc2(t('s3.exp.copyTitle'))}">${esc2(t('s3.exp.copyBtn'))}</button>
           </div>
           ${seededBanner}
           ${expRows}
-          <button class="btn-add" onclick="state.retirementExpenses.push({id:genId(),name:'New Expense',amount:0,type:'variable',icon:'💸'});save();renderRetirement()">+ Add Expense</button>
+          <button class="btn-add" onclick="state.retirementExpenses.push({id:genId(),name:'${newExpenseName}',amount:0,type:'variable',icon:'💸'});save();renderRetirement()">${esc2(t('s3.exp.addExpense'))}</button>
           <div style="margin-top:10px;padding:8px 10px;background:var(--bg3);border-radius:6px;font-size:10px;color:var(--text2);line-height:1.5">
-            💡 Enter in today's purchasing power. At ${state.inflationRate}% inflation over ${nums.ytr} years, ${fmt(1000)} today = ${fmt(Math.round(1000*Math.pow(1+state.inflationRate/100,nums.ytr)))} at retirement.
+            ${inflationHint}
           </div>
         </div>
         <div style="display:flex;flex-direction:column;gap:8px">
           <div class="card">
-            <div class="card-title">All Parameters</div>
+            <div class="card-title">${esc2(t('s3.params.title'))}</div>
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:7px">
-              <div class="field"><label>Current Age</label><input type="number" value="${state.currentAge}" oninput="state.currentAge=+this.value;save()" onchange="commitRender('renderRetirement')"></div>
-              <div class="field"><label>Retirement Age</label><input type="number" value="${state.retirementAge}" oninput="state.retirementAge=+this.value;save()" onchange="commitRender('renderRetirement')"></div>
-              <div class="field"><label class="field-label-row">Growth Rate %<button type="button" class="field-help-btn" onclick="askRetirementParamHelp('growthRate')" title="Ask Horizon AI what this means">?</button></label><input type="number" value="${state.growthRate}" oninput="state.growthRate=+this.value;save()" onchange="commitRender('renderRetirement')"></div>
-              <div class="field"><label class="field-label-row">Inflation %<button type="button" class="field-help-btn" onclick="askRetirementParamHelp('inflation')" title="Ask Horizon AI what this means">?</button></label><input type="number" value="${state.inflationRate}" oninput="state.inflationRate=+this.value;save()" onchange="commitRender('renderRetirement')"></div>
-              <div class="field"><label class="field-label-row">Post-Ret Growth %<button type="button" class="field-help-btn" onclick="askRetirementParamHelp('postGrowth')" title="Ask Horizon AI what this means">?</button></label><input type="number" value="${state.retirementPostGrowth||4}" oninput="state.retirementPostGrowth=+this.value;save()" onchange="commitRender('renderRetirement')"></div>
-              <div class="field"><label class="field-label-row">Withdrawal Tax %<button type="button" class="field-help-btn" onclick="askRetirementParamHelp('withdrawTax')" title="Ask Horizon AI what this means">?</button></label><input type="number" value="${state.withdrawTaxRate||30}" oninput="state.withdrawTaxRate=+this.value;save()" onchange="commitRender('renderRetirement')"></div>
-              <div class="field" style="grid-column:1/-1"><label>Life Expectancy</label><input type="number" value="${state.lifeExp||90}" oninput="state.lifeExp=+this.value;save()" onchange="commitRender('renderRetirement')"></div>
+              <div class="field"><label>${esc2(t('s3.params.currentAge'))}</label><input type="number" value="${state.currentAge}" oninput="state.currentAge=+this.value;save()" onchange="commitRender('renderRetirement')"></div>
+              <div class="field"><label>${esc2(t('s3.params.retirementAge'))}</label><input type="number" value="${state.retirementAge}" oninput="state.retirementAge=+this.value;save()" onchange="commitRender('renderRetirement')"></div>
+              <div class="field"><label class="field-label-row">${esc2(t('s3.params.growthRate'))}<button type="button" class="field-help-btn" onclick="askRetirementParamHelp('growthRate')" title="${esc2(t('s3.params.helpTitle'))}">?</button></label><input type="number" value="${state.growthRate}" oninput="state.growthRate=+this.value;save()" onchange="commitRender('renderRetirement')"></div>
+              <div class="field"><label class="field-label-row">${esc2(t('s3.params.inflation'))}<button type="button" class="field-help-btn" onclick="askRetirementParamHelp('inflation')" title="${esc2(t('s3.params.helpTitle'))}">?</button></label><input type="number" value="${state.inflationRate}" oninput="state.inflationRate=+this.value;save()" onchange="commitRender('renderRetirement')"></div>
+              <div class="field"><label class="field-label-row">${esc2(t('s3.params.postRetGrowth'))}<button type="button" class="field-help-btn" onclick="askRetirementParamHelp('postGrowth')" title="${esc2(t('s3.params.helpTitle'))}">?</button></label><input type="number" value="${state.retirementPostGrowth||4}" oninput="state.retirementPostGrowth=+this.value;save()" onchange="commitRender('renderRetirement')"></div>
+              <div class="field"><label class="field-label-row">${esc2(t('s3.params.withdrawalTax'))}<button type="button" class="field-help-btn" onclick="askRetirementParamHelp('withdrawTax')" title="${esc2(t('s3.params.helpTitle'))}">?</button></label><input type="number" value="${state.withdrawTaxRate||30}" oninput="state.withdrawTaxRate=+this.value;save()" onchange="commitRender('renderRetirement')"></div>
+              <div class="field" style="grid-column:1/-1"><label>${esc2(t('s3.params.lifeExp'))}</label><input type="number" value="${state.lifeExp||90}" oninput="state.lifeExp=+this.value;save()" onchange="commitRender('renderRetirement')"></div>
             </div>
           </div>
           <div class="card">
-            <div class="card-title">Income Requirements</div>
+            <div class="card-title">${esc2(t('s3.ireq.title'))}</div>
             <div style="display:flex;flex-direction:column;gap:2px;font-size:11px">
-              <div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--bg3)"><span style="color:var(--text2)">After-tax expenses needed</span><span style="font-family:var(--fm);font-weight:600">${fmt(nums.totalExp)}/mo</span></div>
-              <div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--bg3)"><span style="color:var(--text2)">Gross needed (÷${(1-nums.taxRate).toFixed(2)})</span><span style="font-family:var(--fm);font-weight:600">${fmt(nums.totalGross)}/mo</span></div>
-              <div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--bg3)"><span style="color:var(--text2)">Pension income offset <span style="color:var(--text3);font-size:10px">(avg)</span></span><span style="font-family:var(--fm);font-weight:600;color:var(--amber)">− ${fmt(nums.pensionAvgMonthly)}/mo</span></div>
-              <div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--bg3)"><span style="color:var(--text2)">Portfolio withdrawal needed</span><span style="font-family:var(--fm);font-weight:700;color:var(--red)">${fmt(nums.grossNeeded)}/mo</span></div>
-              <div style="display:flex;justify-content:space-between;padding:5px 0"><span style="color:var(--text2)">Portfolio can sustain</span><span style="font-family:var(--fm);font-weight:700;color:var(--green)">${fmt(nums.sustainableAfterTax)}/mo after tax</span></div>
+              <div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--bg3)"><span style="color:var(--text2)">${esc2(t('s3.ireq.afterTax'))}</span><span style="font-family:var(--fm);font-weight:600">${fmt(nums.totalExp)}/mo</span></div>
+              <div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--bg3)"><span style="color:var(--text2)">${esc2(t('s3.ireq.grossNeeded', { f: (1-nums.taxRate).toFixed(2) }))}</span><span style="font-family:var(--fm);font-weight:600">${fmt(nums.totalGross)}/mo</span></div>
+              <div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--bg3)"><span style="color:var(--text2)">${esc2(t('s3.ireq.pensionOffset'))} <span style="color:var(--text3);font-size:10px">${esc2(t('s3.ireq.avg'))}</span></span><span style="font-family:var(--fm);font-weight:600;color:var(--amber)">− ${fmt(nums.pensionAvgMonthly)}/mo</span></div>
+              <div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--bg3)"><span style="color:var(--text2)">${esc2(t('s3.ireq.portWithdraw'))}</span><span style="font-family:var(--fm);font-weight:700;color:var(--red)">${fmt(nums.grossNeeded)}/mo</span></div>
+              <div style="display:flex;justify-content:space-between;padding:5px 0"><span style="color:var(--text2)">${esc2(t('s3.ireq.portSustain'))}</span><span style="font-family:var(--fm);font-weight:700;color:var(--green)">${fmt(nums.sustainableAfterTax)}${esc2(t('s3.ireq.afterTaxSuffix'))}</span></div>
             </div>
           </div>
         </div>
