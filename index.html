@@ -9242,17 +9242,17 @@ function renderRetirement() {
         <label>${label}</label>
         <div class="rac-input-wrap">
           ${prefix?`<span class="rac-prefix">${prefix}</span>`:''}
-          <input type="number" value="${val}" oninput="${handler}" onchange="commitRender('renderRetirement')">
+          <input type="text" inputmode="decimal" data-lang-num="1" value="${val}" oninput="${handler}" onchange="commitRender('renderRetirement')">
           ${suffix?`<span class="rac-suffix">${suffix}</span>`:''}
         </div>
       </div>`;
     const fields = isInv ? `
-      ${numCell(t('s2.card.field.balance'),      Math.round(a.balance*r),             `state.externalAssets[${idx}].balance=this.value/${r};save()`, s)}
-      ${numCell(t('s2.card.field.contribution'), Math.round(a.monthlyContribution*r), `state.externalAssets[${idx}].monthlyContribution=this.value/${r};save()`, s, '/mo')}
-      ${numCell(t('s2.card.field.growthRate'),   gr,                                  `state.externalAssets[${idx}].growthRate=+this.value;save()`, '', '%')}
+      ${numCell(t('s2.card.field.balance'),      Math.round(a.balance*r),             `state.externalAssets[${idx}].balance=parseNum(this.value)/${r};save()`, s)}
+      ${numCell(t('s2.card.field.contribution'), Math.round(a.monthlyContribution*r), `state.externalAssets[${idx}].monthlyContribution=parseNum(this.value)/${r};save()`, s, '/mo')}
+      ${numCell(t('s2.card.field.growthRate'),   gr,                                  `state.externalAssets[${idx}].growthRate=parseNum(this.value);save()`, '', '%')}
     ` : `
-      ${numCell(t('s2.card.field.payout'),  Math.round((a.monthlyPayout||0)*r), `state.externalAssets[${idx}].monthlyPayout=this.value/${r};save()`, s, '/mo')}
-      ${numCell(t('s2.card.field.fromAge'), a.startAge||state.retirementAge,    `state.externalAssets[${idx}].startAge=+this.value;save()`)}
+      ${numCell(t('s2.card.field.payout'),  Math.round((a.monthlyPayout||0)*r), `state.externalAssets[${idx}].monthlyPayout=parseNum(this.value)/${r};save()`, s, '/mo')}
+      ${numCell(t('s2.card.field.fromAge'), a.startAge||state.retirementAge,    `state.externalAssets[${idx}].startAge=parseNum(this.value);save()`)}
     `;
     const projCell = isInv ? `
       <div class="ret-asset-proj">
@@ -9364,7 +9364,7 @@ function renderRetirement() {
     <div class="line-item">
       <span style="font-size:14px;width:20px;text-align:center;flex-shrink:0">${e.icon||'💸'}</span>
       <input class="line-name" value="${esc(e.name)}" oninput="state.retirementExpenses[${idx}].name=this.value;save()" onchange="commitRender('renderRetirement')">
-      <div class="line-amt-wrap"><span class="line-cur">${s}</span><input class="line-amt" type="number" value="${Math.round(e.amount*r)}" oninput="state.retirementExpenses[${idx}].amount=this.value/${r};save()" onchange="commitRender('renderRetirement')"></div>
+      <div class="line-amt-wrap"><span class="line-cur">${s}</span><input class="line-amt" type="text" inputmode="decimal" data-lang-num="1" value="${Math.round(e.amount*r)}" oninput="state.retirementExpenses[${idx}].amount=parseNum(this.value)/${r};save()" onchange="commitRender('renderRetirement')"></div>
       <select class="line-type" onchange="state.retirementExpenses[${idx}].type=this.value;save()"><option value="fixed" ${e.type==='fixed'?'selected':''}>Fixed</option><option value="variable" ${e.type==='variable'?'selected':''}>Variable</option></select>
       <button class="line-rm" onclick="state.retirementExpenses.splice(${idx},1);save();renderRetirement()">×</button>
     </div>`).join('');
@@ -9411,13 +9411,13 @@ function renderRetirement() {
           <div class="card">
             <div class="card-title">${esc2(t('s3.params.title'))}</div>
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:7px">
-              <div class="field"><label>${esc2(t('s3.params.currentAge'))}</label><input type="number" value="${state.currentAge}" oninput="state.currentAge=+this.value;save()" onchange="commitRender('renderRetirement')"></div>
-              <div class="field"><label>${esc2(t('s3.params.retirementAge'))}</label><input type="number" value="${state.retirementAge}" oninput="state.retirementAge=+this.value;save()" onchange="commitRender('renderRetirement')"></div>
-              <div class="field"><label class="field-label-row">${esc2(t('s3.params.growthRate'))}<button type="button" class="field-help-btn" onclick="askRetirementParamHelp('growthRate')" title="${esc2(t('s3.params.helpTitle'))}">?</button></label><input type="number" value="${state.growthRate}" oninput="state.growthRate=+this.value;save()" onchange="commitRender('renderRetirement')"></div>
-              <div class="field"><label class="field-label-row">${esc2(t('s3.params.inflation'))}<button type="button" class="field-help-btn" onclick="askRetirementParamHelp('inflation')" title="${esc2(t('s3.params.helpTitle'))}">?</button></label><input type="number" value="${state.inflationRate}" oninput="state.inflationRate=+this.value;save()" onchange="commitRender('renderRetirement')"></div>
-              <div class="field"><label class="field-label-row">${esc2(t('s3.params.postRetGrowth'))}<button type="button" class="field-help-btn" onclick="askRetirementParamHelp('postGrowth')" title="${esc2(t('s3.params.helpTitle'))}">?</button></label><input type="number" value="${state.retirementPostGrowth||4}" oninput="state.retirementPostGrowth=+this.value;save()" onchange="commitRender('renderRetirement')"></div>
-              <div class="field"><label class="field-label-row">${esc2(t('s3.params.withdrawalTax'))}<button type="button" class="field-help-btn" onclick="askRetirementParamHelp('withdrawTax')" title="${esc2(t('s3.params.helpTitle'))}">?</button></label><input type="number" value="${state.withdrawTaxRate||30}" oninput="state.withdrawTaxRate=+this.value;save()" onchange="commitRender('renderRetirement')"></div>
-              <div class="field" style="grid-column:1/-1"><label>${esc2(t('s3.params.lifeExp'))}</label><input type="number" value="${state.lifeExp||90}" oninput="state.lifeExp=+this.value;save()" onchange="commitRender('renderRetirement')"></div>
+              <div class="field"><label>${esc2(t('s3.params.currentAge'))}</label><input type="text" inputmode="decimal" data-lang-num="1" value="${state.currentAge}" oninput="state.currentAge=parseNum(this.value);save()" onchange="commitRender('renderRetirement')"></div>
+              <div class="field"><label>${esc2(t('s3.params.retirementAge'))}</label><input type="text" inputmode="decimal" data-lang-num="1" value="${state.retirementAge}" oninput="state.retirementAge=parseNum(this.value);save()" onchange="commitRender('renderRetirement')"></div>
+              <div class="field"><label class="field-label-row">${esc2(t('s3.params.growthRate'))}<button type="button" class="field-help-btn" onclick="askRetirementParamHelp('growthRate')" title="${esc2(t('s3.params.helpTitle'))}">?</button></label><input type="text" inputmode="decimal" data-lang-num="1" value="${state.growthRate}" oninput="state.growthRate=parseNum(this.value);save()" onchange="commitRender('renderRetirement')"></div>
+              <div class="field"><label class="field-label-row">${esc2(t('s3.params.inflation'))}<button type="button" class="field-help-btn" onclick="askRetirementParamHelp('inflation')" title="${esc2(t('s3.params.helpTitle'))}">?</button></label><input type="text" inputmode="decimal" data-lang-num="1" value="${state.inflationRate}" oninput="state.inflationRate=parseNum(this.value);save()" onchange="commitRender('renderRetirement')"></div>
+              <div class="field"><label class="field-label-row">${esc2(t('s3.params.postRetGrowth'))}<button type="button" class="field-help-btn" onclick="askRetirementParamHelp('postGrowth')" title="${esc2(t('s3.params.helpTitle'))}">?</button></label><input type="text" inputmode="decimal" data-lang-num="1" value="${state.retirementPostGrowth||4}" oninput="state.retirementPostGrowth=parseNum(this.value);save()" onchange="commitRender('renderRetirement')"></div>
+              <div class="field"><label class="field-label-row">${esc2(t('s3.params.withdrawalTax'))}<button type="button" class="field-help-btn" onclick="askRetirementParamHelp('withdrawTax')" title="${esc2(t('s3.params.helpTitle'))}">?</button></label><input type="text" inputmode="decimal" data-lang-num="1" value="${state.withdrawTaxRate||30}" oninput="state.withdrawTaxRate=parseNum(this.value);save()" onchange="commitRender('renderRetirement')"></div>
+              <div class="field" style="grid-column:1/-1"><label>${esc2(t('s3.params.lifeExp'))}</label><input type="text" inputmode="decimal" data-lang-num="1" value="${state.lifeExp||90}" oninput="state.lifeExp=parseNum(this.value);save()" onchange="commitRender('renderRetirement')"></div>
             </div>
           </div>
           <div class="card">
