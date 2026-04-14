@@ -3454,6 +3454,18 @@ const STRINGS = {
   'dash.report.concern':    { en:'Areas of concern',            sv:'Områden att hålla koll på' },
   'dash.report.recs':       { en:'Recommendations',             sv:'Rekommendationer' },
 
+  // ── Fun Fund · running balance table ───────────────────
+  'ff.run.title':           { en:'Monthly Fun Fund — Running Balance',
+                              sv:'Månadsvis Fun Fund — löpande saldo' },
+  'ff.run.blurb':           { en:"Each month's allocation (Income − Expenses − Savings) rolls into a continuous running balance. A negative month carries its deficit forward until later surpluses pay it off.",
+                              sv:'Varje månads tilldelning (Inkomst − Utgifter − Sparande) rullar in i ett löpande saldo. En minusmånad bär sitt underskott vidare tills senare överskott betalar av det.' },
+  'ff.run.col.month':       { en:'Month',                 sv:'Månad' },
+  'ff.run.col.delta':       { en:'Monthly Allocation',    sv:'Månadens tilldelning' },
+  'ff.run.col.balance':     { en:'Running Balance',       sv:'Löpande saldo' },
+  'ff.run.col.status':      { en:'Status',                sv:'Status' },
+  'ff.run.flag.payingOff':  { en:'paying off deficit',    sv:'betalar av underskott' },
+  'ff.run.flag.absorbed':   { en:'absorbed deficit',      sv:'absorberat underskott' },
+
   // ── Fun Fund · trip cards ──────────────────────────────
   'ff.trip.namePlaceholder':{ en:'Trip name',             sv:'Resans namn' },
   'ff.trip.countryPlaceholder':{ en:'Country / region',   sv:'Land / region' },
@@ -9671,14 +9683,14 @@ function renderFunFund() {
           <div class="chart-wrap md"><canvas id="ff-chart"></canvas></div>
         </div>
         <div class="card">
-          <div class="card-title">Monthly Fun Fund — Running Balance</div>
-          <p style="font-size:12px;color:var(--text2);margin-bottom:10px">Each month's allocation (Income − Expenses − Savings) rolls into a continuous running balance. A negative month carries its deficit forward until later surpluses pay it off.</p>
+          <div class="card-title">${esc2(t('ff.run.title'))}</div>
+          <p style="font-size:12px;color:var(--text2);margin-bottom:10px">${esc2(t('ff.run.blurb'))}</p>
           <div class="ff-run-list">
             <div class="ff-run-row ff-run-head" aria-hidden="true">
-              <span class="ff-run-h-label">Month</span>
-              <span class="ff-run-h-delta">Monthly Allocation</span>
-              <span class="ff-run-h-bal">Running Balance</span>
-              <span class="ff-run-h-status">Status</span>
+              <span class="ff-run-h-label">${esc2(t('ff.run.col.month'))}</span>
+              <span class="ff-run-h-delta">${esc2(t('ff.run.col.delta'))}</span>
+              <span class="ff-run-h-bal">${esc2(t('ff.run.col.balance'))}</span>
+              <span class="ff-run-h-status">${esc2(t('ff.run.col.status'))}</span>
             </div>
             ${(()=>{
               // Build the running Fun Fund balance across the 12-month
@@ -9700,9 +9712,9 @@ function renderFunFund() {
                 // empty placeholder — so every row's grid columns line
                 // up one-for-one with the header row above.
                 const status = running < 0
-                  ? `<span class="ff-run-flag">paying off deficit</span>`
+                  ? `<span class="ff-run-flag">${esc2(t('ff.run.flag.payingOff'))}</span>`
                   : (delta < 0 && running >= 0
-                    ? `<span class="ff-run-flag muted">absorbed deficit</span>`
+                    ? `<span class="ff-run-flag muted">${esc2(t('ff.run.flag.absorbed'))}</span>`
                     : `<span class="ff-run-status-empty">—</span>`);
                 return `<div class="ff-run-row">
                   <span class="ff-run-label">${m.label}</span>
