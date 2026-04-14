@@ -2859,12 +2859,12 @@ body.light .piq-country-menu { box-shadow:0 12px 28px -10px rgba(60,40,10,0.22);
       <div class="logo-text">HORIZON <span>FINANCE OS</span></div>
     </div>
     <div class="topbar-right">
-      <button class="cmdp-hint" id="cmdp-hint" onclick="cmdpOpen()" title="Command palette">
+      <button class="cmdp-hint" id="cmdp-hint" onclick="cmdpOpen()" title="Command palette" data-i18n-title="topbar.cmdp">
         <span class="cmdp-hint-icon">⌘</span><span class="cmdp-hint-lbl">K</span>
       </button>
       <div class="cur-toggle" id="cur-toggle"></div>
-      <button class="iBtn" id="theme-btn" onclick="toggleTheme()" title="Toggle theme">☀</button>
-      <button class="iBtn" onclick="toggleAIPanel()" title="AI Advisor">✦</button>
+      <button class="iBtn" id="theme-btn" onclick="toggleTheme()" title="Toggle theme" data-i18n-title="topbar.theme">☀</button>
+      <button class="iBtn" onclick="toggleAIPanel()" title="AI Advisor" data-i18n-title="topbar.ai">✦</button>
     </div>
   </div>
 
@@ -2872,32 +2872,32 @@ body.light .piq-country-menu { box-shadow:0 12px 28px -10px rgba(60,40,10,0.22);
   <div class="main-row">
     <!-- Sidebar -->
     <div class="sidebar">
-      <div class="sb-section">OVERVIEW</div>
-      <div class="nav-item active" data-panel="dashboard" onclick="nav('dashboard')"><span class="nav-icon">◉</span>Dashboard</div>
+      <div class="sb-section" data-i18n="sb.group.overview">OVERVIEW</div>
+      <div class="nav-item active" data-panel="dashboard" onclick="nav('dashboard')"><span class="nav-icon">◉</span><span class="nav-lbl" data-i18n="panel.dashboard">Dashboard</span></div>
 
       <div class="sb-sep"></div>
-      <div class="sb-section">PERSONAL FINANCES</div>
-      <div class="nav-item" data-panel="transactions" onclick="nav('transactions')"><span class="nav-icon">🏦</span>Bank & Transactions</div>
-      <div class="nav-item" data-panel="review" onclick="nav('review')"><span class="nav-icon">▦</span>Forecast & Review</div>
-      <div class="nav-item" data-panel="retirement" onclick="nav('retirement')"><span class="nav-icon">🌅</span>Retirement Plan</div>
+      <div class="sb-section" data-i18n="sb.group.personal">PERSONAL FINANCES</div>
+      <div class="nav-item" data-panel="transactions" onclick="nav('transactions')"><span class="nav-icon">🏦</span><span class="nav-lbl" data-i18n="panel.transactions">Bank & Transactions</span></div>
+      <div class="nav-item" data-panel="review" onclick="nav('review')"><span class="nav-icon">▦</span><span class="nav-lbl" data-i18n="panel.review">Forecast & Review</span></div>
+      <div class="nav-item" data-panel="retirement" onclick="nav('retirement')"><span class="nav-icon">🌅</span><span class="nav-lbl" data-i18n="panel.retirement">Retirement Plan</span></div>
 
       <div class="sb-sep"></div>
-      <div class="sb-section">PLANNING</div>
-      <div class="nav-item" data-panel="funfund" onclick="nav('funfund')"><span class="nav-icon">✦</span>Fun Fund</div>
-      <div class="nav-item" data-panel="retireanywhere" onclick="nav('retireanywhere')"><span class="nav-icon">🌍</span>Retire Anywhere</div>
-      <div class="nav-item" data-panel="propiq" onclick="nav('propiq')"><span class="nav-icon">🏠</span>Property IQ</div>
+      <div class="sb-section" data-i18n="sb.group.planning">PLANNING</div>
+      <div class="nav-item" data-panel="funfund" onclick="nav('funfund')"><span class="nav-icon">✦</span><span class="nav-lbl" data-i18n="panel.funfund">Fun Fund</span></div>
+      <div class="nav-item" data-panel="retireanywhere" onclick="nav('retireanywhere')"><span class="nav-icon">🌍</span><span class="nav-lbl" data-i18n="panel.retireanywhere">Retire Anywhere</span></div>
+      <div class="nav-item" data-panel="propiq" onclick="nav('propiq')"><span class="nav-icon">🏠</span><span class="nav-lbl" data-i18n="panel.propiq">Property IQ</span></div>
 
       <div class="sb-sep"></div>
-      <div class="sb-section">LIBRARY</div>
-      <div class="nav-item" data-panel="vault" onclick="nav('vault')"><span class="nav-icon">🗄</span>Vault</div>
+      <div class="sb-section" data-i18n="sb.group.library">LIBRARY</div>
+      <div class="nav-item" data-panel="vault" onclick="nav('vault')"><span class="nav-icon">🗄</span><span class="nav-lbl" data-i18n="panel.vault">Vault</span></div>
 
       <div class="sb-sep"></div>
-      <div class="sb-section">SYSTEM</div>
-      <div class="nav-item" data-panel="settings" onclick="nav('settings')"><span class="nav-icon">⚙</span>Settings</div>
+      <div class="sb-section" data-i18n="sb.group.system">SYSTEM</div>
+      <div class="nav-item" data-panel="settings" onclick="nav('settings')"><span class="nav-icon">⚙</span><span class="nav-lbl" data-i18n="panel.settings">Settings</span></div>
 
       <div class="sb-bot">
         <div class="sb-mini">
-          <div class="sb-mini-label">MONTHLY SURPLUS</div>
+          <div class="sb-mini-label" data-i18n="sb.monthlySurplus">MONTHLY SURPLUS</div>
           <div class="sb-mini-val" id="sb-surplus">—</div>
           <div class="sb-mini-sub" id="sb-funfund">Fun Fund: —</div>
         </div>
@@ -3166,16 +3166,87 @@ const MONTH_NAMES = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct'
 // render English literals until Phase 2 touches each panel.
 const LANGS = ['en','sv'];
 const STRINGS = {
-  // Language toggle card (Settings → Ticker Quote & Appearance)
+  // ── Settings · Appearance card ─────────────────────────
   'settings.lang.title':    { en:'🌐 Language',       sv:'🌐 Språk' },
   'settings.lang.blurb':    { en:'Interface language. Swedish support is rolling out panel by panel — untranslated text falls back to English.',
                               sv:'Gränssnittsspråk. Svenskt stöd införs panel för panel — otranslaterade texter faller tillbaka till engelska.' },
   'settings.lang.en':       { en:'English',           sv:'Engelska' },
   'settings.lang.sv':       { en:'Swedish',           sv:'Svenska' },
-  // Dark mode label lives in the same card — migrate as a demo.
   'settings.darkMode':      { en:'Dark Mode',         sv:'Mörkt läge' },
-  // Common actions reused by Phase 2 — seeded now so the table has
-  // real content from day one.
+
+  // ── Sidebar · group headings ───────────────────────────
+  'sb.group.overview':      { en:'OVERVIEW',          sv:'ÖVERSIKT' },
+  'sb.group.personal':      { en:'PERSONAL FINANCES', sv:'PERSONLIG EKONOMI' },
+  'sb.group.planning':      { en:'PLANNING',          sv:'PLANERING' },
+  'sb.group.library':       { en:'LIBRARY',           sv:'BIBLIOTEK' },
+  'sb.group.system':        { en:'SYSTEM',            sv:'SYSTEM' },
+  'sb.monthlySurplus':      { en:'MONTHLY SURPLUS',   sv:'MÅNADENS ÖVERSKOTT' },
+  'sb.funFundPrefix':       { en:'Fun Fund:',         sv:'Fun Fund:' },
+
+  // ── Panel labels (used by sidebar, breadcrumb, cmd palette,
+  //     related row, dashboard KPI links, …). Mirrors PANEL_META. ──
+  'panel.dashboard':        { en:'Dashboard',             sv:'Översikt' },
+  'panel.transactions':     { en:'Bank & Transactions',   sv:'Bank & transaktioner' },
+  'panel.review':           { en:'Forecast & Review',     sv:'Prognos & genomgång' },
+  'panel.monthly':          { en:'Monthly Review',        sv:'Månadsgenomgång' },
+  'panel.yearly':           { en:'Yearly Forecast',       sv:'Årsprognos' },
+  'panel.retirement':       { en:'Retirement Plan',       sv:'Pensionsplan' },
+  'panel.funfund':          { en:'Fun Fund',              sv:'Fun Fund' },
+  'panel.retireanywhere':   { en:'Retire Anywhere',       sv:'Pensionera var som helst' },
+  'panel.propiq':           { en:'Property IQ',           sv:'Fastighets-IQ' },
+  'panel.vault':            { en:'Vault',                 sv:'Arkiv' },
+  'panel.settings':         { en:'Settings',              sv:'Inställningar' },
+
+  // Panel groups (used by breadcrumb + command palette hint).
+  'group.overview':         { en:'Overview',              sv:'Översikt' },
+  'group.personal':         { en:'Personal Finances',     sv:'Personlig ekonomi' },
+  'group.planning':         { en:'Planning',              sv:'Planering' },
+  'group.library':          { en:'Library',               sv:'Bibliotek' },
+  'group.system':           { en:'System',                sv:'System' },
+
+  // ── Topbar tooltips & labels ───────────────────────────
+  'topbar.cmdp':            { en:'Command palette',       sv:'Kommandopalett' },
+  'topbar.theme':           { en:'Toggle theme',          sv:'Växla tema' },
+  'topbar.ai':              { en:'AI Advisor',            sv:'AI-rådgivare' },
+
+  // ── Breadcrumb + related row ───────────────────────────
+  'crumb.home':             { en:'Horizon',               sv:'Horizon' },
+  'related.next':           { en:'Next ↗',                sv:'Nästa ↗' },
+
+  // ── Month abbreviations (used by monthNames()) ─────────
+  'months.jan':             { en:'Jan', sv:'jan' },
+  'months.feb':             { en:'Feb', sv:'feb' },
+  'months.mar':             { en:'Mar', sv:'mar' },
+  'months.apr':             { en:'Apr', sv:'apr' },
+  'months.may':             { en:'May', sv:'maj' },
+  'months.jun':             { en:'Jun', sv:'jun' },
+  'months.jul':             { en:'Jul', sv:'jul' },
+  'months.aug':             { en:'Aug', sv:'aug' },
+  'months.sep':             { en:'Sep', sv:'sep' },
+  'months.oct':             { en:'Oct', sv:'okt' },
+  'months.nov':             { en:'Nov', sv:'nov' },
+  'months.dec':             { en:'Dec', sv:'dec' },
+
+  // ── Command palette groups + stock action labels ───────
+  'cmdp.group.goto':        { en:'Go to',                 sv:'Gå till' },
+  'cmdp.group.section':     { en:'Section',               sv:'Avsnitt' },
+  'cmdp.group.action':      { en:'Action',                sv:'Åtgärd' },
+  'cmdp.group.currency':    { en:'Currency',              sv:'Valuta' },
+  'cmdp.group.askAi':       { en:'Ask AI',                sv:'Fråga AI' },
+  'cmdp.action.theme':      { en:'Toggle theme (dark / light)', sv:'Växla tema (mörkt / ljust)' },
+  'cmdp.action.openAi':     { en:'Open AI advisor',       sv:'Öppna AI-rådgivare' },
+  'cmdp.action.clearAi':    { en:'Clear AI chat history', sv:'Rensa AI-chatthistorik' },
+  'cmdp.action.cascade':    { en:'Toggle yearly cascade', sv:'Växla årlig kaskad' },
+  'cmdp.action.addTrip':    { en:'Add a new trip',        sv:'Lägg till ny resa' },
+  'cmdp.action.addLoc':     { en:'Add a retirement destination', sv:'Lägg till pensionsdestination' },
+  'cmdp.action.connectBank':{ en:'Connect bank (demo data)', sv:'Anslut bank (demodata)' },
+  'cmdp.action.switchCur':  { en:'Switch currency to {c}', sv:'Byt valuta till {c}' },
+  'cmdp.section.runway':    { en:'Retirement → Longevity Runway', sv:'Pension → Livslängdsbana' },
+  'cmdp.section.cashflow':  { en:'Dashboard → Cash Flow', sv:'Översikt → Kassaflöde' },
+  'cmdp.section.nestegg':   { en:'Dashboard → Nest Egg Curve', sv:'Översikt → Pensionskapitalkurva' },
+  'cmdp.section.worldmap':  { en:'Retire Anywhere → World Map', sv:'Pensionera var som helst → Världskarta' },
+
+  // ── Common actions / tooltips reused across panels ─────
   'common.save':            { en:'Save',              sv:'Spara' },
   'common.cancel':          { en:'Cancel',            sv:'Avbryt' },
   'common.add':             { en:'Add',               sv:'Lägg till' },
@@ -3186,6 +3257,10 @@ const STRINGS = {
   'common.yes':             { en:'Yes',               sv:'Ja' },
   'common.no':              { en:'No',                sv:'Nej' },
   'common.today':           { en:"Today's money",     sv:'Dagens penningvärde' },
+  'common.back':            { en:'Back',              sv:'Tillbaka' },
+  'common.loading':         { en:'Loading…',          sv:'Laddar…' },
+  'common.empty':           { en:'No data yet.',      sv:'Ingen data ännu.' },
+  'common.more':            { en:'More',              sv:'Mer' },
 };
 // Resolve a translation. `vars` supplies values for {placeholder}
 // tokens. Falls through to English, then to the key itself, so a
@@ -3211,9 +3286,69 @@ function setLang(lang){
   state.lang = lang;
   try { document.documentElement.lang = lang; } catch(_){}
   save();
+  paintI18n();
   renderAll();
 }
 window.setLang = setLang;
+
+// Month-name getter — replaces direct MONTH_NAMES[] reads at the
+// sites that care about display output. The bare MONTH_NAMES array
+// is kept for any remaining callers and as the English source of
+// truth (Phase 2 migrates the high-traffic sites — chart axes,
+// month pills, scope chip — over to this helper).
+const _MONTH_KEYS = ['months.jan','months.feb','months.mar','months.apr','months.may','months.jun','months.jul','months.aug','months.sep','months.oct','months.nov','months.dec'];
+function monthNames(){
+  return _MONTH_KEYS.map(k => t(k));
+}
+window.monthNames = monthNames;
+
+// Panel label / group translators. PANEL_META stays canonical and
+// English-keyed — these helpers prefer the matching t() key and
+// fall back to the meta object so any panel key added in the future
+// works without needing a translation entry.
+function panelLabel(p){
+  const key = 'panel.'+p;
+  if(STRINGS[key]) return t(key);
+  const meta = PANEL_META[p]; return meta ? meta.label : p;
+}
+function panelGroup(p){
+  const meta = PANEL_META[p]; if(!meta) return '';
+  const g = meta.group || '';
+  const map = {
+    'Overview':'group.overview',
+    'Personal Finances':'group.personal',
+    'Planning':'group.planning',
+    'Library':'group.library',
+    'System':'group.system',
+  };
+  const key = map[g];
+  return key && STRINGS[key] ? t(key) : g;
+}
+window.panelLabel = panelLabel;
+window.panelGroup = panelGroup;
+
+// Walk the DOM for [data-i18n], [data-i18n-title],
+// [data-i18n-placeholder] markers and paint the current translation
+// onto the respective text content / attribute. The static topbar +
+// sidebar HTML is tagged with these attributes and painted once at
+// boot and again whenever setLang() fires, so chrome text flips
+// without needing to rebuild any of it via JS.
+function paintI18n(root){
+  const scope = root || document;
+  scope.querySelectorAll('[data-i18n]').forEach(el => {
+    const k = el.getAttribute('data-i18n'); if(k) el.textContent = t(k);
+  });
+  scope.querySelectorAll('[data-i18n-title]').forEach(el => {
+    const k = el.getAttribute('data-i18n-title'); if(k) el.setAttribute('title', t(k));
+  });
+  scope.querySelectorAll('[data-i18n-placeholder]').forEach(el => {
+    const k = el.getAttribute('data-i18n-placeholder'); if(k) el.setAttribute('placeholder', t(k));
+  });
+  scope.querySelectorAll('[data-i18n-aria-label]').forEach(el => {
+    const k = el.getAttribute('data-i18n-aria-label'); if(k) el.setAttribute('aria-label', t(k));
+  });
+}
+window.paintI18n = paintI18n;
 
 // ─── NUMERIC PARSING (Swedish comma safety) ─────────────────────────────────
 // Robust number parser used by Phase 2+ oninput handlers on any input
@@ -3815,10 +3950,11 @@ function get12Months() {
       const pureIncome   = sumArr(incomeItems,  'amount');
       const pureExpenses = sumArr(expenseItems, 'amount');
       const pureFunFund  = pureIncome - pureExpenses - v.savings;
+      const _mn = monthNames();
       months.push({
         key,
-        label: `${MONTH_NAMES[month]} ${year}`,
-        short: `${MONTH_NAMES[month]} '${String(year).slice(2)}`,
+        label: `${_mn[month]} ${year}`,
+        short: `${_mn[month]} '${String(year).slice(2)}`,
         savings: v.savings,
         incomeItems, expenseItems,
         // Income / expenses / surplus / funFund are filled in pass 2
@@ -5454,11 +5590,11 @@ function decoratePanel(panel){
   const crumb = document.createElement('div');
   crumb.className = 'breadcrumb';
   crumb.innerHTML = `
-    <button onclick="nav('dashboard')">Horizon</button>
+    <button onclick="nav('dashboard')">${esc2(t('crumb.home'))}</button>
     <span class="bc-sep">›</span>
-    <span class="bc-current">${esc2(meta.group)}</span>
+    <span class="bc-current">${esc2(panelGroup(panel))}</span>
     <span class="bc-sep">›</span>
-    <span class="bc-current" style="color:var(--text)">${esc2(meta.label)}</span>`;
+    <span class="bc-current" style="color:var(--text)">${esc2(panelLabel(panel))}</span>`;
   if(ph) ph.insertBefore(crumb, ph.firstChild);
   else panelEl.insertBefore(crumb, panelEl.firstChild);
   // 2) Related row appended to bottom
@@ -5466,11 +5602,11 @@ function decoratePanel(panel){
   if(related.length){
     const row = document.createElement('div');
     row.className = 'related-row';
-    row.innerHTML = `<span class="related-row-lbl">Next ↗</span>` + related.map(k=>{
+    row.innerHTML = `<span class="related-row-lbl">${esc2(t('related.next'))}</span>` + related.map(k=>{
       const m = PANEL_META[k];
       return `<button class="related-link" onclick="nav('${k}')">
         <span class="rl-icon">${m.icon}</span>
-        <span>${esc2(m.label)}</span>
+        <span>${esc2(panelLabel(k))}</span>
         <span class="rl-arrow">→</span>
       </button>`;
     }).join('');
@@ -5499,7 +5635,7 @@ function updateScopeChip(){
     // default: show selectedMonth (Monthly) or current month otherwise
     const key = state.selectedMonth || `${CY}-${String(new Date().getMonth()+1).padStart(2,'0')}`;
     const [y,m] = key.split('-').map(Number);
-    const monthName = MONTH_NAMES[(m-1)]||'';
+    const monthName = monthNames()[(m-1)]||'';
     label.textContent = `${monthName} ${y}`;
   }
 }
@@ -5544,44 +5680,57 @@ let _cmdpSelectedIdx = 0;
 let _cmdpFilteredItems = [];
 function buildCmdpItems(){
   const items = [];
-  // Panels
+  // Group labels are looked up fresh each build so they track the
+  // active language without needing to rebuild anything else.
+  const GOTO   = t('cmdp.group.goto');
+  const SECT   = t('cmdp.group.section');
+  const ACT    = t('cmdp.group.action');
+  const CURG   = t('cmdp.group.currency');
+  const ASKAI  = t('cmdp.group.askAi');
+  // Panels — labels and group hints come from the translated
+  // helpers. Keywords retain both translated + English text so a
+  // user searching either language finds the item.
   VALID_PANELS.forEach(p => {
     const m = PANEL_META[p]; if(!m) return;
+    const label = panelLabel(p);
+    const group = panelGroup(p);
     items.push({
-      group:'Go to', icon:m.icon, label:m.label, hint:m.group,
-      keywords:`${m.label} ${m.group} ${p}`.toLowerCase(),
+      group:GOTO, icon:m.icon, label:label, hint:group,
+      keywords:`${label} ${group} ${m.label} ${m.group} ${p}`.toLowerCase(),
       action:()=>nav(p)
     });
   });
   // Deep-link sections
   const sections = [
-    {panel:'retirement',     section:'runway',   icon:'📊', label:'Retirement → Longevity Runway', hint:'Section'},
-    {panel:'dashboard',      section:'cashflow', icon:'📈', label:'Dashboard → Cash Flow',         hint:'Section'},
-    {panel:'dashboard',      section:'nestegg',  icon:'🎯', label:'Dashboard → Nest Egg Curve',    hint:'Section'},
-    {panel:'retireanywhere', section:'map',      icon:'🌍', label:'Retire Anywhere → World Map',    hint:'Section'},
+    {panel:'retirement',     section:'runway',   icon:'📊', key:'cmdp.section.runway'},
+    {panel:'dashboard',      section:'cashflow', icon:'📈', key:'cmdp.section.cashflow'},
+    {panel:'dashboard',      section:'nestegg',  icon:'🎯', key:'cmdp.section.nestegg'},
+    {panel:'retireanywhere', section:'map',      icon:'🌍', key:'cmdp.section.worldmap'},
   ];
   sections.forEach(s => {
+    const label = t(s.key);
+    const enLabel = (STRINGS[s.key] && STRINGS[s.key].en) || label;
     items.push({
-      group:'Go to', icon:s.icon, label:s.label, hint:s.hint,
-      keywords:`${s.label} ${s.panel} ${s.section}`.toLowerCase(),
+      group:GOTO, icon:s.icon, label:label, hint:SECT,
+      keywords:`${label} ${enLabel} ${s.panel} ${s.section}`.toLowerCase(),
       action:()=>nav(s.panel, {section:s.section})
     });
   });
   // Actions
   items.push(
-    {group:'Action', icon:'🌙', label:'Toggle theme (dark / light)', hint:'⌘⇧L', keywords:'theme dark light toggle', action:()=>toggleTheme()},
-    {group:'Action', icon:'✦', label:'Open AI advisor', hint:'', keywords:'ai advisor chat assistant', action:()=>openAIPanel()},
-    {group:'Action', icon:'⚡', label:'Toggle yearly cascade', hint:'', keywords:'cascade yearly forecast toggle', action:()=>{state.cascadeEnabled=!state.cascadeEnabled;save();renderAll();}},
-    {group:'Action', icon:'✈️', label:'Add a new trip', hint:'Fun Fund', keywords:'trip travel add new', action:()=>{state.trips.push({id:genId(),name:'New Trip',country:'',budget:50000,spent:0,date:`${CY}-06`,status:'planning',icon:'✈️'});save();nav('funfund');}},
-    {group:'Action', icon:'📍', label:'Add a retirement destination', hint:'Retire Anywhere', keywords:'location destination city retire add', action:()=>{nav('retireanywhere');setTimeout(()=>{if(typeof addLocation==='function')addLocation();},300);}},
-    {group:'Action', icon:'🏦', label:'Connect bank (demo data)', hint:'', keywords:'bank connect transactions demo', action:()=>{if(typeof connectBankDemo==='function')connectBankDemo();}},
-    {group:'Action', icon:'🧹', label:'Clear AI chat history', hint:'', keywords:'clear reset ai chat history', action:()=>{if(typeof clearAIChat==='function'){clearAIChat();openAIPanel();}}},
+    {group:ACT, icon:'🌙', label:t('cmdp.action.theme'),       hint:'⌘⇧L', keywords:'theme dark light toggle tema mörkt ljust', action:()=>toggleTheme()},
+    {group:ACT, icon:'✦',  label:t('cmdp.action.openAi'),      hint:'',    keywords:'ai advisor chat assistant rådgivare', action:()=>openAIPanel()},
+    {group:ACT, icon:'⚡', label:t('cmdp.action.cascade'),     hint:'',    keywords:'cascade yearly forecast toggle kaskad årlig prognos', action:()=>{state.cascadeEnabled=!state.cascadeEnabled;save();renderAll();}},
+    {group:ACT, icon:'✈️', label:t('cmdp.action.addTrip'),     hint:panelLabel('funfund'), keywords:'trip travel add new resa', action:()=>{state.trips.push({id:genId(),name:'New Trip',country:'',budget:50000,spent:0,date:`${CY}-06`,status:'planning',icon:'✈️'});save();nav('funfund');}},
+    {group:ACT, icon:'📍', label:t('cmdp.action.addLoc'),      hint:panelLabel('retireanywhere'), keywords:'location destination city retire add plats destination stad', action:()=>{nav('retireanywhere');setTimeout(()=>{if(typeof addLocation==='function')addLocation();},300);}},
+    {group:ACT, icon:'🏦', label:t('cmdp.action.connectBank'), hint:'',    keywords:'bank connect transactions demo anslut', action:()=>{if(typeof connectBankDemo==='function')connectBankDemo();}},
+    {group:ACT, icon:'🧹', label:t('cmdp.action.clearAi'),     hint:'',    keywords:'clear reset ai chat history rensa chatthistorik', action:()=>{if(typeof clearAIChat==='function'){clearAIChat();openAIPanel();}}},
   );
   // Currency quick-switch
   Object.keys(CURRENCY_SYMBOLS||{SEK:1}).forEach(c => {
     items.push({
-      group:'Currency', icon:'💱', label:`Switch currency to ${c}`, hint:CURRENCY_SYMBOLS[c],
-      keywords:`currency ${c} swap change`.toLowerCase(),
+      group:CURG, icon:'💱', label:t('cmdp.action.switchCur', {c}), hint:CURRENCY_SYMBOLS[c],
+      keywords:`currency ${c} swap change valuta byt`.toLowerCase(),
       action:()=>{ applyCurrency(c); }
     });
   });
@@ -5589,7 +5738,7 @@ function buildCmdpItems(){
   const chips = aipChipsFor(state.activePanel||'dashboard');
   chips.forEach(chip => {
     items.push({
-      group:'Ask AI', icon:'✦', label:chip, hint:'AI',
+      group:ASKAI, icon:'✦', label:chip, hint:'AI',
       keywords:('ai '+chip).toLowerCase(),
       action:()=>{ openAIPanel(); setTimeout(()=>{ if(typeof aipChip==='function') aipChip(chip); },120); }
     });
@@ -5739,7 +5888,7 @@ function updateSidebar() {
   // Fund — matching the Monthly Review "Month Summary" bar, so the
   // two never disagree about the headline numbers for this month.
   if(sb) sb.textContent = fmt(cm.pureIncome - cm.pureExpenses);
-  if(ff) ff.textContent = `Fun Fund: ${fmt(cm.pureFunFund)}`;
+  if(ff) ff.textContent = `${t('sb.funFundPrefix')} ${fmt(cm.pureFunFund)}`;
 }
 
 // ─── TICKER ─────────────────────────────────────────────────────────────────
@@ -6935,9 +7084,10 @@ function renderTransactions() {
     const pastCtx = document.getElementById('tx-chart-past');
     if(pastCtx){
       const pastLabels = [];
+      const _mn = monthNames();
       for(let i = 11; i >= 0; i--){
         const d = new Date(CY, CM - i, 1);
-        pastLabels.push(`${MONTH_NAMES[d.getMonth()]} '${String(d.getFullYear()).slice(2)}`);
+        pastLabels.push(`${_mn[d.getMonth()]} '${String(d.getFullYear()).slice(2)}`);
       }
       const pastIncome   = [127000,127000,206000,131800,127000,127000,127000,127000,127000,127000,127000,127000];
       const pastExpenses = [132500,178264,88545,91500,103500,91500,108636,63945,81636,91500,56590,107090];
@@ -12478,6 +12628,10 @@ loadState();
 // default.
 if(!LANGS.includes(state.lang)) state.lang = 'en';
 try { document.documentElement.lang = state.lang; } catch(_){}
+// Paint static chrome (sidebar / topbar tags) once before the first
+// renderAll() so the nav labels land in the right language on the
+// initial frame.
+try { paintI18n(); } catch(_){}
 applyTheme();
 // Honor deep-link hash on first load (#retirement or #retirement/runway).
 (()=>{
