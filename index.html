@@ -6289,11 +6289,11 @@ function renderWelcomeStep(){
       <div class="welcome-field-row">
         <div class="welcome-field">
           <label>${esc2(t('welcome.s1.currentAge'))}</label>
-          <input class="welcome-input" id="w-age" type="number" min="18" max="100" value="${_welcomeDraft.currentAge}" oninput="_welcomeDraft.currentAge=+this.value||30">
+          <input class="welcome-input" id="w-age" type="text" inputmode="decimal" data-lang-num="1" value="${_welcomeDraft.currentAge}" oninput="_welcomeDraft.currentAge=parseNum(this.value)||30">
         </div>
         <div class="welcome-field">
           <label>${esc2(t('welcome.s1.retireAge'))}</label>
-          <input class="welcome-input" id="w-retage" type="number" min="40" max="100" value="${_welcomeDraft.retirementAge}" oninput="_welcomeDraft.retirementAge=+this.value||65">
+          <input class="welcome-input" id="w-retage" type="text" inputmode="decimal" data-lang-num="1" value="${_welcomeDraft.retirementAge}" oninput="_welcomeDraft.retirementAge=parseNum(this.value)||65">
         </div>
       </div>
       <div class="welcome-hint" style="margin-top:6px">${t('welcome.s1.compoundHint', { years: `<span id="w-years-span">${yrs0}</span>` })}</div>
@@ -6321,11 +6321,11 @@ function renderWelcomeStep(){
       <div class="welcome-sub">${esc2(t('welcome.s2.sub'))}</div>
       <div class="welcome-field">
         <label>${esc2(t('welcome.s2.income'))}</label>
-        <div class="welcome-input-wrap"><span class="welcome-input-cur">${s}</span><input class="welcome-input welcome-input-amt" id="w-inc" type="number" min="0" placeholder="e.g. 80000" value="${_welcomeDraft.income ? Math.round(_welcomeDraft.income * r) : ''}" oninput="_welcomeDraft.income=(+this.value||0)/${r}"></div>
+        <div class="welcome-input-wrap"><span class="welcome-input-cur">${s}</span><input class="welcome-input welcome-input-amt" id="w-inc" type="text" inputmode="decimal" data-lang-num="1" placeholder="e.g. 80000" value="${_welcomeDraft.income ? Math.round(_welcomeDraft.income * r) : ''}" oninput="_welcomeDraft.income=parseNum(this.value)/${r}"></div>
       </div>
       <div class="welcome-field">
         <label>${esc2(t('welcome.s2.expenses'))}</label>
-        <div class="welcome-input-wrap"><span class="welcome-input-cur">${s}</span><input class="welcome-input welcome-input-amt" id="w-exp" type="number" min="0" placeholder="e.g. 45000" value="${_welcomeDraft.expenses ? Math.round(_welcomeDraft.expenses * r) : ''}" oninput="_welcomeDraft.expenses=(+this.value||0)/${r}"></div>
+        <div class="welcome-input-wrap"><span class="welcome-input-cur">${s}</span><input class="welcome-input welcome-input-amt" id="w-exp" type="text" inputmode="decimal" data-lang-num="1" placeholder="e.g. 45000" value="${_welcomeDraft.expenses ? Math.round(_welcomeDraft.expenses * r) : ''}" oninput="_welcomeDraft.expenses=parseNum(this.value)/${r}"></div>
       </div>
       <div class="welcome-hint">${esc2(t('welcome.s2.hint'))}</div>
       <div class="welcome-actions">
@@ -10094,7 +10094,7 @@ function renderFunFund() {
       return `<div class="trip-exp-row">
         <input class="trip-exp-name" value="${esc(ex.name || '')}" placeholder="${esc2(t('ff.trip.exp.namePlaceholder'))}" oninput="updateTripExpense('${t.id}','${ex.id}','name',this.value)">
         <input type="month" class="trip-exp-date" value="${ym}" onclick="try{this.showPicker&&this.showPicker()}catch(_){}" onfocus="try{this.showPicker&&this.showPicker()}catch(_){}" onchange="updateTripExpense('${t.id}','${ex.id}','date',this.value)" title="${esc2(t('ff.trip.exp.dateTitle'))}">
-        <div class="trip-exp-amt-wrap"><span class="trip-exp-cur">${s}</span><input class="trip-exp-amt" type="number" value="${Math.round((Number(ex.amount)||0)*r)}" oninput="updateTripExpense('${t.id}','${ex.id}','amount',this.value/${r})"></div>
+        <div class="trip-exp-amt-wrap"><span class="trip-exp-cur">${s}</span><input class="trip-exp-amt" type="text" inputmode="decimal" data-lang-num="1" value="${Math.round((Number(ex.amount)||0)*r)}" oninput="updateTripExpense('${t.id}','${ex.id}','amount',parseNum(this.value)/${r})"></div>
         <button class="line-rm" onclick="removeTripExpense('${t.id}','${ex.id}')" title="${esc2(t('ff.trip.exp.removeTitle'))}">×</button>
       </div>`;
     }).join('');
@@ -10122,7 +10122,7 @@ function renderFunFund() {
         </div>
         <div class="trip-meta-field">
           <div class="trip-meta-lbl">${esc2(t('ff.trip.spentLbl'))}</div>
-          <div class="trip-meta-val-wrap"><span class="trip-meta-cur">${s}</span><input class="trip-meta-amt" type="number" value="${Math.round((Number(t.spent)||0)*r)}" oninput="updateTripField('${t.id}','spent',this.value/${r})"></div>
+          <div class="trip-meta-val-wrap"><span class="trip-meta-cur">${s}</span><input class="trip-meta-amt" type="text" inputmode="decimal" data-lang-num="1" value="${Math.round((Number(t.spent)||0)*r)}" oninput="updateTripField('${t.id}','spent',parseNum(this.value)/${r})"></div>
         </div>
       </div>
       <div class="trip-exp-list">
@@ -10270,7 +10270,10 @@ window.removeTrip = function(tripId){
 window.updateTripField = function(tripId, field, val){
   const t = (state.trips || []).find(x => x.id === tripId);
   if(!t) return;
-  t[field] = (field === 'spent') ? (+val || 0) : val;
+  // parseNum tolerates raw strings + already-parsed numbers, so
+  // both the inline `parseNum(this.value)/r` callers and any
+  // legacy callers passing a Number end up with the right shape.
+  t[field] = (field === 'spent') ? (parseNum(val) || 0) : val;
   save();
 };
 // Per-expense mutators — every row in the Monthly Review "linked"
@@ -10301,7 +10304,7 @@ window.updateTripExpense = function(tripId, expenseId, field, val){
   if(!t) return;
   const ex = (t.expenses || []).find(e => e.id === expenseId);
   if(!ex) return;
-  ex[field] = (field === 'amount') ? (+val || 0) : val;
+  ex[field] = (field === 'amount') ? (parseNum(val) || 0) : val;
   save();
 };
 
@@ -10415,7 +10418,7 @@ window.showLocDetail=function(id){
       <div><span style="color:var(--text2)">Healthcare</span><div style="font-weight:600;margin-top:2px">${loc.healthcare}</div></div>
     </div>
     ${loc.notes?`<div style="background:var(--bg3);border-radius:8px;padding:10px;font-size:12px;color:var(--text2);margin-bottom:14px">📝 ${esc(loc.notes)}</div>`:''}
-    <div class="field"><label>Monthly Cost of Living (${s})</label><input type="number" value="${Math.round(loc.costOfLiving*r)}" oninput="updateLocCost('${loc.id}',this.value/${r})"></div>
+    <div class="field"><label>Monthly Cost of Living (${s})</label><input type="text" inputmode="decimal" data-lang-num="1" value="${Math.round(loc.costOfLiving*r)}" oninput="updateLocCost('${loc.id}',parseNum(this.value)/${r})"></div>
     <div class="field"><label>Local Tax Rate (%)</label><input type="number" value="${loc.taxRate}" oninput="updateLocTax('${loc.id}',+this.value)"></div>
     <div class="field"><label>Notes</label><input value="${esc(loc.notes||'')}" oninput="updateLocNotes('${loc.id}',this.value)"></div>
     <div style="display:flex;gap:8px;margin-top:4px;flex-wrap:wrap">
@@ -10511,8 +10514,8 @@ function renderLocAnalysisSlideover(opts){
     <div class="retire-so-section">
       <div class="retire-so-section-hd">${esc2(t('ra.so.edit.title'))}</div>
       <div class="retire-so-edit-row">
-        <div class="field"><label>${esc2(t('ra.so.edit.cost', { s }))}</label><input type="number" value="${Math.round(loc.costOfLiving*r)}" oninput="updateLocCost('${loc.id}',this.value/${r})" onchange="commitRender('renderLocAnalysisSlideover')"></div>
-        <div class="field"><label>${esc2(t('ra.so.edit.tax'))}</label><input type="number" value="${loc.taxRate}" oninput="updateLocTax('${loc.id}',+this.value)" onchange="commitRender('renderLocAnalysisSlideover')"></div>
+        <div class="field"><label>${esc2(t('ra.so.edit.cost', { s }))}</label><input type="text" inputmode="decimal" data-lang-num="1" value="${Math.round(loc.costOfLiving*r)}" oninput="updateLocCost('${loc.id}',parseNum(this.value)/${r})" onchange="commitRender('renderLocAnalysisSlideover')"></div>
+        <div class="field"><label>${esc2(t('ra.so.edit.tax'))}</label><input type="text" inputmode="decimal" data-lang-num="1" value="${loc.taxRate}" oninput="updateLocTax('${loc.id}',parseNum(this.value))" onchange="commitRender('renderLocAnalysisSlideover')"></div>
         <div class="field retire-so-notes"><label>${esc2(t('ra.so.edit.notes'))}</label><input value="${esc(loc.notes||'')}" oninput="updateLocNotes('${loc.id}',this.value)"></div>
       </div>
       <div style="margin-top:10px;display:flex;gap:8px">
@@ -10703,8 +10706,8 @@ window.slideoverExportPdf = function(){
 // slide-over instead of the old narrow modal.
 window.showLocDetail = function(id){ openLocAnalysis(id); };
 
-window.updateLocCost=function(id,val){ const l=state.places.find(l=>l.id===id); if(l){l.costOfLiving=+val;save();} };
-window.updateLocTax=function(id,val){ const l=state.places.find(l=>l.id===id); if(l){l.taxRate=+val;save();} };
+window.updateLocCost=function(id,val){ const l=state.places.find(l=>l.id===id); if(l){l.costOfLiving=parseNum(val);save();} };
+window.updateLocTax=function(id,val){ const l=state.places.find(l=>l.id===id); if(l){l.taxRate=parseNum(val);save();} };
 window.updateLocNotes=function(id,val){ const l=state.places.find(l=>l.id===id); if(l){l.notes=val;save();} };
 window.removeLoc=function(id){ state.places=state.places.filter(l=>l.id!==id);save();closeModal('loc-modal');renderRetireAnywhere(); };
 // ─── GLOBAL GEOCODE AUTOCOMPLETE (Photon / OSM) ─────────────────────────────
@@ -14688,9 +14691,11 @@ async function piq_fetchAnalysis(query,signals,cfg){
 // ── MORTGAGE CALCULATOR ───────────────────────────────────────────────────────
 function piq_calcMortgage(){
   const cfg=PIQ_MC[piq_market];
-  const price=parseFloat(document.getElementById('piq-mc-price')?.value.replace(/[^0-9.]/g,'')||0);
-  const deposit=parseFloat(document.getElementById('piq-mc-deposit')?.value||cfg.mortgageDeposit);
-  const rate=parseFloat(document.getElementById('piq-mc-rate')?.value||cfg.mortgageRates[0].v);
+  // parseNum tolerates commas + thousand separators, so a Swedish
+  // user typing "12 000 000" or "1234,5" works the same as "12000000".
+  const price=parseNum(document.getElementById('piq-mc-price')?.value||0);
+  const deposit=parseNum(document.getElementById('piq-mc-deposit')?.value||cfg.mortgageDeposit);
+  const rate=parseNum(document.getElementById('piq-mc-rate')?.value||cfg.mortgageRates[0].v);
   const months=parseInt(document.getElementById('piq-mc-term')?.value||cfg.mortgageTerm[0].v);
   const res=document.getElementById('piq-mc-result'); if(!res) return;
   if(!price){res.innerHTML='<div style="color:var(--text3);font-size:11px;font-family:var(--fm)">Enter a property price above</div>';return;}
@@ -14710,7 +14715,7 @@ function piq_calcMortgage(){
 // filled them in, otherwise fall back to a sensible default derived from
 // the analysis's avgPrice / priceRange.
 function piq_getMortgageScenario(a, cfg){
-  const inpPrice = parseFloat(document.getElementById('piq-mc-price')?.value.replace(/[^0-9.]/g,'') || '0');
+  const inpPrice = parseNum(document.getElementById('piq-mc-price')?.value || '0');
   // Derive a default price from the analysis if the calculator is empty.
   let price = inpPrice;
   if(!price){
@@ -14721,8 +14726,8 @@ function piq_getMortgageScenario(a, cfg){
       price = Math.round(n);
     }
   }
-  const deposit = parseFloat(document.getElementById('piq-mc-deposit')?.value || cfg.mortgageDeposit);
-  const rate    = parseFloat(document.getElementById('piq-mc-rate')?.value || cfg.mortgageRates[0].v);
+  const deposit = parseNum(document.getElementById('piq-mc-deposit')?.value || cfg.mortgageDeposit);
+  const rate    = parseNum(document.getElementById('piq-mc-rate')?.value || cfg.mortgageRates[0].v);
   const months  = parseInt(document.getElementById('piq-mc-term')?.value || cfg.mortgageTerm[0].v);
   const loan    = price * (1 - deposit/100);
   const mr      = rate/100/12;
@@ -15046,7 +15051,7 @@ window.piq_exportReportPdf = function(){
 // ── FX CONVERTER ──────────────────────────────────────────────────────────────
 const PIQ_FX={KESKES:1,SEKSEK:1,KESUSD:0.0077,USDKES:129.5,SEKUSD:0.093,USDSEK:10.75,KESSEK:0.12,SEKKES:8.33,KESEUR:0.0071,SEKEUR:0.086,EURKES:140.5,EURSEK:11.6,USDEUR:0.925,EURUSD:1.081};
 function piq_convertFX(){
-  const amt=parseFloat(document.getElementById('piq-fx-amount')?.value||0);
+  const amt=parseNum(document.getElementById('piq-fx-amount')?.value||0);
   const from=document.getElementById('piq-fx-from')?.value;
   const to=document.getElementById('piq-fx-to')?.value;
   const rate=PIQ_FX[from+to]||(PIQ_FX[to+from]?1/PIQ_FX[to+from]:1);
@@ -15150,8 +15155,8 @@ function piq_renderResults(query,a,cfg){
         <div class="piq-card-hd"><div class="piq-card-icon" style="background:var(--green-dim)">💳</div><div><div class="piq-card-title">${esc2(t('piq.mc.title'))}</div><div class="piq-card-sub">${esc2(t('piq.mc.sub', { cur: cfg.currency, flag: cfg.flag, country: cfg.name }))}</div></div></div>
         <div class="piq-card-body">
           <div class="piq-calc-grid">
-            <div class="field"><label>${esc2(t('piq.mc.priceLbl', { cur: cfg.currency }))}</label><input id="piq-mc-price" type="number" placeholder="${cfg.currency==='KES'?'12000000':'6000000'}" oninput="piq_calcMortgage()"></div>
-            <div class="field"><label>${esc2(t('piq.mc.depositLbl'))}</label><input id="piq-mc-deposit" type="number" value="${cfg.mortgageDeposit}" oninput="piq_calcMortgage()"></div>
+            <div class="field"><label>${esc2(t('piq.mc.priceLbl', { cur: cfg.currency }))}</label><input id="piq-mc-price" type="text" inputmode="decimal" data-lang-num="1" placeholder="${cfg.currency==='KES'?'12000000':'6000000'}" oninput="piq_calcMortgage()"></div>
+            <div class="field"><label>${esc2(t('piq.mc.depositLbl'))}</label><input id="piq-mc-deposit" type="text" inputmode="decimal" data-lang-num="1" value="${cfg.mortgageDeposit}" oninput="piq_calcMortgage()"></div>
             <div class="field"><label>${esc2(t('piq.mc.rateLbl'))}</label><select id="piq-mc-rate" onchange="piq_calcMortgage()">${rateOpts}</select></div>
             <div class="field"><label>${esc2(t('piq.mc.termLbl'))}</label><select id="piq-mc-term" onchange="piq_calcMortgage()">${termOpts}</select></div>
           </div>
@@ -15186,7 +15191,7 @@ function piq_renderResults(query,a,cfg){
         <div class="piq-card-hd"><div class="piq-card-icon" style="background:var(--blue-dim)">💱</div><div><div class="piq-card-title">${esc2(t('piq.fx.title'))}</div><div class="piq-card-sub">${esc2(t('piq.fx.sub'))}</div></div></div>
         <div class="piq-card-body">
           <div class="piq-fx-row">
-            <div class="piq-fx-f"><label>${esc2(t('piq.fx.amount'))}</label><input id="piq-fx-amount" type="number" placeholder="${esc2(t('piq.fx.amountPlaceholder'))}" oninput="piq_convertFX()"></div>
+            <div class="piq-fx-f"><label>${esc2(t('piq.fx.amount'))}</label><input id="piq-fx-amount" type="text" inputmode="decimal" data-lang-num="1" placeholder="${esc2(t('piq.fx.amountPlaceholder'))}" oninput="piq_convertFX()"></div>
             <select class="piq-fx-sel" id="piq-fx-from" onchange="piq_convertFX()"><option value="KES">KES</option><option value="SEK">SEK</option><option value="USD">USD</option><option value="EUR">EUR</option></select>
             <div class="piq-fx-arrow">→</div>
             <div class="piq-fx-f"><label>${esc2(t('piq.fx.converted'))}</label><input id="piq-fx-result" type="text" readonly placeholder="${esc2(t('piq.fx.resultPlaceholder'))}" style="color:var(--green)"></div>
