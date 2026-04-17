@@ -879,13 +879,21 @@ body.light .loc-card:hover { box-shadow:0 5px 14px -8px rgba(60,40,10,0.18); }
   color:var(--red);
 }
 .ret-asset-grid {
+  /* Investment cards now carry 4 editable fields (balance,
+     contribution, growth, tax). On wide viewports we want all 4 on
+     one row with the projected panel at the end; as the card
+     narrows the fields wrap to 2-col, then 1-col, and the
+     projected panel drops to its own row. `auto-fit` + `minmax`
+     gives us that without writing explicit breakpoints. */
   display:grid;
-  grid-template-columns:repeat(3, minmax(0,1fr)) auto;
+  grid-template-columns:repeat(auto-fit, minmax(140px, 1fr));
   gap:10px;
   align-items:end;
+  /* Guard against any child pushing the grid wider than its card. */
+  min-width:0;
 }
 .ret-asset.is-pension .ret-asset-grid {
-  grid-template-columns:repeat(2, minmax(0,1fr)) auto;
+  grid-template-columns:repeat(auto-fit, minmax(160px, 1fr));
 }
 .ret-asset-cell {
   display:flex; flex-direction:column; gap:4px;
@@ -901,6 +909,11 @@ body.light .loc-card:hover { box-shadow:0 5px 14px -8px rgba(60,40,10,0.18); }
   background:var(--bg3); border:1px solid var(--border);
   border-radius:6px; padding:6px 8px;
   transition:border-color .15s;
+  /* Flex children need explicit min-width:0 so long numbers don't
+     blow the wrap past its grid cell. */
+  min-width:0;
+  box-sizing:border-box;
+  width:100%;
 }
 .ret-asset-cell .rac-input-wrap:focus-within {
   border-color:var(--text3);
@@ -910,20 +923,27 @@ body.light .loc-card:hover { box-shadow:0 5px 14px -8px rgba(60,40,10,0.18); }
   font-family:var(--fm); font-size:11px;
   color:var(--text3); flex-shrink:0;
 }
-.ret-asset-cell input[type="number"] {
-  flex:1; min-width:0;
+/* The rendered input is type="text" with inputmode="decimal"; the old
+   rule targeted [type="number"] and therefore never applied, so text
+   inputs inherited a 20ch default size that overflowed the card.
+   Select the input element itself. */
+.ret-asset-cell .rac-input-wrap input {
+  flex:1 1 0;
+  min-width:0;
+  width:100%;
+  box-sizing:border-box;
   background:transparent; border:none;
   color:var(--text); font-family:var(--fm);
   font-size:12px; font-weight:600;
   text-align:right; outline:none;
   padding:0;
 }
-/* Hide browser spinners for a cleaner look */
-.ret-asset-cell input[type="number"]::-webkit-outer-spin-button,
-.ret-asset-cell input[type="number"]::-webkit-inner-spin-button {
+/* Hide browser spinners if the field ever becomes type="number". */
+.ret-asset-cell .rac-input-wrap input::-webkit-outer-spin-button,
+.ret-asset-cell .rac-input-wrap input::-webkit-inner-spin-button {
   -webkit-appearance:none; margin:0;
 }
-.ret-asset-cell input[type="number"] { -moz-appearance:textfield; }
+.ret-asset-cell .rac-input-wrap input[type="number"] { -moz-appearance:textfield; }
 .ret-asset-proj {
   display:flex; flex-direction:column; align-items:flex-end;
   justify-content:flex-end;
@@ -931,7 +951,18 @@ body.light .loc-card:hover { box-shadow:0 5px 14px -8px rgba(60,40,10,0.18); }
   background:rgba(34,197,94,.08);
   border:1px solid rgba(34,197,94,.25);
   border-radius:6px;
-  min-width:110px;
+  min-width:0;
+  box-sizing:border-box;
+  /* On very wide cards the projected panel likes a little breathing
+     room; on narrow cards it spans the full row so the number stays
+     readable instead of being squeezed into one column. */
+  grid-column:1 / -1;
+}
+@media (min-width:760px) {
+  .ret-asset-proj {
+    grid-column:auto;
+    min-width:130px;
+  }
 }
 .ret-asset.is-pension .ret-asset-proj {
   background:rgba(245,158,11,.08);
@@ -4222,6 +4253,7 @@ const STRINGS = {
   's2.card.field.balance':      { en:'Balance',          sv:'Saldo' },
   's2.card.field.contribution': { en:'Contribution',     sv:'Insättning' },
   's2.card.field.growthRate':   { en:'Growth rate',      sv:'Tillväxttakt' },
+  's2.card.field.taxRate':      { en:'Tax rate',         sv:'Skattesats' },
   's2.card.field.payout':       { en:'Payout',           sv:'Utbetalning' },
   's2.card.field.fromAge':      { en:'From age',         sv:'Från ålder' },
   // Projected chip
@@ -4648,7 +4680,7 @@ function defaultState() {
   return {
     currency:'SEK', darkMode:true, lang:'en', activePanel:'dashboard',
     currentAge:44, retirementAge:69, growthRate:7, inflationRate:2,
-    retirementPostGrowth:4, lifeExp:90, withdrawTaxRate:30,
+    retirementPostGrowth:4, lifeExp:90,
     retirementScenario:'baseline',
     tickerQuote:'Come rain or shine, I will retire under the sun.',
     exchangeRates:{ SEK:1, USD:0.11, EUR:0.09, KES:14.27 },
@@ -4677,9 +4709,9 @@ function defaultState() {
     selectedYear:CY+1, cascadeEnabled:true,
 
     externalAssets:[
-      {id:genId(),name:'ITP1',balance:1400000,monthlyContribution:32000,growthRate:4,assetType:'investment'},
-      {id:genId(),name:'Vanguard',balance:1400000,monthlyContribution:0,growthRate:7,assetType:'investment'},
-      {id:genId(),name:'Royal London',balance:700000,monthlyContribution:0,growthRate:7,assetType:'investment'},
+      {id:genId(),name:'ITP1',balance:1400000,monthlyContribution:32000,growthRate:4,taxRate:30,assetType:'investment'},
+      {id:genId(),name:'Vanguard',balance:1400000,monthlyContribution:0,growthRate:7,taxRate:30,assetType:'investment'},
+      {id:genId(),name:'Royal London',balance:700000,monthlyContribution:0,growthRate:7,taxRate:20,assetType:'investment'},
     ],
 
     retirementExpenses:[
@@ -4901,7 +4933,7 @@ window.dr = function(name){ return window.commitRender(name); };
 // ─── PERSISTENCE ────────────────────────────────────────────────────────────
 // State schema version. Bump this and add a branch to migrate() whenever the
 // shape of `state` changes in a backwards-incompatible way.
-const STATE_VERSION = 11;
+const STATE_VERSION = 12;
 function migrate(s) {
   const from = s.version || 1;
   if(from >= STATE_VERSION) { s.version = STATE_VERSION; return s; }
@@ -4998,6 +5030,18 @@ function migrate(s) {
   // show the welcome to genuinely fresh installs.
   if(from < 11) {
     if(s.welcomeComplete === undefined) s.welcomeComplete = true;
+  }
+  // v11 → v12: per-investment taxRate replaces the single global
+  // `withdrawTaxRate`. Backfill each investment card with the old
+  // global value (or 30% if absent) so existing users see no numeric
+  // change the first time they load, then delete the global field.
+  if(from < 12) {
+    const legacyTax = (typeof s.withdrawTaxRate === 'number') ? s.withdrawTaxRate : 30;
+    (s.externalAssets || []).forEach(a => {
+      if((a.assetType || 'investment') !== 'investment') return;
+      if(typeof a.taxRate !== 'number') a.taxRate = legacyTax;
+    });
+    delete s.withdrawTaxRate;
   }
   s.version = STATE_VERSION;
   return s;
@@ -5303,6 +5347,31 @@ function getProjection() {
 }
 
 function getPensionAssets() { return state.externalAssets.filter(a=>a.assetType==='pension'); }
+function getInvestmentAssets() { return state.externalAssets.filter(a=>(a.assetType||'investment')==='investment'); }
+// Tax on portfolio withdrawals is now per-investment. For surfaces that
+// still need a single headline rate (Income Requirements, the shared
+// _simulateRetirementYears sim, verdict cascade), we collapse the set to
+// a balance-weighted average so accounts with more money have more say
+// in the effective draw-down tax. Fallback of 0% when there are no
+// investments (e.g. pension-only user).
+function getEffectiveWithdrawTaxRate() {
+  const inv = getInvestmentAssets();
+  if(!inv.length) return 0;
+  let wSum = 0, bSum = 0;
+  inv.forEach(a => {
+    const b = Math.max(0, Number(a.balance) || 0);
+    const tr = Number.isFinite(a.taxRate) ? a.taxRate : 30;
+    wSum += b * tr;
+    bSum += b;
+  });
+  if(bSum <= 0) {
+    // No balances yet — simple mean so a user tweaking tax on an empty
+    // account still sees the headline figure respond.
+    const mean = inv.reduce((s,a)=>s+(Number.isFinite(a.taxRate)?a.taxRate:30),0)/inv.length;
+    return mean;
+  }
+  return wSum / bSum;
+}
 function getTotalPensionIncome() {
   return getPensionAssets().reduce((s,p)=>{
     const start=p.startAge??state.retirementAge, end=p.endAge||999;
@@ -5414,7 +5483,7 @@ function getRetirementNumbers() {
     // card and verdict logic now use `pensionAvgMonthly`, computed below
     // from the full simulation.
     const pension = getTotalPensionIncome();
-    const taxRate = Math.min((state.withdrawTaxRate??0)/100, 0.99);
+    const taxRate = Math.min(getEffectiveWithdrawTaxRate()/100, 0.99);
     const totalGross = taxRate>0?totalExp/(1-taxRate):totalExp;
     const proj = getProjection();
     const nestEgg = proj.length?proj[proj.length-1].realTotal:0;
@@ -8953,7 +9022,7 @@ window.askRetirementParamHelp = function(paramKey){
     },
     withdrawTax: {
       name: 'Withdrawal Tax Rate',
-      current: (state.withdrawTaxRate ?? 30) + '%',
+      current: getEffectiveWithdrawTaxRate().toFixed(1) + '% (balance-weighted across investments)',
     },
   };
   const d = defs[paramKey];
@@ -9246,10 +9315,12 @@ function renderRetirement() {
           ${suffix?`<span class="rac-suffix">${suffix}</span>`:''}
         </div>
       </div>`;
+    const tr4 = Number.isFinite(a.taxRate) ? a.taxRate : 30;
     const fields = isInv ? `
       ${numCell(t('s2.card.field.balance'),      Math.round(a.balance*r),             `state.externalAssets[${idx}].balance=parseNum(this.value)/${r};save()`, s)}
       ${numCell(t('s2.card.field.contribution'), Math.round(a.monthlyContribution*r), `state.externalAssets[${idx}].monthlyContribution=parseNum(this.value)/${r};save()`, s, '/mo')}
       ${numCell(t('s2.card.field.growthRate'),   gr,                                  `state.externalAssets[${idx}].growthRate=parseNum(this.value);save()`, '', '%')}
+      ${numCell(t('s2.card.field.taxRate'),      tr4,                                 `state.externalAssets[${idx}].taxRate=parseNum(this.value);save()`, '', '%')}
     ` : `
       ${numCell(t('s2.card.field.payout'),  Math.round((a.monthlyPayout||0)*r), `state.externalAssets[${idx}].monthlyPayout=parseNum(this.value)/${r};save()`, s, '/mo')}
       ${numCell(t('s2.card.field.fromAge'), a.startAge||state.retirementAge,    `state.externalAssets[${idx}].startAge=parseNum(this.value);save()`)}
@@ -9306,7 +9377,7 @@ function renderRetirement() {
   // that's already localised.
   const newAccountName = t('s2.new.account').replace(/'/g, "\\'");
   const newPensionName = t('s2.new.pension').replace(/'/g, "\\'");
-  const addInvestmentBtn = `<button class="ret-col-add" onclick="state.externalAssets.push({id:genId(),name:'${newAccountName}',balance:0,monthlyContribution:0,growthRate:7,assetType:'investment'});save();renderRetirement()">${esc2(t('s2.col.addInvestment'))}</button>`;
+  const addInvestmentBtn = `<button class="ret-col-add" onclick="state.externalAssets.push({id:genId(),name:'${newAccountName}',balance:0,monthlyContribution:0,growthRate:7,taxRate:30,assetType:'investment'});save();renderRetirement()">${esc2(t('s2.col.addInvestment'))}</button>`;
   const addPensionBtn    = `<button class="ret-col-add" onclick="state.externalAssets.push({id:genId(),name:'${newPensionName}',monthlyPayout:0,startAge:state.retirementAge,endAge:null,assetType:'pension'});save();renderRetirement()">${esc2(t('s2.col.addPension'))}</button>`;
   const emptyInv = `<div class="ret-col-empty">${t('s2.col.emptyInv')}</div>`;
   const emptyPen = `<div class="ret-col-empty">${t('s2.col.emptyPen')}</div>`;
@@ -9416,7 +9487,6 @@ function renderRetirement() {
               <div class="field"><label class="field-label-row">${esc2(t('s3.params.growthRate'))}<button type="button" class="field-help-btn" onclick="askRetirementParamHelp('growthRate')" title="${esc2(t('s3.params.helpTitle'))}">?</button></label><input type="text" inputmode="decimal" data-lang-num="1" value="${state.growthRate}" oninput="state.growthRate=parseNum(this.value);save()" onchange="commitRender('renderRetirement')"></div>
               <div class="field"><label class="field-label-row">${esc2(t('s3.params.inflation'))}<button type="button" class="field-help-btn" onclick="askRetirementParamHelp('inflation')" title="${esc2(t('s3.params.helpTitle'))}">?</button></label><input type="text" inputmode="decimal" data-lang-num="1" value="${state.inflationRate}" oninput="state.inflationRate=parseNum(this.value);save()" onchange="commitRender('renderRetirement')"></div>
               <div class="field"><label class="field-label-row">${esc2(t('s3.params.postRetGrowth'))}<button type="button" class="field-help-btn" onclick="askRetirementParamHelp('postGrowth')" title="${esc2(t('s3.params.helpTitle'))}">?</button></label><input type="text" inputmode="decimal" data-lang-num="1" value="${state.retirementPostGrowth||4}" oninput="state.retirementPostGrowth=parseNum(this.value);save()" onchange="commitRender('renderRetirement')"></div>
-              <div class="field"><label class="field-label-row">${esc2(t('s3.params.withdrawalTax'))}<button type="button" class="field-help-btn" onclick="askRetirementParamHelp('withdrawTax')" title="${esc2(t('s3.params.helpTitle'))}">?</button></label><input type="text" inputmode="decimal" data-lang-num="1" value="${state.withdrawTaxRate||30}" oninput="state.withdrawTaxRate=parseNum(this.value);save()" onchange="commitRender('renderRetirement')"></div>
               <div class="field" style="grid-column:1/-1"><label>${esc2(t('s3.params.lifeExp'))}</label><input type="text" inputmode="decimal" data-lang-num="1" value="${state.lifeExp||90}" oninput="state.lifeExp=parseNum(this.value);save()" onchange="commitRender('renderRetirement')"></div>
             </div>
           </div>
@@ -12026,7 +12096,7 @@ ${'<'}script>window.addEventListener('load', () => setTimeout(() => window.print
 // the traditional full-state roundtrip.
 const EXPORT_SLICES = [
   { key:'baseline',   icon:'💰', label:'Baseline',        sub:'Income, expenses, savings target', fields:['baseIncome','baseExpenses','baseSavings'] },
-  { key:'retirement', icon:'🎯', label:'Retirement',      sub:'Portfolio assets, scenarios, ages, tax', fields:['externalAssets','retirementExpenses','retirementScenario','currentAge','retirementAge','lifeExp','withdrawTaxRate','growthRate','inflationRate','retirementPostGrowth'] },
+  { key:'retirement', icon:'🎯', label:'Retirement',      sub:'Portfolio assets, scenarios, ages, tax', fields:['externalAssets','retirementExpenses','retirementScenario','currentAge','retirementAge','lifeExp','growthRate','inflationRate','retirementPostGrowth'] },
   { key:'places',     icon:'🌍', label:'Places',          sub:'Retire Anywhere destinations', fields:['places'] },
   { key:'trips',      icon:'✈️', label:'Trips & Fun Fund', sub:'Planned travel and lifestyle budget', fields:['trips'] },
   { key:'overrides',  icon:'📆', label:'Overrides',       sub:'Monthly overrides + yearly bases', fields:['monthlyOverrides','yearlyBases','cascadeEnabled'] },
