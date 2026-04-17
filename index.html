@@ -76,7 +76,18 @@ input[type="number"] { font-family:var(--fm); font-variant-numeric:tabular-nums;
 /* Tabular numerals on every element that displays money / counts. The
    second selector catches anything rendered in the mono font face so
    numeric columns stay column-aligned even as values change. */
-.kpi-val, .runway-ms-val, .ireq-kpi-val, .tk, .tkv, .line-amt, .sb-mini-val { font-variant-numeric:tabular-nums; }
+/* Tabular numerals across every money-value class on the Retirement
+   Plan tab so toggling Today/Nominal doesn't shift column widths.
+   Without this, digits like 1 vs 7 have different widths in the
+   default JetBrains Mono feature set and cards visibly re-flow when
+   numbers change on mode toggle. */
+.kpi-val, .runway-ms-val, .ireq-kpi-val, .tk, .tkv, .line-amt, .sb-mini-val,
+.sust-num-val, .sust-verdict-text, .runway-chip, .ireq-formula,
+.ireq-phase-row, .ret-asset-proj-val { font-variant-numeric:tabular-nums; }
+/* Compact lens tag shown next to section titles so the label tracks
+   whichever frame (Today's money / Nominal) the numbers are rendered
+   in. Same vocabulary as the dashboard .kpi-lens chip. */
+.lens-tag { font-size:9px; color:var(--text3); letter-spacing:.04em; font-weight:500; text-transform:none; opacity:.7; }
 [style*="font-family:var(--fm)"], [style*="font-family: var(--fm)"] { font-variant-numeric:tabular-nums; }
 /* Layout containment on every panel so a value-width change inside one
    panel never reflows siblings or shifts the page. */
@@ -719,7 +730,14 @@ body.light .card.card-clickable:hover {
 .runway-legend-gap  { display:inline-flex; align-items:center; gap:4px; color:var(--accent-premium); font-weight:600; margin-left:auto; padding:3px 8px; background:var(--accent-premium-dim); border-radius:4px; }
 
 /* ── SVG CHART (pure SVG, replaces Chart.js runway) ───────────────── */
-.runway-svg-host { width:100%; background:var(--bg2); border:1px solid var(--border); border-radius:10px; padding:8px 6px 6px; }
+/* Reserve vertical space for the SVG runway chart. Without this
+   min-height the host collapses to a 1px border during the ~80ms
+   between the innerHTML swap and the deferred renderRunwayChart()
+   call — the page shortens, the scrollbar disappears, cards below
+   reflow, and the user sees a visible "shake" on every display-mode
+   toggle. The min-height matches the drawn chart so there's no
+   content jump when the SVG mounts. */
+.runway-svg-host { width:100%; min-height:340px; background:var(--bg2); border:1px solid var(--border); border-radius:10px; padding:8px 6px 6px; box-sizing:border-box; }
 .runway-wrap > .runway-svg-host { margin-left:-6px; margin-right:-6px; }
 body.light .runway-svg-host { background:var(--bg3); }
 .runway-svg { display:block; width:100%; height:auto; max-height:320px; }
@@ -6219,6 +6237,21 @@ const FinancialEngine = (() => {
       (state.displayMode === 'nominal'
         ? (nominal || 0)
         : (nominal || 0) / (_inflFactor(years) || 1)),
+    // Inverse of .discount: takes a value that's in today's money and
+    // returns its nominal equivalent at `years` from now, but only
+    // when the user is viewing in Nominal mode. In Real mode the
+    // value is returned unchanged. Every retirement-page surface that
+    // displays a real-at-retirement figure (sustainable withdrawal,
+    // pension average, nest egg, required expenses, etc.) pipes
+    // through this so the Today/Nominal toggle reaches all of them
+    // from a single source of truth. Default years = yearsToRetirement
+    // because that's the relevant horizon for every figure referenced
+    // by the Retirement Plan tab.
+    scaleReal:  (realValue, years) => {
+      if(state.displayMode !== 'nominal') return realValue || 0;
+      const y = (typeof years === 'number') ? years : _yearsToRetirement();
+      return (realValue || 0) * (_inflFactor(y) || 1);
+    },
     label:      () =>
       (state.displayMode === 'nominal'
         ? t('dash.chart.toggle.nominal')
@@ -7742,6 +7775,20 @@ window.applyDisplayMode = function(m){
       b.classList.toggle('active', (b.textContent || '').trim().toLowerCase() === (m === 'real' ? t('topbar.mode.real') : t('topbar.mode.nominal')).toLowerCase());
     });
   } catch(_e){}
+  // Freeze the active panel's current rendered height across the
+  // re-render so the scrollbar can't pop in/out between the
+  // innerHTML swap and the deferred chart mount. This is the other
+  // half of the jitter fix — the .runway-svg-host min-height
+  // stabilises the inner chart container, this stabilises the
+  // outer panel. Released after two rAFs (the re-render frame and
+  // the paint after it) so normal layout takes over cleanly.
+  const activeId = state.activePanel || 'dashboard';
+  const panelEl = document.getElementById('panel-' + activeId);
+  let frozenMin = null;
+  if(panelEl){
+    frozenMin = panelEl.style.minHeight;
+    try { panelEl.style.minHeight = (panelEl.offsetHeight || 0) + 'px'; } catch(_e){}
+  }
   // Full panel re-render — every KPI, chart, and AI payload reads
   // state.displayMode, so a single-frame rebuild keeps all surfaces
   // in lockstep.
@@ -7753,6 +7800,13 @@ window.applyDisplayMode = function(m){
       if(typeof renderPanel === 'function') renderPanel(active);
       if(typeof decoratePanel === 'function') decoratePanel(active);
     } catch(e){ console.warn('applyDisplayMode render failed', e); }
+    // Release the freeze after the post-render paint so charts can
+    // size naturally again. The tiny overshoot is imperceptible.
+    requestAnimationFrame(() => {
+      if(panelEl){
+        try { panelEl.style.minHeight = frozenMin || ''; } catch(_e){}
+      }
+    });
   });
   save();
 };
@@ -10129,6 +10183,19 @@ function renderRetirement() {
   const pensions=getPensionAssets();
   const ytr=Math.max(0,state.retirementAge-state.currentAge);
   const infl=state.inflationRate; const inflF=Math.pow(1+infl/100,ytr);
+  // Display-mode wrapper: every value produced by getRetirementNumbers()
+  // is in today's money (real) terms. When the user has flipped the
+  // top-bar toggle to Nominal, we scale each real figure to its
+  // future-kr equivalent at the retirement age so labels and numbers
+  // stay in one frame. `lens` is cached once per render so the arrow
+  // function allocation is trivial and the call sites stay readable.
+  const lens  = FE.display.label();
+  const isNom = FE.display.isNominal();
+  // sR() wraps one real value for rendering. sFmt() is the composition
+  // with fmt() — 99% of call sites want fmt(sR(x)), so expose the
+  // shorthand.
+  const sR   = (v, years) => FE.display.scaleReal(v, years);
+  const sFmt = (v, years) => fmt(sR(v, years));
   // PORTFOLIO KPIs — every number on this row comes from the single
   // FinancialEngine surface so nothing in this file can drift from
   // the Longevity Runway nest-egg card or the Dashboard Nest Egg
@@ -10156,18 +10223,32 @@ function renderRetirement() {
   // Pull the runway data once so the Income Requirements section can
   // average it without duplicating the simulation.
   const cdataReq = buildRunwayChartData(nums);
-  // Income Requirements computed values (annual + per-phase)
-  const expensesMonthly = nums.totalExp;                               // already mult-applied
-  const expensesAnnual  = expensesMonthly * 12;
-  const grossMonthly    = nums.totalGross;                              // already / (1-tax)
-  const grossAnnual     = grossMonthly * 12;
+  // Income Requirements computed values (annual + per-phase).
+  // Every monetary figure here starts in real (today's money) terms
+  // and is wrapped for display via sR(...) so the Today/Nominal
+  // toggle applies uniformly. The ratio (avgWithdrawalRate) is
+  // dimensionless, so we compute it from REAL numerators/denominators
+  // to keep the percentage stable regardless of lens.
+  const expensesMonthly = sR(nums.totalExp);
+  const expensesAnnual  = sR(nums.totalExp * 12);
+  const grossMonthly    = sR(nums.totalGross);
+  const grossAnnual     = sR(nums.totalGross * 12);
+  const pensionAvgDisp  = sR(nums.pensionAvgMonthly);
+  const grossNeededDisp = sR(nums.grossNeeded);
+  const sustainableDisp = sR(nums.sustainableAfterTax);
+  const nestEggDisp     = sR(nums.nestEgg);
+  const gapDisp         = sR(nums.gap);
   const taxPct          = Math.round(nums.taxRate * 100);
   const lifeExpReq      = state.lifeExp || 90;
   const yearsCount      = Math.max(1, cdataReq.portWithdrawal.length);
-  const totalPortAnnual = cdataReq.portWithdrawal.reduce((a,b)=>a+b,0);
-  const avgPortAnnual   = totalPortAnnual / yearsCount;
-  const avgPortMonthly  = avgPortAnnual / 12;
-  const avgWithdrawalRate = nums.nestEgg > 0 ? (avgPortAnnual / nums.nestEgg) * 100 : 0;
+  const totalPortAnnualReal = cdataReq.portWithdrawal.reduce((a,b)=>a+b,0);
+  const avgPortAnnualReal   = totalPortAnnualReal / yearsCount;
+  const avgPortMonthlyReal  = avgPortAnnualReal / 12;
+  const avgPortAnnual   = sR(avgPortAnnualReal);
+  const avgPortMonthly  = sR(avgPortMonthlyReal);
+  // Rate is a ratio — same in both lenses since numerator and
+  // denominator scale by the same inflation factor.
+  const avgWithdrawalRate = nums.nestEgg > 0 ? (avgPortAnnualReal / nums.nestEgg) * 100 : 0;
   // Phase split — uses earliestPension as the boundary
   const hasPhaseSplit = earliestPension !== null && earliestPension > state.retirementAge && earliestPension <= lifeExpReq;
   let phase1 = null, phase2 = null;
@@ -10175,27 +10256,29 @@ function renderRetirement() {
     const p1Start = state.retirementAge;
     const p1EndExclusive = earliestPension;
     const p1Years = p1EndExclusive - p1Start;
-    const p1PortAnnual = grossAnnual; // no pension offset in this period
-    const p1Rate = nums.nestEgg > 0 ? (p1PortAnnual / nums.nestEgg) * 100 : 0;
+    // Phase 1 withdrawal rate is a ratio — computed from real gross
+    // annual / real nest egg — so it's lens-independent.
+    const p1PortAnnualReal = nums.totalGross * 12; // no pension offset in this period
+    const p1Rate = nums.nestEgg > 0 ? (p1PortAnnualReal / nums.nestEgg) * 100 : 0;
     phase1 = {
       label: t('ireq.phase1.label', {
         a: p1Start, b: p1EndExclusive - 1,
         years: p1Years, s: p1Years !== 1 ? 's' : '',
       }),
-      portMonthly: grossMonthly,
+      portMonthly: sR(nums.totalGross),
       pensionMonthly: 0,
       withdrawalRate: p1Rate,
     };
-    // Phase 2 — average across post-pension years from cdata
+    // Phase 2 — average across post-pension years from cdata.
     const p2Idx = cdataReq.labels.findIndex(a => a >= earliestPension);
     const p2Years = cdataReq.labels.length - p2Idx;
-    const p2PortAvgAnnual  = p2Years > 0 ? cdataReq.portWithdrawal.slice(p2Idx).reduce((a,b)=>a+b,0)/p2Years : 0;
-    const p2PenAvgAnnual   = p2Years > 0 ? cdataReq.pensionData.slice(p2Idx).reduce((a,b)=>a+b,0)/p2Years    : 0;
+    const p2PortAvgAnnualReal  = p2Years > 0 ? cdataReq.portWithdrawal.slice(p2Idx).reduce((a,b)=>a+b,0)/p2Years : 0;
+    const p2PenAvgAnnualReal   = p2Years > 0 ? cdataReq.pensionData.slice(p2Idx).reduce((a,b)=>a+b,0)/p2Years    : 0;
     phase2 = {
       label: t('ireq.phase2.label', { age: earliestPension }),
-      portMonthly: p2PortAvgAnnual / 12,
-      pensionMonthly: p2PenAvgAnnual / 12,
-      withdrawalRate: nums.nestEgg > 0 ? (p2PortAvgAnnual / nums.nestEgg) * 100 : 0,
+      portMonthly: sR(p2PortAvgAnnualReal / 12),
+      pensionMonthly: sR(p2PenAvgAnnualReal / 12),
+      withdrawalRate: nums.nestEgg > 0 ? (p2PortAvgAnnualReal / nums.nestEgg) * 100 : 0,
     };
   }
   const fundDepletionLabel = nums.runoutAge
@@ -10215,8 +10298,8 @@ function renderRetirement() {
     : t('s1.summary.neverDepletes');
   const s1SummaryCoverage = t('s1.summary.coverage', { pct: nums.coveragePct.toFixed(0) });
   const s1SummaryGap = nums.gap >= 0
-    ? t('s1.summary.surplus',   { amt: fmt(nums.gap) })
-    : t('s1.summary.shortfall', { amt: fmt(Math.abs(nums.gap)) });
+    ? t('s1.summary.surplus',   { amt: sFmt(nums.gap) })
+    : t('s1.summary.shortfall', { amt: sFmt(Math.abs(nums.gap)) });
   const s1SummaryPension = nums.pensionMaterial
     ? ' · ' + t('s1.summary.pensionShare', { pct: nums.pensionShareOfNeed.toFixed(0) })
     : '';
@@ -10250,10 +10333,10 @@ function renderRetirement() {
       </div>
       `}
       <div class="sust-nums" style="margin-bottom:14px">
-        <div class="sust-num"><div class="sust-num-lbl">${t('s1.num.nestEgg')}</div><div class="sust-num-val">${fmt(nums.nestEgg)}</div></div>
-        <div class="sust-num"><div class="sust-num-lbl">${t('s1.num.portfolioSustains')}</div><div class="sust-num-val pos">${fmt(nums.sustainableAfterTax)}/mo</div></div>
-        ${nums.pensionAvgMonthly > 0 ? `<div class="sust-num"><div class="sust-num-lbl">${t('s1.num.pensionCovers')}</div><div class="sust-num-val" style="color:#4d9fff">${fmt(nums.pensionAvgMonthly)}/mo</div><div style="font-size:9px;color:var(--text3);margin-top:2px;font-family:var(--fm)">${t('s1.num.pensionShareOfNeed', { pct: nums.pensionShareOfNeed.toFixed(0) })}</div></div>` : ''}
-        <div class="sust-num"><div class="sust-num-lbl">${t('s1.num.youNeed')}</div><div class="sust-num-val">${fmt(nums.totalExp)}/mo</div></div>
+        <div class="sust-num"><div class="sust-num-lbl">${t('s1.num.nestEgg')} <span class="lens-tag">· ${esc2(lens)}</span></div><div class="sust-num-val">${sFmt(nums.nestEgg)}</div></div>
+        <div class="sust-num"><div class="sust-num-lbl">${t('s1.num.portfolioSustains')}</div><div class="sust-num-val pos">${sFmt(nums.sustainableAfterTax)}/mo</div></div>
+        ${nums.pensionAvgMonthly > 0 ? `<div class="sust-num"><div class="sust-num-lbl">${t('s1.num.pensionCovers')}</div><div class="sust-num-val" style="color:#4d9fff">${sFmt(nums.pensionAvgMonthly)}/mo</div><div style="font-size:9px;color:var(--text3);margin-top:2px;font-family:var(--fm)">${t('s1.num.pensionShareOfNeed', { pct: nums.pensionShareOfNeed.toFixed(0) })}</div></div>` : ''}
+        <div class="sust-num"><div class="sust-num-lbl">${t('s1.num.youNeed')}</div><div class="sust-num-val">${sFmt(nums.totalExp)}/mo</div></div>
         <div class="sust-num"><div class="sust-num-lbl">${t('s1.num.depletionAge')}</div><div class="sust-num-val ${nums.runoutAge?'neg':'pos'}">${nums.runoutAge?t('s1.num.ageValue', { age: Math.round(nums.runoutAge) }):t('s1.num.never')}</div></div>
       </div>
       <!-- Runway Chart.js (feature #4) -->
@@ -10534,13 +10617,13 @@ function renderRetirement() {
             </div>
           </div>
           <div class="card">
-            <div class="card-title">${esc2(t('s3.ireq.title'))}</div>
+            <div class="card-title">${esc2(t('s3.ireq.title'))} <span class="lens-tag">· ${esc2(lens)}</span></div>
             <div style="display:flex;flex-direction:column;gap:2px;font-size:11px">
-              <div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--bg3)"><span style="color:var(--text2)">${esc2(t('s3.ireq.afterTax'))}</span><span style="font-family:var(--fm);font-weight:600">${fmt(nums.totalExp)}/mo</span></div>
-              <div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--bg3)"><span style="color:var(--text2)">${esc2(t('s3.ireq.grossNeeded', { f: (1-nums.taxRate).toFixed(2) }))}</span><span style="font-family:var(--fm);font-weight:600">${fmt(nums.totalGross)}/mo</span></div>
-              <div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--bg3)"><span style="color:var(--text2)">${esc2(t('s3.ireq.pensionOffset'))} <span style="color:var(--text3);font-size:10px">${esc2(t('s3.ireq.avg'))}</span></span><span style="font-family:var(--fm);font-weight:600;color:var(--amber)">− ${fmt(nums.pensionAvgMonthly)}/mo</span></div>
-              <div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--bg3)"><span style="color:var(--text2)">${esc2(t('s3.ireq.portWithdraw'))}</span><span style="font-family:var(--fm);font-weight:700;color:var(--red)">${fmt(nums.grossNeeded)}/mo</span></div>
-              <div style="display:flex;justify-content:space-between;padding:5px 0"><span style="color:var(--text2)">${esc2(t('s3.ireq.portSustain'))}</span><span style="font-family:var(--fm);font-weight:700;color:var(--green)">${fmt(nums.sustainableAfterTax)}${esc2(t('s3.ireq.afterTaxSuffix'))}</span></div>
+              <div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--bg3)"><span style="color:var(--text2)">${esc2(t('s3.ireq.afterTax'))}</span><span style="font-family:var(--fm);font-weight:600">${sFmt(nums.totalExp)}/mo</span></div>
+              <div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--bg3)"><span style="color:var(--text2)">${esc2(t('s3.ireq.grossNeeded', { f: (1-nums.taxRate).toFixed(2) }))}</span><span style="font-family:var(--fm);font-weight:600">${sFmt(nums.totalGross)}/mo</span></div>
+              <div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--bg3)"><span style="color:var(--text2)">${esc2(t('s3.ireq.pensionOffset'))} <span style="color:var(--text3);font-size:10px">${esc2(t('s3.ireq.avg'))}</span></span><span style="font-family:var(--fm);font-weight:600;color:var(--amber)">− ${sFmt(nums.pensionAvgMonthly)}/mo</span></div>
+              <div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--bg3)"><span style="color:var(--text2)">${esc2(t('s3.ireq.portWithdraw'))}</span><span style="font-family:var(--fm);font-weight:700;color:var(--red)">${sFmt(nums.grossNeeded)}/mo</span></div>
+              <div style="display:flex;justify-content:space-between;padding:5px 0"><span style="color:var(--text2)">${esc2(t('s3.ireq.portSustain'))}</span><span style="font-family:var(--fm);font-weight:700;color:var(--green)">${sFmt(nums.sustainableAfterTax)}${esc2(t('s3.ireq.afterTaxSuffix'))}</span></div>
             </div>
           </div>
         </div>
@@ -10553,7 +10636,7 @@ function renderRetirement() {
   const ireq = `
     <div class="card ireq-card">
       <div class="ireq-head">
-        <div class="ireq-title">${esc2(t('ireq.title'))}</div>
+        <div class="ireq-title">${esc2(t('ireq.title'))} <span class="lens-tag">· ${esc2(lens)}</span></div>
         <div class="ireq-sub">${t('ireq.sub', { scenario: esc2(scenLabel(sc)) })}</div>
       </div>
       <div class="ireq-kpi-row">
@@ -10570,7 +10653,7 @@ function renderRetirement() {
         ${nums.pensionAvgMonthly > 0 ? `
         <div class="ireq-kpi">
           <div class="ireq-kpi-lbl">${esc2(t('ireq.kpi.pensionCovers'))}</div>
-          <div class="ireq-kpi-val ireq-blue">${fmt(nums.pensionAvgMonthly)}</div>
+          <div class="ireq-kpi-val ireq-blue">${fmt(pensionAvgDisp)}</div>
           <div class="ireq-kpi-sub">${t('ireq.kpi.pensionSub', { pct: nums.pensionShareOfNeed.toFixed(0) })}</div>
         </div>` : ''}
         <div class="ireq-kpi">
@@ -10595,12 +10678,12 @@ function renderRetirement() {
         <span>${t('ireq.formula.grossNeeded', { mo: fmt(grossMonthly) })}</span>
         ${nums.pensionAvgMonthly > 0 ? `
           <span class="ireq-formula-op">−</span>
-          <span class="ireq-blue">${t('ireq.formula.pension', { mo: fmt(nums.pensionAvgMonthly) })}</span>
+          <span class="ireq-blue">${t('ireq.formula.pension', { mo: fmt(pensionAvgDisp) })}</span>
         ` : ''}
         <span class="ireq-formula-op">=</span>
         <span class="ireq-amber">${t(nums.pensionAvgMonthly > 0 ? 'ireq.formula.portBurden' : 'ireq.formula.portAvg', { mo: fmt(avgPortMonthly) })}</span>
         <span class="ireq-formula-op">→ ÷</span>
-        <span>${t('ireq.formula.nestEgg', { amt: fmt(nums.nestEgg) })}</span>
+        <span>${t('ireq.formula.nestEgg', { amt: fmt(nestEggDisp) })}</span>
         <span class="ireq-formula-op">=</span>
         <span class="${avgWithdrawalRate>4?'ireq-red':'ireq-green'}">${t('ireq.formula.avgRate', { pct: avgWithdrawalRate.toFixed(1) })}</span>
       </div>
@@ -10654,17 +10737,20 @@ function renderRetirement() {
     pension: sec1PensionBit,
   });
   const sec2Subtitle = t('ret.sec2.sub', {
-    need: fmt(nums.totalExp),
+    need: sFmt(nums.totalExp),
     cur:  state.currentAge,
     ret:  state.retirementAge,
     ytr:  nums.ytr,
   });
+  // Section 3 (Portfolio): the "invested" figure is today's balance
+  // (present-day value — no scaling). The "projected" figure is a
+  // future balance; picks nominal / real per the active lens.
   const sec3Subtitle = t('ret.sec3.sub', {
     invested: fmt(tBal),
     pension:  pensions.length > 0
       ? t('ret.sec3.sub.pension', { amt: fmt(getAllPensionIncome()) })
       : '',
-    projected: fmt(projReal),
+    projected: fmt(isNom ? projNom : projReal),
   });
   document.getElementById('panel-retirement').innerHTML=`
     <div class="ph"><div class="ph-tag">${t('ret.page.tag')}</div><div class="ph-title">${esc2(t('ret.page.title'))}</div><div class="ph-sub">${esc2(t('ret.page.sub'))}</div></div>
