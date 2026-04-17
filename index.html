@@ -10080,40 +10080,40 @@ function renderFunFund() {
   const remaining=totalFF-totalTrips;
   const r=rate(); const s=sym();
 
-  const tripCards=state.trips.map((t)=>{
-    const budget = tripBudget(t);
-    const spentPct = budget > 0 ? Math.round((Number(t.spent)||0) / budget * 100) : 0;
+  const tripCards=state.trips.map((tr)=>{
+    const budget = tripBudget(tr);
+    const spentPct = budget > 0 ? Math.round((Number(tr.spent)||0) / budget * 100) : 0;
     // Per-expense rows — each carries its own month + amount so a
     // single trip can spread costs across several months (e.g.
     // flights in May, hotel in August). Each row is wired straight
     // back to state.trips[].expenses via handler helpers, and
     // get12Months() mirrors them into the Monthly Review tab as
     // purple/lime "linked" lines.
-    const expenseRows = (t.expenses || []).map((ex, exIdx) => {
+    const expenseRows = (tr.expenses || []).map((ex, exIdx) => {
       const ym = (ex.date || '').slice(0,7);
       return `<div class="trip-exp-row">
-        <input class="trip-exp-name" value="${esc(ex.name || '')}" placeholder="${esc2(t('ff.trip.exp.namePlaceholder'))}" oninput="updateTripExpense('${t.id}','${ex.id}','name',this.value)">
-        <input type="month" class="trip-exp-date" value="${ym}" onclick="try{this.showPicker&&this.showPicker()}catch(_){}" onfocus="try{this.showPicker&&this.showPicker()}catch(_){}" onchange="updateTripExpense('${t.id}','${ex.id}','date',this.value)" title="${esc2(t('ff.trip.exp.dateTitle'))}">
-        <div class="trip-exp-amt-wrap"><span class="trip-exp-cur">${s}</span><input class="trip-exp-amt" type="text" inputmode="decimal" data-lang-num="1" value="${Math.round((Number(ex.amount)||0)*r)}" oninput="updateTripExpense('${t.id}','${ex.id}','amount',parseNum(this.value)/${r})"></div>
-        <button class="line-rm" onclick="removeTripExpense('${t.id}','${ex.id}')" title="${esc2(t('ff.trip.exp.removeTitle'))}">×</button>
+        <input class="trip-exp-name" value="${esc(ex.name || '')}" placeholder="${esc2(t('ff.trip.exp.namePlaceholder'))}" oninput="updateTripExpense('${tr.id}','${ex.id}','name',this.value)">
+        <input type="month" class="trip-exp-date" value="${ym}" onclick="try{this.showPicker&&this.showPicker()}catch(_){}" onfocus="try{this.showPicker&&this.showPicker()}catch(_){}" onchange="updateTripExpense('${tr.id}','${ex.id}','date',this.value)" title="${esc2(t('ff.trip.exp.dateTitle'))}">
+        <div class="trip-exp-amt-wrap"><span class="trip-exp-cur">${s}</span><input class="trip-exp-amt" type="text" inputmode="decimal" data-lang-num="1" value="${Math.round((Number(ex.amount)||0)*r)}" oninput="updateTripExpense('${tr.id}','${ex.id}','amount',parseNum(this.value)/${r})"></div>
+        <button class="line-rm" onclick="removeTripExpense('${tr.id}','${ex.id}')" title="${esc2(t('ff.trip.exp.removeTitle'))}">×</button>
       </div>`;
     }).join('');
     return `<div class="trip-card">
       <div class="trip-card-head">
-        <span class="trip-card-icon">${t.icon||'✈️'}</span>
+        <span class="trip-card-icon">${tr.icon||'✈️'}</span>
         <div class="trip-card-hd-body">
-          <input class="trip-card-name" value="${esc(t.name)}" placeholder="${esc2(t('ff.trip.namePlaceholder'))}" oninput="updateTripField('${t.id}','name',this.value)">
-          <input class="trip-card-country" value="${esc(t.country||'')}" placeholder="${esc2(t('ff.trip.countryPlaceholder'))}" oninput="updateTripField('${t.id}','country',this.value)">
+          <input class="trip-card-name" value="${esc(tr.name)}" placeholder="${esc2(t('ff.trip.namePlaceholder'))}" oninput="updateTripField('${tr.id}','name',this.value)">
+          <input class="trip-card-country" value="${esc(tr.country||'')}" placeholder="${esc2(t('ff.trip.countryPlaceholder'))}" oninput="updateTripField('${tr.id}','country',this.value)">
         </div>
-        <span class="trip-status ${t.status}">${esc2(t('ff.trip.statusPill.'+t.status))}</span>
-        <button class="line-rm" onclick="removeTrip('${t.id}')" title="${esc2(t('ff.trip.removeTitle'))}">×</button>
+        <span class="trip-status ${tr.status}">${esc2(t('ff.trip.statusPill.'+tr.status))}</span>
+        <button class="line-rm" onclick="removeTrip('${tr.id}')" title="${esc2(t('ff.trip.removeTitle'))}">×</button>
       </div>
       <div class="trip-card-meta">
         <div class="trip-meta-field">
           <div class="trip-meta-lbl">${esc2(t('ff.trip.statusLbl'))}</div>
-          <select class="trip-meta-sel" onchange="updateTripField('${t.id}','status',this.value)">
-            <option value="planning" ${t.status==='planning'?'selected':''}>${esc2(t('ff.trip.status.planning'))}</option>
-            <option value="booked" ${t.status==='booked'?'selected':''}>${esc2(t('ff.trip.status.booked'))}</option>
+          <select class="trip-meta-sel" onchange="updateTripField('${tr.id}','status',this.value)">
+            <option value="planning" ${tr.status==='planning'?'selected':''}>${esc2(t('ff.trip.status.planning'))}</option>
+            <option value="booked" ${tr.status==='booked'?'selected':''}>${esc2(t('ff.trip.status.booked'))}</option>
           </select>
         </div>
         <div class="trip-meta-field">
@@ -10122,13 +10122,13 @@ function renderFunFund() {
         </div>
         <div class="trip-meta-field">
           <div class="trip-meta-lbl">${esc2(t('ff.trip.spentLbl'))}</div>
-          <div class="trip-meta-val-wrap"><span class="trip-meta-cur">${s}</span><input class="trip-meta-amt" type="text" inputmode="decimal" data-lang-num="1" value="${Math.round((Number(t.spent)||0)*r)}" oninput="updateTripField('${t.id}','spent',parseNum(this.value)/${r})"></div>
+          <div class="trip-meta-val-wrap"><span class="trip-meta-cur">${s}</span><input class="trip-meta-amt" type="text" inputmode="decimal" data-lang-num="1" value="${Math.round((Number(tr.spent)||0)*r)}" oninput="updateTripField('${tr.id}','spent',parseNum(this.value)/${r})"></div>
         </div>
       </div>
       <div class="trip-exp-list">
         <div class="trip-exp-hd">
           <span class="trip-exp-hd-lbl">${esc2(t('ff.trip.expenses.title'))}</span>
-          <button class="trip-exp-add" onclick="addTripExpense('${t.id}')">${esc2(t('ff.trip.expenses.add'))}</button>
+          <button class="trip-exp-add" onclick="addTripExpense('${tr.id}')">${esc2(t('ff.trip.expenses.add'))}</button>
         </div>
         ${expenseRows || `<div class="trip-exp-empty">${esc2(t('ff.trip.expenses.empty'))}</div>`}
       </div>
@@ -10136,7 +10136,7 @@ function renderFunFund() {
         <div class="trip-progress-bar" style="width:${Math.min(100,spentPct)}%;background:${spentPct<75?'var(--green)':spentPct<100?'var(--amber)':'var(--red)'}"></div>
       </div>
       <div class="trip-progress-meta">
-        <span>${esc2(t('ff.trip.progress.spent', { pct: spentPct }))}</span><span>${esc2(t('ff.trip.progress.remaining', { amt: fmt(budget-(Number(t.spent)||0)) }))}</span>
+        <span>${esc2(t('ff.trip.progress.spent', { pct: spentPct }))}</span><span>${esc2(t('ff.trip.progress.remaining', { amt: fmt(budget-(Number(tr.spent)||0)) }))}</span>
       </div>
     </div>`;
   }).join('');
@@ -10217,8 +10217,8 @@ function renderFunFund() {
       const tripByMonth={};
       // Roll every trip expense into its own month so the chart bar
       // matches what the Monthly Review tab shows.
-      state.trips.forEach(t => {
-        (t.expenses || []).forEach(ex => {
+      state.trips.forEach(tr => {
+        (tr.expenses || []).forEach(ex => {
           const key = (ex.date || '').slice(0, 7);
           if(!key) return;
           tripByMonth[key] = (tripByMonth[key] || 0) + (Number(ex.amount) || 0);
