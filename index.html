@@ -2454,6 +2454,96 @@ body.light .retire-slideover { box-shadow:-10px 0 32px -10px rgba(60,40,10,0.25)
 }
 .profile-textarea:focus { border-color:var(--text3); }
 
+/* ── JOURNAL PANEL ──────────────────────────────────────────────────
+   Two-column layout on wide screens: composer pinned on the left as
+   a sticky card, entries grouped by month on the right. On narrow
+   widths the composer drops above the list. */
+.journal-kpis { display:grid; grid-template-columns:repeat(auto-fit, minmax(160px,1fr)); gap:10px; margin-bottom:14px; }
+.journal-grid { display:grid; grid-template-columns:minmax(0, 340px) minmax(0, 1fr); gap:16px; align-items:start; }
+@media (max-width:900px){ .journal-grid { grid-template-columns:1fr; } }
+
+.journal-compose { position:sticky; top:14px; }
+.journal-compose .card-title { margin-bottom:10px; }
+.journal-row { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:10px; }
+@media (max-width:420px){ .journal-row { grid-template-columns:1fr; } }
+.journal-row .ctx-field { min-width:0; }
+.journal-date {
+  width:100%; box-sizing:border-box;
+  background:var(--bg3); border:1px solid var(--border);
+  border-radius:8px; padding:9px 12px;
+  color:var(--text); font-family:var(--fm); font-size:13px;
+  outline:none; transition:border-color .15s;
+}
+.journal-date:focus { border-color:var(--text3); }
+.journal-textarea {
+  width:100%; box-sizing:border-box; resize:vertical;
+  min-height:120px;
+  background:var(--bg3); border:1px solid var(--border);
+  border-radius:8px; padding:12px;
+  color:var(--text); font-family:var(--ff); font-size:13px; line-height:1.55;
+  outline:none; transition:border-color .15s;
+  margin-bottom:10px;
+}
+.journal-textarea:focus { border-color:var(--text3); }
+.journal-actions { display:flex; gap:8px; justify-content:flex-end; }
+
+.journal-month { margin-bottom:18px; }
+.journal-month-hd {
+  font-family:var(--fm); font-size:10px; font-weight:700;
+  letter-spacing:.12em; text-transform:uppercase;
+  color:var(--text3);
+  padding:6px 2px; margin-bottom:8px;
+  border-bottom:1px solid var(--border);
+}
+
+.journal-entry {
+  background:var(--bg2); border:1px solid var(--border);
+  border-left:3px solid var(--border2);
+  border-radius:10px; padding:14px 16px;
+  margin-bottom:10px;
+  transition:background .15s, border-color .15s;
+}
+.journal-entry:hover { background:var(--bg3); border-left-color:var(--text3); }
+.journal-entry[data-tag="event"]      { border-left-color:var(--blue); }
+.journal-entry[data-tag="decision"]   { border-left-color:var(--green); }
+.journal-entry[data-tag="reflection"] { border-left-color:var(--violet); }
+.journal-entry-top {
+  display:flex; align-items:baseline; gap:10px; flex-wrap:wrap;
+  margin-bottom:8px;
+}
+.journal-entry-date {
+  font-family:var(--fm); font-size:12px; font-weight:700;
+  color:var(--text);
+}
+.journal-entry-weekday {
+  font-family:var(--fm); font-size:10px; color:var(--text3);
+  text-transform:uppercase; letter-spacing:.06em;
+}
+.journal-tag {
+  font-family:var(--fm); font-size:9px; font-weight:700;
+  letter-spacing:.08em; text-transform:uppercase;
+  padding:3px 8px; border-radius:4px;
+  background:var(--bg3); color:var(--text2);
+  border:1px solid var(--border);
+}
+.journal-entry[data-tag="event"]      .journal-tag { background:rgba(77,159,255,.12); color:var(--blue);   border-color:rgba(77,159,255,.35); }
+.journal-entry[data-tag="decision"]   .journal-tag { background:rgba(34,197,94,.14); color:var(--green);  border-color:rgba(34,197,94,.35); }
+.journal-entry[data-tag="reflection"] .journal-tag { background:rgba(168,85,247,.14); color:var(--violet); border-color:rgba(168,85,247,.35); }
+.journal-entry-actions { margin-left:auto; display:flex; gap:6px; }
+.journal-entry-content {
+  color:var(--text); font-size:13px; line-height:1.6;
+  white-space:pre-wrap; word-wrap:break-word;
+}
+.journal-entry-edit .journal-textarea { margin-bottom:8px; }
+
+.journal-empty {
+  text-align:center; padding:48px 24px;
+  color:var(--text3); font-size:13px; line-height:1.6;
+}
+.journal-empty-title {
+  font-size:15px; font-weight:700; color:var(--text2); margin-bottom:6px;
+}
+
 /* ── SHARED COUNTRY DROPDOWN (createCountryDropdown) ───────────────── */
 .country-dd { position:relative; display:inline-block; }
 .country-dd .cd-trigger { display:inline-flex; align-items:center; gap:10px; background:var(--bg3); border:1px solid var(--border2); border-radius:10px; padding:10px 14px; color:var(--text); font-family:var(--fb); font-size:13px; font-weight:600; cursor:pointer; transition:all .18s; min-width:240px; width:100%; }
@@ -2974,6 +3064,7 @@ body.light .piq-country-menu { box-shadow:0 12px 28px -10px rgba(60,40,10,0.22);
 
       <div class="sb-sep"></div>
       <div class="sb-section" data-i18n="sb.group.library">LIBRARY</div>
+      <div class="nav-item" data-panel="journal" onclick="nav('journal')"><span class="nav-icon">📓</span><span class="nav-lbl" data-i18n="panel.journal">Journal</span></div>
       <div class="nav-item" data-panel="vault" onclick="nav('vault')"><span class="nav-icon">🗄</span><span class="nav-lbl" data-i18n="panel.vault">Vault</span></div>
 
       <div class="sb-sep"></div>
@@ -3006,6 +3097,7 @@ body.light .piq-country-menu { box-shadow:0 12px 28px -10px rgba(60,40,10,0.22);
       <div class="panel" id="panel-funfund"></div>
       <div class="panel" id="panel-retireanywhere"></div>
       <div class="panel" id="panel-propiq"></div>
+      <div class="panel" id="panel-journal"></div>
       <div class="panel" id="panel-vault"></div>
       <div class="panel" id="panel-settings"></div>
     </div>
@@ -3279,6 +3371,7 @@ const STRINGS = {
   'panel.funfund':          { en:'Fun Fund',              sv:'Fun Fund' },
   'panel.retireanywhere':   { en:'Retire Anywhere',       sv:'Pensionera var som helst' },
   'panel.propiq':           { en:'Property IQ',           sv:'Fastighets-IQ' },
+  'panel.journal':          { en:'Journal',               sv:'Dagbok' },
   'panel.vault':            { en:'Vault',                 sv:'Arkiv' },
   'panel.settings':         { en:'Settings',              sv:'Inställningar' },
 
@@ -3402,6 +3495,36 @@ const STRINGS = {
   'settings.profile.marital.divorced':  { en:'Divorced',         sv:'Skild' },
   'settings.profile.marital.widowed':   { en:'Widowed',          sv:'Änka/änkling' },
   'settings.profile.marital.ph':        { en:'— Select —',       sv:'— Välj —' },
+
+  // ── Journal ──────────────────────────────────────────────
+  'journal.page.title':     { en:'Journal',
+                              sv:'Dagbok' },
+  'journal.page.sub':       { en:'Log events, decisions, and reflections so advice stays grounded in what\u2019s actually happened.',
+                              sv:'Logga händelser, beslut och reflektioner så att rådgivningen förblir grundad i det som faktiskt hänt.' },
+  'journal.compose.title':  { en:'New entry',              sv:'Ny anteckning' },
+  'journal.compose.date':   { en:'Date',                   sv:'Datum' },
+  'journal.compose.tag':    { en:'Tag',                    sv:'Etikett' },
+  'journal.compose.content':{ en:'What happened, what did you decide, what are you thinking?',
+                              sv:'Vad hände, vad bestämde du, vad tänker du?' },
+  'journal.compose.save':   { en:'Save entry',             sv:'Spara' },
+  'journal.compose.cancel': { en:'Clear',                  sv:'Rensa' },
+  'journal.tag.event':      { en:'Event',                  sv:'Händelse' },
+  'journal.tag.decision':   { en:'Decision',               sv:'Beslut' },
+  'journal.tag.reflection': { en:'Reflection',             sv:'Reflektion' },
+  'journal.tag.none':       { en:'— None —',               sv:'— Ingen —' },
+  'journal.kpi.total':      { en:'Total entries',          sv:'Totala anteckningar' },
+  'journal.kpi.thisMonth':  { en:'This month',             sv:'Denna månad' },
+  'journal.kpi.last':       { en:'Last entry',             sv:'Senaste' },
+  'journal.kpi.last.none':  { en:'No entries yet',         sv:'Inga anteckningar än' },
+  'journal.empty.title':    { en:'Start your journal',     sv:'Påbörja din dagbok' },
+  'journal.empty.body':     { en:'Short notes beat perfect prose. Jot a line when you make a call, see a number shift, or feel a gut check — your future self (and the AI) will thank you.',
+                              sv:'Korta anteckningar slår perfekta texter. Skriv en rad när du fattar ett beslut, ser en siffra röra sig eller får en magkänsla.' },
+  'journal.entry.edit':     { en:'Edit',                   sv:'Redigera' },
+  'journal.entry.save':     { en:'Save',                   sv:'Spara' },
+  'journal.entry.cancel':   { en:'Cancel',                 sv:'Avbryt' },
+  'journal.entry.delete':   { en:'Delete',                 sv:'Radera' },
+  'journal.entry.deleteConfirm': { en:'Delete this journal entry? This cannot be undone.',
+                                   sv:'Radera denna anteckning? Kan inte ångras.' },
 
   // ── Settings · recurring baseline cards ────────────────
   'settings.recurring':     { en:'RECURRING',          sv:'ÅTERKOMMANDE' },
@@ -4537,6 +4660,9 @@ const STRINGS = {
   'slice.overrides.label':  { en:'Overrides',         sv:'Överskrifter' },
   'slice.overrides.sub':    { en:'Monthly overrides + yearly bases',
                               sv:'Månadsöverskrifter + årsgrunder' },
+  'slice.journal.label':    { en:'Journal',           sv:'Dagbok' },
+  'slice.journal.sub':      { en:'Dated events, decisions, and reflections',
+                              sv:'Daterade händelser, beslut och reflektioner' },
   'slice.settings.label':   { en:'Preferences',       sv:'Inställningar' },
   'slice.settings.sub':     { en:'Theme, currency, exchange rates, AI keys',
                               sv:'Tema, valuta, växelkurser, AI-nycklar' },
@@ -4780,6 +4906,11 @@ function defaultState() {
       householdIncome:0,   // combined household monthly (SEK)
       goals:'',            // free-text financial goals / aspirations
     },
+    // Journal — dated log of events, decisions, and reflections. Each
+    // entry is { id, date:'YYYY-MM-DD', tag, content, updatedAt }.
+    // The recent entries also flow into the AI context so advice
+    // stays aware of what the user has recorded about their life.
+    journal:[],
     tickerQuote:'Come rain or shine, I will retire under the sun.',
     exchangeRates:{ SEK:1, USD:0.11, EUR:0.09, KES:14.27 },
 
@@ -5031,7 +5162,7 @@ window.dr = function(name){ return window.commitRender(name); };
 // ─── PERSISTENCE ────────────────────────────────────────────────────────────
 // State schema version. Bump this and add a branch to migrate() whenever the
 // shape of `state` changes in a backwards-incompatible way.
-const STATE_VERSION = 14;
+const STATE_VERSION = 15;
 function migrate(s) {
   const from = s.version || 1;
   if(from >= STATE_VERSION) { s.version = STATE_VERSION; return s; }
@@ -5165,6 +5296,13 @@ function migrate(s) {
       if(typeof s.profile.householdIncome !== 'number') s.profile.householdIncome = 0;
       if(typeof s.profile.goals !== 'string')           s.profile.goals = '';
     }
+  }
+  // v14 → v15: dated journal. Seed as an empty array so renderers
+  // can read state.journal without a null guard. Existing users land
+  // on an empty list with the composer ready to take their first
+  // entry; new users get the same behaviour via defaultState().
+  if(from < 15) {
+    if(!Array.isArray(s.journal)) s.journal = [];
   }
   s.version = STATE_VERSION;
   return s;
@@ -6430,7 +6568,7 @@ function scoreLocation(loc) {
 // KPI cards continue to work — they redirect into `review` with the right
 // scope preset inside nav(). The Forecast & Review tab is the new unified
 // home for both views.
-const VALID_PANELS = ['dashboard','transactions','review','monthly','yearly','retirement','funfund','retireanywhere','propiq','vault','settings'];
+const VALID_PANELS = ['dashboard','transactions','review','monthly','yearly','retirement','funfund','retireanywhere','propiq','journal','vault','settings'];
 let _navFromHash = false;
 function parseHash() {
   const raw = (location.hash||'').replace(/^#/,'');
@@ -6851,6 +6989,7 @@ function renderPanel(panel) {
     funfund:renderFunFund,
     retireanywhere:renderRetireAnywhere,
     propiq:typeof renderPropIQ==='function'?renderPropIQ:null,
+    journal:renderJournal,
     vault:renderVault,
     settings:renderSettings,
   };
@@ -6871,6 +7010,7 @@ const PANEL_META = {
   funfund:        {label:'Fun Fund',         group:'Planning',          icon:'✦'},
   retireanywhere: {label:'Retire Anywhere',  group:'Planning',          icon:'🌍'},
   propiq:         {label:'Property IQ',      group:'Planning',          icon:'🏠'},
+  journal:        {label:'Journal',          group:'Library',           icon:'📓'},
   vault:          {label:'Vault',            group:'Library',           icon:'🗄'},
   settings:       {label:'Settings',         group:'System',            icon:'⚙'},
 };
@@ -6885,6 +7025,7 @@ const RELATED_MAP = {
   funfund:        ['review','retireanywhere','dashboard'],
   retireanywhere: ['retirement','propiq','vault'],
   propiq:         ['retireanywhere','retirement','vault'],
+  journal:        ['dashboard','review','retirement'],
   vault:          ['retireanywhere','retirement','propiq'],
   settings:       ['dashboard','retirement','transactions'],
 };
@@ -11967,6 +12108,233 @@ function _vaultNormalise(v){
     raw: v,
   };
 }
+// ══ JOURNAL ══════════════════════════════════════════════════════════════
+// Dated log of events, decisions, and reflections. Deliberately light —
+// each entry is just { id, date, tag, content, updatedAt } — so the UX
+// stays out of the user's way. The composer is sticky on wide screens
+// so capture is always one action away, and entries group by month so
+// patterns across weeks are easy to scan. _journalEditing holds the id
+// of the entry currently in edit mode (one at a time) so inline edit
+// doesn't need its own DOM diffing.
+let _journalEditing = null;
+const JOURNAL_TAGS = ['event','decision','reflection'];
+function _journalTodayIso(){
+  const d = new Date();
+  const mm = String(d.getMonth()+1).padStart(2,'0');
+  const dd = String(d.getDate()).padStart(2,'0');
+  return `${d.getFullYear()}-${mm}-${dd}`;
+}
+function _journalWeekday(iso){
+  try {
+    const d = new Date(iso + 'T00:00:00');
+    return d.toLocaleDateString(state.lang === 'sv' ? 'sv-SE' : 'en-US', { weekday:'short' });
+  } catch(_e){ return ''; }
+}
+function _journalMonthLabel(iso){
+  try {
+    const d = new Date(iso + 'T00:00:00');
+    return d.toLocaleDateString(state.lang === 'sv' ? 'sv-SE' : 'en-US', { year:'numeric', month:'long' });
+  } catch(_e){ return iso.slice(0,7); }
+}
+function _journalDateLabel(iso){
+  try {
+    const d = new Date(iso + 'T00:00:00');
+    return d.toLocaleDateString(state.lang === 'sv' ? 'sv-SE' : 'en-US', { day:'numeric', month:'short', year:'numeric' });
+  } catch(_e){ return iso; }
+}
+function renderJournal(){
+  const el = document.getElementById('panel-journal'); if(!el) return;
+  const entries = Array.isArray(state.journal) ? state.journal.slice() : [];
+  // Newest first — primary by date (YYYY-MM-DD sorts lexically), then
+  // by updatedAt for entries sharing a date (latest edit wins).
+  entries.sort((a,b) => {
+    if(a.date !== b.date) return (b.date || '').localeCompare(a.date || '');
+    return (b.updatedAt || 0) - (a.updatedAt || 0);
+  });
+  // KPIs
+  const todayIso = _journalTodayIso();
+  const yyyymm   = todayIso.slice(0,7);
+  const thisMonth = entries.filter(e => (e.date || '').startsWith(yyyymm)).length;
+  const last = entries[0];
+  const lastLabel = last ? _journalDateLabel(last.date) : t('journal.kpi.last.none');
+  // Group by YYYY-MM so the list reads as a monthly digest.
+  const groups = [];
+  const groupByKey = {};
+  entries.forEach(e => {
+    const key = (e.date || '').slice(0,7) || '—';
+    if(!groupByKey[key]){
+      groupByKey[key] = { key, label:_journalMonthLabel((e.date || todayIso).slice(0,7) + '-01'), items:[] };
+      groups.push(groupByKey[key]);
+    }
+    groupByKey[key].items.push(e);
+  });
+
+  const tagOption = (val, label, selected) =>
+    `<option value="${val}" ${selected===val?'selected':''}>${esc2(label)}</option>`;
+
+  const composer = `
+    <div class="card journal-compose">
+      <div class="card-title">${esc2(t('journal.compose.title'))}</div>
+      <div class="journal-row">
+        <div class="ctx-field">
+          <label>${esc2(t('journal.compose.date'))}</label>
+          <input id="j-compose-date" type="date" class="journal-date" value="${todayIso}">
+        </div>
+        <div class="ctx-field">
+          <label>${esc2(t('journal.compose.tag'))}</label>
+          <select id="j-compose-tag" class="profile-select">
+            ${tagOption('',           t('journal.tag.none'),        '')}
+            ${tagOption('event',      t('journal.tag.event'),       '')}
+            ${tagOption('decision',   t('journal.tag.decision'),    '')}
+            ${tagOption('reflection', t('journal.tag.reflection'),  '')}
+          </select>
+        </div>
+      </div>
+      <textarea id="j-compose-content" class="journal-textarea" placeholder="${esc2(t('journal.compose.content'))}"></textarea>
+      <div class="journal-actions">
+        <button class="btn btn-o btn-sm" onclick="journalClearComposer()">${esc2(t('journal.compose.cancel'))}</button>
+        <button class="btn btn-g btn-sm" onclick="journalSaveNew()">${esc2(t('journal.compose.save'))}</button>
+      </div>
+    </div>`;
+
+  const emptyState = `
+    <div class="card">
+      <div class="journal-empty">
+        <div class="journal-empty-title">${esc2(t('journal.empty.title'))}</div>
+        <div>${esc2(t('journal.empty.body'))}</div>
+      </div>
+    </div>`;
+
+  const renderEntry = (e) => {
+    const tag = JOURNAL_TAGS.includes(e.tag) ? e.tag : '';
+    const editing = _journalEditing === e.id;
+    if(editing){
+      return `
+        <div class="journal-entry journal-entry-edit" data-tag="${tag}">
+          <div class="journal-row">
+            <div class="ctx-field">
+              <label>${esc2(t('journal.compose.date'))}</label>
+              <input id="j-edit-date-${e.id}" type="date" class="journal-date" value="${esc(e.date||todayIso)}">
+            </div>
+            <div class="ctx-field">
+              <label>${esc2(t('journal.compose.tag'))}</label>
+              <select id="j-edit-tag-${e.id}" class="profile-select">
+                ${tagOption('',           t('journal.tag.none'),       e.tag||'')}
+                ${tagOption('event',      t('journal.tag.event'),      e.tag||'')}
+                ${tagOption('decision',   t('journal.tag.decision'),   e.tag||'')}
+                ${tagOption('reflection', t('journal.tag.reflection'), e.tag||'')}
+              </select>
+            </div>
+          </div>
+          <textarea id="j-edit-content-${e.id}" class="journal-textarea">${esc(e.content||'')}</textarea>
+          <div class="journal-actions">
+            <button class="btn btn-o btn-sm" onclick="journalCancelEdit()">${esc2(t('journal.entry.cancel'))}</button>
+            <button class="btn btn-g btn-sm" onclick="journalSaveEdit('${e.id}')">${esc2(t('journal.entry.save'))}</button>
+          </div>
+        </div>`;
+    }
+    const tagLabel = tag ? t('journal.tag.'+tag) : '';
+    return `
+      <div class="journal-entry" data-tag="${tag}">
+        <div class="journal-entry-top">
+          <span class="journal-entry-date">${esc2(_journalDateLabel(e.date||''))}</span>
+          <span class="journal-entry-weekday">${esc2(_journalWeekday(e.date||''))}</span>
+          ${tag ? `<span class="journal-tag">${esc2(tagLabel)}</span>` : ''}
+          <div class="journal-entry-actions">
+            <button class="btn btn-o btn-xs" onclick="journalStartEdit('${e.id}')">${esc2(t('journal.entry.edit'))}</button>
+            <button class="btn btn-danger btn-xs" onclick="journalDelete('${e.id}')">${esc2(t('journal.entry.delete'))}</button>
+          </div>
+        </div>
+        <div class="journal-entry-content">${esc2(e.content||'')}</div>
+      </div>`;
+  };
+
+  const list = entries.length === 0 ? emptyState : groups.map(g => `
+    <div class="journal-month">
+      <div class="journal-month-hd">${esc2(g.label)} · ${g.items.length}</div>
+      ${g.items.map(renderEntry).join('')}
+    </div>`).join('');
+
+  el.innerHTML = `
+    <div class="ph">
+      <div class="ph-tag">${esc2(t('sb.group.library'))}</div>
+      <div class="ph-title">${esc2(t('journal.page.title'))}</div>
+      <div class="ph-sub">${esc2(t('journal.page.sub'))}</div>
+    </div>
+
+    <div class="journal-kpis">
+      <div class="kpi"><div class="kpi-icon">📓</div><div class="kpi-lbl">${esc2(t('journal.kpi.total'))}</div><div class="kpi-val">${entries.length}</div></div>
+      <div class="kpi"><div class="kpi-icon">📅</div><div class="kpi-lbl">${esc2(t('journal.kpi.thisMonth'))}</div><div class="kpi-val" style="color:var(--cyan)">${thisMonth}</div></div>
+      <div class="kpi" style="grid-column:span 2"><div class="kpi-icon">⌛</div><div class="kpi-lbl">${esc2(t('journal.kpi.last'))}</div><div class="kpi-val" style="font-size:14px;font-weight:600">${esc2(lastLabel)}</div></div>
+    </div>
+
+    <div class="journal-grid">
+      ${composer}
+      <div>${list}</div>
+    </div>`;
+}
+
+// ─── Journal handlers ──────────────────────────────────────────────
+window.journalSaveNew = function(){
+  const date = (document.getElementById('j-compose-date')||{}).value || _journalTodayIso();
+  const tag  = (document.getElementById('j-compose-tag')||{}).value || '';
+  const content = ((document.getElementById('j-compose-content')||{}).value || '').trim();
+  if(!content) return;
+  if(!Array.isArray(state.journal)) state.journal = [];
+  const now = Date.now();
+  state.journal.push({
+    id: genId(),
+    date,
+    tag,
+    content,
+    createdAt: now,
+    updatedAt: now,
+  });
+  save();
+  renderJournal();
+};
+window.journalClearComposer = function(){
+  const d = document.getElementById('j-compose-date');   if(d) d.value = _journalTodayIso();
+  const g = document.getElementById('j-compose-tag');    if(g) g.value = '';
+  const c = document.getElementById('j-compose-content'); if(c) c.value = '';
+};
+window.journalStartEdit = function(id){
+  _journalEditing = id;
+  renderJournal();
+};
+window.journalCancelEdit = function(){
+  _journalEditing = null;
+  renderJournal();
+};
+window.journalSaveEdit = function(id){
+  const list = state.journal || [];
+  const e = list.find(x => x.id === id);
+  if(!e) { _journalEditing = null; renderJournal(); return; }
+  const date = (document.getElementById('j-edit-date-'+id)||{}).value || e.date;
+  const tag  = (document.getElementById('j-edit-tag-'+id)||{}).value || '';
+  const content = ((document.getElementById('j-edit-content-'+id)||{}).value || '').trim();
+  if(!content){
+    // Empty edit = delete. Mirrors how most journal apps treat
+    // "save empty" so the user has a second path to remove an entry.
+    state.journal = list.filter(x => x.id !== id);
+  } else {
+    e.date = date;
+    e.tag = tag;
+    e.content = content;
+    e.updatedAt = Date.now();
+  }
+  _journalEditing = null;
+  save();
+  renderJournal();
+};
+window.journalDelete = function(id){
+  if(!confirm(t('journal.entry.deleteConfirm'))) return;
+  state.journal = (state.journal || []).filter(x => x.id !== id);
+  if(_journalEditing === id) _journalEditing = null;
+  save();
+  renderJournal();
+};
+
 function renderVault(){
   const el = document.getElementById('panel-vault'); if(!el) return;
   const rawVault = Array.isArray(state.vault) ? state.vault : [];
@@ -12337,6 +12705,7 @@ const EXPORT_SLICES = [
   { key:'places',     icon:'🌍', label:'Places',          sub:'Retire Anywhere destinations', fields:['places'] },
   { key:'trips',      icon:'✈️', label:'Trips & Fun Fund', sub:'Planned travel and lifestyle budget', fields:['trips'] },
   { key:'overrides',  icon:'📆', label:'Overrides',       sub:'Monthly overrides + yearly bases', fields:['monthlyOverrides','yearlyBases','cascadeEnabled'] },
+  { key:'journal',    icon:'📓', label:'Journal',         sub:'Dated events, decisions, and reflections', fields:['journal'] },
   { key:'settings',   icon:'⚙', label:'Preferences',     sub:'Theme, currency, exchange rates, AI keys, personal profile', fields:['currency','exchangeRates','darkMode','tickerQuote','aiKeys','aiProvider','categoryMap','profile','displayMode'] },
   { key:'all',        icon:'📦', label:'Everything',      sub:'Full state backup (overwrites on import)', fields:null },
 ];
@@ -12807,6 +13176,22 @@ function buildPersonalContext(){
   }
   if(profileLines.length){
     ctx += `\n\nPERSONAL PROFILE (tie specific advice to these facts — never invent ones the user hasn't shared):\n` + profileLines.join('\n');
+  }
+  // Recent journal entries — helps the AI reference what's actually
+  // been happening in the user's life. Cap at 5 most recent, trim
+  // each to 280 chars so the prompt stays focused.
+  const journal = Array.isArray(state.journal) ? state.journal.slice() : [];
+  if(journal.length){
+    journal.sort((a,b) => {
+      if(a.date !== b.date) return (b.date || '').localeCompare(a.date || '');
+      return (b.updatedAt || 0) - (a.updatedAt || 0);
+    });
+    const recent = journal.slice(0, 5).map(e => {
+      const tag = e.tag ? ` [${e.tag}]` : '';
+      const body = String(e.content || '').replace(/\s+/g,' ').trim().slice(0, 280);
+      return `- ${e.date || '(undated)'}${tag}: ${body}`;
+    });
+    ctx += `\n\nRECENT JOURNAL (${journal.length} total, 5 latest shown — reference these when the user asks about recent decisions or events; never fabricate ones not listed):\n` + recent.join('\n');
   }
   return ctx;
 }
