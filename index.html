@@ -1443,85 +1443,6 @@ label.field-label-row {
 .dash-ai-visual-badge-val { font-family:var(--fm); font-size:22px; font-weight:800; color:var(--violet); line-height:1; }
 .dash-ai-visual-badge-lbl { font-family:var(--fm); font-size:9px; color:var(--text3); letter-spacing:.08em; text-transform:uppercase; margin-top:3px; }
 
-/* ── AI CARD · DEEP DIVE EXPANSION ─────────────────────
-   Sits at the bottom of each AI section card: a small
-   "Deep dive" button toggles a full-width expanded
-   panel below the 4-card grid. Only one section is
-   open at a time so the dashboard never becomes a
-   runaway accordion. */
-.dash-ai-sec-actions {
-  margin-top:10px; padding-top:8px;
-  display:flex; justify-content:flex-end;
-  border-top:1px dashed var(--border);
-}
-.dash-ai-dd-btn {
-  background:transparent; border:1px dashed var(--border);
-  color:var(--text2); font-family:var(--fm);
-  font-size:10px; font-weight:600; letter-spacing:.04em;
-  padding:5px 10px; border-radius:5px; cursor:pointer;
-  transition:all .15s;
-}
-.dash-ai-dd-btn:hover {
-  background:var(--bg2); color:var(--text); border-style:solid; border-color:var(--text3);
-}
-.dash-ai-dd-btn.active {
-  background:var(--bg2); color:var(--text); border-style:solid; border-color:var(--text3);
-}
-.dash-ai-dd-panel {
-  margin-top:14px;
-  background:var(--bg2);
-  border:1px solid var(--border);
-  border-radius:10px;
-  padding:16px 18px;
-  animation:ddSlide .28s cubic-bezier(.2,.7,.2,1);
-}
-@keyframes ddSlide {
-  from { opacity:0; transform:translateY(-6px); }
-  to   { opacity:1; transform:none; }
-}
-.dash-ai-dd-panel.dd-position { border-top:3px solid #4d9fff; }
-.dash-ai-dd-panel.dd-good     { border-top:3px solid var(--green); }
-.dash-ai-dd-panel.dd-concern  { border-top:3px solid var(--red); }
-.dash-ai-dd-panel.dd-recs     { border-top:3px solid var(--violet); }
-.dash-ai-dd-hd {
-  display:flex; align-items:center; justify-content:space-between;
-  gap:10px; margin-bottom:12px;
-  font-family:var(--fm); font-size:10px; font-weight:700;
-  letter-spacing:.08em; text-transform:uppercase;
-  color:var(--text2);
-}
-.dash-ai-dd-close {
-  background:transparent; border:none;
-  color:var(--text3); cursor:pointer;
-  font-family:var(--fm); font-size:11px;
-  padding:4px 8px; border-radius:5px;
-  transition:background .15s, color .15s;
-}
-.dash-ai-dd-close:hover { background:var(--bg3); color:var(--text); }
-.dash-ai-dd-stats {
-  display:grid; grid-template-columns:repeat(auto-fit, minmax(140px, 1fr));
-  gap:10px; margin-bottom:14px;
-}
-.dash-ai-dd-stat {
-  background:var(--bg3); border:1px solid var(--border);
-  border-radius:8px;
-  padding:8px 12px;
-}
-.dash-ai-dd-stat-lbl {
-  font-family:var(--fm); font-size:9px; font-weight:600;
-  letter-spacing:.08em; text-transform:uppercase;
-  color:var(--text3); margin-bottom:3px;
-}
-.dash-ai-dd-stat-val {
-  font-family:var(--fm); font-size:14px; font-weight:700; color:var(--text);
-}
-.dash-ai-dd-chart-wrap {
-  background:var(--bg3); border:1px solid var(--border);
-  border-radius:8px; padding:12px;
-  height:260px; position:relative;
-}
-.dash-ai-dd-chart-wrap canvas { width:100% !important; height:100% !important; }
-
 /* ── FUN FUND · AI FUND OUTLOOK ─────────────────────────
    Compact AI-analysis block at the bottom of the Fun
    Fund tab. Mirrors the dashboard .dash-ai-sec vocabulary
@@ -3845,17 +3766,28 @@ const STRINGS = {
                                   sv:'{mo}/mån snitt · {pct}% sparkvot' },
   'dash.kpi.sub.avgPerMo':      { en:'{mo}/mo average',       sv:'{mo}/mån snitt' },
 
-  // ── Dashboard · KPI row 2 (retirement, today's money) ──
+  // ── Dashboard · KPI row 2 (retirement; lens-aware) ──
+  // These keys are resolved based on the active display mode so the
+  // label matches the number shown. The nominal variant is picked
+  // when state.displayMode === 'nominal'.
   'dash.kpi.nestEgg':           { en:'NEST EGG · TODAY&rsquo;S MONEY',
                                   sv:'PENSIONSKAPITAL · DAGENS PENNINGVÄRDE' },
+  'dash.kpi.nestEgg.nominal':   { en:'NEST EGG · NOMINAL',
+                                  sv:'PENSIONSKAPITAL · NOMINELLT' },
   'dash.kpi.monthlyIncomeReal': { en:'MONTHLY RETIREMENT INCOME · TODAY&rsquo;S MONEY',
                                   sv:'MÅNATLIG PENSIONSINKOMST · DAGENS PENNINGVÄRDE' },
+  'dash.kpi.monthlyIncomeReal.nominal': { en:'MONTHLY RETIREMENT INCOME · NOMINAL',
+                                          sv:'MÅNATLIG PENSIONSINKOMST · NOMINELLT' },
   'dash.kpi.yearsToRetire':     { en:'YEARS TO RETIRE',       sv:'ÅR TILL PENSION' },
   'dash.kpi.retireStatus':      { en:'RETIREMENT STATUS',     sv:'PENSIONSSTATUS' },
   'dash.kpi.nestEggSub':        { en:'At age {age} · nominal {amt} (future kr)',
                                   sv:'Vid ålder {age} · nominellt {amt} (framtida kr)' },
+  'dash.kpi.nestEggSub.nominal':{ en:'At age {age} · real {amt} (today\u2019s money)',
+                                  sv:'Vid ålder {age} · reellt {amt} (dagens penningvärde)' },
   'dash.kpi.incomeSub':         { en:'Portfolio {p} + pension {pen} (real avg)',
                                   sv:'Portfölj {p} + pension {pen} (reellt snitt)' },
+  'dash.kpi.incomeSub.nominal': { en:'Portfolio {p} + pension {pen} (nominal avg)',
+                                  sv:'Portfölj {p} + pension {pen} (nominellt snitt)' },
   'dash.kpi.ageSub':            { en:'Age {cur} → {ret}',     sv:'Ålder {cur} → {ret}' },
   'dash.kpi.statusSub':         { en:'{pct}% funded · {amt}/mo real',
                                   sv:'{pct}% täckning · {amt}/mån reellt' },
@@ -3918,31 +3850,27 @@ const STRINGS = {
                               sv:'⚠ Den här rapporten genererades på {other}. Generera på {current}?' },
   'dash.ai.langStale.btn':  { en:'🌐 Regenerate in {lang}',
                               sv:'🌐 Generera om på {lang}' },
-  // Deep-dive action on each AI analysis card.
-  'dash.dd.open':           { en:'Deep dive',                sv:'Djupdykning' },
-  'dash.dd.close':          { en:'Close deep dive',          sv:'Stäng djupdykning' },
-  'dash.dd.header':         { en:'Deep dive · {title}',      sv:'Djupdykning · {title}' },
-  'dash.dd.chartTitle.position': { en:'Nest egg trajectory ({lens})',
-                                   sv:'Boets utveckling ({lens})' },
-  'dash.dd.chartTitle.good':     { en:'Coverage over retirement years',
-                                   sv:'Täckning under pensionsår' },
-  'dash.dd.chartTitle.concern':  { en:'Next 12 months · cash flow',
-                                   sv:'Kommande 12 månader · kassaflöde' },
-  'dash.dd.chartTitle.recs':     { en:'Per-account contribution mix',
-                                   sv:'Bidragsmix per konto' },
-  'dash.dd.stat.today':     { en:'Today',                    sv:'Idag' },
-  'dash.dd.stat.atRet':     { en:'At age {age}',             sv:'Vid {age} år' },
-  'dash.dd.stat.coverage':  { en:'Coverage',                 sv:'Täckning' },
-  'dash.dd.stat.verdict':   { en:'Verdict',                  sv:'Omdöme' },
-  'dash.dd.stat.runout':    { en:'Runway',                   sv:'Räckvidd' },
-  'dash.dd.stat.runout.val':{ en:'to age {age}',             sv:'till {age} år' },
-  'dash.dd.stat.runout.none':{en:'funds last',               sv:'pengarna räcker' },
-  'dash.dd.stat.surplus':   { en:'Avg monthly surplus',      sv:'Snittöverskott/mo' },
-  'dash.dd.stat.savingsRate':{en:'Savings rate',             sv:'Sparandegrad' },
-  'dash.dd.stat.actions':   { en:'Recommended actions',      sv:'Rekommenderade åtgärder' },
-  'dash.dd.stat.totalProj': { en:'Total projected',          sv:'Total projicerad' },
-  'dash.dd.mini.coverage':  { en:'{pct}%',                   sv:'{pct}%' },
-  'dash.dd.mini.trajectory':{ en:'{n} years · {lens}',       sv:'{n} år · {lens}' },
+  'dash.ai.lensStale':      { en:'⚠ This report was generated in {other} mode. Numbers and commentary may not match the current {current} view.',
+                              sv:'⚠ Rapporten genererades i läget {other}. Siffror och kommentarer kan skilja sig från nuvarande {current}-vy.' },
+  'dash.ai.lensStale.btn':  { en:'Regenerate in {current}',
+                              sv:'Kör om i {current}' },
+  'dash.ai.lens.real':      { en:'Today\u2019s money',     sv:'Dagens penningvärde' },
+  'dash.ai.lens.nominal':   { en:'Nominal',                sv:'Nominellt' },
+  'ff.ai.lensStale':        { en:'⚠ Analysis generated in {other} — re-run to sync with {current}.',
+                              sv:'⚠ Analysen genererades i {other} — kör om för att matcha {current}.' },
+  // Mini-visual labels shared by the 4 dashboard AI cards.
+  'dash.mini.today':        { en:'Today',                    sv:'Idag' },
+  'dash.mini.coverage':     { en:'Coverage',                 sv:'Täckning' },
+  'dash.mini.verdict':      { en:'Verdict',                  sv:'Omdöme' },
+  'dash.mini.savingsRate':  { en:'Savings rate',             sv:'Sparandegrad' },
+  'dash.mini.actions':      { en:'Recommended actions',      sv:'Rekommenderade åtgärder' },
+  'dash.mini.trajectory':   { en:'{n} years · {lens}',       sv:'{n} år · {lens}' },
+  'dash.mini.strongest':    { en:'Strongest signal',         sv:'Starkaste signalen' },
+  'dash.mini.runway':       { en:'Runway to age {age}',      sv:'Räckvidd till {age} år' },
+  'dash.mini.pensionCover': { en:'Pension cover',            sv:'Pensionstäckning' },
+  'dash.mini.verdict.overfunded': { en:'Ahead of target',    sv:'Före målet' },
+  'dash.mini.verdict.ontarget':   { en:'On track',           sv:'På rätt väg' },
+  'dash.mini.verdict.light':      { en:'Short of target',    sv:'Under målet' },
   // Fun Fund AI analysis block.
   'ff.ai.title':            { en:'🤖 AI fund outlook',       sv:'🤖 AI-fondutsikter' },
   'ff.ai.sub':              { en:'Interpret the current numbers and advise on discretionary funding.',
@@ -5422,7 +5350,7 @@ window.dr = function(name){ return window.commitRender(name); };
 // ─── PERSISTENCE ────────────────────────────────────────────────────────────
 // State schema version. Bump this and add a branch to migrate() whenever the
 // shape of `state` changes in a backwards-incompatible way.
-const STATE_VERSION = 16;
+const STATE_VERSION = 17;
 function migrate(s) {
   const from = s.version || 1;
   if(from >= STATE_VERSION) { s.version = STATE_VERSION; return s; }
@@ -5564,13 +5492,18 @@ function migrate(s) {
   if(from < 15) {
     if(!Array.isArray(s.journal)) s.journal = [];
   }
-  // v15 → v16: dashboard AI deep-dive state (which section is currently
-  // expanded, if any) and Fun Fund AI report cache. Both default to
-  // clean slates — no legacy data to carry forward.
+  // v15 → v16: Fun Fund AI report cache. (A transient
+  // state.dashDeepDive field lived here for one release before the
+  // deep-dive feature was withdrawn; v17 removes it.)
   if(from < 16) {
-    if(!('dashDeepDive' in s)) s.dashDeepDive = null;
     if(!('funFundReport' in s)) s.funFundReport = null;
     if(!('funFundReportError' in s)) s.funFundReportError = null;
+  }
+  // v16 → v17: withdraw the dashboard AI deep-dive feature. The only
+  // state it owned was s.dashDeepDive (which section was expanded).
+  // Drop it cleanly so the field doesn't linger in saved blobs.
+  if(from < 17) {
+    delete s.dashDeepDive;
   }
   s.version = STATE_VERSION;
   return s;
@@ -8437,9 +8370,42 @@ function _enhanceAIMarkup(html){
     return `<span class="ai-tone ${cls}">${body}</span>`;
   });
 }
+// Strip machine-formatted payloads that can leak through from the
+// model. The advisor chat system prompt trains Claude to emit fenced
+// ```horizon-chart``` blocks with JSON chart specs; those specs are
+// rendered as real charts by the chat path but must NEVER appear
+// verbatim inside an AI analysis card (where the renderer doesn't
+// know how to hydrate them). Also guards against loose JSON objects
+// that look like chart specs (e.g. `{"kind":"custom",...}`) and any
+// ```json``` fenced block whose top-level body is a chart-spec-like
+// object. Non-chart code blocks are left intact.
+function _sanitizeAIMarkdown(md){
+  let s = String(md || '');
+  if(!s) return s;
+  // 1) Explicit fenced horizon-chart blocks (any variant spacing/case).
+  s = s.replace(/```\s*horizon[-_ ]?chart\s*\n?[\s\S]*?```/gi, '');
+  // 2) Fenced json / js / js­var blocks whose body has `"kind":"…"`
+  //    at the top level — a common drift where the model reaches for
+  //    the more familiar `json` language tag.
+  s = s.replace(/```(?:json|JSON|js|javascript)?\s*\n?(\{[\s\S]*?\})\s*```/g, (full, body) => {
+    return /"kind"\s*:\s*"/.test(body) ? '' : full;
+  });
+  // 3) Bare inline JSON objects starting on a fresh line and smelling
+  //    like a chart spec — these are the ones that rendered as raw
+  //    text when the model forgot the fence entirely.
+  s = s.replace(/(^|\n)\s*\{[^{}]{0,400}"kind"\s*:\s*"[^"]*"[\s\S]*?\}\s*(?=\n|$)/g, '$1');
+  // 4) Collapse runs of blank lines introduced by the stripping.
+  s = s.replace(/\n{3,}/g, '\n\n').trim();
+  return s;
+}
+
 // Render one section's markdown block with cap + colour enhancement.
+// Every AI-generated markdown body MUST pass through the sanitizer
+// first so a model that slips a chart spec into an analysis card
+// can't dump raw JSON at the user.
 function _renderAISectionBody(md){
-  const capped = _capWordsPerSection(md, DASH_REPORT_WORD_CAP);
+  const sanitized = _sanitizeAIMarkdown(md);
+  const capped = _capWordsPerSection(sanitized, DASH_REPORT_WORD_CAP);
   const parsed = mdParse(capped);
   return _enhanceAIMarkup(parsed);
 }
@@ -8516,173 +8482,262 @@ function renderDashboardAIReportBody(){
       <button class="btn btn-xs btn-o" onclick="runDashboardAIReport()">${t('dash.ai.langStale.btn', { lang: t('lang.label.'+state.lang) })}</button>
     </div>
   ` : '';
+  // Lens-stale banner — triggers when the cached report was generated
+  // in a display mode different from the one the user is currently
+  // viewing. The prose embeds concrete numbers in whichever lens was
+  // active at generation time, so those numbers can silently disagree
+  // with the KPIs above. Rather than silently mislead, we show a
+  // one-click regenerate chip.
+  const reportMode = (r.snapshot && r.snapshot.displayMode) || 'real';
+  const lensStale = reportMode !== FE.display.mode();
+  const lensStaleHtml = (!langStale && lensStale) ? `
+    <div class="dash-ai-lens-stale" style="display:flex;align-items:center;gap:10px;margin-bottom:10px;padding:8px 12px;background:rgba(77,159,255,.10);border:1px solid rgba(77,159,255,.35);border-radius:8px;font-size:11px;color:var(--text2)">
+      <span style="flex:1">${t('dash.ai.lensStale', { other: t('dash.ai.lens.'+reportMode), current: t('dash.ai.lens.'+FE.display.mode()) })}</span>
+      <button class="btn btn-xs btn-o" onclick="runDashboardAIReport()">${t('dash.ai.lensStale.btn', { current: t('dash.ai.lens.'+FE.display.mode()) })}</button>
+    </div>
+  ` : '';
   const actions = `
     <button class="btn btn-sm btn-o" onclick="saveDashboardReportToVault()">${t('dash.ai.saveToVault')}</button>
     <button class="btn btn-sm btn-o" onclick="runDashboardAIReport()">${t('dash.ai.rerun')}</button>`;
-  const activeDD = state.dashDeepDive || null;
   const sections = DASH_REPORT_SECTIONS.map(sec => {
     const body = (r.sections && r.sections[sec.key]) || '';
     const title = t('dash.report.'+sec.key);
-    const isOpen = activeDD === sec.key;
-    // Visual strip and deep-dive button are scoped per section. The
-    // visual is a small canvas / ring / badge keyed to the section
-    // topic (nest egg sparkline, coverage ring, cash-flow bar,
-    // action counter) so the card has a glance-layer above the
-    // prose without pushing the text below the fold.
+    // Each section card carries a small topical visual at the top —
+    // sparkline, ring, mini bars, or action counter — so the glance
+    // layer supports the prose below. The deep-dive drawer that used
+    // to sit under the 4-card grid was removed after Batch 5; the
+    // visual + prose are now the full contract.
     return `<div class="dash-ai-sec ${sec.cls}" data-sec-key="${sec.key}">
       <div class="dash-ai-sec-hd"><span class="ic">${sec.icon}</span><span>${esc2(title)}</span></div>
       <div class="dash-ai-visual" data-visual-for="${sec.key}">${_renderDashAIMiniVisual(sec.key)}</div>
       ${body ? _renderAISectionBody(body) : `<div class="md" style="color:var(--text3);font-style:italic">${t('dash.ai.emptyNotes')}</div>`}
-      <div class="dash-ai-sec-actions">
-        <button class="dash-ai-dd-btn ${isOpen?'active':''}" onclick="toggleDashDeepDive('${sec.key}')">
-          ${isOpen ? '▼ ' : '▸ '}${esc2(t('dash.dd.open'))}
-        </button>
-      </div>
     </div>`;
   }).join('');
-  const deepDivePanel = activeDD ? _renderDashDeepDivePanel(activeDD) : '';
-  return head(actions) + langStaleHtml + `<div class="dash-ai-sections">${sections}</div>${deepDivePanel}`;
+  return head(actions) + langStaleHtml + lensStaleHtml + `<div class="dash-ai-sections">${sections}</div>`;
+}
+
+// ─── AI report · strength / concern signal pickers ───────────────────
+// Each of the 4 dashboard AI cards has a framing (going well / of
+// concern / neutral / actions). A card's mini-visual must NEVER
+// contradict that framing — e.g. the "going well" card must not
+// render a red UNDERFUNDED ring. So the visual picks the strongest
+// genuinely-positive metric for the good card, the worst genuinely-
+// negative metric for the concern card, and never inverts.
+//
+// Returned shape: { value, label, sub, tone } where tone ∈
+// 'pos' | 'neg' | 'warn' | 'neutral'. If no qualifying signal
+// exists, returns null so the caller can render a neutral fallback.
+function _collectDashboardSignals(){
+  const nums = FE.retirement.numbers();
+  const cm   = FE.months.current();
+  const income  = Math.max(1, cm.pureIncome || 0);
+  const savings = cm.savings || 0;
+  const sr      = Math.round((savings / income) * 100);
+  const cov     = Math.round(nums.coveragePct || 0);
+  const runoutAge = nums.runoutAge;
+  const pensionMo = Math.round(nums.pensionAvgMonthly || 0);
+  const surplus = Math.round(savings);
+  return { sr, cov, runoutAge, pensionMo, surplus, cm, nums };
+}
+function _pickStrongestSignal(s){
+  // Order candidates by strictness so the most meaningful positive
+  // signal wins. Thresholds are conservative — we only call something
+  // "going well" if it clearly is.
+  const candidates = [];
+  if(s.cov >= 100){
+    candidates.push({
+      value:`${s.cov}%`, label:t('dash.mini.coverage'),
+      sub:t('dash.mini.verdict.overfunded'), tone:'pos', _rank:5,
+    });
+  } else if(s.cov >= 75){
+    candidates.push({
+      value:`${s.cov}%`, label:t('dash.mini.coverage'),
+      sub:t('dash.mini.verdict.ontarget'), tone:'pos', _rank:4,
+    });
+  }
+  if(s.sr >= 20){
+    candidates.push({
+      value:`${s.sr}%`, label:t('dash.mini.savingsRate'),
+      sub:`${fmt(s.surplus)}/mo`, tone:'pos', _rank:3,
+    });
+  }
+  if(s.pensionMo > 0 && s.cov < 100){
+    // Pension coverage is a genuine strength even when total coverage
+    // is short — don't let total coverage < 100 mask it.
+    candidates.push({
+      value:`${fmt(s.pensionMo)}/mo`, label:t('dash.mini.pensionCover'),
+      sub:'', tone:'pos', _rank:2,
+    });
+  }
+  if(s.runoutAge && s.runoutAge >= (state.retirementAge + 20)){
+    candidates.push({
+      value:`${Math.round(s.runoutAge)}`, label:t('dash.mini.runway', { age: Math.round(s.runoutAge) }),
+      sub:'', tone:'pos', _rank:1,
+    });
+  }
+  if(!candidates.length) return null;
+  candidates.sort((a,b) => b._rank - a._rank);
+  return candidates[0];
+}
+function _pickWeakestSignal(s){
+  // Mirror of _pickStrongestSignal but for the concern card. Picks
+  // the most negative signal so concern never inherits a positive
+  // metric by accident.
+  const candidates = [];
+  if(s.sr < 10){
+    candidates.push({
+      value:`${s.sr}%`, label:t('dash.mini.savingsRate'),
+      sub:`${fmt(s.surplus)}/mo`, tone:'neg', _rank:5,
+    });
+  } else if(s.sr < 20){
+    candidates.push({
+      value:`${s.sr}%`, label:t('dash.mini.savingsRate'),
+      sub:`${fmt(s.surplus)}/mo`, tone:'warn', _rank:3,
+    });
+  }
+  if(s.cov < 75){
+    candidates.push({
+      value:`${s.cov}%`, label:t('dash.mini.coverage'),
+      sub:t('dash.mini.verdict.light'), tone:'neg', _rank:4,
+    });
+  } else if(s.cov < 100){
+    candidates.push({
+      value:`${s.cov}%`, label:t('dash.mini.coverage'),
+      sub:t('dash.mini.verdict.ontarget'), tone:'warn', _rank:2,
+    });
+  }
+  if(s.surplus < 0){
+    candidates.push({
+      value:`${fmt(s.surplus)}/mo`, label:'Monthly surplus',
+      sub:'', tone:'neg', _rank:6,
+    });
+  }
+  if(!candidates.length){
+    // Nothing is genuinely a concern — still render a signal so the
+    // card has a glance-layer, but explicitly neutral.
+    return { value:`${s.sr}%`, label:t('dash.mini.savingsRate'), sub:'', tone:'neutral', _rank:0 };
+  }
+  candidates.sort((a,b) => b._rank - a._rank);
+  return candidates[0];
 }
 
 // ─── AI report · mini visual per section ─────────────────────────────
 // Builds the glance-layer HTML for each section card. The visuals
 // are deliberately small and self-contained so they don't compete
-// with the prose below. Charts (position) are rendered via a canvas
-// that _syncDashAIMiniCharts() picks up after mount.
+// with the prose below. Critically, each card's visual is filtered
+// through the section's framing: a "going well" card only shows a
+// positive signal, a "concern" card only shows a negative one — so
+// the card title, ring/badge, and caption can never contradict each
+// other. See _pickStrongestSignal / _pickWeakestSignal.
 function _renderDashAIMiniVisual(key){
   try {
-    const nums = FE.retirement.numbers();
-    const cm   = FE.months.current();
+    const signals = _collectDashboardSignals();
     if(key === 'position'){
-      // Sparkline canvas; meta shows today vs at-retirement figure in
-      // the active display lens.
+      // Sparkline canvas; meta shows at-retirement figure in the
+      // active display lens plus today's balance. Neutral by nature
+      // — this is a factual trajectory, not a verdict.
       const atRet = FE.display.isNominal()
         ? FE.projection.totalNominal()
-        : nums.nestEgg;
-      const today = FE.projection.savingsYearToDate() + (nums && nums._firstYear ? 0 : 0);
+        : signals.nums.nestEgg;
       const tBalNow = (state.externalAssets || []).filter(a => (a.assetType||'investment')==='investment').reduce((s,a) => s + (a.balance||0), 0);
       const ytr = FE.retirement.yearsToRetirement();
       return `
         <canvas class="dash-ai-visual-canvas" id="dash-ai-mini-position"></canvas>
         <div class="dash-ai-visual-meta">
           <div class="dash-ai-visual-val">${fmt(atRet)}</div>
-          <div class="dash-ai-visual-sub">${esc2(t('dash.dd.mini.trajectory', { n: ytr, lens: FE.display.label() }))}</div>
-          <div class="dash-ai-visual-sub" style="color:var(--text2)">${esc2(t('dash.dd.stat.today'))}: ${fmt(tBalNow)}</div>
+          <div class="dash-ai-visual-sub">${esc2(t('dash.mini.trajectory', { n: ytr, lens: FE.display.label() }))}</div>
+          <div class="dash-ai-visual-sub" style="color:var(--text2)">${esc2(t('dash.mini.today'))}: ${fmt(tBalNow)}</div>
         </div>`;
     }
     if(key === 'good'){
-      // Coverage ring — pct of retirement income covered by the
-      // portfolio + pensions combined.
-      const pct = Math.max(0, Math.min(150, Math.round(nums.coveragePct || 0)));
-      const tone = pct >= 100 ? '' : (pct >= 75 ? ' amber' : ' red');
-      const circ = 2 * Math.PI * 28;
-      const fill = Math.min(pct/100, 1);
+      // Pick the strongest genuinely-positive signal. If none exists,
+      // explicitly render a neutral "nothing standing out yet" badge
+      // rather than borrowing a negative metric (the old bug: a 28%
+      // coverage ring labelled UNDERFUNDED inside a card titled
+      // "WHAT IS GOING WELL").
+      const sig = _pickStrongestSignal(signals);
+      if(!sig){
+        return `
+          <div class="dash-ai-visual-badge">
+            <div class="dash-ai-visual-badge-val" style="color:var(--text3);font-size:16px">—</div>
+            <div class="dash-ai-visual-badge-lbl">${esc2(t('dash.mini.strongest'))}</div>
+          </div>
+          <div class="dash-ai-visual-meta">
+            <div class="dash-ai-visual-val" style="color:var(--text3)">${esc2(t('dash.mini.strongest'))}</div>
+            <div class="dash-ai-visual-sub">${esc2(t('dash.ai.emptyNotes'))}</div>
+          </div>`;
+      }
+      // Render a positive ring ONLY when the signal is coverage-%.
+      // Otherwise render a positive badge — ensures the visual shape
+      // matches the metric type.
+      const isCov = sig.label === t('dash.mini.coverage');
+      if(isCov){
+        const pct = Math.max(0, Math.min(150, parseInt(sig.value, 10) || 0));
+        const circ = 2 * Math.PI * 28;
+        const fill = Math.min(pct/100, 1);
+        return `
+          <div class="dash-ai-visual-ring">
+            <svg viewBox="0 0 64 64">
+              <circle class="ring-track" cx="32" cy="32" r="28"></circle>
+              <circle class="ring-fill"  cx="32" cy="32" r="28"
+                stroke-dasharray="${circ.toFixed(2)}"
+                stroke-dashoffset="${(circ * (1 - fill)).toFixed(2)}"></circle>
+            </svg>
+            <div class="dash-ai-visual-ring-lbl">${pct}%</div>
+          </div>
+          <div class="dash-ai-visual-meta">
+            <div class="dash-ai-visual-val">${esc2(sig.label)}</div>
+            <div class="dash-ai-visual-sub">${esc2(sig.sub || '')}</div>
+          </div>`;
+      }
       return `
-        <div class="dash-ai-visual-ring${tone}">
-          <svg viewBox="0 0 64 64">
-            <circle class="ring-track" cx="32" cy="32" r="28"></circle>
-            <circle class="ring-fill"  cx="32" cy="32" r="28"
-              stroke-dasharray="${circ.toFixed(2)}"
-              stroke-dashoffset="${(circ * (1 - fill)).toFixed(2)}"></circle>
-          </svg>
-          <div class="dash-ai-visual-ring-lbl">${pct}%</div>
+        <div class="dash-ai-visual-badge" style="border-color:rgba(34,197,94,.35);background:rgba(34,197,94,.08)">
+          <div class="dash-ai-visual-badge-val" style="color:var(--green)">${esc2(sig.value)}</div>
+          <div class="dash-ai-visual-badge-lbl">${esc2(sig.label)}</div>
         </div>
         <div class="dash-ai-visual-meta">
-          <div class="dash-ai-visual-val">${esc2(t('dash.dd.stat.coverage'))}</div>
-          <div class="dash-ai-visual-sub">${esc2(t('dash.dd.stat.verdict'))}: ${esc2(nums.verdict || '—')}</div>
+          <div class="dash-ai-visual-val">${esc2(sig.label)}</div>
+          ${sig.sub ? `<div class="dash-ai-visual-sub">${esc2(sig.sub)}</div>` : ''}
         </div>`;
     }
     if(key === 'concern'){
-      // Mini cash-flow bar: current-month surplus / savings rate.
-      const income   = Math.max(1, cm.pureIncome || 0);
-      const expenses = cm.pureExpenses || 0;
-      const savings  = cm.savings || 0;
-      const sr = Math.round((savings / income) * 100);
-      const srTone = sr >= 20 ? 'pos' : (sr >= 10 ? 'warn' : 'neg');
+      // Worst genuinely-negative signal; concern card must not surface
+      // a positive metric by accident.
+      const sig = _pickWeakestSignal(signals);
+      const toneColor = sig.tone === 'neg' ? 'var(--red)'
+                     : sig.tone === 'warn' ? 'var(--amber)'
+                     : 'var(--text2)';
+      const toneBg = sig.tone === 'neg' ? 'rgba(239,68,68,.08)'
+                   : sig.tone === 'warn' ? 'rgba(245,158,11,.08)'
+                   : 'var(--bg3)';
+      const toneBorder = sig.tone === 'neg' ? 'rgba(239,68,68,.35)'
+                      : sig.tone === 'warn' ? 'rgba(245,158,11,.35)'
+                      : 'var(--border)';
       return `
         <canvas class="dash-ai-visual-canvas" id="dash-ai-mini-concern"></canvas>
         <div class="dash-ai-visual-meta">
-          <div class="dash-ai-visual-val">${sr}%</div>
-          <div class="dash-ai-visual-sub">${esc2(t('dash.dd.stat.savingsRate'))}</div>
-          <div class="dash-ai-visual-sub" style="color:var(${srTone==='pos'?'--green':srTone==='warn'?'--amber':'--red'})">${fmt(savings)}/mo</div>
+          <div class="dash-ai-visual-val" style="color:${toneColor}">${esc2(sig.value)}</div>
+          <div class="dash-ai-visual-sub">${esc2(sig.label)}</div>
+          ${sig.sub ? `<div class="dash-ai-visual-sub" style="color:${toneColor}">${esc2(sig.sub)}</div>` : ''}
         </div>`;
     }
     if(key === 'recs'){
-      // Action counter — count list items the model produced, fall
-      // back to a generic "read" hint when no parse.
+      // Action counter — count list items the model produced. Always
+      // neutral/violet (no tonal verdict attached).
       const body = (state.dashboardReport && state.dashboardReport.sections && state.dashboardReport.sections.recs) || '';
       const count = (body.match(/^\s*[-*•]\s+|^\s*\d+\.\s+/gm) || []).length;
       return `
         <div class="dash-ai-visual-badge">
           <div class="dash-ai-visual-badge-val">${count || '—'}</div>
-          <div class="dash-ai-visual-badge-lbl">${esc2(t('dash.dd.stat.actions'))}</div>
+          <div class="dash-ai-visual-badge-lbl">${esc2(t('dash.mini.actions'))}</div>
         </div>
         <div class="dash-ai-visual-meta">
-          <div class="dash-ai-visual-val">${esc2(t('dash.dd.stat.actions'))}</div>
-          <div class="dash-ai-visual-sub">${esc2(t('dash.dd.open'))} ↓</div>
+          <div class="dash-ai-visual-val">${esc2(t('dash.mini.actions'))}</div>
+          <div class="dash-ai-visual-sub">${count ? '' : esc2(t('dash.ai.emptyNotes'))}</div>
         </div>`;
     }
   } catch(_e){ /* visual is additive — never block the report on a render error */ }
   return '';
-}
-
-// ─── AI report · deep dive expansion ─────────────────────────────────
-// One section open at a time. The expanded panel sits below the 4-card
-// grid and renders topical charts + stat pills drawn from existing
-// FE data. No extra AI call is required — the underlying data is the
-// "why" behind whatever the prose above said.
-function _renderDashDeepDivePanel(key){
-  let title = '';
-  DASH_REPORT_SECTIONS.forEach(s => { if(s.key === key) title = t('dash.report.'+s.key); });
-  const nums = FE.retirement.numbers();
-  const cm   = FE.months.current();
-  let stats = '';
-  let chartTitle = '';
-  const chartId = 'dash-dd-chart';
-  if(key === 'position'){
-    chartTitle = t('dash.dd.chartTitle.position', { lens: FE.display.label() });
-    const projTotal = FE.display.isNominal() ? FE.projection.totalNominal() : FE.projection.totalReal();
-    const tBalNow = (state.externalAssets || []).filter(a => (a.assetType||'investment')==='investment').reduce((s,a) => s + (a.balance||0), 0);
-    stats = `
-      <div class="dash-ai-dd-stat"><div class="dash-ai-dd-stat-lbl">${esc2(t('dash.dd.stat.today'))}</div><div class="dash-ai-dd-stat-val">${fmt(tBalNow)}</div></div>
-      <div class="dash-ai-dd-stat"><div class="dash-ai-dd-stat-lbl">${esc2(t('dash.dd.stat.atRet', { age: state.retirementAge }))}</div><div class="dash-ai-dd-stat-val">${fmt(projTotal)}</div></div>
-      <div class="dash-ai-dd-stat"><div class="dash-ai-dd-stat-lbl">${esc2(t('dash.dd.stat.totalProj'))}</div><div class="dash-ai-dd-stat-val">${fmt(projTotal)}</div></div>`;
-  } else if(key === 'good'){
-    chartTitle = t('dash.dd.chartTitle.good');
-    const pct = Math.round(nums.coveragePct || 0);
-    const runoutLbl = nums.runoutAge
-      ? t('dash.dd.stat.runout.val', { age: Math.round(nums.runoutAge) })
-      : t('dash.dd.stat.runout.none');
-    stats = `
-      <div class="dash-ai-dd-stat"><div class="dash-ai-dd-stat-lbl">${esc2(t('dash.dd.stat.coverage'))}</div><div class="dash-ai-dd-stat-val">${pct}%</div></div>
-      <div class="dash-ai-dd-stat"><div class="dash-ai-dd-stat-lbl">${esc2(t('dash.dd.stat.verdict'))}</div><div class="dash-ai-dd-stat-val">${esc2(nums.verdict || '—')}</div></div>
-      <div class="dash-ai-dd-stat"><div class="dash-ai-dd-stat-lbl">${esc2(t('dash.dd.stat.runout'))}</div><div class="dash-ai-dd-stat-val">${esc2(runoutLbl)}</div></div>`;
-  } else if(key === 'concern'){
-    chartTitle = t('dash.dd.chartTitle.concern');
-    const income   = Math.max(1, cm.pureIncome || 0);
-    const savings  = cm.savings || 0;
-    const sr = Math.round((savings / income) * 100);
-    stats = `
-      <div class="dash-ai-dd-stat"><div class="dash-ai-dd-stat-lbl">${esc2(t('dash.dd.stat.savingsRate'))}</div><div class="dash-ai-dd-stat-val">${sr}%</div></div>
-      <div class="dash-ai-dd-stat"><div class="dash-ai-dd-stat-lbl">${esc2(t('dash.dd.stat.surplus'))}</div><div class="dash-ai-dd-stat-val">${fmt(savings)}</div></div>`;
-  } else if(key === 'recs'){
-    chartTitle = t('dash.dd.chartTitle.recs');
-    const inv = (state.externalAssets || []).filter(a => (a.assetType||'investment')==='investment');
-    const totalContrib = inv.reduce((s,a) => s + (a.monthlyContribution || 0), 0);
-    const count = inv.length;
-    stats = `
-      <div class="dash-ai-dd-stat"><div class="dash-ai-dd-stat-lbl">Accounts</div><div class="dash-ai-dd-stat-val">${count}</div></div>
-      <div class="dash-ai-dd-stat"><div class="dash-ai-dd-stat-lbl">Monthly contributions</div><div class="dash-ai-dd-stat-val">${fmt(totalContrib)}</div></div>`;
-  }
-  return `
-    <div class="dash-ai-dd-panel dd-${key}" data-dd-key="${key}">
-      <div class="dash-ai-dd-hd">
-        <span>${esc2(t('dash.dd.header', { title }))}</span>
-        <button class="dash-ai-dd-close" onclick="toggleDashDeepDive('${key}')">${esc2(t('dash.dd.close'))} ×</button>
-      </div>
-      <div class="dash-ai-dd-stats">${stats}</div>
-      <div class="dash-ai-dd-chart-wrap" data-chart-title="${esc(chartTitle)}"><canvas id="${chartId}"></canvas></div>
-    </div>`;
 }
 
 // Build the mini-charts after the report body mounts. Mirrors how
@@ -8738,100 +8793,9 @@ function _syncDashAIMiniCharts(){
         },
       });
     }
-    // Deep-dive chart (whichever section is open)
-    const ddCv = document.getElementById('dash-dd-chart');
-    const ddKey = state.dashDeepDive;
-    if(ddCv && ddKey){
-      destroyChart('dash-dd-chart');
-      const common = {
-        responsive:true, maintainAspectRatio:false,
-        plugins:{ legend:{position:'top', labels:{color:cd.textColor, font:cd.tickFont}}, tooltip:{enabled:true} },
-        scales:{
-          x:{ ticks:{color:cd.textColor, font:cd.tickFont, maxTicksLimit:8}, grid:{color:cd.gridColor} },
-          y:{ ticks:{color:cd.textColor, font:cd.tickFont, callback:v=>fmtC(v)}, grid:{color:cd.gridColor} },
-        },
-      };
-      if(ddKey === 'position'){
-        const savings    = proj.map(p => FE.display.isNominal() ? (p.appSavings||0) : FE.inflation.toTodaysMoney(p.appSavings||0, p.age - state.currentAge));
-        const investment = proj.map(p => FE.display.isNominal() ? (p.external||0)   : FE.inflation.toTodaysMoney(p.external||0,   p.age - state.currentAge));
-        const total      = proj.map(p => FE.display.isNominal() ? (p.total||0)      : (p.realTotal||0));
-        charts['dash-dd-chart'] = new Chart(ddCv.getContext('2d'), {
-          type:'line',
-          data:{
-            labels: proj.map(p => 'Age '+p.age),
-            datasets:[
-              { label:'Total',       data: total,      borderColor:'#00e8a0', backgroundColor:'#00e8a022', fill:true,  tension:.3, pointRadius:0, borderWidth:2 },
-              { label:'Investments', data: investment, borderColor:'#4d9fff', backgroundColor:'transparent', fill:false, tension:.3, pointRadius:0, borderWidth:1.8, borderDash:[6,4] },
-              { label:'Savings',     data: savings,    borderColor:'#f5a623', backgroundColor:'transparent', fill:false, tension:.3, pointRadius:0, borderWidth:1.8, borderDash:[2,4] },
-            ],
-          },
-          options: common,
-        });
-      } else if(ddKey === 'good'){
-        // Coverage series: for each year of retirement, how much of
-        // the gross need was covered by pension + portfolio draw?
-        const sim = (FE.retirement.numbers() || {})._simResult;
-        if(sim && sim.pensionData && sim.portfolioData){
-          const years = sim.pensionData.map((_,i) => state.retirementAge + i);
-          const pension = sim.pensionData.slice();
-          const portfolio = (sim.portfolioData || []).slice();
-          charts['dash-dd-chart'] = new Chart(ddCv.getContext('2d'), {
-            type:'bar',
-            data:{
-              labels: years.map(y => 'Age '+y),
-              datasets:[
-                { label:'Pension',   data: pension,   backgroundColor:'#f5a62366', borderColor:'#f5a623', borderWidth:1, stack:'income' },
-                { label:'Portfolio', data: portfolio, backgroundColor:'#4d9fff66', borderColor:'#4d9fff', borderWidth:1, stack:'income' },
-              ],
-            },
-            options: common,
-          });
-        }
-      } else if(ddKey === 'concern'){
-        const months = FE.months.next12();
-        charts['dash-dd-chart'] = new Chart(ddCv.getContext('2d'), {
-          type:'bar',
-          data:{
-            labels: months.map(m => m.short || m.label),
-            datasets:[
-              { label:'Income',   data: months.map(m => m.pureIncome   || 0), backgroundColor:'#22c55e88', borderRadius:3 },
-              { label:'Expenses', data: months.map(m => m.pureExpenses || 0), backgroundColor:'#ef444488', borderRadius:3 },
-              { label:'Savings',  data: months.map(m => m.savings      || 0), borderColor:'#00d4ff', backgroundColor:'#00d4ff22', type:'line', fill:false, tension:.3, pointRadius:2, borderWidth:2 },
-            ],
-          },
-          options: common,
-        });
-      } else if(ddKey === 'recs'){
-        const inv = (state.externalAssets || []).filter(a => (a.assetType||'investment')==='investment');
-        charts['dash-dd-chart'] = new Chart(ddCv.getContext('2d'), {
-          type:'bar',
-          data:{
-            labels: inv.map(a => a.name || 'Account'),
-            datasets:[
-              { label:'Balance',             data: inv.map(a => a.balance || 0),             backgroundColor:'#4d9fff88', borderRadius:3 },
-              { label:'Monthly contribution',data: inv.map(a => (a.monthlyContribution || 0) * 12), backgroundColor:'#22c55e88', borderRadius:3 },
-            ],
-          },
-          options: common,
-        });
-      }
-    }
   } catch(e){ console.warn('dash-ai mini charts failed:', e); }
 }
 
-// Toggle one deep-dive panel open at a time. Clicking the same
-// section again collapses it.
-window.toggleDashDeepDive = function(key){
-  if(state.dashDeepDive === key){
-    state.dashDeepDive = null;
-  } else {
-    state.dashDeepDive = key;
-  }
-  save();
-  _syncDashboardReportBody();
-  // Rebuild mini charts + deep-dive chart on the new DOM.
-  setTimeout(_syncDashAIMiniCharts, 20);
-};
 function _fmtWhen(ts){
   if(!ts) return '';
   const d = new Date(ts);
@@ -8849,7 +8813,7 @@ function _syncDashboardReportBody(){
   const host = document.getElementById('dash-ai-report');
   if(host){
     host.innerHTML = renderDashboardAIReportBody();
-    // Mini-visuals + deep-dive chart need the canvases to exist, so
+    // Mini-visual canvases need to exist before Chart.js attaches, so
     // defer one tick — cheap, and keeps the rest of the function
     // synchronous for the layout swap.
     setTimeout(_syncDashAIMiniCharts, 20);
@@ -8910,9 +8874,20 @@ Key snapshot values to reference where relevant:
 - Retirement coverage: **${nums.coveragePct.toFixed(0)}%** (verdict: ${nums.verdict})
 - Nest egg (today's money): **${Math.round(nums.nestEgg).toLocaleString()} kr** at age **${state.retirementAge}**${FE.display.isNominal() ? `\n- Nest egg (nominal/future kr): **${Math.round(FE.projection.totalNominal()).toLocaleString()} kr**` : ''}
 
-Return plain markdown only — no preamble, no sign-off, no JSON.${langSuffix()}`;
+Return plain markdown only. IMPORTANT: this is an analysis card, not a chat reply — DO NOT emit any fenced code blocks of any kind (no \`\`\`horizon-chart, no \`\`\`json, no \`\`\` at all), DO NOT emit any JSON objects, and DO NOT emit any chart specs or \`{"kind":…}\` payloads. Markdown headings, bullets, bold, and the {+}/{-}/{!}/{~} tone markers only. Any code fence or JSON-looking object will render as broken machine output to the user.${langSuffix()}`;
     const raw = await callClaude(prompt, 1800);
     const parsed = _parseDashboardReport(raw);
+    // Sanitize every section at cache time. This means (a) a user
+    // who never re-generates still gets a clean render after a
+    // later release tightens the sanitizer, and (b) the vault-save
+    // path inherits the clean copy by default.
+    const rawSections = parsed || { position: raw, good:'', concern:'', recs:'' };
+    const cleanSections = {
+      position: _sanitizeAIMarkdown(rawSections.position || ''),
+      good:     _sanitizeAIMarkdown(rawSections.good || ''),
+      concern:  _sanitizeAIMarkdown(rawSections.concern || ''),
+      recs:     _sanitizeAIMarkdown(rawSections.recs || ''),
+    };
     state.dashboardReport = {
       generatedAt: Date.now(),
       // Tag the cached report with the language it was generated in
@@ -8920,7 +8895,7 @@ Return plain markdown only — no preamble, no sign-off, no JSON.${langSuffix()}
       // the active language no longer matches the cached prose.
       lang: state.lang,
       raw,
-      sections: parsed || { position: raw, good:'', concern:'', recs:'' },
+      sections: cleanSections,
       snapshot: {
         month: cm.label,
         income: cm.pureIncome, expenses: cm.pureExpenses, savings: cm.savings, funFund: cm.pureFunFund,
@@ -9054,13 +9029,35 @@ function renderDashboard() {
       {icon:'✦', label:t('dash.kpi.funFund12'),  value:`<span style="color:var(--cyan)">${fmt(funFundTotal)}</span>`, sub:t('dash.kpi.sub.avgPerMo', { mo: fmt(funFundTotal/12) }), link:'funfund'},
     ])}
 
-    <!-- KPI Row 2: Retirement (all values are TODAY'S MONEY / real value) -->
-    ${ui.kpiRow([
-      {icon:'◈', label:t('dash.kpi.nestEgg'), value:fmt(realNestEgg), tone:'pos', sub:t('dash.kpi.nestEggSub', { age: state.retirementAge, amt: fmt(nominalNestEgg) }), link:'retirement', section:'runway'},
-      {icon:'💰', label:t('dash.kpi.monthlyIncomeReal'), value:fmt(realRetirementIncome), tone:'pos', sub:t('dash.kpi.incomeSub', { p: fmt(retNums.sustainableAfterTax), pen: fmt(retNums.pensionAvgMonthly) }), link:'retirement', section:'runway'},
-      {icon:'⏱', label:t('dash.kpi.yearsToRetire'), value:ytr,              sub:t('dash.kpi.ageSub', { cur: state.currentAge, ret: state.retirementAge }), link:'retirement'},
-      {icon:retNums.verdictIcon, label:t('dash.kpi.retireStatus'), value:`<span class="${retNums.verdictClass==='overfunded'?'pos':retNums.verdictClass==='ontarget'?'amb':'neg'}">${retNums.verdict}</span>`, sub:t('dash.kpi.statusSub', { pct: covPct, amt: fmt(retNums.sustainableAfterTax) }), link:'retirement', section:'runway'},
-    ])}
+    <!-- KPI Row 2: Retirement — lens-aware. Both the label and the
+         number flip when the user switches Today / Nominal so the
+         row can never display a number in one frame with a label in
+         the other. The sub line shows the OTHER frame as context. -->
+    ${(() => {
+      const isNom = FE.display.isNominal();
+      const primaryNest = isNom ? nominalNestEgg : realNestEgg;
+      const otherNest   = isNom ? realNestEgg    : nominalNestEgg;
+      // Monthly retirement income is computed in real (today's money)
+      // terms. To express it nominally, scale by cumulative inflation
+      // from now to the retirement age so the figure represents the
+      // same purchasing power in future kr.
+      const inflF = FE.inflation.factor(FE.retirement.yearsToRetirement());
+      const primaryInc = isNom ? Math.round(realRetirementIncome * inflF) : realRetirementIncome;
+      const nestLabel   = isNom ? t('dash.kpi.nestEgg.nominal')           : t('dash.kpi.nestEgg');
+      const nestSub     = isNom ? t('dash.kpi.nestEggSub.nominal', { age: state.retirementAge, amt: fmt(otherNest) })
+                                : t('dash.kpi.nestEggSub',         { age: state.retirementAge, amt: fmt(otherNest) });
+      const incLabel    = isNom ? t('dash.kpi.monthlyIncomeReal.nominal') : t('dash.kpi.monthlyIncomeReal');
+      const subPort = isNom ? Math.round((retNums.sustainableAfterTax || 0) * inflF) : retNums.sustainableAfterTax;
+      const subPen  = isNom ? Math.round((retNums.pensionAvgMonthly   || 0) * inflF) : retNums.pensionAvgMonthly;
+      const incSub      = isNom ? t('dash.kpi.incomeSub.nominal', { p: fmt(subPort), pen: fmt(subPen) })
+                                : t('dash.kpi.incomeSub',         { p: fmt(subPort), pen: fmt(subPen) });
+      return ui.kpiRow([
+        {icon:'◈', label:nestLabel, value:fmt(primaryNest), tone:'pos', sub:nestSub, link:'retirement', section:'runway'},
+        {icon:'💰', label:incLabel, value:fmt(primaryInc),  tone:'pos', sub:incSub,  link:'retirement', section:'runway'},
+        {icon:'⏱', label:t('dash.kpi.yearsToRetire'), value:ytr,              sub:t('dash.kpi.ageSub', { cur: state.currentAge, ret: state.retirementAge }), link:'retirement'},
+        {icon:retNums.verdictIcon, label:t('dash.kpi.retireStatus'), value:`<span class="${retNums.verdictClass==='overfunded'?'pos':retNums.verdictClass==='ontarget'?'amb':'neg'}">${retNums.verdict}</span>`, sub:t('dash.kpi.statusSub', { pct: covPct, amt: fmt(retNums.sustainableAfterTax) }), link:'retirement', section:'runway'},
+      ]);
+    })()}
 
     <!-- Bank status -->
     <div class="callout ${state.bankConnected?'':'callout-warn'}">
@@ -11261,9 +11258,27 @@ function renderFunFundAIBody(){
     return head(`<button class="btn btn-g btn-sm" onclick="runFunFundAIReport()">${t('ff.ai.run')}</button>`)
       + `<div class="ff-ai-empty">${t('ff.ai.empty')}</div>`;
   }
-  const body = r.content || '';
+  const rawBody = r.content || '';
+  // Run the sanitizer eagerly so we can decide whether the body still
+  // has anything the user will want to read. A response that was
+  // entirely chart-spec JSON leaves an empty body after sanitisation
+  // — in that case we show a graceful fallback instead of a silent
+  // empty card.
+  const sanitized = _sanitizeAIMarkdown(rawBody);
+  const hasBody = sanitized.trim().length > 0;
+  const reportMode = (r.snapshot && r.snapshot.displayMode) || 'real';
+  const lensStale = reportMode !== FE.display.mode();
+  const lensStaleHtml = lensStale ? `
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;padding:6px 10px;background:rgba(77,159,255,.10);border:1px solid rgba(77,159,255,.35);border-radius:6px;font-size:11px;color:var(--text2)">
+      <span style="flex:1">${t('ff.ai.lensStale', { other: t('dash.ai.lens.'+reportMode), current: t('dash.ai.lens.'+FE.display.mode()) })}</span>
+      <button class="btn btn-xs btn-o" onclick="runFunFundAIReport()">${t('ff.ai.rerun')}</button>
+    </div>` : '';
+  const bodyHtml = hasBody
+    ? `<div class="ff-ai-body">${_renderAISectionBody(sanitized)}</div>`
+    : `<div class="ff-ai-empty">${t('ff.ai.err')}</div>`;
   return head(`<button class="btn btn-sm btn-o" onclick="runFunFundAIReport()">${t('ff.ai.rerun')}</button>`)
-    + `<div class="ff-ai-body">${body ? _renderAISectionBody(body) : ''}</div>`;
+    + lensStaleHtml
+    + bodyHtml;
 }
 function _syncFunFundAIBody(){
   const host = document.getElementById('ff-ai-report');
@@ -11307,12 +11322,15 @@ Snapshot:
 - Trips:
 ${tripSummary}
 
-Return plain markdown only.${langSuffix()}`;
+Return plain markdown only. IMPORTANT: this is an inline analysis card, not a chat reply — DO NOT emit any fenced code blocks of any kind (no \`\`\`horizon-chart, no \`\`\`json, no \`\`\` at all), DO NOT emit any JSON objects, and DO NOT emit any chart specs or \`{"kind":…}\` payloads. Bullets, bold, and the {+}/{-}/{!}/{~} tone markers only. Any code fence or JSON-looking object will render as broken machine output to the user.${langSuffix()}`;
     const raw = await callClaude(prompt, 600);
+    // Sanitize at cache time — same rationale as the Dashboard report.
+    const clean = _sanitizeAIMarkdown(raw);
     state.funFundReport = {
       generatedAt: Date.now(),
       lang: state.lang,
-      content: raw,
+      content: clean,
+      raw,
       snapshot: { totalFF, totalTrips, spentSoFar, remaining, tripCount: (state.trips||[]).length, displayMode: FE.display.mode() },
     };
     state.funFundReportError = null;
