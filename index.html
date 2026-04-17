@@ -112,6 +112,12 @@ input[type="number"] { -moz-appearance:textfield; }
 .iBtn { width:32px; height:32px; border-radius:7px; border:1px solid var(--border); background:var(--bg3); color:var(--text2); display:flex; align-items:center; justify-content:center; cursor:pointer; font-size:13px; transition:all .2s; }
 .iBtn:hover { border-color:var(--green); color:var(--green); }
 .cur-toggle { display:flex; gap:2px; background:var(--bg0); border-radius:6px; padding:2px; }
+/* Money-display mode pill. Mirrors the currency/lang toggles so the
+   three top-bar selectors read as one family. */
+.mode-toggle { display:inline-flex; gap:2px; background:var(--bg0); border:1px solid var(--border); border-radius:6px; padding:2px; }
+.mode-btn { background:transparent; border:none; color:var(--text3); padding:4px 10px; border-radius:5px; font-family:var(--fm); font-size:10px; font-weight:600; letter-spacing:.02em; cursor:pointer; transition:all .15s; white-space:nowrap; }
+.mode-btn:hover { color:var(--text); }
+.mode-btn.active { background:var(--green); color:#000; font-weight:700; }
 /* Language toggle (Settings → Appearance). Flat two-button pill that
    mirrors the currency toggle vocabulary so the control feels native. */
 .lang-toggle { display:inline-flex; gap:2px; background:var(--bg0); border:1px solid var(--border); border-radius:8px; padding:3px; }
@@ -275,6 +281,7 @@ input[type="number"] { -moz-appearance:textfield; }
 @media (prefers-reduced-motion: reduce) { .kpi.kpi-pulse { animation:none; } }
 .kpi-icon { font-size:18px; margin-bottom:4px; line-height:1; }
 .kpi-lbl { font-size:9px; letter-spacing:.08em; color:var(--text3); text-transform:uppercase; margin-bottom:4px; font-weight:600; }
+.kpi-lens { font-size:8px; color:var(--text3); letter-spacing:.04em; font-weight:500; text-transform:none; opacity:.7; }
 .kpi-val { font-family:var(--fm); font-size:20px; font-weight:700; color:var(--text); line-height:1.15; word-break:break-word; }
 .kpi-sub { font-size:10px; color:var(--text2); margin-top:3px; line-height:1.3; }
 
@@ -2894,6 +2901,11 @@ body.light .piq-country-menu { box-shadow:0 12px 28px -10px rgba(60,40,10,0.22);
         <span class="cmdp-hint-icon">⌘</span><span class="cmdp-hint-lbl">K</span>
       </button>
       <div class="cur-toggle" id="cur-toggle"></div>
+      <!-- Money-display mode toggle: Today's money vs Nominal. Reads
+           state.displayMode and re-renders every panel so headline KPIs,
+           projections, the Nest Egg chart, and AI prompts all flip in
+           lockstep. Rebuilt by syncDisplayModeToggle() on every render. -->
+      <div class="mode-toggle" id="mode-toggle" role="group" aria-label="Money display mode"></div>
       <button class="iBtn" id="theme-btn" onclick="toggleTheme()" title="Toggle theme" data-i18n-title="topbar.theme">☀</button>
       <button class="iBtn" onclick="toggleAIPanel()" title="AI Advisor" data-i18n-title="topbar.ai">✦</button>
     </div>
@@ -3238,6 +3250,12 @@ const STRINGS = {
   // ── Topbar tooltips & labels ───────────────────────────
   'topbar.cmdp':            { en:'Command palette',       sv:'Kommandopalett' },
   'topbar.theme':           { en:'Toggle theme',          sv:'Växla tema' },
+  'topbar.mode.real':       { en:'Today',                 sv:'Idag' },
+  'topbar.mode.nominal':    { en:'Nominal',               sv:'Nominellt' },
+  'topbar.mode.real.title': { en:'Display amounts in today\u2019s money (inflation-adjusted)',
+                              sv:'Visa belopp i dagens penningvärde (inflationsjusterat)' },
+  'topbar.mode.nominal.title':{ en:'Display amounts in future (nominal) kr',
+                              sv:'Visa belopp i framtida (nominella) kronor' },
   'topbar.ai':              { en:'AI Advisor',            sv:'AI-rådgivare' },
 
   // ── Breadcrumb + related row ───────────────────────────
@@ -4682,6 +4700,12 @@ function defaultState() {
     currentAge:44, retirementAge:69, growthRate:7, inflationRate:2,
     retirementPostGrowth:4, lifeExp:90,
     retirementScenario:'baseline',
+    // Global money-display mode. 'real' = every future-dated figure is
+    // discounted back to today's purchasing power using inflationRate.
+    // 'nominal' = raw future kr. Default is 'real' because planning
+    // decisions are almost always easier to reason about in today's
+    // money — the Nominal lens is an escape hatch, not the default.
+    displayMode:'real',
     tickerQuote:'Come rain or shine, I will retire under the sun.',
     exchangeRates:{ SEK:1, USD:0.11, EUR:0.09, KES:14.27 },
 
@@ -4933,7 +4957,7 @@ window.dr = function(name){ return window.commitRender(name); };
 // ─── PERSISTENCE ────────────────────────────────────────────────────────────
 // State schema version. Bump this and add a branch to migrate() whenever the
 // shape of `state` changes in a backwards-incompatible way.
-const STATE_VERSION = 12;
+const STATE_VERSION = 13;
 function migrate(s) {
   const from = s.version || 1;
   if(from >= STATE_VERSION) { s.version = STATE_VERSION; return s; }
@@ -5042,6 +5066,17 @@ function migrate(s) {
       if(typeof a.taxRate !== 'number') a.taxRate = legacyTax;
     });
     delete s.withdrawTaxRate;
+  }
+  // v12 → v13: unified global money-display mode. Previously only the
+  // Nest Egg chart owned a local `dashNestEggMode`; now every
+  // future-dated surface honours a single `state.displayMode`. If the
+  // user had set the chart to 'nominal' we carry that preference up;
+  // otherwise default to 'real' (today's money).
+  if(from < 13) {
+    if(!s.displayMode) {
+      s.displayMode = (s.dashNestEggMode === 'nominal') ? 'nominal' : 'real';
+    }
+    delete s.dashNestEggMode;
   }
   s.version = STATE_VERSION;
   return s;
@@ -5732,6 +5767,36 @@ const FinancialEngine = (() => {
     factor:        _inflFactor,
     toTodaysMoney: (nominal, years) => nominal / (_inflFactor(years) || 1),
   };
+  // ── display · global money-display mode ────────────────────────────
+  // Every KPI, chart series, and AI prompt that reports a future-dated
+  // amount should route through here so the user's Today / Nominal
+  // toggle is respected app-wide.
+  //
+  //   mode()            → 'real' | 'nominal'
+  //   isReal() / isNominal() → convenience booleans
+  //   pick(real, nominal)    → select the right value
+  //   discount(nominal, years) → nominal kr when in Nominal mode,
+  //                              discounted to today's money in Real
+  //                              (uses the same _inflFactor as the
+  //                              projection, so values stay consistent
+  //                              with the yearly chart series).
+  //   label()           → localised label for the currently active
+  //                       lens; handy for chart subtitles.
+  const display = {
+    mode:       () => state.displayMode || 'real',
+    isReal:     () => (state.displayMode || 'real') === 'real',
+    isNominal:  () => state.displayMode === 'nominal',
+    pick:       (realVal, nominalVal) =>
+      (state.displayMode === 'nominal' ? nominalVal : realVal),
+    discount:   (nominal, years) =>
+      (state.displayMode === 'nominal'
+        ? (nominal || 0)
+        : (nominal || 0) / (_inflFactor(years) || 1)),
+    label:      () =>
+      (state.displayMode === 'nominal'
+        ? t('dash.chart.toggle.nominal')
+        : t('dash.chart.toggle.real')),
+  };
   // ── currency + format ──────────────────────────────────────────────
   const format = {
     // Convert a native-kr value to the user's selected display
@@ -5828,7 +5893,7 @@ const FinancialEngine = (() => {
     }
     return v;
   };
-  return { months, projection, retirement, inflation, format, assertInvariants };
+  return { months, projection, retirement, inflation, display, format, assertInvariants };
 })();
 // Short alias so renderers can write `FE.months.current()` without
 // cluttering the site — same identity, purely ergonomic.
@@ -6656,6 +6721,7 @@ bus.on('state:changed', () => {
     try {
       if(typeof renderTicker         === 'function') renderTicker();
       if(typeof renderCurrencyToggle === 'function') renderCurrencyToggle();
+      if(typeof renderModeToggle     === 'function') renderModeToggle();
       if(typeof updateSidebar        === 'function') updateSidebar();
       if(typeof bus !== 'undefined') bus.emit('state:liveSync', { panel: state.activePanel });
     } catch(e){ console.warn('live sync failed', e); }
@@ -7143,6 +7209,7 @@ window.addEventListener('keydown', (e) => {
 function renderAll() {
   renderTicker();
   renderCurrencyToggle();
+  renderModeToggle();
   updateSidebar();
   const panel=state.activePanel||'dashboard';
   // Sync the `.active` class on panels and sidebar nav-items to whatever
@@ -7218,6 +7285,47 @@ function renderCurrencyToggle() {
   if(!el) return;
   el.innerHTML = Object.keys(CURRENCY_SYMBOLS).map(c=>`<button class="cur-btn ${c===state.currency?'active':''}" onclick="applyCurrency('${c}')">${c}</button>`).join('');
 }
+
+// Money-display mode toggle — Today's money vs Nominal. Re-renders on
+// every panel render so the active-button highlight always matches
+// state. applyDisplayMode() below is the click handler; mirrors
+// applyCurrency() so the flip feels instant without waiting for the
+// 200 ms live-reactivity debounce.
+function renderModeToggle() {
+  const el = document.getElementById('mode-toggle');
+  if(!el) return;
+  const mode = (state.displayMode || 'real');
+  const mk = (key, label, title) =>
+    `<button class="mode-btn ${mode===key?'active':''}" onclick="applyDisplayMode('${key}')" title="${esc2(title)}">${esc2(label)}</button>`;
+  el.innerHTML =
+    mk('real',    t('topbar.mode.real'),    t('topbar.mode.real.title')) +
+    mk('nominal', t('topbar.mode.nominal'), t('topbar.mode.nominal.title'));
+}
+window.applyDisplayMode = function(m){
+  if(m !== 'real' && m !== 'nominal') return;
+  if(state.displayMode === m) return;
+  state.displayMode = m;
+  if(typeof invalidateSelectors === 'function') invalidateSelectors();
+  // Instant toggle patch so the highlight doesn't lag.
+  try {
+    document.querySelectorAll('#mode-toggle .mode-btn').forEach(b => {
+      b.classList.toggle('active', (b.textContent || '').trim().toLowerCase() === (m === 'real' ? t('topbar.mode.real') : t('topbar.mode.nominal')).toLowerCase());
+    });
+  } catch(_e){}
+  // Full panel re-render — every KPI, chart, and AI payload reads
+  // state.displayMode, so a single-frame rebuild keeps all surfaces
+  // in lockstep.
+  requestAnimationFrame(() => {
+    try {
+      if(typeof renderModeToggle === 'function') renderModeToggle();
+      if(typeof updateSidebar === 'function') updateSidebar();
+      const active = state.activePanel || 'dashboard';
+      if(typeof renderPanel === 'function') renderPanel(active);
+      if(typeof decoratePanel === 'function') decoratePanel(active);
+    } catch(e){ console.warn('applyDisplayMode render failed', e); }
+  });
+  save();
+};
 // ─── CURRENCY APPLIER ───────────────────────────────────────────────────────
 // One atomic, single-frame path for every currency flip.
 //
@@ -7988,11 +8096,13 @@ FORMATTING · Follow these rules exactly. No walls of prose.
 
 6. Recommendations must contain **3–5 concrete, actionable bullets** the user can act on THIS month.
 
+Display lens · The user is currently viewing every future-dated amount in ${FE.display.isNominal() ? '**nominal (future kr)** — values have NOT been discounted for inflation' : '**today\u2019s money** — future amounts are inflation-adjusted back to present purchasing power'}. Frame your commentary in that lens; if you reference the opposite frame, label it explicitly so the reader never has to guess which kr is which.
+
 Key snapshot values to reference where relevant:
 - Current month (${cm.label}): income **${Math.round(cm.pureIncome).toLocaleString()} kr**, expenses **${Math.round(cm.pureExpenses).toLocaleString()} kr**, savings **${Math.round(cm.savings).toLocaleString()} kr**, fun fund **${Math.round(cm.pureFunFund).toLocaleString()} kr**
 - 12-month Fun Fund outlook: **${Math.round(funFundTotal).toLocaleString()} kr**
 - Retirement coverage: **${nums.coveragePct.toFixed(0)}%** (verdict: ${nums.verdict})
-- Nest egg (today's money): **${Math.round(nums.nestEgg).toLocaleString()} kr** at age **${state.retirementAge}**
+- Nest egg (today's money): **${Math.round(nums.nestEgg).toLocaleString()} kr** at age **${state.retirementAge}**${FE.display.isNominal() ? `\n- Nest egg (nominal/future kr): **${Math.round(FE.projection.totalNominal()).toLocaleString()} kr**` : ''}
 
 Return plain markdown only — no preamble, no sign-off, no JSON.${langSuffix()}`;
     const raw = await callClaude(prompt, 1800);
@@ -8011,6 +8121,7 @@ Return plain markdown only — no preamble, no sign-off, no JSON.${langSuffix()}
         funFund12mo: funFundTotal,
         coveragePct: nums.coveragePct, verdict: nums.verdict,
         nestEgg: nums.nestEgg, retirementAge: state.retirementAge,
+        displayMode: FE.display.mode(),
       },
     };
     state.dashboardReportError = null;
@@ -8162,14 +8273,14 @@ function renderDashboard() {
         </div>
         <div class="chart-wrap lg"><canvas id="dash-cashflow-chart"></canvas></div>
       </div>
-      <!-- Nest Egg Projection -->
+      <!-- Nest Egg Projection — the in-card Today/Nominal toggle has
+           been replaced by the global topbar toggle so a single
+           control governs every future-dated surface. A subtle lens
+           label on the card title tells the user which frame is
+           active. -->
       <div class="card" data-section="nestegg">
         <div class="card-title" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px">
-          <span>${t('dash.chart.nestegg.title')}</span>
-          <div class="scen-tabs" style="margin:0">
-            <button class="scen-btn ${(state.dashNestEggMode||'real')==='real'?'active':''}" onclick="setDashNestEggMode('real')">${t('dash.chart.toggle.real')}</button>
-            <button class="scen-btn ${(state.dashNestEggMode||'real')==='nominal'?'active':''}" onclick="setDashNestEggMode('nominal')">${t('dash.chart.toggle.nominal')}</button>
-          </div>
+          <span>${t('dash.chart.nestegg.title')} <span class="kpi-lens">· ${esc2(FE.display.label())}</span></span>
         </div>
         <div class="chart-wrap lg"><canvas id="dash-nestegg-chart"></canvas></div>
       </div>
@@ -8223,7 +8334,7 @@ function renderDashboard() {
     if(ne) {
       const cd=chartDefaults();
       const proj=getProjection();
-      const mode = state.dashNestEggMode || 'real';
+      const mode = FE.display.mode();
       // Three distinct series, all sourced from the same single
       // getProjection() result so they stay in lockstep with the
       // Retirement Plan portfolio KPIs and the Savings line item.
@@ -8266,20 +8377,10 @@ function renderDashboard() {
     }
   },50);
 }
-// Toggle between real (today's money) and nominal (future kr)
-// on the Dashboard Nest Egg Growth Curve. Persists the choice so
-// a user's preferred lens sticks across sessions. Defaults to
-// real — that's the lens every other retirement view ships with.
-window.setDashNestEggMode = function(mode){
-  if(mode !== 'real' && mode !== 'nominal') return;
-  state.dashNestEggMode = mode;
-  save();
-  // Re-render just the dashboard so the toggle button state + chart
-  // flip together. The live-reactivity pipeline would also catch
-  // this after 200 ms, but firing it synchronously here keeps the
-  // click feel snappy.
-  if(typeof renderDashboard === 'function') renderDashboard();
-};
+// setDashNestEggMode was removed in v13 — the Nest Egg chart now
+// reads the global state.displayMode (see applyDisplayMode in the
+// top bar), which is the single source of truth for every
+// future-dated surface app-wide.
 
 // ══ TRANSACTIONS ═════════════════════════════════════════════════════════════
 function renderTransactions() {
@@ -9254,7 +9355,12 @@ function renderRetirement() {
   // savings / Yearly Forecast savings targets upstream.
   const savingsProj = getProjection();
   const savingsFinal = savingsProj.length ? savingsProj[savingsProj.length-1].appSavings : 0;
-  const savingsFinalReal = Math.round(savingsFinal / inflF);
+  // `savingsFinalReal` keeps its old name for callers, but honours the
+  // global display mode: in Nominal the raw future-kr savings balance
+  // is shown; in Real it's discounted back to today's money. The
+  // variable name is kept for git-blame churn reasons — every consumer
+  // just wants "the number to display", which is what this now is.
+  const savingsFinalReal = Math.round(FE.display.isNominal() ? savingsFinal : (savingsFinal / inflF));
   const savingsLastYearContrib = savingsProj.length ? savingsProj[savingsProj.length-1].yearlyContrib : 0;
   // Average monthly savings across the projection window, used as
   // the "Contrib/mo" readout on the row. We average instead of
@@ -9301,7 +9407,11 @@ function renderRetirement() {
     // Per-account projection is read through FinancialEngine so the
     // row-level number always matches the Total Projected card and
     // the Longevity Runway nest egg. No inline inflation math.
-    const projR = isInv ? FE.projection.perAccountReal(a.id) : 0;
+    const projR = isInv
+      ? (FE.display.isNominal()
+          ? FE.projection.perAccountNominal(a.id)
+          : FE.projection.perAccountReal(a.id))
+      : 0;
     // Structured labelled-cell layout. Each field sits in its own
     // .ret-asset-cell with a small UPPERCASE label above a bordered
     // input wrap so the row scans cleanly left-to-right and field
@@ -9398,7 +9508,7 @@ function renderRetirement() {
       <div class="kpi-row" style="margin-bottom:10px;margin-top:10px">
         <div class="kpi"><div class="kpi-icon">◈</div><div class="kpi-lbl">${esc2(t('s2.kpi.totalBalance'))}</div><div class="kpi-val pos">${fmt(tBal)}</div><div class="kpi-sub">${t('s2.kpi.totalBalance.sub', { n: investments.length, s: investments.length !== 1 ? 's' : '', savings: fmt(savNow) })}</div></div>
         <div class="kpi"><div class="kpi-icon">▲</div><div class="kpi-lbl">${esc2(t('s2.kpi.monthlyContrib'))}</div><div class="kpi-val" style="color:var(--amber)">${fmt(tContrib)}</div><div class="kpi-sub">${esc2(t('s2.kpi.monthlyContrib.sub'))}</div></div>
-        <div class="kpi"><div class="kpi-icon">☀</div><div class="kpi-lbl">${esc2(t('s2.kpi.projected'))}</div><div class="kpi-val" style="color:var(--cyan)">${fmt(projReal)}</div><div class="kpi-sub">${t('s2.kpi.projected.sub', { ytr, inv: fmt(investmentsProjReal), sav: fmt(savingsProjReal) })}</div></div>
+        <div class="kpi"><div class="kpi-icon">☀</div><div class="kpi-lbl">${esc2(t('s2.kpi.projected'))} <span class="kpi-lens">· ${esc2(FE.display.label())}</span></div><div class="kpi-val" style="color:var(--cyan)">${fmt(FE.display.pick(projReal, projNom))}</div><div class="kpi-sub">${t('s2.kpi.projected.sub', { ytr, inv: fmt(FE.display.pick(investmentsProjReal, investmentsProjNom)), sav: fmt(FE.display.pick(savingsProjReal, savingsProjNom)) })}</div></div>
         ${hasPensions?`<div class="kpi"><div class="kpi-icon">🏛</div><div class="kpi-lbl">${esc2(t('s2.kpi.pensionIncome'))}</div><div class="kpi-val" style="color:var(--amber)">${fmt(getAllPensionIncome())}/mo</div><div class="kpi-sub">${t(pensionKpiSubKey, { n: pensions.length, s: pensions.length !== 1 ? 's' : '', age: earliestPension })}</div></div>`:''}
       </div>
       <div class="ret-portfolio-grid">
