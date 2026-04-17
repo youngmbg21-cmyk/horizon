@@ -8312,6 +8312,31 @@ const DASH_REPORT_SECTIONS = [
 // include them until the running word count hits the cap — whole sentences
 // preserved so we never chop a number in half or leave an unbalanced **…**.
 const DASH_REPORT_WORD_CAP = 250;
+// Hard word-count range for dashboard AI analysis sections. The
+// prompt asks the model to land inside this window; the normalize
+// pass enforces it before cache + render. _MIN is only a generation
+// target — at render time we can't fabricate extra prose without
+// another API call, so a best-effort "regenerate" button stays
+// available instead of hard-rejecting an under-length section.
+const DASH_REPORT_WORD_MIN = 230;
+const DASH_REPORT_WORD_MAX = 250;
+// Markdown-aware word counter. Strips markdown syntax symbols so
+// asterisks in **bold** and leading `-` list markers don't inflate
+// the count. Reuses the same regex as _capWordsPerSection so the two
+// helpers can never drift out of sync.
+function _countReportWords(md){
+  return (String(md || '').replace(/[*_`>#\-\u2022]+/g, ' ').match(/\S+/g) || []).length;
+}
+// Truncate a markdown block to a maximum word count at the nearest
+// sentence boundary (so numbers and unbalanced bold markers never get
+// chopped mid-word). _capWordsPerSection already does this for the
+// cap case — this thin wrapper keeps the semantics explicit at the
+// call site.
+function _truncateReportSection(md, maxWords){
+  const count = _countReportWords(md);
+  if(count <= maxWords) return md;
+  return _capWordsPerSection(md, maxWords);
+}
 function _capWordsPerSection(md, cap){
   const text = String(md || '').trim();
   if(!text) return text;
@@ -8441,6 +8466,100 @@ function _parseDashboardReport(raw){
   }
   return result;
 }
+// ─── AI report · word-count normalisation ────────────────────────────
+// Every dashboard AI card must render between DASH_REPORT_WORD_MIN
+// and DASH_REPORT_WORD_MAX words. Enforcement happens in two layers:
+//
+//   1. Cache-time (in runDashboardAIReport): right after the model
+//      responds we validate each section. If any section is outside
+//      the range we fire ONE focused correction call asking the
+//      model to rewrite only the offending sections at the right
+//      length. Anything still above max after that is deterministically
+//      truncated at a sentence boundary.
+//   2. Render-time (in _renderAISectionBody): a defensive hard cap
+//      at max so even a legacy cached report (generated before this
+//      release) cannot render over-length prose.
+//
+// Under-length sections after the correction pass are accepted as-is
+// — padding would violate the "no fluff" rule and we can't call the
+// API again from the render path. The user can always click Re-run.
+async function _normalizeReportWordCounts(sections){
+  const KEYS = ['position','good','concern','recs'];
+  const TITLES = {
+    position: 'Current financial position',
+    good:     'What is going well',
+    concern:  'Areas of concern',
+    recs:     'Recommendations',
+  };
+  const counts = {};
+  const offenders = [];
+  KEYS.forEach(k => {
+    const c = _countReportWords(sections[k] || '');
+    counts[k] = c;
+    if(c < DASH_REPORT_WORD_MIN || c > DASH_REPORT_WORD_MAX){
+      offenders.push(k);
+    }
+  });
+  if(offenders.length === 0){
+    return { sections: { ...sections }, counts, correctionApplied: false };
+  }
+  // One correction pass. We ask the model to rewrite ONLY the
+  // offending sections, preserving tone markers, bolded figures, and
+  // list structure. Keeping the payload tight reduces the odds of a
+  // drift in the sections we already had right.
+  let corrected = null;
+  try {
+    const toFix = offenders.map(k => `## ${TITLES[k]}
+(current length: ${counts[k]} words — must be rewritten to land between ${DASH_REPORT_WORD_MIN} and ${DASH_REPORT_WORD_MAX} words)
+
+${sections[k] || '(empty — produce a fresh ${DASH_REPORT_WORD_MIN}-${DASH_REPORT_WORD_MAX} word section grounded in the snapshot in the system prompt.)'}`).join('\n\n');
+    const prompt = `The following dashboard analysis section(s) are outside the 230–250 word target range. Rewrite each one so it lands STRICTLY between ${DASH_REPORT_WORD_MIN} and ${DASH_REPORT_WORD_MAX} words. Hard constraint.
+
+Rules you MUST follow:
+- Preserve the {+text}/{-text}/{!text}/{~text} tone markers and **bold** on every currency, percentage, rate, and ratio.
+- Keep the same H2 heading text exactly as given.
+- Do not pad with fluff — if a section was short, add grounded insight with specific numbers; if it was long, cut the weakest sentences.
+- Match the user's active display lens as described in the system prompt.
+- No preamble, no sign-off, no code fences, no JSON, no chart specs.
+
+Output EXACTLY the H2 heading(s) below followed by the rewritten section body, in the order given, nothing else:
+
+${toFix}`;
+    const raw = await callClaude(prompt, 1800);
+    corrected = _parseDashboardReport(raw) || null;
+  } catch(_e){ /* swallow — fall through to deterministic truncation */ }
+  const out = { ...sections };
+  if(corrected){
+    offenders.forEach(k => {
+      const newBody = _sanitizeAIMarkdown(corrected[k] || '');
+      if(!newBody) return;
+      const c = _countReportWords(newBody);
+      // Accept the correction if it's inside the range OR at least
+      // closer to the range than what we had. Avoids replacing a
+      // 225-word section with a 180-word one.
+      const wasOutside = counts[k] < DASH_REPORT_WORD_MIN || counts[k] > DASH_REPORT_WORD_MAX;
+      const nowInside  = c >= DASH_REPORT_WORD_MIN && c <= DASH_REPORT_WORD_MAX;
+      const nowCloser  = (c < DASH_REPORT_WORD_MIN && counts[k] < c) ||
+                         (c > DASH_REPORT_WORD_MAX && c < counts[k]);
+      if(wasOutside && (nowInside || nowCloser)){
+        out[k] = newBody;
+        counts[k] = c;
+      }
+    });
+  }
+  // Deterministic upper-bound clamp — anything still over MAX gets
+  // truncated at a sentence boundary. Cannot deterministically
+  // expand an under-length section, so those are left as the best
+  // available result.
+  KEYS.forEach(k => {
+    if(_countReportWords(out[k] || '') > DASH_REPORT_WORD_MAX){
+      out[k] = _truncateReportSection(out[k], DASH_REPORT_WORD_MAX);
+      counts[k] = _countReportWords(out[k]);
+    }
+  });
+  return { sections: out, counts, correctionApplied: true };
+}
+
 // In-memory running flag — deliberately NOT persisted to state so the
 // transient "Analysing…" spinner doesn't trigger a full panel rebuild
 // through the save() → live-render pipeline. The real result lands in
@@ -8845,7 +8964,7 @@ STRUCTURE · EXACTLY these four markdown H2 headings, in this order, nothing bef
 ## Areas of concern
 ## Recommendations
 
-WORD BUDGET · Each section must be 120–200 words. Absolute max 250. Every section should be about the same length so the cards read as a balanced brief.
+WORD BUDGET · HARD CONSTRAINT: every section MUST be between 230 and 250 words. Not 220, not 260 — strictly 230–250. Every section should land in the same narrow range so the four cards read as a balanced brief. Count words carefully; drafts outside this range will be rejected and regenerated, so do it right the first time. Do not pad with filler — if a section feels short, add another grounded insight, concrete number, or tone-marked observation. If it runs long, cut the weakest sentence rather than compressing every line into dense clauses.
 
 FORMATTING · Follow these rules exactly. No walls of prose.
 
@@ -8882,12 +9001,18 @@ Return plain markdown only. IMPORTANT: this is an analysis card, not a chat repl
     // later release tightens the sanitizer, and (b) the vault-save
     // path inherits the clean copy by default.
     const rawSections = parsed || { position: raw, good:'', concern:'', recs:'' };
-    const cleanSections = {
+    const sanitizedSections = {
       position: _sanitizeAIMarkdown(rawSections.position || ''),
       good:     _sanitizeAIMarkdown(rawSections.good || ''),
       concern:  _sanitizeAIMarkdown(rawSections.concern || ''),
       recs:     _sanitizeAIMarkdown(rawSections.recs || ''),
     };
+    // Enforce the 230–250 word target for every section. May fire a
+    // single follow-up callClaude() for offending sections only; the
+    // function is guaranteed to return content no longer than the
+    // MAX even if the correction call fails (deterministic truncate).
+    const normalized = await _normalizeReportWordCounts(sanitizedSections);
+    const cleanSections = normalized.sections;
     state.dashboardReport = {
       generatedAt: Date.now(),
       // Tag the cached report with the language it was generated in
@@ -8903,6 +9028,9 @@ Return plain markdown only. IMPORTANT: this is an analysis card, not a chat repl
         coveragePct: nums.coveragePct, verdict: nums.verdict,
         nestEgg: nums.nestEgg, retirementAge: state.retirementAge,
         displayMode: FE.display.mode(),
+        wordCounts: normalized.counts,
+        correctionApplied: normalized.correctionApplied,
+        targetRange: [DASH_REPORT_WORD_MIN, DASH_REPORT_WORD_MAX],
       },
     };
     state.dashboardReportError = null;
