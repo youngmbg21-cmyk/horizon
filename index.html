@@ -2412,6 +2412,48 @@ body.light .retire-slideover { box-shadow:-10px 0 32px -10px rgba(60,40,10,0.25)
 .ctx-field label { display:block; font-family:var(--fm); font-size:10px; letter-spacing:.06em; text-transform:uppercase; color:var(--text2); margin-bottom:5px; font-weight:700; }
 .ctx-field .country-dd { width:100%; display:block; }
 
+/* ── PERSONAL PROFILE CARD (Settings) ──────────────────────────────
+   Sibling of .ctx-card but neutral — optional context, not a
+   required gate. 2-col on wide, collapses to 1-col on narrow. The
+   goals textarea always spans the full row so long aspirational
+   notes get room to breathe. */
+.profile-card { border-left:4px solid var(--border2); }
+.profile-grid { display:grid; grid-template-columns:repeat(2, minmax(0,1fr)); gap:14px; }
+@media (max-width:720px){ .profile-grid { grid-template-columns:1fr; } }
+.profile-grid .profile-goals { grid-column:1 / -1; }
+.profile-money {
+  display:flex; align-items:center; gap:8px;
+  background:var(--bg3); border:1px solid var(--border);
+  border-radius:8px; padding:2px 12px;
+  min-width:0; box-sizing:border-box;
+  transition:border-color .15s;
+}
+.profile-money:focus-within { border-color:var(--text3); }
+.profile-money-sym { color:var(--text3); font-family:var(--fm); font-size:12px; flex-shrink:0; }
+.profile-money input {
+  flex:1 1 0; min-width:0; width:100%; box-sizing:border-box;
+  background:transparent; border:none; outline:none;
+  color:var(--text); font-family:var(--fm); font-size:14px; font-weight:600;
+  padding:9px 0;
+}
+.profile-select {
+  width:100%; box-sizing:border-box;
+  background:var(--bg3); border:1px solid var(--border);
+  border-radius:8px; padding:10px 12px;
+  color:var(--text); font-family:var(--ff); font-size:13px;
+  outline:none; transition:border-color .15s;
+}
+.profile-select:focus { border-color:var(--text3); }
+.profile-textarea {
+  width:100%; box-sizing:border-box; resize:vertical;
+  min-height:72px;
+  background:var(--bg3); border:1px solid var(--border);
+  border-radius:8px; padding:10px 12px;
+  color:var(--text); font-family:var(--ff); font-size:13px; line-height:1.5;
+  outline:none; transition:border-color .15s;
+}
+.profile-textarea:focus { border-color:var(--text3); }
+
 /* ── SHARED COUNTRY DROPDOWN (createCountryDropdown) ───────────────── */
 .country-dd { position:relative; display:inline-block; }
 .country-dd .cd-trigger { display:inline-flex; align-items:center; gap:10px; background:var(--bg3); border:1px solid var(--border2); border-radius:10px; padding:10px 14px; color:var(--text); font-family:var(--fb); font-size:13px; font-weight:600; cursor:pointer; transition:all .18s; min-width:240px; width:100%; }
@@ -3338,6 +3380,28 @@ const STRINGS = {
   'settings.ctx.homeBase':     { en:'Home Base (current residence)', sv:'Hemvist (nuvarande bostadsland)' },
   'settings.ctx.selectCitizenship': { en:'Select your citizenship', sv:'Välj ditt medborgarskap' },
   'settings.ctx.selectHomeBase':    { en:'Select your home base',   sv:'Välj din hemvist' },
+
+  // ── Settings · Personal profile card ───────────────────
+  'settings.profile.title':    { en:'👤 Personal Profile',
+                                 sv:'👤 Personlig profil' },
+  'settings.profile.optional': { en:'OPTIONAL',                  sv:'FRIVILLIG' },
+  'settings.profile.blurb':    { en:'Share a little more about your situation so AI recommendations become genuinely personalised. Every field is optional — leave anything you\u2019d rather not share blank, and the AI will simply skip it.',
+                                 sv:'Dela lite mer om din situation så att AI-rekommendationerna blir verkligt personliga. Alla fält är frivilliga — lämna tomt vad du hellre inte delar, så hoppar AI:n över det.' },
+  'settings.profile.salary':   { en:'Gross monthly salary',      sv:'Bruttolön per månad' },
+  'settings.profile.salary.ph':{ en:'e.g. 65 000',                sv:'t.ex. 65 000' },
+  'settings.profile.marital':  { en:'Marital status',            sv:'Civilstånd' },
+  'settings.profile.hhIncome': { en:'Combined household income (monthly)',
+                                 sv:'Gemensam hushållsinkomst (månad)' },
+  'settings.profile.hhIncome.ph':{ en:'Leave blank if single',   sv:'Lämna tomt om singel' },
+  'settings.profile.goals':    { en:'Financial goals',           sv:'Ekonomiska mål' },
+  'settings.profile.goals.ph': { en:'e.g. retire at 60 in Portugal, fund children\u2019s university, build a 6-month emergency buffer, save for an investment property…',
+                                 sv:'t.ex. gå i pension vid 60 i Portugal, finansiera barnens studier, bygga en buffert på 6 månader, spara till investeringsbostad…' },
+  'settings.profile.marital.single':    { en:'Single',           sv:'Singel' },
+  'settings.profile.marital.partnered': { en:'Partnered',        sv:'Sambo' },
+  'settings.profile.marital.married':   { en:'Married',          sv:'Gift' },
+  'settings.profile.marital.divorced':  { en:'Divorced',         sv:'Skild' },
+  'settings.profile.marital.widowed':   { en:'Widowed',          sv:'Änka/änkling' },
+  'settings.profile.marital.ph':        { en:'— Select —',       sv:'— Välj —' },
 
   // ── Settings · recurring baseline cards ────────────────
   'settings.recurring':     { en:'RECURRING',          sv:'ÅTERKOMMANDE' },
@@ -4706,6 +4770,16 @@ function defaultState() {
     // decisions are almost always easier to reason about in today's
     // money — the Nominal lens is an escape hatch, not the default.
     displayMode:'real',
+    // Personal profile — free-form context the user shares to make
+    // AI recommendations personalised. All fields optional; AI prompts
+    // will drop any field that's empty so there's no penalty for a
+    // partial profile.
+    profile:{
+      salary:0,            // individual gross monthly salary (SEK)
+      maritalStatus:'',    // 'single' | 'partnered' | 'married' | 'divorced' | 'widowed'
+      householdIncome:0,   // combined household monthly (SEK)
+      goals:'',            // free-text financial goals / aspirations
+    },
     tickerQuote:'Come rain or shine, I will retire under the sun.',
     exchangeRates:{ SEK:1, USD:0.11, EUR:0.09, KES:14.27 },
 
@@ -4957,7 +5031,7 @@ window.dr = function(name){ return window.commitRender(name); };
 // ─── PERSISTENCE ────────────────────────────────────────────────────────────
 // State schema version. Bump this and add a branch to migrate() whenever the
 // shape of `state` changes in a backwards-incompatible way.
-const STATE_VERSION = 13;
+const STATE_VERSION = 14;
 function migrate(s) {
   const from = s.version || 1;
   if(from >= STATE_VERSION) { s.version = STATE_VERSION; return s; }
@@ -5077,6 +5151,20 @@ function migrate(s) {
       s.displayMode = (s.dashNestEggMode === 'nominal') ? 'nominal' : 'real';
     }
     delete s.dashNestEggMode;
+  }
+  // v13 → v14: personal profile. Optional fields that improve AI
+  // personalisation (salary, marital status, household income, goals).
+  // Seeded as an empty object so every access site can safely read
+  // state.profile.* without a null check.
+  if(from < 14) {
+    if(!s.profile || typeof s.profile !== 'object') {
+      s.profile = { salary:0, maritalStatus:'', householdIncome:0, goals:'' };
+    } else {
+      if(typeof s.profile.salary !== 'number')          s.profile.salary = 0;
+      if(typeof s.profile.maritalStatus !== 'string')   s.profile.maritalStatus = '';
+      if(typeof s.profile.householdIncome !== 'number') s.profile.householdIncome = 0;
+      if(typeof s.profile.goals !== 'string')           s.profile.goals = '';
+    }
   }
   s.version = STATE_VERSION;
   return s;
@@ -11624,6 +11712,45 @@ function renderSettings() {
       </div>
     </div>
 
+    <!-- Personal Profile — OPTIONAL; every field the user fills gets
+         threaded into buildPersonalContext() so it reaches every AI
+         surface (dashboard report, retirement chat, deep dives). -->
+    <div class="card profile-card">
+      <div class="card-title">${esc2(t('settings.profile.title'))} <span class="ctx-badge" style="background:var(--bg3);color:var(--text3);border-color:var(--border)">${esc2(t('settings.profile.optional'))}</span></div>
+      <p class="ctx-blurb">${esc2(t('settings.profile.blurb'))}</p>
+      <div class="profile-grid">
+        <div class="ctx-field">
+          <label>${esc2(t('settings.profile.salary'))}</label>
+          <div class="profile-money">
+            <span class="profile-money-sym">${s}</span>
+            <input type="text" inputmode="decimal" data-lang-num="1" placeholder="${esc2(t('settings.profile.salary.ph'))}" value="${state.profile.salary?Math.round(state.profile.salary*r):''}" oninput="state.profile.salary=parseNum(this.value)/${r};save()">
+          </div>
+        </div>
+        <div class="ctx-field">
+          <label>${esc2(t('settings.profile.marital'))}</label>
+          <select class="profile-select" onchange="state.profile.maritalStatus=this.value;save()">
+            <option value="" ${!state.profile.maritalStatus?'selected':''}>${esc2(t('settings.profile.marital.ph'))}</option>
+            <option value="single"    ${state.profile.maritalStatus==='single'?'selected':''}>${esc2(t('settings.profile.marital.single'))}</option>
+            <option value="partnered" ${state.profile.maritalStatus==='partnered'?'selected':''}>${esc2(t('settings.profile.marital.partnered'))}</option>
+            <option value="married"   ${state.profile.maritalStatus==='married'?'selected':''}>${esc2(t('settings.profile.marital.married'))}</option>
+            <option value="divorced"  ${state.profile.maritalStatus==='divorced'?'selected':''}>${esc2(t('settings.profile.marital.divorced'))}</option>
+            <option value="widowed"   ${state.profile.maritalStatus==='widowed'?'selected':''}>${esc2(t('settings.profile.marital.widowed'))}</option>
+          </select>
+        </div>
+        <div class="ctx-field">
+          <label>${esc2(t('settings.profile.hhIncome'))}</label>
+          <div class="profile-money">
+            <span class="profile-money-sym">${s}</span>
+            <input type="text" inputmode="decimal" data-lang-num="1" placeholder="${esc2(t('settings.profile.hhIncome.ph'))}" value="${state.profile.householdIncome?Math.round(state.profile.householdIncome*r):''}" oninput="state.profile.householdIncome=parseNum(this.value)/${r};save()">
+          </div>
+        </div>
+        <div class="ctx-field profile-goals">
+          <label>${esc2(t('settings.profile.goals'))}</label>
+          <textarea class="profile-textarea" rows="3" placeholder="${esc2(t('settings.profile.goals.ph'))}" oninput="state.profile.goals=this.value;save()">${esc(state.profile.goals||'')}</textarea>
+        </div>
+      </div>
+    </div>
+
     <div class="two-col">
       <!-- Baseline income -->
       <div class="card">
@@ -12210,7 +12337,7 @@ const EXPORT_SLICES = [
   { key:'places',     icon:'🌍', label:'Places',          sub:'Retire Anywhere destinations', fields:['places'] },
   { key:'trips',      icon:'✈️', label:'Trips & Fun Fund', sub:'Planned travel and lifestyle budget', fields:['trips'] },
   { key:'overrides',  icon:'📆', label:'Overrides',       sub:'Monthly overrides + yearly bases', fields:['monthlyOverrides','yearlyBases','cascadeEnabled'] },
-  { key:'settings',   icon:'⚙', label:'Preferences',     sub:'Theme, currency, exchange rates, AI keys', fields:['currency','exchangeRates','darkMode','tickerQuote','aiKeys','aiProvider','categoryMap'] },
+  { key:'settings',   icon:'⚙', label:'Preferences',     sub:'Theme, currency, exchange rates, AI keys, personal profile', fields:['currency','exchangeRates','darkMode','tickerQuote','aiKeys','aiProvider','categoryMap','profile','displayMode'] },
   { key:'all',        icon:'📦', label:'Everything',      sub:'Full state backup (overwrites on import)', fields:null },
 ];
 function downloadJSON(filename, data){
@@ -12655,9 +12782,33 @@ function buildPersonalContext(){
   const cz = countryInfo(state.citizenship);
   const hb = countryInfo(state.homeBase);
   if(!cz || !hb) return '';
-  return `PERSONAL CONTEXT (use this to personalise every answer — tax, pensions, visas, residency, cost of living, currency):
+  let ctx = `PERSONAL CONTEXT (use this to personalise every answer — tax, pensions, visas, residency, cost of living, currency):
 - Citizenship: ${cz.name} (${cz.code}) — evaluate passport strength, visa reciprocity, tax treaties, and pension portability based on this nationality.
 - Current home base: ${hb.name} (${hb.code}) — use this as the baseline for comparisons, assume the user currently files taxes here, and reference this country's cost of living / healthcare / rules when drawing contrasts.`;
+  // Optional profile lines — each one is only appended when the user
+  // has actually filled it in, so a blank profile adds no noise to
+  // the prompt and an incomplete profile contributes exactly the
+  // fields the user was comfortable sharing.
+  const p = state.profile || {};
+  const profileLines = [];
+  if(p.salary && p.salary > 0){
+    profileLines.push(`- Gross individual salary: ~${Math.round(p.salary).toLocaleString()} kr/mo — anchor any tax, savings-rate, or affordability analysis to this income.`);
+  }
+  if(p.maritalStatus){
+    const MARITAL_LABEL = { single:'single', partnered:'partnered / cohabiting', married:'married', divorced:'divorced', widowed:'widowed' };
+    profileLines.push(`- Marital status: ${MARITAL_LABEL[p.maritalStatus] || p.maritalStatus} — factor in spousal tax allowances, survivor benefits, joint filing, and beneficiary planning where relevant.`);
+  }
+  if(p.householdIncome && p.householdIncome > 0){
+    profileLines.push(`- Combined household income: ~${Math.round(p.householdIncome).toLocaleString()} kr/mo — use this as the true household cash-flow base when the question is about household-level affordability, not individual.`);
+  }
+  if(p.goals && p.goals.trim()){
+    // Keep free-text goals literal so the model can quote them back.
+    profileLines.push(`- Stated financial goals (quote these verbatim when making recommendations): "${p.goals.trim().replace(/\s+/g,' ')}"`);
+  }
+  if(profileLines.length){
+    ctx += `\n\nPERSONAL PROFILE (tie specific advice to these facts — never invent ones the user hasn't shared):\n` + profileLines.join('\n');
+  }
+  return ctx;
 }
 
 // Build the "dynamic catalog" section of the system prompt. Runs
