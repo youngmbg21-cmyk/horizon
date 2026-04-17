@@ -4369,22 +4369,27 @@ const STRINGS = {
   'ff.page.sub':            { en:'Your discretionary income tracked against travel plans and lifestyle goals',
                               sv:'Din fritt disponibla inkomst följs mot resplaner och livsstilsmål' },
   'ff.kpi.total':           { en:'12-MONTH FUN FUND',     sv:'12-MÅNADERS FUN FUND' },
-  'ff.kpi.total.sub':       { en:'{mo}/mo average',       sv:'{mo}/mån snitt' },
+  'ff.kpi.total.sub':       { en:'{mo}/mo capacity, before trips',
+                              sv:'{mo}/mån kapacitet, före resor' },
   'ff.kpi.travelBudget':    { en:'TOTAL TRAVEL BUDGET',   sv:'TOTAL RESBUDGET' },
   'ff.kpi.travelBudget.sub':{ en:'{n} planned trips',     sv:'{n} planerade resor' },
+  'ff.kpi.travelBudget.sub.split':{ en:'{n} trips · {inw} in next 12 mo · {out} beyond',
+                                    sv:'{n} resor · {inw} inom 12 mån · {out} bortom' },
   'ff.kpi.spent':           { en:'ALREADY SPENT',         sv:'REDAN SPENDERAT' },
   'ff.kpi.spent.sub':       { en:'{pct}% of budget used', sv:'{pct}% av budgeten använd' },
   'ff.kpi.balance':         { en:'FUN FUND BALANCE',      sv:'FUN FUND-SALDO' },
   'ff.kpi.balance.afterTrips':{ en:'After all trips',     sv:'Efter alla resor' },
   'ff.kpi.balance.over':    { en:'Over budget by {amt}',  sv:'Över budget med {amt}' },
-  'ff.callout.over':        { en:'⚠️ <strong>Over budget!</strong> Your planned trips ({trips}) exceed your 12-month fun fund ({total}) by {over}. Consider adjusting trip budgets or saving more each month.',
-                              sv:'⚠️ <strong>Över budget!</strong> Dina planerade resor ({trips}) överstiger din 12-månaders Fun Fund ({total}) med {over}. Överväg att justera resbudgetar eller spara mer varje månad.' },
+  'ff.callout.over':        { en:'⚠️ <strong>Over budget!</strong> Your planned trips ({trips}) exceed your 12-month fun fund capacity ({total}) by {over}. Consider adjusting trip budgets or saving more each month.',
+                              sv:'⚠️ <strong>Över budget!</strong> Dina planerade resor ({trips}) överstiger din 12-månaders fun fund-kapacitet ({total}) med {over}. Överväg att justera resebudgetarna eller spara mer per månad.' },
+  'ff.callout.horizonNote': { en:'{out} of that sits outside the next 12 months — you can still save for it after the window, but the card above compares everything against a single 12-month capacity.',
+                              sv:'{out} av det ligger utanför de kommande 12 månaderna — du kan ändå spara till det efter fönstret, men kortet ovan jämför allt mot en enda 12-månaders kapacitet.' },
   'ff.section.travelPlans': { en:'Travel Plans',          sv:'Resplaner' },
   'ff.btn.addTrip':         { en:'+ Add Trip',            sv:'+ Lägg till resa' },
   'ff.chart.title':         { en:'Fun Fund vs Travel Budget by Month',
                               sv:'Fun Fund mot resbudget per månad' },
-  'ff.chart.series.fund':   { en:'Fun Fund',              sv:'Fun Fund' },
-  'ff.chart.series.budget': { en:'Trip Budget',           sv:'Resbudget' },
+  'ff.chart.series.fund':   { en:'Monthly Fun Fund capacity', sv:'Månatlig Fun Fund-kapacitet' },
+  'ff.chart.series.budget': { en:'Trip spend that month',     sv:'Resekostnad den månaden' },
 
   // ── Yearly Forecast body ───────────────────────────────
   'yearly.window':          { en:'Window: {start}\u2013{end} · age {cur}\u2192{ret}',
@@ -6067,15 +6072,19 @@ function getRetirementNumbers() {
 }
 
 function getMonthlyFunFundBalance() {
-  // Sum the "pure" per-month Fun Fund (Income − Expenses − Savings for
-  // that month, with no cross-month carry-forward) across the current
-  // 12-month window. Using the pure figure means every summary tile
-  // that surfaces a "12-month Fun Fund" headline — Dashboard KPI,
-  // Monthly Review total, Fun Fund tab — shows the same number, which
-  // also matches what the user would compute by hand from their
-  // Monthly Review inputs.
-  const m = get12Months();
-  return m.slice(0,12).reduce((s,mo)=>s+mo.pureFunFund,0);
+  // GROSS 12-month Fun Fund capacity — the headline figure every
+  // "12-month Fun Fund" label across the app refers to. Equivalent to
+  // the money available for discretionary / travel spending over the
+  // next 12 months IF the user took no trips. Trips are tracked
+  // separately via FE.funFund.summary().totalTrips so the "balance"
+  // card can do ONE subtraction (capacity − trips) instead of the
+  // double-count bug that used to make a −$13k "over budget" banner
+  // appear against a $3k fund.
+  //
+  // Routes through FE.funFund.summary() so every surface (Dashboard
+  // KPI, Fun Fund tab, AI prompts, reports) sees the same number by
+  // construction.
+  return FE.funFund.summary().capacity12mo;
 }
 
 // ══ FINANCIAL ENGINE ═════════════════════════════════════════════════════════
@@ -6275,6 +6284,89 @@ const FinancialEngine = (() => {
       return Math.max(0, Math.min(cap, p));
     },
   };
+  // ── funFund · single normalized model ──────────────────────────────
+  // Every Fun Fund surface (tab KPIs, over-budget banner, chart,
+  // running-balance table, AI prompt, dashboard KPI) reads from
+  // summary() so card math, chart data, and commentary can never
+  // disagree.
+  //
+  // Definitions (the ONLY interpretations this app uses):
+  //
+  //   capacity12mo        Gross 12-month discretionary capacity =
+  //                       Σ (income − non-trip expenses − savings)
+  //                       across the 12-month window. "What you'd
+  //                       have for fun if you took no trips."
+  //   monthlyAllocation   Per-month array of the above. Feeds the
+  //                       chart's blue bars — bar height matches the
+  //                       summary card's mental model exactly.
+  //   netFlow12mo         Σ (m.pureFunFund) — capacity AFTER trips
+  //                       in the window are deducted. Kept for
+  //                       invariant checks; not shown directly.
+  //   totalTrips          Σ over every trip expense, all trips, all
+  //                       timing. Matches what the user sees on the
+  //                       trip cards.
+  //   tripsInWindow       Subset that falls inside the 12-month
+  //                       window.
+  //   tripsOutOfWindow    totalTrips − tripsInWindow. Surfaces in
+  //                       sub-text so the horizon mismatch is
+  //                       visible when it matters.
+  //   alreadySpent        Σ tr.spent.
+  //   remaining           capacity12mo − totalTrips. The headline
+  //                       "Fun Fund Balance" card reads this.
+  //   tripByMonth         { 'YYYY-MM': amount } — drives the chart's
+  //                       orange bars and the running-balance
+  //                       column of the Running Balance table.
+  //   running             Array of cumulative running balance at
+  //                       end-of-month (post-trip, post-carry). Drives
+  //                       the running-balance table.
+  const funFund = {
+    summary: () => memoSelect('ff:summary', () => {
+      const all = get12Months();
+      const windowMonths = all.slice(0, 12);
+      const windowKeys = new Set(windowMonths.map(x => x.key));
+      // Walk trips once; compute tripByMonth + totals in lockstep.
+      const tripByMonth = {};
+      let totalTrips = 0;
+      let tripsInWindow = 0;
+      let alreadySpent = 0;
+      (state.trips || []).forEach(tr => {
+        alreadySpent += Number(tr.spent) || 0;
+        (tr.expenses || []).forEach(ex => {
+          const amt = Number(ex.amount) || 0;
+          if(!(amt > 0)) return;
+          totalTrips += amt;
+          const key = (ex.date || '').slice(0, 7);
+          if(!key) return;
+          if(windowKeys.has(key)){
+            tripsInWindow += amt;
+            tripByMonth[key] = (tripByMonth[key] || 0) + amt;
+          }
+        });
+      });
+      const tripsOutOfWindow = Math.max(0, totalTrips - tripsInWindow);
+      // GROSS monthly allocation: pureFunFund already nets trip
+      // expenses for the month, so add them back to recover the
+      // "no-trip" baseline allocation. This is the number every
+      // Fun Fund surface agrees on as the user's actual discretionary
+      // capacity per month.
+      const monthlyAllocation = windowMonths.map(m => {
+        const trip = tripByMonth[m.key] || 0;
+        return (m.pureFunFund || 0) + trip;
+      });
+      const capacity12mo = monthlyAllocation.reduce((s, v) => s + v, 0);
+      const netFlow12mo = windowMonths.reduce((s, m) => s + (m.pureFunFund || 0), 0);
+      const running = windowMonths.map(m => m.funFund || 0);
+      const remaining = capacity12mo - totalTrips;
+      return {
+        windowMonths, windowKeys,
+        monthlyAllocation, capacity12mo,
+        netFlow12mo,
+        totalTrips, tripsInWindow, tripsOutOfWindow, tripByMonth,
+        alreadySpent, remaining,
+        avgMonthly: capacity12mo / 12,
+      };
+    }),
+  };
   // ── invariant guards · debug-mode runtime assertions ─────────────
   // Checks a handful of mathematical identities the engine is
   // supposed to guarantee. Returns an array of violation strings
@@ -6341,19 +6433,35 @@ const FinancialEngine = (() => {
         }
       }
     }
-    // I6 — funFundTwelveMoTotal must equal sum of slice(0,12)
-    // pureFunFund. A quick check that the headline KPI hasn't
-    // drifted from its per-month source.
+    // I6 — funFundTwelveMoTotal is the GROSS 12-month Fun Fund
+    // capacity (income − non-trip expenses − savings). It must equal
+    // sum(pureFunFund) + sum(trip expenses falling in the window) —
+    // i.e. the net flow plus the trips we subtracted when building
+    // pureFunFund. Any drift here means the Fun Fund tab, the
+    // dashboard KPI, and the AI prompts have stopped sharing a
+    // single definition of "12-month Fun Fund".
     if(m && m.length >= 12){
-      const expected = m.slice(0,12).reduce((s, x) => s + (x.pureFunFund || 0), 0);
       const actual = months.funFundTwelveMoTotal();
-      if(!near(actual, expected, 1)){
-        v.push(`I6: funFundTwelveMoTotal (${Math.round(actual)}) != sum of first 12 pureFunFund (${Math.round(expected)})`);
+      const ffSum = funFund.summary();
+      if(!near(actual, ffSum.capacity12mo, 1)){
+        v.push(`I6: funFundTwelveMoTotal (${Math.round(actual)}) != capacity12mo (${Math.round(ffSum.capacity12mo)})`);
+      }
+      // I6b — capacity = netFlow + tripsInWindow, by definition.
+      const expectedCap = ffSum.netFlow12mo + ffSum.tripsInWindow;
+      if(!near(ffSum.capacity12mo, expectedCap, 1)){
+        v.push(`I6b: capacity12mo (${Math.round(ffSum.capacity12mo)}) != netFlow12mo + tripsInWindow (${Math.round(expectedCap)})`);
+      }
+      // I6c — the Fun Fund Balance shown on the KPI row must equal
+      // capacity − totalTrips. The double-counting bug that used to
+      // produce −$13k banners would fail this invariant.
+      const expectedRemaining = ffSum.capacity12mo - ffSum.totalTrips;
+      if(!near(ffSum.remaining, expectedRemaining, 1)){
+        v.push(`I6c: remaining (${Math.round(ffSum.remaining)}) != capacity12mo − totalTrips (${Math.round(expectedRemaining)})`);
       }
     }
     return v;
   };
-  return { months, projection, retirement, inflation, display, format, assertInvariants };
+  return { months, projection, retirement, inflation, display, funFund, format, assertInvariants };
 })();
 // Short alias so renderers can write `FE.months.current()` without
 // cluttering the site — same identity, purely ergonomic.
@@ -9043,7 +9151,7 @@ Display lens · The user is currently viewing every future-dated amount in ${FE.
 
 Key snapshot values to reference where relevant:
 - Current month (${cm.label}): income **${Math.round(cm.pureIncome).toLocaleString()} kr**, expenses **${Math.round(cm.pureExpenses).toLocaleString()} kr**, savings **${Math.round(cm.savings).toLocaleString()} kr**, fun fund **${Math.round(cm.pureFunFund).toLocaleString()} kr**
-- 12-month Fun Fund outlook: **${Math.round(funFundTotal).toLocaleString()} kr**
+- 12-month Fun Fund capacity (gross discretionary capacity over the next 12 months, BEFORE any trip spending is subtracted): **${Math.round(funFundTotal).toLocaleString()} kr**
 - Retirement coverage: **${nums.coveragePct.toFixed(0)}%** (verdict: ${nums.verdict})
 - Nest egg (today's money): **${Math.round(nums.nestEgg).toLocaleString()} kr** at age **${state.retirementAge}**${FE.display.isNominal() ? `\n- Nest egg (nominal/future kr): **${Math.round(FE.projection.totalNominal()).toLocaleString()} kr**` : ''}
 
@@ -11263,9 +11371,6 @@ function renderFunFund() {
   // Fund KPI below still comes from funFundTwelveMoTotal() which
   // is explicitly scoped to 12 months by definition.
   const months = allMonths;
-  // Headline Fun Fund total — always via FinancialEngine so it stays
-  // identical to the Dashboard KPI + any other 12-month Fun Fund read.
-  const totalFF = FE.months.funFundTwelveMoTotal();
   // Normalise status: the dropdown now only offers "planning" and
   // "booked". Any legacy state left over from the older four-option
   // version (wishlist / completed / …) is coerced to "planning" so
@@ -11273,10 +11378,15 @@ function renderFunFund() {
   (state.trips || []).forEach(t => {
     if(t.status !== 'planning' && t.status !== 'booked') t.status = 'planning';
   });
+  // All Fun Fund KPIs, the banner, the AI summary, and the chart now
+  // read from the SAME normalized model so they cannot contradict
+  // each other. summary() owns the definitions — see FE.funFund.
+  const ff = FE.funFund.summary();
+  const totalFF    = ff.capacity12mo;
+  const totalTrips = ff.totalTrips;
+  const totalSpent = ff.alreadySpent;
+  const remaining  = ff.remaining;
   const tripBudget = (t) => (t.expenses || []).reduce((s,ex)=>s + (Number(ex.amount)||0), 0);
-  const totalTrips=state.trips.reduce((s,t)=>s+tripBudget(t),0);
-  const totalSpent=state.trips.reduce((s,t)=>s+(Number(t.spent)||0),0);
-  const remaining=totalFF-totalTrips;
   const r=rate(); const s=sym();
 
   const tripCards=state.trips.map((tr)=>{
@@ -11343,13 +11453,15 @@ function renderFunFund() {
   document.getElementById('panel-funfund').innerHTML=`
     <div class="ph"><div class="ph-tag">${t('ff.page.tag')}</div><div class="ph-title">${esc2(t('ff.page.title'))}</div><div class="ph-sub">${esc2(t('ff.page.sub'))}</div></div>
     <div class="kpi-row">
-      <div class="kpi"><div class="kpi-icon">💫</div><div class="kpi-lbl">${esc2(t('ff.kpi.total'))}</div><div class="kpi-val" style="color:var(--cyan)">${fmt(totalFF)}</div><div class="kpi-sub">${esc2(t('ff.kpi.total.sub', { mo: fmt(totalFF/12) }))}</div></div>
-      <div class="kpi"><div class="kpi-icon">✈️</div><div class="kpi-lbl">${esc2(t('ff.kpi.travelBudget'))}</div><div class="kpi-val" style="color:var(--amber)">${fmt(totalTrips)}</div><div class="kpi-sub">${esc2(t('ff.kpi.travelBudget.sub', { n: state.trips.length }))}</div></div>
+      <div class="kpi"><div class="kpi-icon">💫</div><div class="kpi-lbl">${esc2(t('ff.kpi.total'))}</div><div class="kpi-val" style="color:var(--cyan)">${fmt(totalFF)}</div><div class="kpi-sub">${esc2(t('ff.kpi.total.sub', { mo: fmt(ff.avgMonthly) }))}</div></div>
+      <div class="kpi"><div class="kpi-icon">✈️</div><div class="kpi-lbl">${esc2(t('ff.kpi.travelBudget'))}</div><div class="kpi-val" style="color:var(--amber)">${fmt(totalTrips)}</div><div class="kpi-sub">${ff.tripsOutOfWindow > 0
+        ? esc2(t('ff.kpi.travelBudget.sub.split', { n: state.trips.length, inw: fmt(ff.tripsInWindow), out: fmt(ff.tripsOutOfWindow) }))
+        : esc2(t('ff.kpi.travelBudget.sub', { n: state.trips.length }))}</div></div>
       <div class="kpi"><div class="kpi-icon">💳</div><div class="kpi-lbl">${esc2(t('ff.kpi.spent'))}</div><div class="kpi-val neg">${fmt(totalSpent)}</div><div class="kpi-sub">${esc2(t('ff.kpi.spent.sub', { pct: totalTrips>0?Math.round(totalSpent/totalTrips*100):0 }))}</div></div>
       <div class="kpi"><div class="kpi-icon">${remaining>=0?'✅':'⚠️'}</div><div class="kpi-lbl">${esc2(t('ff.kpi.balance'))}</div><div class="kpi-val ${remaining>=0?'pos':'neg'}">${fmt(remaining)}</div><div class="kpi-sub">${esc2(remaining>=0?t('ff.kpi.balance.afterTrips'):t('ff.kpi.balance.over', { amt: fmt(Math.abs(remaining)) }))}</div></div>
     </div>
 
-    ${remaining<0?`<div class="callout callout-danger">${t('ff.callout.over', { trips: fmt(totalTrips), total: fmt(totalFF), over: fmt(Math.abs(remaining)) })}</div>`:''}
+    ${remaining<0?`<div class="callout callout-danger">${t('ff.callout.over', { trips: fmt(totalTrips), total: fmt(totalFF), over: fmt(Math.abs(remaining)) })}${ff.tripsOutOfWindow > 0 ? ' ' + t('ff.callout.horizonNote', { out: fmt(ff.tripsOutOfWindow) }) : ''}</div>`:''}
 
     <div class="two-col">
       <div>
@@ -11420,23 +11532,18 @@ function renderFunFund() {
     destroyChart('ff');
     const ctx=document.getElementById('ff-chart');
     if(ctx){
-      const tripByMonth={};
-      // Roll every trip expense into its own month so the chart bar
-      // matches what the Monthly Review tab shows.
-      state.trips.forEach(tr => {
-        (tr.expenses || []).forEach(ex => {
-          const key = (ex.date || '').slice(0, 7);
-          if(!key) return;
-          tripByMonth[key] = (tripByMonth[key] || 0) + (Number(ex.amount) || 0);
-        });
-      });
-      charts['ff']=new Chart(ctx.getContext('2d'),{type:'bar',data:{labels:months.map(m=>m.short),datasets:[
-        // Fun Fund bar uses the chained running balance — same value
-        // shown in the Running Balance column below, the Month
-        // Summary bar on Forecast & Review, and the Fun Fund line on
-        // the monthly charts. One Fun Fund number, everywhere.
-        {label:t('ff.chart.series.fund'),data:months.map(m=>Math.max(0,m.funFund)),backgroundColor:'#00d4ff18',borderColor:'#00d4ff',borderWidth:1.5,borderRadius:3},
-        {label:t('ff.chart.series.budget'),data:months.map(m=>tripByMonth[m.key]||0),backgroundColor:'#f5a62325',borderColor:'#f5a623',borderWidth:1.5,borderRadius:3},
+      // Data comes from the same FE.funFund.summary() that feeds the
+      // KPI row + banner + AI card, so the bars + cards can't disagree
+      // by construction. Blue bar = GROSS monthly Fun Fund allocation
+      // (what the summary cards call "12-month capacity" divided per
+      // month). Orange bar = trip spend that month. The cumulative
+      // running balance — post-trip, with deficits carried forward —
+      // lives in the Running Balance table below; plotting it as bars
+      // here would confuse "cumulative balance" with "monthly flow".
+      const windowMonths = ff.windowMonths;
+      charts['ff']=new Chart(ctx.getContext('2d'),{type:'bar',data:{labels:windowMonths.map(m=>m.short),datasets:[
+        {label:t('ff.chart.series.fund'),  data:ff.monthlyAllocation,                              backgroundColor:'#00d4ff18',borderColor:'#00d4ff',borderWidth:1.5,borderRadius:3},
+        {label:t('ff.chart.series.budget'),data:windowMonths.map(m => ff.tripByMonth[m.key] || 0), backgroundColor:'#f5a62325',borderColor:'#f5a623',borderWidth:1.5,borderRadius:3},
       ]},options:chartPreset()});
     }
   },50);
@@ -11504,35 +11611,41 @@ window.runFunFundAIReport = async function(){
   state.funFundReportError = null;
   _syncFunFundAIBody();
   try {
-    const months = FE.months.next12();
-    const totalFF = getMonthlyFunFundBalance();
-    const totalTrips = (state.trips || []).reduce((s, tr) => s + (tr.expenses || []).reduce((a,e) => a + (Number(e.amount)||0), 0), 0);
-    const spentSoFar = (state.trips || []).reduce((s, tr) => s + (Number(tr.spent) || 0), 0);
-    const remaining = totalFF - totalTrips;
+    // Every number the AI sees comes from the same normalized model
+    // the UI reads from — so the prose cannot contradict the cards.
+    const ff = FE.funFund.summary();
+    const { capacity12mo, totalTrips, tripsInWindow, tripsOutOfWindow, alreadySpent, remaining } = ff;
     const tripSummary = (state.trips || []).map(tr => {
       const trBudget = (tr.expenses || []).reduce((a,e) => a + (Number(e.amount)||0), 0);
       return `  · ${tr.name || 'Trip'} (${tr.country || '—'}, ${tr.status || 'planning'}) — budget ${Math.round(trBudget).toLocaleString()} kr, spent ${Math.round(tr.spent || 0).toLocaleString()} kr`;
     }).join('\n') || '  · (no trips planned)';
-    const minBal = months.reduce((m, mo) => Math.min(m, mo.funFund || 0), Infinity);
-    const maxBal = months.reduce((m, mo) => Math.max(m, mo.funFund || 0), -Infinity);
+    const minMo = ff.monthlyAllocation.length ? Math.min(...ff.monthlyAllocation) : 0;
+    const maxMo = ff.monthlyAllocation.length ? Math.max(...ff.monthlyAllocation) : 0;
+    // spentSoFar alias for prompt readability.
+    const spentSoFar = alreadySpent;
     const prompt = `Write a short, practical Fun Fund outlook for me. Interpret what the current numbers say about discretionary funding for lifestyle and travel — this is a reality check, not a sermon.
 
 STRUCTURE · 3–5 bullet points. No headings. No intro. No sign-off.
 
 FORMATTING · Follow these rules exactly:
-1. Lead with a one-sentence verdict: can the current Fun Fund comfortably cover the planned trips, or not?
+1. Lead with a one-sentence verdict: can the current Fun Fund capacity comfortably cover the planned trips, or not?
 2. **Bold** every currency figure, percentage, and ratio.
 3. Use inline tone markers:
    {+text} POSITIVE (green) · {-text} NEGATIVE (red) · {!text} WARNING (amber) · {~text} NEUTRAL (muted).
 4. Close with one concrete, actionable suggestion tied to the specific numbers — not generic advice.
 5. Keep the whole thing under 120 words.
 
+Definitions you MUST respect:
+- "12-month Fun Fund capacity" = income − non-trip expenses − savings, summed across the next 12 months. It is a GROSS number — trips have NOT been subtracted from it. Comparing it to total trip budget tells you whether your discretionary capacity covers your trips.
+- "Remaining after trips" = capacity − total trip budget. If negative, the user is over budget.
+
 Snapshot:
-- 12-month Fun Fund total: **${Math.round(totalFF).toLocaleString()} kr**
-- Planned trip budget (sum of all trips): **${Math.round(totalTrips).toLocaleString()} kr**
+- 12-month Fun Fund capacity (gross, before trips): **${Math.round(capacity12mo).toLocaleString()} kr**
+- Planned trip budget (all trips, all timing): **${Math.round(totalTrips).toLocaleString()} kr**
+- Of which falls inside the next 12 months: **${Math.round(tripsInWindow).toLocaleString()} kr**${tripsOutOfWindow > 0 ? `\n- Of which sits beyond the next 12 months: **${Math.round(tripsOutOfWindow).toLocaleString()} kr**` : ''}
 - Already spent on trips: **${Math.round(spentSoFar).toLocaleString()} kr**
-- Remaining after planned trips: **${Math.round(remaining).toLocaleString()} kr**
-- Running balance min/max across next 12 months: ${Math.round(minBal === Infinity ? 0 : minBal).toLocaleString()} kr / ${Math.round(maxBal === -Infinity ? 0 : maxBal).toLocaleString()} kr
+- Remaining after planned trips (capacity − total budget): **${Math.round(remaining).toLocaleString()} kr**
+- Monthly allocation (gross) min/max across next 12 months: **${Math.round(minMo).toLocaleString()} kr / ${Math.round(maxMo).toLocaleString()} kr**
 - Trips:
 ${tripSummary}
 
@@ -11545,7 +11658,7 @@ Return plain markdown only. IMPORTANT: this is an inline analysis card, not a ch
       lang: state.lang,
       content: clean,
       raw,
-      snapshot: { totalFF, totalTrips, spentSoFar, remaining, tripCount: (state.trips||[]).length, displayMode: FE.display.mode() },
+      snapshot: { capacity12mo, totalTrips, tripsInWindow, tripsOutOfWindow, spentSoFar, remaining, tripCount: (state.trips||[]).length, displayMode: FE.display.mode() },
     };
     state.funFundReportError = null;
   } catch(e){
