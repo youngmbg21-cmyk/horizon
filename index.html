@@ -269,8 +269,52 @@ input[type="number"] { -moz-appearance:textfield; }
 
 /* ── KPI GRID ────────────────────────────────────────── */
 .kpi-row { display:grid; grid-template-columns:repeat(auto-fit,minmax(190px,1fr)); gap:10px; margin-bottom:14px; }
-.kpi { background:var(--bg2); border:1px solid var(--border); border-radius:10px; padding:14px 16px; transition:border-color .2s, transform .2s, box-shadow .2s; cursor:default; min-height:86px; display:flex; flex-direction:column; justify-content:center; position:relative; }
+.kpi { background:var(--bg2); border:1px solid var(--border); border-radius:10px; padding:14px 16px; transition:background-color .18s, border-color .2s, transform .2s, box-shadow .2s; cursor:default; min-height:86px; display:flex; flex-direction:column; justify-content:center; position:relative; }
 .kpi:hover { border-color:var(--border2); }
+/* ── Clickable card hover-brighten ────────────────────────────────
+   Only cards that are actually navigational (role=button / onclick)
+   pick up the lift treatment so the affordance signal stays honest:
+   if it brightens under the cursor, clicking it does something. A
+   small background tint (one shade up) plus a 1px lift and a faint
+   shadow reads as tactile without competing with the existing
+   border-brighten baseline hover. */
+.kpi[role="button"]:hover,
+.kpi[onclick]:hover,
+.card[onclick]:hover,
+.card.card-clickable:hover {
+  background:var(--bg3);
+  border-color:var(--text3);
+  transform:translateY(-1px);
+  box-shadow:0 6px 18px -10px rgba(0,0,0,0.45);
+}
+body.light .kpi[role="button"]:hover,
+body.light .kpi[onclick]:hover,
+body.light .card[onclick]:hover,
+body.light .card.card-clickable:hover {
+  box-shadow:0 6px 18px -10px rgba(60,40,10,0.18);
+}
+.kpi[role="button"]:active,
+.kpi[onclick]:active,
+.card[onclick]:active,
+.card.card-clickable:active {
+  transform:translateY(0);
+  box-shadow:none;
+}
+.kpi[role="button"]:focus-visible,
+.kpi[onclick]:focus-visible,
+.card[onclick]:focus-visible,
+.card.card-clickable:focus-visible {
+  outline:2px solid var(--accent-positive);
+  outline-offset:2px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .kpi[role="button"]:hover,
+  .kpi[onclick]:hover,
+  .card[onclick]:hover,
+  .card.card-clickable:hover {
+    transform:none;
+  }
+}
 /* Flash when the displayed value changed since last render */
 .kpi.kpi-pulse { animation:kpiPulse 1.6s cubic-bezier(.2,.7,.2,1); }
 @keyframes kpiPulse {
