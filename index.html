@@ -112,6 +112,12 @@ input[type="number"] { -moz-appearance:textfield; }
 .iBtn { width:32px; height:32px; border-radius:7px; border:1px solid var(--border); background:var(--bg3); color:var(--text2); display:flex; align-items:center; justify-content:center; cursor:pointer; font-size:13px; transition:all .2s; }
 .iBtn:hover { border-color:var(--green); color:var(--green); }
 .cur-toggle { display:flex; gap:2px; background:var(--bg0); border-radius:6px; padding:2px; }
+/* Money-display mode pill. Mirrors the currency/lang toggles so the
+   three top-bar selectors read as one family. */
+.mode-toggle { display:inline-flex; gap:2px; background:var(--bg0); border:1px solid var(--border); border-radius:6px; padding:2px; }
+.mode-btn { background:transparent; border:none; color:var(--text3); padding:4px 10px; border-radius:5px; font-family:var(--fm); font-size:10px; font-weight:600; letter-spacing:.02em; cursor:pointer; transition:all .15s; white-space:nowrap; }
+.mode-btn:hover { color:var(--text); }
+.mode-btn.active { background:var(--green); color:#000; font-weight:700; }
 /* Language toggle (Settings → Appearance). Flat two-button pill that
    mirrors the currency toggle vocabulary so the control feels native. */
 .lang-toggle { display:inline-flex; gap:2px; background:var(--bg0); border:1px solid var(--border); border-radius:8px; padding:3px; }
@@ -263,8 +269,52 @@ input[type="number"] { -moz-appearance:textfield; }
 
 /* ── KPI GRID ────────────────────────────────────────── */
 .kpi-row { display:grid; grid-template-columns:repeat(auto-fit,minmax(190px,1fr)); gap:10px; margin-bottom:14px; }
-.kpi { background:var(--bg2); border:1px solid var(--border); border-radius:10px; padding:14px 16px; transition:border-color .2s, transform .2s, box-shadow .2s; cursor:default; min-height:86px; display:flex; flex-direction:column; justify-content:center; position:relative; }
+.kpi { background:var(--bg2); border:1px solid var(--border); border-radius:10px; padding:14px 16px; transition:background-color .18s, border-color .2s, transform .2s, box-shadow .2s; cursor:default; min-height:86px; display:flex; flex-direction:column; justify-content:center; position:relative; }
 .kpi:hover { border-color:var(--border2); }
+/* ── Clickable card hover-brighten ────────────────────────────────
+   Only cards that are actually navigational (role=button / onclick)
+   pick up the lift treatment so the affordance signal stays honest:
+   if it brightens under the cursor, clicking it does something. A
+   small background tint (one shade up) plus a 1px lift and a faint
+   shadow reads as tactile without competing with the existing
+   border-brighten baseline hover. */
+.kpi[role="button"]:hover,
+.kpi[onclick]:hover,
+.card[onclick]:hover,
+.card.card-clickable:hover {
+  background:var(--bg3);
+  border-color:var(--text3);
+  transform:translateY(-1px);
+  box-shadow:0 6px 18px -10px rgba(0,0,0,0.45);
+}
+body.light .kpi[role="button"]:hover,
+body.light .kpi[onclick]:hover,
+body.light .card[onclick]:hover,
+body.light .card.card-clickable:hover {
+  box-shadow:0 6px 18px -10px rgba(60,40,10,0.18);
+}
+.kpi[role="button"]:active,
+.kpi[onclick]:active,
+.card[onclick]:active,
+.card.card-clickable:active {
+  transform:translateY(0);
+  box-shadow:none;
+}
+.kpi[role="button"]:focus-visible,
+.kpi[onclick]:focus-visible,
+.card[onclick]:focus-visible,
+.card.card-clickable:focus-visible {
+  outline:2px solid var(--accent-positive);
+  outline-offset:2px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .kpi[role="button"]:hover,
+  .kpi[onclick]:hover,
+  .card[onclick]:hover,
+  .card.card-clickable:hover {
+    transform:none;
+  }
+}
 /* Flash when the displayed value changed since last render */
 .kpi.kpi-pulse { animation:kpiPulse 1.6s cubic-bezier(.2,.7,.2,1); }
 @keyframes kpiPulse {
@@ -275,6 +325,7 @@ input[type="number"] { -moz-appearance:textfield; }
 @media (prefers-reduced-motion: reduce) { .kpi.kpi-pulse { animation:none; } }
 .kpi-icon { font-size:18px; margin-bottom:4px; line-height:1; }
 .kpi-lbl { font-size:9px; letter-spacing:.08em; color:var(--text3); text-transform:uppercase; margin-bottom:4px; font-weight:600; }
+.kpi-lens { font-size:8px; color:var(--text3); letter-spacing:.04em; font-weight:500; text-transform:none; opacity:.7; }
 .kpi-val { font-family:var(--fm); font-size:20px; font-weight:700; color:var(--text); line-height:1.15; word-break:break-word; }
 .kpi-sub { font-size:10px; color:var(--text2); margin-top:3px; line-height:1.3; }
 
@@ -879,13 +930,21 @@ body.light .loc-card:hover { box-shadow:0 5px 14px -8px rgba(60,40,10,0.18); }
   color:var(--red);
 }
 .ret-asset-grid {
+  /* Investment cards now carry 4 editable fields (balance,
+     contribution, growth, tax). On wide viewports we want all 4 on
+     one row with the projected panel at the end; as the card
+     narrows the fields wrap to 2-col, then 1-col, and the
+     projected panel drops to its own row. `auto-fit` + `minmax`
+     gives us that without writing explicit breakpoints. */
   display:grid;
-  grid-template-columns:repeat(3, minmax(0,1fr)) auto;
+  grid-template-columns:repeat(auto-fit, minmax(140px, 1fr));
   gap:10px;
   align-items:end;
+  /* Guard against any child pushing the grid wider than its card. */
+  min-width:0;
 }
 .ret-asset.is-pension .ret-asset-grid {
-  grid-template-columns:repeat(2, minmax(0,1fr)) auto;
+  grid-template-columns:repeat(auto-fit, minmax(160px, 1fr));
 }
 .ret-asset-cell {
   display:flex; flex-direction:column; gap:4px;
@@ -901,6 +960,11 @@ body.light .loc-card:hover { box-shadow:0 5px 14px -8px rgba(60,40,10,0.18); }
   background:var(--bg3); border:1px solid var(--border);
   border-radius:6px; padding:6px 8px;
   transition:border-color .15s;
+  /* Flex children need explicit min-width:0 so long numbers don't
+     blow the wrap past its grid cell. */
+  min-width:0;
+  box-sizing:border-box;
+  width:100%;
 }
 .ret-asset-cell .rac-input-wrap:focus-within {
   border-color:var(--text3);
@@ -910,20 +974,27 @@ body.light .loc-card:hover { box-shadow:0 5px 14px -8px rgba(60,40,10,0.18); }
   font-family:var(--fm); font-size:11px;
   color:var(--text3); flex-shrink:0;
 }
-.ret-asset-cell input[type="number"] {
-  flex:1; min-width:0;
+/* The rendered input is type="text" with inputmode="decimal"; the old
+   rule targeted [type="number"] and therefore never applied, so text
+   inputs inherited a 20ch default size that overflowed the card.
+   Select the input element itself. */
+.ret-asset-cell .rac-input-wrap input {
+  flex:1 1 0;
+  min-width:0;
+  width:100%;
+  box-sizing:border-box;
   background:transparent; border:none;
   color:var(--text); font-family:var(--fm);
   font-size:12px; font-weight:600;
   text-align:right; outline:none;
   padding:0;
 }
-/* Hide browser spinners for a cleaner look */
-.ret-asset-cell input[type="number"]::-webkit-outer-spin-button,
-.ret-asset-cell input[type="number"]::-webkit-inner-spin-button {
+/* Hide browser spinners if the field ever becomes type="number". */
+.ret-asset-cell .rac-input-wrap input::-webkit-outer-spin-button,
+.ret-asset-cell .rac-input-wrap input::-webkit-inner-spin-button {
   -webkit-appearance:none; margin:0;
 }
-.ret-asset-cell input[type="number"] { -moz-appearance:textfield; }
+.ret-asset-cell .rac-input-wrap input[type="number"] { -moz-appearance:textfield; }
 .ret-asset-proj {
   display:flex; flex-direction:column; align-items:flex-end;
   justify-content:flex-end;
@@ -931,7 +1002,18 @@ body.light .loc-card:hover { box-shadow:0 5px 14px -8px rgba(60,40,10,0.18); }
   background:rgba(34,197,94,.08);
   border:1px solid rgba(34,197,94,.25);
   border-radius:6px;
-  min-width:110px;
+  min-width:0;
+  box-sizing:border-box;
+  /* On very wide cards the projected panel likes a little breathing
+     room; on narrow cards it spans the full row so the number stays
+     readable instead of being squeezed into one column. */
+  grid-column:1 / -1;
+}
+@media (min-width:760px) {
+  .ret-asset-proj {
+    grid-column:auto;
+    min-width:130px;
+  }
 }
 .ret-asset.is-pension .ret-asset-proj {
   background:rgba(245,158,11,.08);
@@ -1299,6 +1381,185 @@ label.field-label-row {
 .dash-ai-sec .ai-tone strong  { color:inherit; }
 .dash-ai-err {
   padding:14px 18px; border-radius:8px;
+  background:var(--accent-critical-dim); color:var(--red);
+  font-size:12px; font-family:var(--fm);
+}
+
+/* ── AI CARD · MINI VISUAL STRIP ───────────────────────
+   Each of the four AI sections carries a small, topical
+   visual at the top of the card body: sparkline,
+   coverage ring, mini bar, or action counter. Small
+   enough (~68 px) that the prose below still reads as
+   the headline; coloured to match the section accent. */
+.dash-ai-visual {
+  display:flex; align-items:center; gap:12px;
+  padding:8px 0 12px;
+  margin-bottom:10px;
+  border-bottom:1px dashed var(--border);
+  min-width:0;
+}
+.dash-ai-visual canvas {
+  max-width:100%;
+  height:56px !important;
+}
+.dash-ai-visual-canvas { flex:1 1 0; min-width:0; }
+.dash-ai-visual-ring {
+  flex:0 0 auto;
+  width:64px; height:64px;
+  display:flex; align-items:center; justify-content:center;
+  position:relative;
+}
+.dash-ai-visual-ring svg { width:64px; height:64px; transform:rotate(-90deg); }
+.dash-ai-visual-ring .ring-track { fill:none; stroke:var(--bg4); stroke-width:6; }
+.dash-ai-visual-ring .ring-fill  { fill:none; stroke-width:6; stroke-linecap:round; transition:stroke-dashoffset .5s; }
+.sec-good .dash-ai-visual-ring .ring-fill { stroke:var(--green); }
+.sec-good .dash-ai-visual-ring.amber .ring-fill { stroke:var(--amber); }
+.sec-good .dash-ai-visual-ring.red   .ring-fill { stroke:var(--red); }
+.dash-ai-visual-ring-lbl {
+  position:absolute; inset:0;
+  display:flex; align-items:center; justify-content:center;
+  font-family:var(--fm); font-size:14px; font-weight:700; color:var(--text);
+}
+.dash-ai-visual-meta {
+  display:flex; flex-direction:column; gap:2px;
+  min-width:0; flex:1 1 0;
+}
+.dash-ai-visual-val {
+  font-family:var(--fm); font-size:13px; font-weight:700; color:var(--text);
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+}
+.dash-ai-visual-sub {
+  font-family:var(--fm); font-size:9px; color:var(--text3);
+  letter-spacing:.06em; text-transform:uppercase;
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+}
+.dash-ai-visual-badge {
+  flex:0 0 auto;
+  background:var(--bg2); border:1px solid var(--border);
+  border-radius:10px;
+  padding:10px 14px;
+  text-align:center;
+}
+.dash-ai-visual-badge-val { font-family:var(--fm); font-size:22px; font-weight:800; color:var(--violet); line-height:1; }
+.dash-ai-visual-badge-lbl { font-family:var(--fm); font-size:9px; color:var(--text3); letter-spacing:.08em; text-transform:uppercase; margin-top:3px; }
+
+/* ── AI CARD · DEEP DIVE EXPANSION ─────────────────────
+   Sits at the bottom of each AI section card: a small
+   "Deep dive" button toggles a full-width expanded
+   panel below the 4-card grid. Only one section is
+   open at a time so the dashboard never becomes a
+   runaway accordion. */
+.dash-ai-sec-actions {
+  margin-top:10px; padding-top:8px;
+  display:flex; justify-content:flex-end;
+  border-top:1px dashed var(--border);
+}
+.dash-ai-dd-btn {
+  background:transparent; border:1px dashed var(--border);
+  color:var(--text2); font-family:var(--fm);
+  font-size:10px; font-weight:600; letter-spacing:.04em;
+  padding:5px 10px; border-radius:5px; cursor:pointer;
+  transition:all .15s;
+}
+.dash-ai-dd-btn:hover {
+  background:var(--bg2); color:var(--text); border-style:solid; border-color:var(--text3);
+}
+.dash-ai-dd-btn.active {
+  background:var(--bg2); color:var(--text); border-style:solid; border-color:var(--text3);
+}
+.dash-ai-dd-panel {
+  margin-top:14px;
+  background:var(--bg2);
+  border:1px solid var(--border);
+  border-radius:10px;
+  padding:16px 18px;
+  animation:ddSlide .28s cubic-bezier(.2,.7,.2,1);
+}
+@keyframes ddSlide {
+  from { opacity:0; transform:translateY(-6px); }
+  to   { opacity:1; transform:none; }
+}
+.dash-ai-dd-panel.dd-position { border-top:3px solid #4d9fff; }
+.dash-ai-dd-panel.dd-good     { border-top:3px solid var(--green); }
+.dash-ai-dd-panel.dd-concern  { border-top:3px solid var(--red); }
+.dash-ai-dd-panel.dd-recs     { border-top:3px solid var(--violet); }
+.dash-ai-dd-hd {
+  display:flex; align-items:center; justify-content:space-between;
+  gap:10px; margin-bottom:12px;
+  font-family:var(--fm); font-size:10px; font-weight:700;
+  letter-spacing:.08em; text-transform:uppercase;
+  color:var(--text2);
+}
+.dash-ai-dd-close {
+  background:transparent; border:none;
+  color:var(--text3); cursor:pointer;
+  font-family:var(--fm); font-size:11px;
+  padding:4px 8px; border-radius:5px;
+  transition:background .15s, color .15s;
+}
+.dash-ai-dd-close:hover { background:var(--bg3); color:var(--text); }
+.dash-ai-dd-stats {
+  display:grid; grid-template-columns:repeat(auto-fit, minmax(140px, 1fr));
+  gap:10px; margin-bottom:14px;
+}
+.dash-ai-dd-stat {
+  background:var(--bg3); border:1px solid var(--border);
+  border-radius:8px;
+  padding:8px 12px;
+}
+.dash-ai-dd-stat-lbl {
+  font-family:var(--fm); font-size:9px; font-weight:600;
+  letter-spacing:.08em; text-transform:uppercase;
+  color:var(--text3); margin-bottom:3px;
+}
+.dash-ai-dd-stat-val {
+  font-family:var(--fm); font-size:14px; font-weight:700; color:var(--text);
+}
+.dash-ai-dd-chart-wrap {
+  background:var(--bg3); border:1px solid var(--border);
+  border-radius:8px; padding:12px;
+  height:260px; position:relative;
+}
+.dash-ai-dd-chart-wrap canvas { width:100% !important; height:100% !important; }
+
+/* ── FUN FUND · AI FUND OUTLOOK ─────────────────────────
+   Compact AI-analysis block at the bottom of the Fun
+   Fund tab. Mirrors the dashboard .dash-ai-sec vocabulary
+   but at a smaller, less-dominant scale so it never
+   competes with the main Fun Fund chart above. */
+.ff-ai {
+  margin-top:18px;
+  border-left:3px solid var(--cyan);
+}
+.ff-ai-hd {
+  display:flex; align-items:center; justify-content:space-between;
+  gap:10px; flex-wrap:wrap;
+  margin-bottom:10px;
+}
+.ff-ai-title {
+  font-family:var(--ff); font-size:14px; font-weight:700; color:var(--text);
+}
+.ff-ai-stamp {
+  font-family:var(--fm); font-size:10px; color:var(--text3);
+  font-weight:500; letter-spacing:.04em;
+}
+.ff-ai-sub { font-size:11px; color:var(--text2); margin:0 0 12px; line-height:1.55; }
+.ff-ai-body {
+  font-size:12.5px; line-height:1.6; color:var(--text);
+}
+.ff-ai-body .md ul, .ff-ai-body .md ol { margin:6px 0 6px 20px; padding:0; }
+.ff-ai-body .md li { margin:3px 0; }
+.ff-ai-body .md strong { color:var(--text); font-weight:700; }
+.ff-ai-body .ai-tone { display:inline; padding:1px 4px; border-radius:3px; font-weight:600; }
+.ff-ai-body .ai-tone.ai-pos  { color:var(--green); background:var(--accent-positive-dim); }
+.ff-ai-body .ai-tone.ai-neg  { color:var(--red);   background:var(--accent-critical-dim); }
+.ff-ai-body .ai-tone.ai-warn { color:var(--amber); background:var(--accent-warning-dim); }
+.ff-ai-body .ai-tone.ai-dim  { color:var(--text3); background:var(--bg2); }
+.ff-ai-running { display:flex; align-items:center; gap:10px; font-size:12px; color:var(--text2); padding:14px 0; }
+.ff-ai-empty { color:var(--text2); font-size:12.5px; line-height:1.55; padding:6px 0 2px; }
+.ff-ai-empty strong { color:var(--text); font-weight:700; }
+.ff-ai-err {
+  padding:10px 14px; border-radius:8px;
   background:var(--accent-critical-dim); color:var(--red);
   font-size:12px; font-family:var(--fm);
 }
@@ -2374,6 +2635,138 @@ body.light .retire-slideover { box-shadow:-10px 0 32px -10px rgba(60,40,10,0.25)
 .ctx-field label { display:block; font-family:var(--fm); font-size:10px; letter-spacing:.06em; text-transform:uppercase; color:var(--text2); margin-bottom:5px; font-weight:700; }
 .ctx-field .country-dd { width:100%; display:block; }
 
+/* ── PERSONAL PROFILE CARD (Settings) ──────────────────────────────
+   Sibling of .ctx-card but neutral — optional context, not a
+   required gate. 2-col on wide, collapses to 1-col on narrow. The
+   goals textarea always spans the full row so long aspirational
+   notes get room to breathe. */
+.profile-card { border-left:4px solid var(--border2); }
+.profile-grid { display:grid; grid-template-columns:repeat(2, minmax(0,1fr)); gap:14px; }
+@media (max-width:720px){ .profile-grid { grid-template-columns:1fr; } }
+.profile-grid .profile-goals { grid-column:1 / -1; }
+.profile-money {
+  display:flex; align-items:center; gap:8px;
+  background:var(--bg3); border:1px solid var(--border);
+  border-radius:8px; padding:2px 12px;
+  min-width:0; box-sizing:border-box;
+  transition:border-color .15s;
+}
+.profile-money:focus-within { border-color:var(--text3); }
+.profile-money-sym { color:var(--text3); font-family:var(--fm); font-size:12px; flex-shrink:0; }
+.profile-money input {
+  flex:1 1 0; min-width:0; width:100%; box-sizing:border-box;
+  background:transparent; border:none; outline:none;
+  color:var(--text); font-family:var(--fm); font-size:14px; font-weight:600;
+  padding:9px 0;
+}
+.profile-select {
+  width:100%; box-sizing:border-box;
+  background:var(--bg3); border:1px solid var(--border);
+  border-radius:8px; padding:10px 12px;
+  color:var(--text); font-family:var(--ff); font-size:13px;
+  outline:none; transition:border-color .15s;
+}
+.profile-select:focus { border-color:var(--text3); }
+.profile-textarea {
+  width:100%; box-sizing:border-box; resize:vertical;
+  min-height:72px;
+  background:var(--bg3); border:1px solid var(--border);
+  border-radius:8px; padding:10px 12px;
+  color:var(--text); font-family:var(--ff); font-size:13px; line-height:1.5;
+  outline:none; transition:border-color .15s;
+}
+.profile-textarea:focus { border-color:var(--text3); }
+
+/* ── JOURNAL PANEL ──────────────────────────────────────────────────
+   Two-column layout on wide screens: composer pinned on the left as
+   a sticky card, entries grouped by month on the right. On narrow
+   widths the composer drops above the list. */
+.journal-kpis { display:grid; grid-template-columns:repeat(auto-fit, minmax(160px,1fr)); gap:10px; margin-bottom:14px; }
+.journal-grid { display:grid; grid-template-columns:minmax(0, 340px) minmax(0, 1fr); gap:16px; align-items:start; }
+@media (max-width:900px){ .journal-grid { grid-template-columns:1fr; } }
+
+.journal-compose { position:sticky; top:14px; }
+.journal-compose .card-title { margin-bottom:10px; }
+.journal-row { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:10px; }
+@media (max-width:420px){ .journal-row { grid-template-columns:1fr; } }
+.journal-row .ctx-field { min-width:0; }
+.journal-date {
+  width:100%; box-sizing:border-box;
+  background:var(--bg3); border:1px solid var(--border);
+  border-radius:8px; padding:9px 12px;
+  color:var(--text); font-family:var(--fm); font-size:13px;
+  outline:none; transition:border-color .15s;
+}
+.journal-date:focus { border-color:var(--text3); }
+.journal-textarea {
+  width:100%; box-sizing:border-box; resize:vertical;
+  min-height:120px;
+  background:var(--bg3); border:1px solid var(--border);
+  border-radius:8px; padding:12px;
+  color:var(--text); font-family:var(--ff); font-size:13px; line-height:1.55;
+  outline:none; transition:border-color .15s;
+  margin-bottom:10px;
+}
+.journal-textarea:focus { border-color:var(--text3); }
+.journal-actions { display:flex; gap:8px; justify-content:flex-end; }
+
+.journal-month { margin-bottom:18px; }
+.journal-month-hd {
+  font-family:var(--fm); font-size:10px; font-weight:700;
+  letter-spacing:.12em; text-transform:uppercase;
+  color:var(--text3);
+  padding:6px 2px; margin-bottom:8px;
+  border-bottom:1px solid var(--border);
+}
+
+.journal-entry {
+  background:var(--bg2); border:1px solid var(--border);
+  border-left:3px solid var(--border2);
+  border-radius:10px; padding:14px 16px;
+  margin-bottom:10px;
+  transition:background .15s, border-color .15s;
+}
+.journal-entry:hover { background:var(--bg3); border-left-color:var(--text3); }
+.journal-entry[data-tag="event"]      { border-left-color:var(--blue); }
+.journal-entry[data-tag="decision"]   { border-left-color:var(--green); }
+.journal-entry[data-tag="reflection"] { border-left-color:var(--violet); }
+.journal-entry-top {
+  display:flex; align-items:baseline; gap:10px; flex-wrap:wrap;
+  margin-bottom:8px;
+}
+.journal-entry-date {
+  font-family:var(--fm); font-size:12px; font-weight:700;
+  color:var(--text);
+}
+.journal-entry-weekday {
+  font-family:var(--fm); font-size:10px; color:var(--text3);
+  text-transform:uppercase; letter-spacing:.06em;
+}
+.journal-tag {
+  font-family:var(--fm); font-size:9px; font-weight:700;
+  letter-spacing:.08em; text-transform:uppercase;
+  padding:3px 8px; border-radius:4px;
+  background:var(--bg3); color:var(--text2);
+  border:1px solid var(--border);
+}
+.journal-entry[data-tag="event"]      .journal-tag { background:rgba(77,159,255,.12); color:var(--blue);   border-color:rgba(77,159,255,.35); }
+.journal-entry[data-tag="decision"]   .journal-tag { background:rgba(34,197,94,.14); color:var(--green);  border-color:rgba(34,197,94,.35); }
+.journal-entry[data-tag="reflection"] .journal-tag { background:rgba(168,85,247,.14); color:var(--violet); border-color:rgba(168,85,247,.35); }
+.journal-entry-actions { margin-left:auto; display:flex; gap:6px; }
+.journal-entry-content {
+  color:var(--text); font-size:13px; line-height:1.6;
+  white-space:pre-wrap; word-wrap:break-word;
+}
+.journal-entry-edit .journal-textarea { margin-bottom:8px; }
+
+.journal-empty {
+  text-align:center; padding:48px 24px;
+  color:var(--text3); font-size:13px; line-height:1.6;
+}
+.journal-empty-title {
+  font-size:15px; font-weight:700; color:var(--text2); margin-bottom:6px;
+}
+
 /* ── SHARED COUNTRY DROPDOWN (createCountryDropdown) ───────────────── */
 .country-dd { position:relative; display:inline-block; }
 .country-dd .cd-trigger { display:inline-flex; align-items:center; gap:10px; background:var(--bg3); border:1px solid var(--border2); border-radius:10px; padding:10px 14px; color:var(--text); font-family:var(--fb); font-size:13px; font-weight:600; cursor:pointer; transition:all .18s; min-width:240px; width:100%; }
@@ -2863,6 +3256,11 @@ body.light .piq-country-menu { box-shadow:0 12px 28px -10px rgba(60,40,10,0.22);
         <span class="cmdp-hint-icon">⌘</span><span class="cmdp-hint-lbl">K</span>
       </button>
       <div class="cur-toggle" id="cur-toggle"></div>
+      <!-- Money-display mode toggle: Today's money vs Nominal. Reads
+           state.displayMode and re-renders every panel so headline KPIs,
+           projections, the Nest Egg chart, and AI prompts all flip in
+           lockstep. Rebuilt by syncDisplayModeToggle() on every render. -->
+      <div class="mode-toggle" id="mode-toggle" role="group" aria-label="Money display mode"></div>
       <button class="iBtn" id="theme-btn" onclick="toggleTheme()" title="Toggle theme" data-i18n-title="topbar.theme">☀</button>
       <button class="iBtn" onclick="toggleAIPanel()" title="AI Advisor" data-i18n-title="topbar.ai">✦</button>
     </div>
@@ -2889,6 +3287,7 @@ body.light .piq-country-menu { box-shadow:0 12px 28px -10px rgba(60,40,10,0.22);
 
       <div class="sb-sep"></div>
       <div class="sb-section" data-i18n="sb.group.library">LIBRARY</div>
+      <div class="nav-item" data-panel="journal" onclick="nav('journal')"><span class="nav-icon">📓</span><span class="nav-lbl" data-i18n="panel.journal">Journal</span></div>
       <div class="nav-item" data-panel="vault" onclick="nav('vault')"><span class="nav-icon">🗄</span><span class="nav-lbl" data-i18n="panel.vault">Vault</span></div>
 
       <div class="sb-sep"></div>
@@ -2921,6 +3320,7 @@ body.light .piq-country-menu { box-shadow:0 12px 28px -10px rgba(60,40,10,0.22);
       <div class="panel" id="panel-funfund"></div>
       <div class="panel" id="panel-retireanywhere"></div>
       <div class="panel" id="panel-propiq"></div>
+      <div class="panel" id="panel-journal"></div>
       <div class="panel" id="panel-vault"></div>
       <div class="panel" id="panel-settings"></div>
     </div>
@@ -3194,6 +3594,7 @@ const STRINGS = {
   'panel.funfund':          { en:'Fun Fund',              sv:'Fun Fund' },
   'panel.retireanywhere':   { en:'Retire Anywhere',       sv:'Pensionera var som helst' },
   'panel.propiq':           { en:'Property IQ',           sv:'Fastighets-IQ' },
+  'panel.journal':          { en:'Journal',               sv:'Dagbok' },
   'panel.vault':            { en:'Vault',                 sv:'Arkiv' },
   'panel.settings':         { en:'Settings',              sv:'Inställningar' },
 
@@ -3207,6 +3608,12 @@ const STRINGS = {
   // ── Topbar tooltips & labels ───────────────────────────
   'topbar.cmdp':            { en:'Command palette',       sv:'Kommandopalett' },
   'topbar.theme':           { en:'Toggle theme',          sv:'Växla tema' },
+  'topbar.mode.real':       { en:'Today',                 sv:'Idag' },
+  'topbar.mode.nominal':    { en:'Nominal',               sv:'Nominellt' },
+  'topbar.mode.real.title': { en:'Display amounts in today\u2019s money (inflation-adjusted)',
+                              sv:'Visa belopp i dagens penningvärde (inflationsjusterat)' },
+  'topbar.mode.nominal.title':{ en:'Display amounts in future (nominal) kr',
+                              sv:'Visa belopp i framtida (nominella) kronor' },
   'topbar.ai':              { en:'AI Advisor',            sv:'AI-rådgivare' },
 
   // ── Breadcrumb + related row ───────────────────────────
@@ -3289,6 +3696,58 @@ const STRINGS = {
   'settings.ctx.homeBase':     { en:'Home Base (current residence)', sv:'Hemvist (nuvarande bostadsland)' },
   'settings.ctx.selectCitizenship': { en:'Select your citizenship', sv:'Välj ditt medborgarskap' },
   'settings.ctx.selectHomeBase':    { en:'Select your home base',   sv:'Välj din hemvist' },
+
+  // ── Settings · Personal profile card ───────────────────
+  'settings.profile.title':    { en:'👤 Personal Profile',
+                                 sv:'👤 Personlig profil' },
+  'settings.profile.optional': { en:'OPTIONAL',                  sv:'FRIVILLIG' },
+  'settings.profile.blurb':    { en:'Share a little more about your situation so AI recommendations become genuinely personalised. Every field is optional — leave anything you\u2019d rather not share blank, and the AI will simply skip it.',
+                                 sv:'Dela lite mer om din situation så att AI-rekommendationerna blir verkligt personliga. Alla fält är frivilliga — lämna tomt vad du hellre inte delar, så hoppar AI:n över det.' },
+  'settings.profile.salary':   { en:'Gross monthly salary',      sv:'Bruttolön per månad' },
+  'settings.profile.salary.ph':{ en:'e.g. 65 000',                sv:'t.ex. 65 000' },
+  'settings.profile.marital':  { en:'Marital status',            sv:'Civilstånd' },
+  'settings.profile.hhIncome': { en:'Combined household income (monthly)',
+                                 sv:'Gemensam hushållsinkomst (månad)' },
+  'settings.profile.hhIncome.ph':{ en:'Leave blank if single',   sv:'Lämna tomt om singel' },
+  'settings.profile.goals':    { en:'Financial goals',           sv:'Ekonomiska mål' },
+  'settings.profile.goals.ph': { en:'e.g. retire at 60 in Portugal, fund children\u2019s university, build a 6-month emergency buffer, save for an investment property…',
+                                 sv:'t.ex. gå i pension vid 60 i Portugal, finansiera barnens studier, bygga en buffert på 6 månader, spara till investeringsbostad…' },
+  'settings.profile.marital.single':    { en:'Single',           sv:'Singel' },
+  'settings.profile.marital.partnered': { en:'Partnered',        sv:'Sambo' },
+  'settings.profile.marital.married':   { en:'Married',          sv:'Gift' },
+  'settings.profile.marital.divorced':  { en:'Divorced',         sv:'Skild' },
+  'settings.profile.marital.widowed':   { en:'Widowed',          sv:'Änka/änkling' },
+  'settings.profile.marital.ph':        { en:'— Select —',       sv:'— Välj —' },
+
+  // ── Journal ──────────────────────────────────────────────
+  'journal.page.title':     { en:'Journal',
+                              sv:'Dagbok' },
+  'journal.page.sub':       { en:'Log events, decisions, and reflections so advice stays grounded in what\u2019s actually happened.',
+                              sv:'Logga händelser, beslut och reflektioner så att rådgivningen förblir grundad i det som faktiskt hänt.' },
+  'journal.compose.title':  { en:'New entry',              sv:'Ny anteckning' },
+  'journal.compose.date':   { en:'Date',                   sv:'Datum' },
+  'journal.compose.tag':    { en:'Tag',                    sv:'Etikett' },
+  'journal.compose.content':{ en:'What happened, what did you decide, what are you thinking?',
+                              sv:'Vad hände, vad bestämde du, vad tänker du?' },
+  'journal.compose.save':   { en:'Save entry',             sv:'Spara' },
+  'journal.compose.cancel': { en:'Clear',                  sv:'Rensa' },
+  'journal.tag.event':      { en:'Event',                  sv:'Händelse' },
+  'journal.tag.decision':   { en:'Decision',               sv:'Beslut' },
+  'journal.tag.reflection': { en:'Reflection',             sv:'Reflektion' },
+  'journal.tag.none':       { en:'— None —',               sv:'— Ingen —' },
+  'journal.kpi.total':      { en:'Total entries',          sv:'Totala anteckningar' },
+  'journal.kpi.thisMonth':  { en:'This month',             sv:'Denna månad' },
+  'journal.kpi.last':       { en:'Last entry',             sv:'Senaste' },
+  'journal.kpi.last.none':  { en:'No entries yet',         sv:'Inga anteckningar än' },
+  'journal.empty.title':    { en:'Start your journal',     sv:'Påbörja din dagbok' },
+  'journal.empty.body':     { en:'Short notes beat perfect prose. Jot a line when you make a call, see a number shift, or feel a gut check — your future self (and the AI) will thank you.',
+                              sv:'Korta anteckningar slår perfekta texter. Skriv en rad när du fattar ett beslut, ser en siffra röra sig eller får en magkänsla.' },
+  'journal.entry.edit':     { en:'Edit',                   sv:'Redigera' },
+  'journal.entry.save':     { en:'Save',                   sv:'Spara' },
+  'journal.entry.cancel':   { en:'Cancel',                 sv:'Avbryt' },
+  'journal.entry.delete':   { en:'Delete',                 sv:'Radera' },
+  'journal.entry.deleteConfirm': { en:'Delete this journal entry? This cannot be undone.',
+                                   sv:'Radera denna anteckning? Kan inte ångras.' },
 
   // ── Settings · recurring baseline cards ────────────────
   'settings.recurring':     { en:'RECURRING',          sv:'ÅTERKOMMANDE' },
@@ -3459,6 +3918,43 @@ const STRINGS = {
                               sv:'⚠ Den här rapporten genererades på {other}. Generera på {current}?' },
   'dash.ai.langStale.btn':  { en:'🌐 Regenerate in {lang}',
                               sv:'🌐 Generera om på {lang}' },
+  // Deep-dive action on each AI analysis card.
+  'dash.dd.open':           { en:'Deep dive',                sv:'Djupdykning' },
+  'dash.dd.close':          { en:'Close deep dive',          sv:'Stäng djupdykning' },
+  'dash.dd.header':         { en:'Deep dive · {title}',      sv:'Djupdykning · {title}' },
+  'dash.dd.chartTitle.position': { en:'Nest egg trajectory ({lens})',
+                                   sv:'Boets utveckling ({lens})' },
+  'dash.dd.chartTitle.good':     { en:'Coverage over retirement years',
+                                   sv:'Täckning under pensionsår' },
+  'dash.dd.chartTitle.concern':  { en:'Next 12 months · cash flow',
+                                   sv:'Kommande 12 månader · kassaflöde' },
+  'dash.dd.chartTitle.recs':     { en:'Per-account contribution mix',
+                                   sv:'Bidragsmix per konto' },
+  'dash.dd.stat.today':     { en:'Today',                    sv:'Idag' },
+  'dash.dd.stat.atRet':     { en:'At age {age}',             sv:'Vid {age} år' },
+  'dash.dd.stat.coverage':  { en:'Coverage',                 sv:'Täckning' },
+  'dash.dd.stat.verdict':   { en:'Verdict',                  sv:'Omdöme' },
+  'dash.dd.stat.runout':    { en:'Runway',                   sv:'Räckvidd' },
+  'dash.dd.stat.runout.val':{ en:'to age {age}',             sv:'till {age} år' },
+  'dash.dd.stat.runout.none':{en:'funds last',               sv:'pengarna räcker' },
+  'dash.dd.stat.surplus':   { en:'Avg monthly surplus',      sv:'Snittöverskott/mo' },
+  'dash.dd.stat.savingsRate':{en:'Savings rate',             sv:'Sparandegrad' },
+  'dash.dd.stat.actions':   { en:'Recommended actions',      sv:'Rekommenderade åtgärder' },
+  'dash.dd.stat.totalProj': { en:'Total projected',          sv:'Total projicerad' },
+  'dash.dd.mini.coverage':  { en:'{pct}%',                   sv:'{pct}%' },
+  'dash.dd.mini.trajectory':{ en:'{n} years · {lens}',       sv:'{n} år · {lens}' },
+  // Fun Fund AI analysis block.
+  'ff.ai.title':            { en:'🤖 AI fund outlook',       sv:'🤖 AI-fondutsikter' },
+  'ff.ai.sub':              { en:'Interpret the current numbers and advise on discretionary funding.',
+                              sv:'Tolka aktuella siffror och ge råd om diskretionär finansiering.' },
+  'ff.ai.run':              { en:'Run analysis',              sv:'Kör analys' },
+  'ff.ai.rerun':            { en:'🔄 Re-run',                 sv:'🔄 Kör igen' },
+  'ff.ai.running':          { en:'Analysing your Fun Fund…',   sv:'Analyserar din Fun Fund…' },
+  'ff.ai.empty':            { en:'No analysis yet. Click <strong>Run analysis</strong> to get a practical take on whether your current numbers comfortably fund the trips you\u2019ve planned.',
+                              sv:'Ingen analys ännu. Klicka <strong>Kör analys</strong> för att få en praktisk bedömning av dina nuvarande siffror.' },
+  'ff.ai.stamp':            { en:'· generated {when}',        sv:'· genererad {when}' },
+  'ff.ai.err':              { en:'Analysis failed. Try again.', sv:'Analysen misslyckades. Försök igen.' },
+
   'lang.label.en':          { en:'English',                      sv:'engelska' },
   'lang.label.sv':          { en:'Swedish',                      sv:'svenska' },
 
@@ -4222,6 +4718,7 @@ const STRINGS = {
   's2.card.field.balance':      { en:'Balance',          sv:'Saldo' },
   's2.card.field.contribution': { en:'Contribution',     sv:'Insättning' },
   's2.card.field.growthRate':   { en:'Growth rate',      sv:'Tillväxttakt' },
+  's2.card.field.taxRate':      { en:'Tax rate',         sv:'Skattesats' },
   's2.card.field.payout':       { en:'Payout',           sv:'Utbetalning' },
   's2.card.field.fromAge':      { en:'From age',         sv:'Från ålder' },
   // Projected chip
@@ -4423,6 +4920,9 @@ const STRINGS = {
   'slice.overrides.label':  { en:'Overrides',         sv:'Överskrifter' },
   'slice.overrides.sub':    { en:'Monthly overrides + yearly bases',
                               sv:'Månadsöverskrifter + årsgrunder' },
+  'slice.journal.label':    { en:'Journal',           sv:'Dagbok' },
+  'slice.journal.sub':      { en:'Dated events, decisions, and reflections',
+                              sv:'Daterade händelser, beslut och reflektioner' },
   'slice.settings.label':   { en:'Preferences',       sv:'Inställningar' },
   'slice.settings.sub':     { en:'Theme, currency, exchange rates, AI keys',
                               sv:'Tema, valuta, växelkurser, AI-nycklar' },
@@ -4648,8 +5148,29 @@ function defaultState() {
   return {
     currency:'SEK', darkMode:true, lang:'en', activePanel:'dashboard',
     currentAge:44, retirementAge:69, growthRate:7, inflationRate:2,
-    retirementPostGrowth:4, lifeExp:90, withdrawTaxRate:30,
+    retirementPostGrowth:4, lifeExp:90,
     retirementScenario:'baseline',
+    // Global money-display mode. 'real' = every future-dated figure is
+    // discounted back to today's purchasing power using inflationRate.
+    // 'nominal' = raw future kr. Default is 'real' because planning
+    // decisions are almost always easier to reason about in today's
+    // money — the Nominal lens is an escape hatch, not the default.
+    displayMode:'real',
+    // Personal profile — free-form context the user shares to make
+    // AI recommendations personalised. All fields optional; AI prompts
+    // will drop any field that's empty so there's no penalty for a
+    // partial profile.
+    profile:{
+      salary:0,            // individual gross monthly salary (SEK)
+      maritalStatus:'',    // 'single' | 'partnered' | 'married' | 'divorced' | 'widowed'
+      householdIncome:0,   // combined household monthly (SEK)
+      goals:'',            // free-text financial goals / aspirations
+    },
+    // Journal — dated log of events, decisions, and reflections. Each
+    // entry is { id, date:'YYYY-MM-DD', tag, content, updatedAt }.
+    // The recent entries also flow into the AI context so advice
+    // stays aware of what the user has recorded about their life.
+    journal:[],
     tickerQuote:'Come rain or shine, I will retire under the sun.',
     exchangeRates:{ SEK:1, USD:0.11, EUR:0.09, KES:14.27 },
 
@@ -4677,9 +5198,9 @@ function defaultState() {
     selectedYear:CY+1, cascadeEnabled:true,
 
     externalAssets:[
-      {id:genId(),name:'ITP1',balance:1400000,monthlyContribution:32000,growthRate:4,assetType:'investment'},
-      {id:genId(),name:'Vanguard',balance:1400000,monthlyContribution:0,growthRate:7,assetType:'investment'},
-      {id:genId(),name:'Royal London',balance:700000,monthlyContribution:0,growthRate:7,assetType:'investment'},
+      {id:genId(),name:'ITP1',balance:1400000,monthlyContribution:32000,growthRate:4,taxRate:30,assetType:'investment'},
+      {id:genId(),name:'Vanguard',balance:1400000,monthlyContribution:0,growthRate:7,taxRate:30,assetType:'investment'},
+      {id:genId(),name:'Royal London',balance:700000,monthlyContribution:0,growthRate:7,taxRate:20,assetType:'investment'},
     ],
 
     retirementExpenses:[
@@ -4901,7 +5422,7 @@ window.dr = function(name){ return window.commitRender(name); };
 // ─── PERSISTENCE ────────────────────────────────────────────────────────────
 // State schema version. Bump this and add a branch to migrate() whenever the
 // shape of `state` changes in a backwards-incompatible way.
-const STATE_VERSION = 11;
+const STATE_VERSION = 16;
 function migrate(s) {
   const from = s.version || 1;
   if(from >= STATE_VERSION) { s.version = STATE_VERSION; return s; }
@@ -4998,6 +5519,58 @@ function migrate(s) {
   // show the welcome to genuinely fresh installs.
   if(from < 11) {
     if(s.welcomeComplete === undefined) s.welcomeComplete = true;
+  }
+  // v11 → v12: per-investment taxRate replaces the single global
+  // `withdrawTaxRate`. Backfill each investment card with the old
+  // global value (or 30% if absent) so existing users see no numeric
+  // change the first time they load, then delete the global field.
+  if(from < 12) {
+    const legacyTax = (typeof s.withdrawTaxRate === 'number') ? s.withdrawTaxRate : 30;
+    (s.externalAssets || []).forEach(a => {
+      if((a.assetType || 'investment') !== 'investment') return;
+      if(typeof a.taxRate !== 'number') a.taxRate = legacyTax;
+    });
+    delete s.withdrawTaxRate;
+  }
+  // v12 → v13: unified global money-display mode. Previously only the
+  // Nest Egg chart owned a local `dashNestEggMode`; now every
+  // future-dated surface honours a single `state.displayMode`. If the
+  // user had set the chart to 'nominal' we carry that preference up;
+  // otherwise default to 'real' (today's money).
+  if(from < 13) {
+    if(!s.displayMode) {
+      s.displayMode = (s.dashNestEggMode === 'nominal') ? 'nominal' : 'real';
+    }
+    delete s.dashNestEggMode;
+  }
+  // v13 → v14: personal profile. Optional fields that improve AI
+  // personalisation (salary, marital status, household income, goals).
+  // Seeded as an empty object so every access site can safely read
+  // state.profile.* without a null check.
+  if(from < 14) {
+    if(!s.profile || typeof s.profile !== 'object') {
+      s.profile = { salary:0, maritalStatus:'', householdIncome:0, goals:'' };
+    } else {
+      if(typeof s.profile.salary !== 'number')          s.profile.salary = 0;
+      if(typeof s.profile.maritalStatus !== 'string')   s.profile.maritalStatus = '';
+      if(typeof s.profile.householdIncome !== 'number') s.profile.householdIncome = 0;
+      if(typeof s.profile.goals !== 'string')           s.profile.goals = '';
+    }
+  }
+  // v14 → v15: dated journal. Seed as an empty array so renderers
+  // can read state.journal without a null guard. Existing users land
+  // on an empty list with the composer ready to take their first
+  // entry; new users get the same behaviour via defaultState().
+  if(from < 15) {
+    if(!Array.isArray(s.journal)) s.journal = [];
+  }
+  // v15 → v16: dashboard AI deep-dive state (which section is currently
+  // expanded, if any) and Fun Fund AI report cache. Both default to
+  // clean slates — no legacy data to carry forward.
+  if(from < 16) {
+    if(!('dashDeepDive' in s)) s.dashDeepDive = null;
+    if(!('funFundReport' in s)) s.funFundReport = null;
+    if(!('funFundReportError' in s)) s.funFundReportError = null;
   }
   s.version = STATE_VERSION;
   return s;
@@ -5303,6 +5876,31 @@ function getProjection() {
 }
 
 function getPensionAssets() { return state.externalAssets.filter(a=>a.assetType==='pension'); }
+function getInvestmentAssets() { return state.externalAssets.filter(a=>(a.assetType||'investment')==='investment'); }
+// Tax on portfolio withdrawals is now per-investment. For surfaces that
+// still need a single headline rate (Income Requirements, the shared
+// _simulateRetirementYears sim, verdict cascade), we collapse the set to
+// a balance-weighted average so accounts with more money have more say
+// in the effective draw-down tax. Fallback of 0% when there are no
+// investments (e.g. pension-only user).
+function getEffectiveWithdrawTaxRate() {
+  const inv = getInvestmentAssets();
+  if(!inv.length) return 0;
+  let wSum = 0, bSum = 0;
+  inv.forEach(a => {
+    const b = Math.max(0, Number(a.balance) || 0);
+    const tr = Number.isFinite(a.taxRate) ? a.taxRate : 30;
+    wSum += b * tr;
+    bSum += b;
+  });
+  if(bSum <= 0) {
+    // No balances yet — simple mean so a user tweaking tax on an empty
+    // account still sees the headline figure respond.
+    const mean = inv.reduce((s,a)=>s+(Number.isFinite(a.taxRate)?a.taxRate:30),0)/inv.length;
+    return mean;
+  }
+  return wSum / bSum;
+}
 function getTotalPensionIncome() {
   return getPensionAssets().reduce((s,p)=>{
     const start=p.startAge??state.retirementAge, end=p.endAge||999;
@@ -5414,7 +6012,7 @@ function getRetirementNumbers() {
     // card and verdict logic now use `pensionAvgMonthly`, computed below
     // from the full simulation.
     const pension = getTotalPensionIncome();
-    const taxRate = Math.min((state.withdrawTaxRate??0)/100, 0.99);
+    const taxRate = Math.min(getEffectiveWithdrawTaxRate()/100, 0.99);
     const totalGross = taxRate>0?totalExp/(1-taxRate):totalExp;
     const proj = getProjection();
     const nestEgg = proj.length?proj[proj.length-1].realTotal:0;
@@ -5663,6 +6261,36 @@ const FinancialEngine = (() => {
     factor:        _inflFactor,
     toTodaysMoney: (nominal, years) => nominal / (_inflFactor(years) || 1),
   };
+  // ── display · global money-display mode ────────────────────────────
+  // Every KPI, chart series, and AI prompt that reports a future-dated
+  // amount should route through here so the user's Today / Nominal
+  // toggle is respected app-wide.
+  //
+  //   mode()            → 'real' | 'nominal'
+  //   isReal() / isNominal() → convenience booleans
+  //   pick(real, nominal)    → select the right value
+  //   discount(nominal, years) → nominal kr when in Nominal mode,
+  //                              discounted to today's money in Real
+  //                              (uses the same _inflFactor as the
+  //                              projection, so values stay consistent
+  //                              with the yearly chart series).
+  //   label()           → localised label for the currently active
+  //                       lens; handy for chart subtitles.
+  const display = {
+    mode:       () => state.displayMode || 'real',
+    isReal:     () => (state.displayMode || 'real') === 'real',
+    isNominal:  () => state.displayMode === 'nominal',
+    pick:       (realVal, nominalVal) =>
+      (state.displayMode === 'nominal' ? nominalVal : realVal),
+    discount:   (nominal, years) =>
+      (state.displayMode === 'nominal'
+        ? (nominal || 0)
+        : (nominal || 0) / (_inflFactor(years) || 1)),
+    label:      () =>
+      (state.displayMode === 'nominal'
+        ? t('dash.chart.toggle.nominal')
+        : t('dash.chart.toggle.real')),
+  };
   // ── currency + format ──────────────────────────────────────────────
   const format = {
     // Convert a native-kr value to the user's selected display
@@ -5759,7 +6387,7 @@ const FinancialEngine = (() => {
     }
     return v;
   };
-  return { months, projection, retirement, inflation, format, assertInvariants };
+  return { months, projection, retirement, inflation, display, format, assertInvariants };
 })();
 // Short alias so renderers can write `FE.months.current()` without
 // cluttering the site — same identity, purely ergonomic.
@@ -6208,7 +6836,7 @@ function scoreLocation(loc) {
 // KPI cards continue to work — they redirect into `review` with the right
 // scope preset inside nav(). The Forecast & Review tab is the new unified
 // home for both views.
-const VALID_PANELS = ['dashboard','transactions','review','monthly','yearly','retirement','funfund','retireanywhere','propiq','vault','settings'];
+const VALID_PANELS = ['dashboard','transactions','review','monthly','yearly','retirement','funfund','retireanywhere','propiq','journal','vault','settings'];
 let _navFromHash = false;
 function parseHash() {
   const raw = (location.hash||'').replace(/^#/,'');
@@ -6587,6 +7215,7 @@ bus.on('state:changed', () => {
     try {
       if(typeof renderTicker         === 'function') renderTicker();
       if(typeof renderCurrencyToggle === 'function') renderCurrencyToggle();
+      if(typeof renderModeToggle     === 'function') renderModeToggle();
       if(typeof updateSidebar        === 'function') updateSidebar();
       if(typeof bus !== 'undefined') bus.emit('state:liveSync', { panel: state.activePanel });
     } catch(e){ console.warn('live sync failed', e); }
@@ -6628,6 +7257,7 @@ function renderPanel(panel) {
     funfund:renderFunFund,
     retireanywhere:renderRetireAnywhere,
     propiq:typeof renderPropIQ==='function'?renderPropIQ:null,
+    journal:renderJournal,
     vault:renderVault,
     settings:renderSettings,
   };
@@ -6648,6 +7278,7 @@ const PANEL_META = {
   funfund:        {label:'Fun Fund',         group:'Planning',          icon:'✦'},
   retireanywhere: {label:'Retire Anywhere',  group:'Planning',          icon:'🌍'},
   propiq:         {label:'Property IQ',      group:'Planning',          icon:'🏠'},
+  journal:        {label:'Journal',          group:'Library',           icon:'📓'},
   vault:          {label:'Vault',            group:'Library',           icon:'🗄'},
   settings:       {label:'Settings',         group:'System',            icon:'⚙'},
 };
@@ -6662,6 +7293,7 @@ const RELATED_MAP = {
   funfund:        ['review','retireanywhere','dashboard'],
   retireanywhere: ['retirement','propiq','vault'],
   propiq:         ['retireanywhere','retirement','vault'],
+  journal:        ['dashboard','review','retirement'],
   vault:          ['retireanywhere','retirement','propiq'],
   settings:       ['dashboard','retirement','transactions'],
 };
@@ -7074,6 +7706,7 @@ window.addEventListener('keydown', (e) => {
 function renderAll() {
   renderTicker();
   renderCurrencyToggle();
+  renderModeToggle();
   updateSidebar();
   const panel=state.activePanel||'dashboard';
   // Sync the `.active` class on panels and sidebar nav-items to whatever
@@ -7149,6 +7782,47 @@ function renderCurrencyToggle() {
   if(!el) return;
   el.innerHTML = Object.keys(CURRENCY_SYMBOLS).map(c=>`<button class="cur-btn ${c===state.currency?'active':''}" onclick="applyCurrency('${c}')">${c}</button>`).join('');
 }
+
+// Money-display mode toggle — Today's money vs Nominal. Re-renders on
+// every panel render so the active-button highlight always matches
+// state. applyDisplayMode() below is the click handler; mirrors
+// applyCurrency() so the flip feels instant without waiting for the
+// 200 ms live-reactivity debounce.
+function renderModeToggle() {
+  const el = document.getElementById('mode-toggle');
+  if(!el) return;
+  const mode = (state.displayMode || 'real');
+  const mk = (key, label, title) =>
+    `<button class="mode-btn ${mode===key?'active':''}" onclick="applyDisplayMode('${key}')" title="${esc2(title)}">${esc2(label)}</button>`;
+  el.innerHTML =
+    mk('real',    t('topbar.mode.real'),    t('topbar.mode.real.title')) +
+    mk('nominal', t('topbar.mode.nominal'), t('topbar.mode.nominal.title'));
+}
+window.applyDisplayMode = function(m){
+  if(m !== 'real' && m !== 'nominal') return;
+  if(state.displayMode === m) return;
+  state.displayMode = m;
+  if(typeof invalidateSelectors === 'function') invalidateSelectors();
+  // Instant toggle patch so the highlight doesn't lag.
+  try {
+    document.querySelectorAll('#mode-toggle .mode-btn').forEach(b => {
+      b.classList.toggle('active', (b.textContent || '').trim().toLowerCase() === (m === 'real' ? t('topbar.mode.real') : t('topbar.mode.nominal')).toLowerCase());
+    });
+  } catch(_e){}
+  // Full panel re-render — every KPI, chart, and AI payload reads
+  // state.displayMode, so a single-frame rebuild keeps all surfaces
+  // in lockstep.
+  requestAnimationFrame(() => {
+    try {
+      if(typeof renderModeToggle === 'function') renderModeToggle();
+      if(typeof updateSidebar === 'function') updateSidebar();
+      const active = state.activePanel || 'dashboard';
+      if(typeof renderPanel === 'function') renderPanel(active);
+      if(typeof decoratePanel === 'function') decoratePanel(active);
+    } catch(e){ console.warn('applyDisplayMode render failed', e); }
+  });
+  save();
+};
 // ─── CURRENCY APPLIER ───────────────────────────────────────────────────────
 // One atomic, single-frame path for every currency flip.
 //
@@ -7845,16 +8519,319 @@ function renderDashboardAIReportBody(){
   const actions = `
     <button class="btn btn-sm btn-o" onclick="saveDashboardReportToVault()">${t('dash.ai.saveToVault')}</button>
     <button class="btn btn-sm btn-o" onclick="runDashboardAIReport()">${t('dash.ai.rerun')}</button>`;
+  const activeDD = state.dashDeepDive || null;
   const sections = DASH_REPORT_SECTIONS.map(sec => {
     const body = (r.sections && r.sections[sec.key]) || '';
     const title = t('dash.report.'+sec.key);
-    return `<div class="dash-ai-sec ${sec.cls}">
+    const isOpen = activeDD === sec.key;
+    // Visual strip and deep-dive button are scoped per section. The
+    // visual is a small canvas / ring / badge keyed to the section
+    // topic (nest egg sparkline, coverage ring, cash-flow bar,
+    // action counter) so the card has a glance-layer above the
+    // prose without pushing the text below the fold.
+    return `<div class="dash-ai-sec ${sec.cls}" data-sec-key="${sec.key}">
       <div class="dash-ai-sec-hd"><span class="ic">${sec.icon}</span><span>${esc2(title)}</span></div>
+      <div class="dash-ai-visual" data-visual-for="${sec.key}">${_renderDashAIMiniVisual(sec.key)}</div>
       ${body ? _renderAISectionBody(body) : `<div class="md" style="color:var(--text3);font-style:italic">${t('dash.ai.emptyNotes')}</div>`}
+      <div class="dash-ai-sec-actions">
+        <button class="dash-ai-dd-btn ${isOpen?'active':''}" onclick="toggleDashDeepDive('${sec.key}')">
+          ${isOpen ? '▼ ' : '▸ '}${esc2(t('dash.dd.open'))}
+        </button>
+      </div>
     </div>`;
   }).join('');
-  return head(actions) + langStaleHtml + `<div class="dash-ai-sections">${sections}</div>`;
+  const deepDivePanel = activeDD ? _renderDashDeepDivePanel(activeDD) : '';
+  return head(actions) + langStaleHtml + `<div class="dash-ai-sections">${sections}</div>${deepDivePanel}`;
 }
+
+// ─── AI report · mini visual per section ─────────────────────────────
+// Builds the glance-layer HTML for each section card. The visuals
+// are deliberately small and self-contained so they don't compete
+// with the prose below. Charts (position) are rendered via a canvas
+// that _syncDashAIMiniCharts() picks up after mount.
+function _renderDashAIMiniVisual(key){
+  try {
+    const nums = FE.retirement.numbers();
+    const cm   = FE.months.current();
+    if(key === 'position'){
+      // Sparkline canvas; meta shows today vs at-retirement figure in
+      // the active display lens.
+      const atRet = FE.display.isNominal()
+        ? FE.projection.totalNominal()
+        : nums.nestEgg;
+      const today = FE.projection.savingsYearToDate() + (nums && nums._firstYear ? 0 : 0);
+      const tBalNow = (state.externalAssets || []).filter(a => (a.assetType||'investment')==='investment').reduce((s,a) => s + (a.balance||0), 0);
+      const ytr = FE.retirement.yearsToRetirement();
+      return `
+        <canvas class="dash-ai-visual-canvas" id="dash-ai-mini-position"></canvas>
+        <div class="dash-ai-visual-meta">
+          <div class="dash-ai-visual-val">${fmt(atRet)}</div>
+          <div class="dash-ai-visual-sub">${esc2(t('dash.dd.mini.trajectory', { n: ytr, lens: FE.display.label() }))}</div>
+          <div class="dash-ai-visual-sub" style="color:var(--text2)">${esc2(t('dash.dd.stat.today'))}: ${fmt(tBalNow)}</div>
+        </div>`;
+    }
+    if(key === 'good'){
+      // Coverage ring — pct of retirement income covered by the
+      // portfolio + pensions combined.
+      const pct = Math.max(0, Math.min(150, Math.round(nums.coveragePct || 0)));
+      const tone = pct >= 100 ? '' : (pct >= 75 ? ' amber' : ' red');
+      const circ = 2 * Math.PI * 28;
+      const fill = Math.min(pct/100, 1);
+      return `
+        <div class="dash-ai-visual-ring${tone}">
+          <svg viewBox="0 0 64 64">
+            <circle class="ring-track" cx="32" cy="32" r="28"></circle>
+            <circle class="ring-fill"  cx="32" cy="32" r="28"
+              stroke-dasharray="${circ.toFixed(2)}"
+              stroke-dashoffset="${(circ * (1 - fill)).toFixed(2)}"></circle>
+          </svg>
+          <div class="dash-ai-visual-ring-lbl">${pct}%</div>
+        </div>
+        <div class="dash-ai-visual-meta">
+          <div class="dash-ai-visual-val">${esc2(t('dash.dd.stat.coverage'))}</div>
+          <div class="dash-ai-visual-sub">${esc2(t('dash.dd.stat.verdict'))}: ${esc2(nums.verdict || '—')}</div>
+        </div>`;
+    }
+    if(key === 'concern'){
+      // Mini cash-flow bar: current-month surplus / savings rate.
+      const income   = Math.max(1, cm.pureIncome || 0);
+      const expenses = cm.pureExpenses || 0;
+      const savings  = cm.savings || 0;
+      const sr = Math.round((savings / income) * 100);
+      const srTone = sr >= 20 ? 'pos' : (sr >= 10 ? 'warn' : 'neg');
+      return `
+        <canvas class="dash-ai-visual-canvas" id="dash-ai-mini-concern"></canvas>
+        <div class="dash-ai-visual-meta">
+          <div class="dash-ai-visual-val">${sr}%</div>
+          <div class="dash-ai-visual-sub">${esc2(t('dash.dd.stat.savingsRate'))}</div>
+          <div class="dash-ai-visual-sub" style="color:var(${srTone==='pos'?'--green':srTone==='warn'?'--amber':'--red'})">${fmt(savings)}/mo</div>
+        </div>`;
+    }
+    if(key === 'recs'){
+      // Action counter — count list items the model produced, fall
+      // back to a generic "read" hint when no parse.
+      const body = (state.dashboardReport && state.dashboardReport.sections && state.dashboardReport.sections.recs) || '';
+      const count = (body.match(/^\s*[-*•]\s+|^\s*\d+\.\s+/gm) || []).length;
+      return `
+        <div class="dash-ai-visual-badge">
+          <div class="dash-ai-visual-badge-val">${count || '—'}</div>
+          <div class="dash-ai-visual-badge-lbl">${esc2(t('dash.dd.stat.actions'))}</div>
+        </div>
+        <div class="dash-ai-visual-meta">
+          <div class="dash-ai-visual-val">${esc2(t('dash.dd.stat.actions'))}</div>
+          <div class="dash-ai-visual-sub">${esc2(t('dash.dd.open'))} ↓</div>
+        </div>`;
+    }
+  } catch(_e){ /* visual is additive — never block the report on a render error */ }
+  return '';
+}
+
+// ─── AI report · deep dive expansion ─────────────────────────────────
+// One section open at a time. The expanded panel sits below the 4-card
+// grid and renders topical charts + stat pills drawn from existing
+// FE data. No extra AI call is required — the underlying data is the
+// "why" behind whatever the prose above said.
+function _renderDashDeepDivePanel(key){
+  let title = '';
+  DASH_REPORT_SECTIONS.forEach(s => { if(s.key === key) title = t('dash.report.'+s.key); });
+  const nums = FE.retirement.numbers();
+  const cm   = FE.months.current();
+  let stats = '';
+  let chartTitle = '';
+  const chartId = 'dash-dd-chart';
+  if(key === 'position'){
+    chartTitle = t('dash.dd.chartTitle.position', { lens: FE.display.label() });
+    const projTotal = FE.display.isNominal() ? FE.projection.totalNominal() : FE.projection.totalReal();
+    const tBalNow = (state.externalAssets || []).filter(a => (a.assetType||'investment')==='investment').reduce((s,a) => s + (a.balance||0), 0);
+    stats = `
+      <div class="dash-ai-dd-stat"><div class="dash-ai-dd-stat-lbl">${esc2(t('dash.dd.stat.today'))}</div><div class="dash-ai-dd-stat-val">${fmt(tBalNow)}</div></div>
+      <div class="dash-ai-dd-stat"><div class="dash-ai-dd-stat-lbl">${esc2(t('dash.dd.stat.atRet', { age: state.retirementAge }))}</div><div class="dash-ai-dd-stat-val">${fmt(projTotal)}</div></div>
+      <div class="dash-ai-dd-stat"><div class="dash-ai-dd-stat-lbl">${esc2(t('dash.dd.stat.totalProj'))}</div><div class="dash-ai-dd-stat-val">${fmt(projTotal)}</div></div>`;
+  } else if(key === 'good'){
+    chartTitle = t('dash.dd.chartTitle.good');
+    const pct = Math.round(nums.coveragePct || 0);
+    const runoutLbl = nums.runoutAge
+      ? t('dash.dd.stat.runout.val', { age: Math.round(nums.runoutAge) })
+      : t('dash.dd.stat.runout.none');
+    stats = `
+      <div class="dash-ai-dd-stat"><div class="dash-ai-dd-stat-lbl">${esc2(t('dash.dd.stat.coverage'))}</div><div class="dash-ai-dd-stat-val">${pct}%</div></div>
+      <div class="dash-ai-dd-stat"><div class="dash-ai-dd-stat-lbl">${esc2(t('dash.dd.stat.verdict'))}</div><div class="dash-ai-dd-stat-val">${esc2(nums.verdict || '—')}</div></div>
+      <div class="dash-ai-dd-stat"><div class="dash-ai-dd-stat-lbl">${esc2(t('dash.dd.stat.runout'))}</div><div class="dash-ai-dd-stat-val">${esc2(runoutLbl)}</div></div>`;
+  } else if(key === 'concern'){
+    chartTitle = t('dash.dd.chartTitle.concern');
+    const income   = Math.max(1, cm.pureIncome || 0);
+    const savings  = cm.savings || 0;
+    const sr = Math.round((savings / income) * 100);
+    stats = `
+      <div class="dash-ai-dd-stat"><div class="dash-ai-dd-stat-lbl">${esc2(t('dash.dd.stat.savingsRate'))}</div><div class="dash-ai-dd-stat-val">${sr}%</div></div>
+      <div class="dash-ai-dd-stat"><div class="dash-ai-dd-stat-lbl">${esc2(t('dash.dd.stat.surplus'))}</div><div class="dash-ai-dd-stat-val">${fmt(savings)}</div></div>`;
+  } else if(key === 'recs'){
+    chartTitle = t('dash.dd.chartTitle.recs');
+    const inv = (state.externalAssets || []).filter(a => (a.assetType||'investment')==='investment');
+    const totalContrib = inv.reduce((s,a) => s + (a.monthlyContribution || 0), 0);
+    const count = inv.length;
+    stats = `
+      <div class="dash-ai-dd-stat"><div class="dash-ai-dd-stat-lbl">Accounts</div><div class="dash-ai-dd-stat-val">${count}</div></div>
+      <div class="dash-ai-dd-stat"><div class="dash-ai-dd-stat-lbl">Monthly contributions</div><div class="dash-ai-dd-stat-val">${fmt(totalContrib)}</div></div>`;
+  }
+  return `
+    <div class="dash-ai-dd-panel dd-${key}" data-dd-key="${key}">
+      <div class="dash-ai-dd-hd">
+        <span>${esc2(t('dash.dd.header', { title }))}</span>
+        <button class="dash-ai-dd-close" onclick="toggleDashDeepDive('${key}')">${esc2(t('dash.dd.close'))} ×</button>
+      </div>
+      <div class="dash-ai-dd-stats">${stats}</div>
+      <div class="dash-ai-dd-chart-wrap" data-chart-title="${esc(chartTitle)}"><canvas id="${chartId}"></canvas></div>
+    </div>`;
+}
+
+// Build the mini-charts after the report body mounts. Mirrors how
+// other dashboard charts are deferred via setTimeout so the canvases
+// exist in the DOM before Chart.js tries to attach. Tolerant to
+// missing nodes (re-renders can race with state flips).
+function _syncDashAIMiniCharts(){
+  if(typeof Chart === 'undefined') return;
+  try {
+    const cd = chartDefaults();
+    const proj = getProjection();
+    // Position sparkline — nest egg trajectory in the active lens.
+    const pCv = document.getElementById('dash-ai-mini-position');
+    if(pCv){
+      destroyChart('dash-ai-mini-position');
+      const vals = proj.map(p => FE.display.isNominal() ? (p.total || 0) : (p.realTotal || 0));
+      charts['dash-ai-mini-position'] = new Chart(pCv.getContext('2d'), {
+        type:'line',
+        data:{
+          labels: proj.map(p => p.age),
+          datasets:[{
+            data: vals,
+            borderColor:'#4d9fff', backgroundColor:'#4d9fff22',
+            fill:true, tension:.3, pointRadius:0, borderWidth:1.8,
+          }],
+        },
+        options:{
+          responsive:true, maintainAspectRatio:false,
+          plugins:{ legend:{display:false}, tooltip:{enabled:false} },
+          scales:{ x:{display:false}, y:{display:false} },
+          elements:{ line:{ borderJoinStyle:'round' } },
+        },
+      });
+    }
+    // Concern mini — 12-month income vs expenses.
+    const cCv = document.getElementById('dash-ai-mini-concern');
+    if(cCv){
+      destroyChart('dash-ai-mini-concern');
+      const months = FE.months.next12();
+      charts['dash-ai-mini-concern'] = new Chart(cCv.getContext('2d'), {
+        type:'bar',
+        data:{
+          labels: months.map(m => m.short || ''),
+          datasets:[
+            { label:'Income',   data: months.map(m => m.pureIncome   || 0), backgroundColor:'#22c55e55', borderRadius:2 },
+            { label:'Expenses', data: months.map(m => m.pureExpenses || 0), backgroundColor:'#ef444455', borderRadius:2 },
+          ],
+        },
+        options:{
+          responsive:true, maintainAspectRatio:false,
+          plugins:{ legend:{display:false}, tooltip:{enabled:false} },
+          scales:{ x:{display:false}, y:{display:false} },
+        },
+      });
+    }
+    // Deep-dive chart (whichever section is open)
+    const ddCv = document.getElementById('dash-dd-chart');
+    const ddKey = state.dashDeepDive;
+    if(ddCv && ddKey){
+      destroyChart('dash-dd-chart');
+      const common = {
+        responsive:true, maintainAspectRatio:false,
+        plugins:{ legend:{position:'top', labels:{color:cd.textColor, font:cd.tickFont}}, tooltip:{enabled:true} },
+        scales:{
+          x:{ ticks:{color:cd.textColor, font:cd.tickFont, maxTicksLimit:8}, grid:{color:cd.gridColor} },
+          y:{ ticks:{color:cd.textColor, font:cd.tickFont, callback:v=>fmtC(v)}, grid:{color:cd.gridColor} },
+        },
+      };
+      if(ddKey === 'position'){
+        const savings    = proj.map(p => FE.display.isNominal() ? (p.appSavings||0) : FE.inflation.toTodaysMoney(p.appSavings||0, p.age - state.currentAge));
+        const investment = proj.map(p => FE.display.isNominal() ? (p.external||0)   : FE.inflation.toTodaysMoney(p.external||0,   p.age - state.currentAge));
+        const total      = proj.map(p => FE.display.isNominal() ? (p.total||0)      : (p.realTotal||0));
+        charts['dash-dd-chart'] = new Chart(ddCv.getContext('2d'), {
+          type:'line',
+          data:{
+            labels: proj.map(p => 'Age '+p.age),
+            datasets:[
+              { label:'Total',       data: total,      borderColor:'#00e8a0', backgroundColor:'#00e8a022', fill:true,  tension:.3, pointRadius:0, borderWidth:2 },
+              { label:'Investments', data: investment, borderColor:'#4d9fff', backgroundColor:'transparent', fill:false, tension:.3, pointRadius:0, borderWidth:1.8, borderDash:[6,4] },
+              { label:'Savings',     data: savings,    borderColor:'#f5a623', backgroundColor:'transparent', fill:false, tension:.3, pointRadius:0, borderWidth:1.8, borderDash:[2,4] },
+            ],
+          },
+          options: common,
+        });
+      } else if(ddKey === 'good'){
+        // Coverage series: for each year of retirement, how much of
+        // the gross need was covered by pension + portfolio draw?
+        const sim = (FE.retirement.numbers() || {})._simResult;
+        if(sim && sim.pensionData && sim.portfolioData){
+          const years = sim.pensionData.map((_,i) => state.retirementAge + i);
+          const pension = sim.pensionData.slice();
+          const portfolio = (sim.portfolioData || []).slice();
+          charts['dash-dd-chart'] = new Chart(ddCv.getContext('2d'), {
+            type:'bar',
+            data:{
+              labels: years.map(y => 'Age '+y),
+              datasets:[
+                { label:'Pension',   data: pension,   backgroundColor:'#f5a62366', borderColor:'#f5a623', borderWidth:1, stack:'income' },
+                { label:'Portfolio', data: portfolio, backgroundColor:'#4d9fff66', borderColor:'#4d9fff', borderWidth:1, stack:'income' },
+              ],
+            },
+            options: common,
+          });
+        }
+      } else if(ddKey === 'concern'){
+        const months = FE.months.next12();
+        charts['dash-dd-chart'] = new Chart(ddCv.getContext('2d'), {
+          type:'bar',
+          data:{
+            labels: months.map(m => m.short || m.label),
+            datasets:[
+              { label:'Income',   data: months.map(m => m.pureIncome   || 0), backgroundColor:'#22c55e88', borderRadius:3 },
+              { label:'Expenses', data: months.map(m => m.pureExpenses || 0), backgroundColor:'#ef444488', borderRadius:3 },
+              { label:'Savings',  data: months.map(m => m.savings      || 0), borderColor:'#00d4ff', backgroundColor:'#00d4ff22', type:'line', fill:false, tension:.3, pointRadius:2, borderWidth:2 },
+            ],
+          },
+          options: common,
+        });
+      } else if(ddKey === 'recs'){
+        const inv = (state.externalAssets || []).filter(a => (a.assetType||'investment')==='investment');
+        charts['dash-dd-chart'] = new Chart(ddCv.getContext('2d'), {
+          type:'bar',
+          data:{
+            labels: inv.map(a => a.name || 'Account'),
+            datasets:[
+              { label:'Balance',             data: inv.map(a => a.balance || 0),             backgroundColor:'#4d9fff88', borderRadius:3 },
+              { label:'Monthly contribution',data: inv.map(a => (a.monthlyContribution || 0) * 12), backgroundColor:'#22c55e88', borderRadius:3 },
+            ],
+          },
+          options: common,
+        });
+      }
+    }
+  } catch(e){ console.warn('dash-ai mini charts failed:', e); }
+}
+
+// Toggle one deep-dive panel open at a time. Clicking the same
+// section again collapses it.
+window.toggleDashDeepDive = function(key){
+  if(state.dashDeepDive === key){
+    state.dashDeepDive = null;
+  } else {
+    state.dashDeepDive = key;
+  }
+  save();
+  _syncDashboardReportBody();
+  // Rebuild mini charts + deep-dive chart on the new DOM.
+  setTimeout(_syncDashAIMiniCharts, 20);
+};
 function _fmtWhen(ts){
   if(!ts) return '';
   const d = new Date(ts);
@@ -7870,7 +8847,13 @@ function _fmtWhen(ts){
 // smoothly in place.
 function _syncDashboardReportBody(){
   const host = document.getElementById('dash-ai-report');
-  if(host) host.innerHTML = renderDashboardAIReportBody();
+  if(host){
+    host.innerHTML = renderDashboardAIReportBody();
+    // Mini-visuals + deep-dive chart need the canvases to exist, so
+    // defer one tick — cheap, and keeps the rest of the function
+    // synchronous for the layout swap.
+    setTimeout(_syncDashAIMiniCharts, 20);
+  }
 }
 window.runDashboardAIReport = async function(){
   if(_dashReportRunning) return;
@@ -7919,11 +8902,13 @@ FORMATTING · Follow these rules exactly. No walls of prose.
 
 6. Recommendations must contain **3–5 concrete, actionable bullets** the user can act on THIS month.
 
+Display lens · The user is currently viewing every future-dated amount in ${FE.display.isNominal() ? '**nominal (future kr)** — values have NOT been discounted for inflation' : '**today\u2019s money** — future amounts are inflation-adjusted back to present purchasing power'}. Frame your commentary in that lens; if you reference the opposite frame, label it explicitly so the reader never has to guess which kr is which.
+
 Key snapshot values to reference where relevant:
 - Current month (${cm.label}): income **${Math.round(cm.pureIncome).toLocaleString()} kr**, expenses **${Math.round(cm.pureExpenses).toLocaleString()} kr**, savings **${Math.round(cm.savings).toLocaleString()} kr**, fun fund **${Math.round(cm.pureFunFund).toLocaleString()} kr**
 - 12-month Fun Fund outlook: **${Math.round(funFundTotal).toLocaleString()} kr**
 - Retirement coverage: **${nums.coveragePct.toFixed(0)}%** (verdict: ${nums.verdict})
-- Nest egg (today's money): **${Math.round(nums.nestEgg).toLocaleString()} kr** at age **${state.retirementAge}**
+- Nest egg (today's money): **${Math.round(nums.nestEgg).toLocaleString()} kr** at age **${state.retirementAge}**${FE.display.isNominal() ? `\n- Nest egg (nominal/future kr): **${Math.round(FE.projection.totalNominal()).toLocaleString()} kr**` : ''}
 
 Return plain markdown only — no preamble, no sign-off, no JSON.${langSuffix()}`;
     const raw = await callClaude(prompt, 1800);
@@ -7942,6 +8927,7 @@ Return plain markdown only — no preamble, no sign-off, no JSON.${langSuffix()}
         funFund12mo: funFundTotal,
         coveragePct: nums.coveragePct, verdict: nums.verdict,
         nestEgg: nums.nestEgg, retirementAge: state.retirementAge,
+        displayMode: FE.display.mode(),
       },
     };
     state.dashboardReportError = null;
@@ -8093,14 +9079,14 @@ function renderDashboard() {
         </div>
         <div class="chart-wrap lg"><canvas id="dash-cashflow-chart"></canvas></div>
       </div>
-      <!-- Nest Egg Projection -->
+      <!-- Nest Egg Projection — the in-card Today/Nominal toggle has
+           been replaced by the global topbar toggle so a single
+           control governs every future-dated surface. A subtle lens
+           label on the card title tells the user which frame is
+           active. -->
       <div class="card" data-section="nestegg">
         <div class="card-title" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px">
-          <span>${t('dash.chart.nestegg.title')}</span>
-          <div class="scen-tabs" style="margin:0">
-            <button class="scen-btn ${(state.dashNestEggMode||'real')==='real'?'active':''}" onclick="setDashNestEggMode('real')">${t('dash.chart.toggle.real')}</button>
-            <button class="scen-btn ${(state.dashNestEggMode||'real')==='nominal'?'active':''}" onclick="setDashNestEggMode('nominal')">${t('dash.chart.toggle.nominal')}</button>
-          </div>
+          <span>${t('dash.chart.nestegg.title')} <span class="kpi-lens">· ${esc2(FE.display.label())}</span></span>
         </div>
         <div class="chart-wrap lg"><canvas id="dash-nestegg-chart"></canvas></div>
       </div>
@@ -8154,7 +9140,7 @@ function renderDashboard() {
     if(ne) {
       const cd=chartDefaults();
       const proj=getProjection();
-      const mode = state.dashNestEggMode || 'real';
+      const mode = FE.display.mode();
       // Three distinct series, all sourced from the same single
       // getProjection() result so they stay in lockstep with the
       // Retirement Plan portfolio KPIs and the Savings line item.
@@ -8195,22 +9181,14 @@ function renderDashboard() {
         }})
       });
     }
+    // Mini AI-card visuals + (if open) deep-dive chart.
+    if(typeof _syncDashAIMiniCharts === 'function') _syncDashAIMiniCharts();
   },50);
 }
-// Toggle between real (today's money) and nominal (future kr)
-// on the Dashboard Nest Egg Growth Curve. Persists the choice so
-// a user's preferred lens sticks across sessions. Defaults to
-// real — that's the lens every other retirement view ships with.
-window.setDashNestEggMode = function(mode){
-  if(mode !== 'real' && mode !== 'nominal') return;
-  state.dashNestEggMode = mode;
-  save();
-  // Re-render just the dashboard so the toggle button state + chart
-  // flip together. The live-reactivity pipeline would also catch
-  // this after 200 ms, but firing it synchronously here keeps the
-  // click feel snappy.
-  if(typeof renderDashboard === 'function') renderDashboard();
-};
+// setDashNestEggMode was removed in v13 — the Nest Egg chart now
+// reads the global state.displayMode (see applyDisplayMode in the
+// top bar), which is the single source of truth for every
+// future-dated surface app-wide.
 
 // ══ TRANSACTIONS ═════════════════════════════════════════════════════════════
 function renderTransactions() {
@@ -8953,7 +9931,7 @@ window.askRetirementParamHelp = function(paramKey){
     },
     withdrawTax: {
       name: 'Withdrawal Tax Rate',
-      current: (state.withdrawTaxRate ?? 30) + '%',
+      current: getEffectiveWithdrawTaxRate().toFixed(1) + '% (balance-weighted across investments)',
     },
   };
   const d = defs[paramKey];
@@ -9185,7 +10163,12 @@ function renderRetirement() {
   // savings / Yearly Forecast savings targets upstream.
   const savingsProj = getProjection();
   const savingsFinal = savingsProj.length ? savingsProj[savingsProj.length-1].appSavings : 0;
-  const savingsFinalReal = Math.round(savingsFinal / inflF);
+  // `savingsFinalReal` keeps its old name for callers, but honours the
+  // global display mode: in Nominal the raw future-kr savings balance
+  // is shown; in Real it's discounted back to today's money. The
+  // variable name is kept for git-blame churn reasons — every consumer
+  // just wants "the number to display", which is what this now is.
+  const savingsFinalReal = Math.round(FE.display.isNominal() ? savingsFinal : (savingsFinal / inflF));
   const savingsLastYearContrib = savingsProj.length ? savingsProj[savingsProj.length-1].yearlyContrib : 0;
   // Average monthly savings across the projection window, used as
   // the "Contrib/mo" readout on the row. We average instead of
@@ -9232,7 +10215,11 @@ function renderRetirement() {
     // Per-account projection is read through FinancialEngine so the
     // row-level number always matches the Total Projected card and
     // the Longevity Runway nest egg. No inline inflation math.
-    const projR = isInv ? FE.projection.perAccountReal(a.id) : 0;
+    const projR = isInv
+      ? (FE.display.isNominal()
+          ? FE.projection.perAccountNominal(a.id)
+          : FE.projection.perAccountReal(a.id))
+      : 0;
     // Structured labelled-cell layout. Each field sits in its own
     // .ret-asset-cell with a small UPPERCASE label above a bordered
     // input wrap so the row scans cleanly left-to-right and field
@@ -9246,10 +10233,12 @@ function renderRetirement() {
           ${suffix?`<span class="rac-suffix">${suffix}</span>`:''}
         </div>
       </div>`;
+    const tr4 = Number.isFinite(a.taxRate) ? a.taxRate : 30;
     const fields = isInv ? `
       ${numCell(t('s2.card.field.balance'),      Math.round(a.balance*r),             `state.externalAssets[${idx}].balance=parseNum(this.value)/${r};save()`, s)}
       ${numCell(t('s2.card.field.contribution'), Math.round(a.monthlyContribution*r), `state.externalAssets[${idx}].monthlyContribution=parseNum(this.value)/${r};save()`, s, '/mo')}
       ${numCell(t('s2.card.field.growthRate'),   gr,                                  `state.externalAssets[${idx}].growthRate=parseNum(this.value);save()`, '', '%')}
+      ${numCell(t('s2.card.field.taxRate'),      tr4,                                 `state.externalAssets[${idx}].taxRate=parseNum(this.value);save()`, '', '%')}
     ` : `
       ${numCell(t('s2.card.field.payout'),  Math.round((a.monthlyPayout||0)*r), `state.externalAssets[${idx}].monthlyPayout=parseNum(this.value)/${r};save()`, s, '/mo')}
       ${numCell(t('s2.card.field.fromAge'), a.startAge||state.retirementAge,    `state.externalAssets[${idx}].startAge=parseNum(this.value);save()`)}
@@ -9306,7 +10295,7 @@ function renderRetirement() {
   // that's already localised.
   const newAccountName = t('s2.new.account').replace(/'/g, "\\'");
   const newPensionName = t('s2.new.pension').replace(/'/g, "\\'");
-  const addInvestmentBtn = `<button class="ret-col-add" onclick="state.externalAssets.push({id:genId(),name:'${newAccountName}',balance:0,monthlyContribution:0,growthRate:7,assetType:'investment'});save();renderRetirement()">${esc2(t('s2.col.addInvestment'))}</button>`;
+  const addInvestmentBtn = `<button class="ret-col-add" onclick="state.externalAssets.push({id:genId(),name:'${newAccountName}',balance:0,monthlyContribution:0,growthRate:7,taxRate:30,assetType:'investment'});save();renderRetirement()">${esc2(t('s2.col.addInvestment'))}</button>`;
   const addPensionBtn    = `<button class="ret-col-add" onclick="state.externalAssets.push({id:genId(),name:'${newPensionName}',monthlyPayout:0,startAge:state.retirementAge,endAge:null,assetType:'pension'});save();renderRetirement()">${esc2(t('s2.col.addPension'))}</button>`;
   const emptyInv = `<div class="ret-col-empty">${t('s2.col.emptyInv')}</div>`;
   const emptyPen = `<div class="ret-col-empty">${t('s2.col.emptyPen')}</div>`;
@@ -9327,7 +10316,7 @@ function renderRetirement() {
       <div class="kpi-row" style="margin-bottom:10px;margin-top:10px">
         <div class="kpi"><div class="kpi-icon">◈</div><div class="kpi-lbl">${esc2(t('s2.kpi.totalBalance'))}</div><div class="kpi-val pos">${fmt(tBal)}</div><div class="kpi-sub">${t('s2.kpi.totalBalance.sub', { n: investments.length, s: investments.length !== 1 ? 's' : '', savings: fmt(savNow) })}</div></div>
         <div class="kpi"><div class="kpi-icon">▲</div><div class="kpi-lbl">${esc2(t('s2.kpi.monthlyContrib'))}</div><div class="kpi-val" style="color:var(--amber)">${fmt(tContrib)}</div><div class="kpi-sub">${esc2(t('s2.kpi.monthlyContrib.sub'))}</div></div>
-        <div class="kpi"><div class="kpi-icon">☀</div><div class="kpi-lbl">${esc2(t('s2.kpi.projected'))}</div><div class="kpi-val" style="color:var(--cyan)">${fmt(projReal)}</div><div class="kpi-sub">${t('s2.kpi.projected.sub', { ytr, inv: fmt(investmentsProjReal), sav: fmt(savingsProjReal) })}</div></div>
+        <div class="kpi"><div class="kpi-icon">☀</div><div class="kpi-lbl">${esc2(t('s2.kpi.projected'))} <span class="kpi-lens">· ${esc2(FE.display.label())}</span></div><div class="kpi-val" style="color:var(--cyan)">${fmt(FE.display.pick(projReal, projNom))}</div><div class="kpi-sub">${t('s2.kpi.projected.sub', { ytr, inv: fmt(FE.display.pick(investmentsProjReal, investmentsProjNom)), sav: fmt(FE.display.pick(savingsProjReal, savingsProjNom)) })}</div></div>
         ${hasPensions?`<div class="kpi"><div class="kpi-icon">🏛</div><div class="kpi-lbl">${esc2(t('s2.kpi.pensionIncome'))}</div><div class="kpi-val" style="color:var(--amber)">${fmt(getAllPensionIncome())}/mo</div><div class="kpi-sub">${t(pensionKpiSubKey, { n: pensions.length, s: pensions.length !== 1 ? 's' : '', age: earliestPension })}</div></div>`:''}
       </div>
       <div class="ret-portfolio-grid">
@@ -9416,7 +10405,6 @@ function renderRetirement() {
               <div class="field"><label class="field-label-row">${esc2(t('s3.params.growthRate'))}<button type="button" class="field-help-btn" onclick="askRetirementParamHelp('growthRate')" title="${esc2(t('s3.params.helpTitle'))}">?</button></label><input type="text" inputmode="decimal" data-lang-num="1" value="${state.growthRate}" oninput="state.growthRate=parseNum(this.value);save()" onchange="commitRender('renderRetirement')"></div>
               <div class="field"><label class="field-label-row">${esc2(t('s3.params.inflation'))}<button type="button" class="field-help-btn" onclick="askRetirementParamHelp('inflation')" title="${esc2(t('s3.params.helpTitle'))}">?</button></label><input type="text" inputmode="decimal" data-lang-num="1" value="${state.inflationRate}" oninput="state.inflationRate=parseNum(this.value);save()" onchange="commitRender('renderRetirement')"></div>
               <div class="field"><label class="field-label-row">${esc2(t('s3.params.postRetGrowth'))}<button type="button" class="field-help-btn" onclick="askRetirementParamHelp('postGrowth')" title="${esc2(t('s3.params.helpTitle'))}">?</button></label><input type="text" inputmode="decimal" data-lang-num="1" value="${state.retirementPostGrowth||4}" oninput="state.retirementPostGrowth=parseNum(this.value);save()" onchange="commitRender('renderRetirement')"></div>
-              <div class="field"><label class="field-label-row">${esc2(t('s3.params.withdrawalTax'))}<button type="button" class="field-help-btn" onclick="askRetirementParamHelp('withdrawTax')" title="${esc2(t('s3.params.helpTitle'))}">?</button></label><input type="text" inputmode="decimal" data-lang-num="1" value="${state.withdrawTaxRate||30}" oninput="state.withdrawTaxRate=parseNum(this.value);save()" onchange="commitRender('renderRetirement')"></div>
               <div class="field" style="grid-column:1/-1"><label>${esc2(t('s3.params.lifeExp'))}</label><input type="text" inputmode="decimal" data-lang-num="1" value="${state.lifeExp||90}" oninput="state.lifeExp=parseNum(this.value);save()" onchange="commitRender('renderRetirement')"></div>
             </div>
           </div>
@@ -10208,7 +11196,14 @@ function renderFunFund() {
           </div>
         </div>
       </div>
-    </div>`;
+    </div>
+
+    <!-- AI fund outlook — pulls from monthly cash-flow, planned trips,
+         and the running Fun Fund balance to advise on discretionary
+         funding. Same tone/shape as the Dashboard AI Financial
+         Analysis, scaled down so it never overshadows the trip list
+         and chart above. -->
+    <div id="ff-ai-report" class="card ff-ai">${renderFunFundAIBody()}</div>`;
 
   setTimeout(()=>{
     destroyChart('ff');
@@ -10235,6 +11230,101 @@ function renderFunFund() {
     }
   },50);
 }
+
+// ─── FUN FUND · AI fund outlook ─────────────────────────────────────
+// Short, scannable analysis block at the bottom of the Fun Fund tab.
+// Deliberately lighter than the Dashboard report: no four-section
+// scaffold, no lang-stale banner — just a single tight write-up
+// focused on whether the current numbers comfortably fund the
+// discretionary + travel plans above.
+let _funFundReportRunning = false;
+function renderFunFundAIBody(){
+  const r = state.funFundReport;
+  const err = state.funFundReportError;
+  const running = _funFundReportRunning;
+  const head = (actions='') => `
+    <div class="ff-ai-hd">
+      <div>
+        <div class="ff-ai-title">${t('ff.ai.title')} ${r && r.generatedAt ? `<span class="ff-ai-stamp">${t('ff.ai.stamp', { when: _fmtWhen(r.generatedAt) })}</span>` : ''}</div>
+      </div>
+      <div style="display:flex;gap:8px">${actions}</div>
+    </div>
+    <p class="ff-ai-sub">${esc2(t('ff.ai.sub'))}</p>`;
+  if(running){
+    return head('') + `<div class="ff-ai-running"><div class="spinner"></div><span>${t('ff.ai.running')}</span></div>`;
+  }
+  if(err){
+    return head(`<button class="btn btn-sm btn-o" onclick="runFunFundAIReport()">${t('dash.ai.tryAgain')}</button>`)
+      + `<div class="ff-ai-err">${esc(err)}</div>`;
+  }
+  if(!r){
+    return head(`<button class="btn btn-g btn-sm" onclick="runFunFundAIReport()">${t('ff.ai.run')}</button>`)
+      + `<div class="ff-ai-empty">${t('ff.ai.empty')}</div>`;
+  }
+  const body = r.content || '';
+  return head(`<button class="btn btn-sm btn-o" onclick="runFunFundAIReport()">${t('ff.ai.rerun')}</button>`)
+    + `<div class="ff-ai-body">${body ? _renderAISectionBody(body) : ''}</div>`;
+}
+function _syncFunFundAIBody(){
+  const host = document.getElementById('ff-ai-report');
+  if(host) host.innerHTML = renderFunFundAIBody();
+}
+window.runFunFundAIReport = async function(){
+  if(_funFundReportRunning) return;
+  _funFundReportRunning = true;
+  state.funFundReportError = null;
+  _syncFunFundAIBody();
+  try {
+    const months = FE.months.next12();
+    const totalFF = getMonthlyFunFundBalance();
+    const totalTrips = (state.trips || []).reduce((s, tr) => s + (tr.expenses || []).reduce((a,e) => a + (Number(e.amount)||0), 0), 0);
+    const spentSoFar = (state.trips || []).reduce((s, tr) => s + (Number(tr.spent) || 0), 0);
+    const remaining = totalFF - totalTrips;
+    const tripSummary = (state.trips || []).map(tr => {
+      const trBudget = (tr.expenses || []).reduce((a,e) => a + (Number(e.amount)||0), 0);
+      return `  · ${tr.name || 'Trip'} (${tr.country || '—'}, ${tr.status || 'planning'}) — budget ${Math.round(trBudget).toLocaleString()} kr, spent ${Math.round(tr.spent || 0).toLocaleString()} kr`;
+    }).join('\n') || '  · (no trips planned)';
+    const minBal = months.reduce((m, mo) => Math.min(m, mo.funFund || 0), Infinity);
+    const maxBal = months.reduce((m, mo) => Math.max(m, mo.funFund || 0), -Infinity);
+    const prompt = `Write a short, practical Fun Fund outlook for me. Interpret what the current numbers say about discretionary funding for lifestyle and travel — this is a reality check, not a sermon.
+
+STRUCTURE · 3–5 bullet points. No headings. No intro. No sign-off.
+
+FORMATTING · Follow these rules exactly:
+1. Lead with a one-sentence verdict: can the current Fun Fund comfortably cover the planned trips, or not?
+2. **Bold** every currency figure, percentage, and ratio.
+3. Use inline tone markers:
+   {+text} POSITIVE (green) · {-text} NEGATIVE (red) · {!text} WARNING (amber) · {~text} NEUTRAL (muted).
+4. Close with one concrete, actionable suggestion tied to the specific numbers — not generic advice.
+5. Keep the whole thing under 120 words.
+
+Snapshot:
+- 12-month Fun Fund total: **${Math.round(totalFF).toLocaleString()} kr**
+- Planned trip budget (sum of all trips): **${Math.round(totalTrips).toLocaleString()} kr**
+- Already spent on trips: **${Math.round(spentSoFar).toLocaleString()} kr**
+- Remaining after planned trips: **${Math.round(remaining).toLocaleString()} kr**
+- Running balance min/max across next 12 months: ${Math.round(minBal === Infinity ? 0 : minBal).toLocaleString()} kr / ${Math.round(maxBal === -Infinity ? 0 : maxBal).toLocaleString()} kr
+- Trips:
+${tripSummary}
+
+Return plain markdown only.${langSuffix()}`;
+    const raw = await callClaude(prompt, 600);
+    state.funFundReport = {
+      generatedAt: Date.now(),
+      lang: state.lang,
+      content: raw,
+      snapshot: { totalFF, totalTrips, spentSoFar, remaining, tripCount: (state.trips||[]).length, displayMode: FE.display.mode() },
+    };
+    state.funFundReportError = null;
+  } catch(e){
+    state.funFundReportError = (e && e.message) || String(e);
+  } finally {
+    _funFundReportRunning = false;
+    save();
+    _syncFunFundAIBody();
+  }
+};
+
 // Trip lifecycle handlers. Trips carry an `expenses` array so a
 // single trip can spread costs across multiple months (e.g. flights
 // in May, hotel in August). get12Months() mirrors every expense into
@@ -11444,6 +12534,45 @@ function renderSettings() {
       </div>
     </div>
 
+    <!-- Personal Profile — OPTIONAL; every field the user fills gets
+         threaded into buildPersonalContext() so it reaches every AI
+         surface (dashboard report, retirement chat, deep dives). -->
+    <div class="card profile-card">
+      <div class="card-title">${esc2(t('settings.profile.title'))} <span class="ctx-badge" style="background:var(--bg3);color:var(--text3);border-color:var(--border)">${esc2(t('settings.profile.optional'))}</span></div>
+      <p class="ctx-blurb">${esc2(t('settings.profile.blurb'))}</p>
+      <div class="profile-grid">
+        <div class="ctx-field">
+          <label>${esc2(t('settings.profile.salary'))}</label>
+          <div class="profile-money">
+            <span class="profile-money-sym">${s}</span>
+            <input type="text" inputmode="decimal" data-lang-num="1" placeholder="${esc2(t('settings.profile.salary.ph'))}" value="${state.profile.salary?Math.round(state.profile.salary*r):''}" oninput="state.profile.salary=parseNum(this.value)/${r};save()">
+          </div>
+        </div>
+        <div class="ctx-field">
+          <label>${esc2(t('settings.profile.marital'))}</label>
+          <select class="profile-select" onchange="state.profile.maritalStatus=this.value;save()">
+            <option value="" ${!state.profile.maritalStatus?'selected':''}>${esc2(t('settings.profile.marital.ph'))}</option>
+            <option value="single"    ${state.profile.maritalStatus==='single'?'selected':''}>${esc2(t('settings.profile.marital.single'))}</option>
+            <option value="partnered" ${state.profile.maritalStatus==='partnered'?'selected':''}>${esc2(t('settings.profile.marital.partnered'))}</option>
+            <option value="married"   ${state.profile.maritalStatus==='married'?'selected':''}>${esc2(t('settings.profile.marital.married'))}</option>
+            <option value="divorced"  ${state.profile.maritalStatus==='divorced'?'selected':''}>${esc2(t('settings.profile.marital.divorced'))}</option>
+            <option value="widowed"   ${state.profile.maritalStatus==='widowed'?'selected':''}>${esc2(t('settings.profile.marital.widowed'))}</option>
+          </select>
+        </div>
+        <div class="ctx-field">
+          <label>${esc2(t('settings.profile.hhIncome'))}</label>
+          <div class="profile-money">
+            <span class="profile-money-sym">${s}</span>
+            <input type="text" inputmode="decimal" data-lang-num="1" placeholder="${esc2(t('settings.profile.hhIncome.ph'))}" value="${state.profile.householdIncome?Math.round(state.profile.householdIncome*r):''}" oninput="state.profile.householdIncome=parseNum(this.value)/${r};save()">
+          </div>
+        </div>
+        <div class="ctx-field profile-goals">
+          <label>${esc2(t('settings.profile.goals'))}</label>
+          <textarea class="profile-textarea" rows="3" placeholder="${esc2(t('settings.profile.goals.ph'))}" oninput="state.profile.goals=this.value;save()">${esc(state.profile.goals||'')}</textarea>
+        </div>
+      </div>
+    </div>
+
     <div class="two-col">
       <!-- Baseline income -->
       <div class="card">
@@ -11660,6 +12789,233 @@ function _vaultNormalise(v){
     raw: v,
   };
 }
+// ══ JOURNAL ══════════════════════════════════════════════════════════════
+// Dated log of events, decisions, and reflections. Deliberately light —
+// each entry is just { id, date, tag, content, updatedAt } — so the UX
+// stays out of the user's way. The composer is sticky on wide screens
+// so capture is always one action away, and entries group by month so
+// patterns across weeks are easy to scan. _journalEditing holds the id
+// of the entry currently in edit mode (one at a time) so inline edit
+// doesn't need its own DOM diffing.
+let _journalEditing = null;
+const JOURNAL_TAGS = ['event','decision','reflection'];
+function _journalTodayIso(){
+  const d = new Date();
+  const mm = String(d.getMonth()+1).padStart(2,'0');
+  const dd = String(d.getDate()).padStart(2,'0');
+  return `${d.getFullYear()}-${mm}-${dd}`;
+}
+function _journalWeekday(iso){
+  try {
+    const d = new Date(iso + 'T00:00:00');
+    return d.toLocaleDateString(state.lang === 'sv' ? 'sv-SE' : 'en-US', { weekday:'short' });
+  } catch(_e){ return ''; }
+}
+function _journalMonthLabel(iso){
+  try {
+    const d = new Date(iso + 'T00:00:00');
+    return d.toLocaleDateString(state.lang === 'sv' ? 'sv-SE' : 'en-US', { year:'numeric', month:'long' });
+  } catch(_e){ return iso.slice(0,7); }
+}
+function _journalDateLabel(iso){
+  try {
+    const d = new Date(iso + 'T00:00:00');
+    return d.toLocaleDateString(state.lang === 'sv' ? 'sv-SE' : 'en-US', { day:'numeric', month:'short', year:'numeric' });
+  } catch(_e){ return iso; }
+}
+function renderJournal(){
+  const el = document.getElementById('panel-journal'); if(!el) return;
+  const entries = Array.isArray(state.journal) ? state.journal.slice() : [];
+  // Newest first — primary by date (YYYY-MM-DD sorts lexically), then
+  // by updatedAt for entries sharing a date (latest edit wins).
+  entries.sort((a,b) => {
+    if(a.date !== b.date) return (b.date || '').localeCompare(a.date || '');
+    return (b.updatedAt || 0) - (a.updatedAt || 0);
+  });
+  // KPIs
+  const todayIso = _journalTodayIso();
+  const yyyymm   = todayIso.slice(0,7);
+  const thisMonth = entries.filter(e => (e.date || '').startsWith(yyyymm)).length;
+  const last = entries[0];
+  const lastLabel = last ? _journalDateLabel(last.date) : t('journal.kpi.last.none');
+  // Group by YYYY-MM so the list reads as a monthly digest.
+  const groups = [];
+  const groupByKey = {};
+  entries.forEach(e => {
+    const key = (e.date || '').slice(0,7) || '—';
+    if(!groupByKey[key]){
+      groupByKey[key] = { key, label:_journalMonthLabel((e.date || todayIso).slice(0,7) + '-01'), items:[] };
+      groups.push(groupByKey[key]);
+    }
+    groupByKey[key].items.push(e);
+  });
+
+  const tagOption = (val, label, selected) =>
+    `<option value="${val}" ${selected===val?'selected':''}>${esc2(label)}</option>`;
+
+  const composer = `
+    <div class="card journal-compose">
+      <div class="card-title">${esc2(t('journal.compose.title'))}</div>
+      <div class="journal-row">
+        <div class="ctx-field">
+          <label>${esc2(t('journal.compose.date'))}</label>
+          <input id="j-compose-date" type="date" class="journal-date" value="${todayIso}">
+        </div>
+        <div class="ctx-field">
+          <label>${esc2(t('journal.compose.tag'))}</label>
+          <select id="j-compose-tag" class="profile-select">
+            ${tagOption('',           t('journal.tag.none'),        '')}
+            ${tagOption('event',      t('journal.tag.event'),       '')}
+            ${tagOption('decision',   t('journal.tag.decision'),    '')}
+            ${tagOption('reflection', t('journal.tag.reflection'),  '')}
+          </select>
+        </div>
+      </div>
+      <textarea id="j-compose-content" class="journal-textarea" placeholder="${esc2(t('journal.compose.content'))}"></textarea>
+      <div class="journal-actions">
+        <button class="btn btn-o btn-sm" onclick="journalClearComposer()">${esc2(t('journal.compose.cancel'))}</button>
+        <button class="btn btn-g btn-sm" onclick="journalSaveNew()">${esc2(t('journal.compose.save'))}</button>
+      </div>
+    </div>`;
+
+  const emptyState = `
+    <div class="card">
+      <div class="journal-empty">
+        <div class="journal-empty-title">${esc2(t('journal.empty.title'))}</div>
+        <div>${esc2(t('journal.empty.body'))}</div>
+      </div>
+    </div>`;
+
+  const renderEntry = (e) => {
+    const tag = JOURNAL_TAGS.includes(e.tag) ? e.tag : '';
+    const editing = _journalEditing === e.id;
+    if(editing){
+      return `
+        <div class="journal-entry journal-entry-edit" data-tag="${tag}">
+          <div class="journal-row">
+            <div class="ctx-field">
+              <label>${esc2(t('journal.compose.date'))}</label>
+              <input id="j-edit-date-${e.id}" type="date" class="journal-date" value="${esc(e.date||todayIso)}">
+            </div>
+            <div class="ctx-field">
+              <label>${esc2(t('journal.compose.tag'))}</label>
+              <select id="j-edit-tag-${e.id}" class="profile-select">
+                ${tagOption('',           t('journal.tag.none'),       e.tag||'')}
+                ${tagOption('event',      t('journal.tag.event'),      e.tag||'')}
+                ${tagOption('decision',   t('journal.tag.decision'),   e.tag||'')}
+                ${tagOption('reflection', t('journal.tag.reflection'), e.tag||'')}
+              </select>
+            </div>
+          </div>
+          <textarea id="j-edit-content-${e.id}" class="journal-textarea">${esc(e.content||'')}</textarea>
+          <div class="journal-actions">
+            <button class="btn btn-o btn-sm" onclick="journalCancelEdit()">${esc2(t('journal.entry.cancel'))}</button>
+            <button class="btn btn-g btn-sm" onclick="journalSaveEdit('${e.id}')">${esc2(t('journal.entry.save'))}</button>
+          </div>
+        </div>`;
+    }
+    const tagLabel = tag ? t('journal.tag.'+tag) : '';
+    return `
+      <div class="journal-entry" data-tag="${tag}">
+        <div class="journal-entry-top">
+          <span class="journal-entry-date">${esc2(_journalDateLabel(e.date||''))}</span>
+          <span class="journal-entry-weekday">${esc2(_journalWeekday(e.date||''))}</span>
+          ${tag ? `<span class="journal-tag">${esc2(tagLabel)}</span>` : ''}
+          <div class="journal-entry-actions">
+            <button class="btn btn-o btn-xs" onclick="journalStartEdit('${e.id}')">${esc2(t('journal.entry.edit'))}</button>
+            <button class="btn btn-danger btn-xs" onclick="journalDelete('${e.id}')">${esc2(t('journal.entry.delete'))}</button>
+          </div>
+        </div>
+        <div class="journal-entry-content">${esc2(e.content||'')}</div>
+      </div>`;
+  };
+
+  const list = entries.length === 0 ? emptyState : groups.map(g => `
+    <div class="journal-month">
+      <div class="journal-month-hd">${esc2(g.label)} · ${g.items.length}</div>
+      ${g.items.map(renderEntry).join('')}
+    </div>`).join('');
+
+  el.innerHTML = `
+    <div class="ph">
+      <div class="ph-tag">${esc2(t('sb.group.library'))}</div>
+      <div class="ph-title">${esc2(t('journal.page.title'))}</div>
+      <div class="ph-sub">${esc2(t('journal.page.sub'))}</div>
+    </div>
+
+    <div class="journal-kpis">
+      <div class="kpi"><div class="kpi-icon">📓</div><div class="kpi-lbl">${esc2(t('journal.kpi.total'))}</div><div class="kpi-val">${entries.length}</div></div>
+      <div class="kpi"><div class="kpi-icon">📅</div><div class="kpi-lbl">${esc2(t('journal.kpi.thisMonth'))}</div><div class="kpi-val" style="color:var(--cyan)">${thisMonth}</div></div>
+      <div class="kpi" style="grid-column:span 2"><div class="kpi-icon">⌛</div><div class="kpi-lbl">${esc2(t('journal.kpi.last'))}</div><div class="kpi-val" style="font-size:14px;font-weight:600">${esc2(lastLabel)}</div></div>
+    </div>
+
+    <div class="journal-grid">
+      ${composer}
+      <div>${list}</div>
+    </div>`;
+}
+
+// ─── Journal handlers ──────────────────────────────────────────────
+window.journalSaveNew = function(){
+  const date = (document.getElementById('j-compose-date')||{}).value || _journalTodayIso();
+  const tag  = (document.getElementById('j-compose-tag')||{}).value || '';
+  const content = ((document.getElementById('j-compose-content')||{}).value || '').trim();
+  if(!content) return;
+  if(!Array.isArray(state.journal)) state.journal = [];
+  const now = Date.now();
+  state.journal.push({
+    id: genId(),
+    date,
+    tag,
+    content,
+    createdAt: now,
+    updatedAt: now,
+  });
+  save();
+  renderJournal();
+};
+window.journalClearComposer = function(){
+  const d = document.getElementById('j-compose-date');   if(d) d.value = _journalTodayIso();
+  const g = document.getElementById('j-compose-tag');    if(g) g.value = '';
+  const c = document.getElementById('j-compose-content'); if(c) c.value = '';
+};
+window.journalStartEdit = function(id){
+  _journalEditing = id;
+  renderJournal();
+};
+window.journalCancelEdit = function(){
+  _journalEditing = null;
+  renderJournal();
+};
+window.journalSaveEdit = function(id){
+  const list = state.journal || [];
+  const e = list.find(x => x.id === id);
+  if(!e) { _journalEditing = null; renderJournal(); return; }
+  const date = (document.getElementById('j-edit-date-'+id)||{}).value || e.date;
+  const tag  = (document.getElementById('j-edit-tag-'+id)||{}).value || '';
+  const content = ((document.getElementById('j-edit-content-'+id)||{}).value || '').trim();
+  if(!content){
+    // Empty edit = delete. Mirrors how most journal apps treat
+    // "save empty" so the user has a second path to remove an entry.
+    state.journal = list.filter(x => x.id !== id);
+  } else {
+    e.date = date;
+    e.tag = tag;
+    e.content = content;
+    e.updatedAt = Date.now();
+  }
+  _journalEditing = null;
+  save();
+  renderJournal();
+};
+window.journalDelete = function(id){
+  if(!confirm(t('journal.entry.deleteConfirm'))) return;
+  state.journal = (state.journal || []).filter(x => x.id !== id);
+  if(_journalEditing === id) _journalEditing = null;
+  save();
+  renderJournal();
+};
+
 function renderVault(){
   const el = document.getElementById('panel-vault'); if(!el) return;
   const rawVault = Array.isArray(state.vault) ? state.vault : [];
@@ -12026,11 +13382,12 @@ ${'<'}script>window.addEventListener('load', () => setTimeout(() => window.print
 // the traditional full-state roundtrip.
 const EXPORT_SLICES = [
   { key:'baseline',   icon:'💰', label:'Baseline',        sub:'Income, expenses, savings target', fields:['baseIncome','baseExpenses','baseSavings'] },
-  { key:'retirement', icon:'🎯', label:'Retirement',      sub:'Portfolio assets, scenarios, ages, tax', fields:['externalAssets','retirementExpenses','retirementScenario','currentAge','retirementAge','lifeExp','withdrawTaxRate','growthRate','inflationRate','retirementPostGrowth'] },
+  { key:'retirement', icon:'🎯', label:'Retirement',      sub:'Portfolio assets, scenarios, ages, tax', fields:['externalAssets','retirementExpenses','retirementScenario','currentAge','retirementAge','lifeExp','growthRate','inflationRate','retirementPostGrowth'] },
   { key:'places',     icon:'🌍', label:'Places',          sub:'Retire Anywhere destinations', fields:['places'] },
   { key:'trips',      icon:'✈️', label:'Trips & Fun Fund', sub:'Planned travel and lifestyle budget', fields:['trips'] },
   { key:'overrides',  icon:'📆', label:'Overrides',       sub:'Monthly overrides + yearly bases', fields:['monthlyOverrides','yearlyBases','cascadeEnabled'] },
-  { key:'settings',   icon:'⚙', label:'Preferences',     sub:'Theme, currency, exchange rates, AI keys', fields:['currency','exchangeRates','darkMode','tickerQuote','aiKeys','aiProvider','categoryMap'] },
+  { key:'journal',    icon:'📓', label:'Journal',         sub:'Dated events, decisions, and reflections', fields:['journal'] },
+  { key:'settings',   icon:'⚙', label:'Preferences',     sub:'Theme, currency, exchange rates, AI keys, personal profile', fields:['currency','exchangeRates','darkMode','tickerQuote','aiKeys','aiProvider','categoryMap','profile','displayMode'] },
   { key:'all',        icon:'📦', label:'Everything',      sub:'Full state backup (overwrites on import)', fields:null },
 ];
 function downloadJSON(filename, data){
@@ -12475,9 +13832,49 @@ function buildPersonalContext(){
   const cz = countryInfo(state.citizenship);
   const hb = countryInfo(state.homeBase);
   if(!cz || !hb) return '';
-  return `PERSONAL CONTEXT (use this to personalise every answer — tax, pensions, visas, residency, cost of living, currency):
+  let ctx = `PERSONAL CONTEXT (use this to personalise every answer — tax, pensions, visas, residency, cost of living, currency):
 - Citizenship: ${cz.name} (${cz.code}) — evaluate passport strength, visa reciprocity, tax treaties, and pension portability based on this nationality.
 - Current home base: ${hb.name} (${hb.code}) — use this as the baseline for comparisons, assume the user currently files taxes here, and reference this country's cost of living / healthcare / rules when drawing contrasts.`;
+  // Optional profile lines — each one is only appended when the user
+  // has actually filled it in, so a blank profile adds no noise to
+  // the prompt and an incomplete profile contributes exactly the
+  // fields the user was comfortable sharing.
+  const p = state.profile || {};
+  const profileLines = [];
+  if(p.salary && p.salary > 0){
+    profileLines.push(`- Gross individual salary: ~${Math.round(p.salary).toLocaleString()} kr/mo — anchor any tax, savings-rate, or affordability analysis to this income.`);
+  }
+  if(p.maritalStatus){
+    const MARITAL_LABEL = { single:'single', partnered:'partnered / cohabiting', married:'married', divorced:'divorced', widowed:'widowed' };
+    profileLines.push(`- Marital status: ${MARITAL_LABEL[p.maritalStatus] || p.maritalStatus} — factor in spousal tax allowances, survivor benefits, joint filing, and beneficiary planning where relevant.`);
+  }
+  if(p.householdIncome && p.householdIncome > 0){
+    profileLines.push(`- Combined household income: ~${Math.round(p.householdIncome).toLocaleString()} kr/mo — use this as the true household cash-flow base when the question is about household-level affordability, not individual.`);
+  }
+  if(p.goals && p.goals.trim()){
+    // Keep free-text goals literal so the model can quote them back.
+    profileLines.push(`- Stated financial goals (quote these verbatim when making recommendations): "${p.goals.trim().replace(/\s+/g,' ')}"`);
+  }
+  if(profileLines.length){
+    ctx += `\n\nPERSONAL PROFILE (tie specific advice to these facts — never invent ones the user hasn't shared):\n` + profileLines.join('\n');
+  }
+  // Recent journal entries — helps the AI reference what's actually
+  // been happening in the user's life. Cap at 5 most recent, trim
+  // each to 280 chars so the prompt stays focused.
+  const journal = Array.isArray(state.journal) ? state.journal.slice() : [];
+  if(journal.length){
+    journal.sort((a,b) => {
+      if(a.date !== b.date) return (b.date || '').localeCompare(a.date || '');
+      return (b.updatedAt || 0) - (a.updatedAt || 0);
+    });
+    const recent = journal.slice(0, 5).map(e => {
+      const tag = e.tag ? ` [${e.tag}]` : '';
+      const body = String(e.content || '').replace(/\s+/g,' ').trim().slice(0, 280);
+      return `- ${e.date || '(undated)'}${tag}: ${body}`;
+    });
+    ctx += `\n\nRECENT JOURNAL (${journal.length} total, 5 latest shown — reference these when the user asks about recent decisions or events; never fabricate ones not listed):\n` + recent.join('\n');
+  }
+  return ctx;
 }
 
 // Build the "dynamic catalog" section of the system prompt. Runs
