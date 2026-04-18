@@ -5648,12 +5648,21 @@ function getEffective(year, month) {
   };
 }
 
-function get12Months() {
-  return memoSelect('12mo', () => {
+// Internal 13-entry window used ONLY as the raw chain computation.
+// Public views — get12Months() and getNext12Forward() — slice this
+// to expose exactly 12 entries in their respective semantics. We
+// compute 13 internally so the forward-only view (CM+1..CM+12) can
+// share one chain with the rolling view (CM..CM+11) without
+// re-running the carry-forward pass twice per render.
+function _get13MonthChain() {
+  return memoSelect('13mo', () => {
     const months = [];
-    // Pass 1: build the 13-month window (current + 12 forward) from the
-    // raw effective values. carryForward is computed in pass 2 so each
-    // month's totals INCLUDE the rollover from the previous month.
+    // Pass 1: build the 13-month window (current + 12 forward) from
+    // the raw effective values. carryForward is computed in pass 2
+    // so each month's totals INCLUDE the rollover from the previous
+    // month. The 13th entry is NOT shown to the user via the rolling
+    // view — it exists so getNext12Forward() can slice index 1..12
+    // and still get 12 entries.
     for (let i=0; i<=12; i++) {
       const d = new Date(CY, CM+i, 1);
       const year=d.getFullYear(), month=d.getMonth();
@@ -5693,10 +5702,7 @@ function get12Months() {
       // "Pure" values — Income / Expenses / Fun Fund computed STRICTLY
       // from the user's baseline + monthly override inputs (plus any
       // synthetic trip items injected above), with no cross-month
-      // carry-forward applied. These are the numbers that answer "for
-      // this month, what do Income − Expenses − Savings yield?" —
-      // used by the Fun Fund tab so its chart + list always mirror
-      // the Monthly Review inputs one-for-one.
+      // carry-forward applied.
       const pureIncome   = sumArr(incomeItems,  'amount');
       const pureExpenses = sumArr(expenseItems, 'amount');
       const pureFunFund  = pureIncome - pureExpenses - v.savings;
@@ -5787,6 +5793,25 @@ function get12Months() {
     }
     return months;
   });
+}
+
+// Rolling 12-month window = current month + 11 forward. The canonical
+// "12 months ahead" view every tab uses. Exactly 12 entries.
+//
+// A rolling 12-month window means month 1 = current month and
+// month 12 = current month + 11. If the window starts in April it
+// ends in March of the following year, not April.
+function get12Months() {
+  return _get13MonthChain().slice(0, 12);
+}
+
+// Strictly-future 12-month window = CM+1 .. CM+12. Used ONLY where
+// the UI explicitly contrasts past vs future and the two panels
+// cannot share the current month (the Transactions tab's Past 12 /
+// Next 12 paired charts). Distinct concept from the rolling window;
+// do NOT use this helper anywhere that's supposed to be "rolling 12".
+function getNext12Forward() {
+  return _get13MonthChain().slice(1);
 }
 
 function futureValue(P, PMT, r, years) {
@@ -6125,45 +6150,46 @@ const FinancialEngine = (() => {
     const p = getProjection();
     return p.length ? p[p.length - 1] : null;
   };
-  // ── months · 12-month forward window ────────────────────────────────
+  // ── months · 12-month rolling window ────────────────────────────────
+  // Every helper here returns exactly 12 entries — the rolling view
+  // defined as "current month + 11 forward". The strictly-future
+  // sibling (CM+1..CM+12) lives on .next12Forward() for the one
+  // chart pair that still needs a 12-month future-only view.
   const months = {
     next12:            () => get12Months(),
+    next12Forward:     () => getNext12Forward(),
     current:           () => get12Months()[0] || null,
     find:              (key) => get12Months().find(m => m.key === key) || null,
-    // Running cumulative savings across the 12-month window. Each
-    // index i holds the sum of months[0..i].savings. Replaces the
-    // five independent `let run=0; months.map(...)` blocks that
-    // previously lived in renderDashboard / renderMonthly /
-    // liveSyncMonthlyReview / _liveSyncCharts.
+    // Running cumulative savings across the 12-month rolling window.
+    // Each index i holds the sum of months[0..i].savings.
     runningSavings:    () => {
       const all = get12Months();
       let run = 0;
       return all.map(m => { run += (m.savings || 0); return run; });
     },
-    // Running cumulative savings across the 12 FORWARD months only
-    // — skipping the current month at index 0. Returns a 12-entry
-    // array so it lines up with views that slice next12() from
-    // index 1 (e.g. the Transactions "Next 12 Months" chart).
+    // Running cumulative savings across the strictly-future 12 months
+    // — skipping the current month. Returns a 12-entry array aligned
+    // to next12Forward() so the Transactions "Next 12 Months" chart's
+    // savings line has the same length as its bar datasets.
     runningSavingsForward: () => {
-      const fwd = get12Months().slice(1);
+      const fwd = getNext12Forward();
       let run = 0;
       return fwd.map(m => { run += (m.savings || 0); return run; });
     },
     // Running cumulative Fun Fund balance. m.funFund is already the
-    // chained running value from get12Months() pass 2, so this is a
-    // thin projection of that field — kept as a named helper so
-    // callers never read the wrong field by mistake.
+    // chained running value from the 13-month chain (pass 2), so
+    // this is a thin projection of that field — kept as a named
+    // helper so callers never read the wrong field by mistake.
     runningFunFund:    () => get12Months().map(m => m.funFund || 0),
     // Sum of per-month pure Fun Fund allocations over the 12-month
-    // window. Used as the headline "12-month Fun Fund" KPI.
+    // rolling window. Used as the headline "12-month Fun Fund" KPI.
     funFundTwelveMoTotal: () => getMonthlyFunFundBalance(),
-    // 12-month aggregate helpers — sum the next 12 months (indices 0-11
-    // of the 13-entry array) for each major cash-flow metric. These
-    // power the Dashboard KPI row so all four top cards share the same
-    // 12-month scope.
-    totalIncome12:   () => get12Months().slice(0,12).reduce((s,m) => s + (m.pureIncome   || 0), 0),
-    totalExpenses12: () => get12Months().slice(0,12).reduce((s,m) => s + (m.pureExpenses || 0), 0),
-    totalSavings12:  () => get12Months().slice(0,12).reduce((s,m) => s + (m.savings      || 0), 0),
+    // 12-month aggregate helpers — sum all 12 months of the rolling
+    // window for each major cash-flow metric. Power the Dashboard
+    // KPI row so the four top cards share one 12-month scope.
+    totalIncome12:   () => get12Months().reduce((s,m) => s + (m.pureIncome   || 0), 0),
+    totalExpenses12: () => get12Months().reduce((s,m) => s + (m.pureExpenses || 0), 0),
+    totalSavings12:  () => get12Months().reduce((s,m) => s + (m.savings      || 0), 0),
     // Deep-clone the current month's expense line items with FRESH
     // ids and every "synthetic" row stripped (carry-forward rollovers,
     // Fun Fund trip expenses). Used by the Retirement Plan tab's
@@ -6338,8 +6364,11 @@ const FinancialEngine = (() => {
   //                       the in-window balance is positive.
   const funFund = {
     summary: () => memoSelect('ff:summary', () => {
-      const all = get12Months();
-      const windowMonths = all.slice(0, 12);
+      // get12Months() already returns exactly 12 rolling entries —
+      // this IS the window summary uses. Keep a dedicated alias so
+      // downstream reads (windowKeys, monthlyAllocation, etc.) stay
+      // readable at the call sites.
+      const windowMonths = get12Months();
       const windowKeys = new Set(windowMonths.map(x => x.key));
       // Walk trips once; compute tripByMonth + totals in lockstep.
       const tripByMonth = {};
@@ -6427,7 +6456,7 @@ const FinancialEngine = (() => {
     }
     // I3 — runningSavings must be monotonically non-decreasing.
     // You can't un-save (monthly savings target is always ≥ 0).
-    // Covers both the full 13-entry window and the 12-forward
+    // Covers both the rolling-12 window and the strictly-future
     // variant so the Transactions Next chart helper stays honest.
     const runSav = months.runningSavings();
     for(let i = 1; i < runSav.length; i++){
@@ -6446,11 +6475,21 @@ const FinancialEngine = (() => {
         break;
       }
     }
-    // I4 — months window must always be length 13 (current + 12
-    // forward). Any other length means get12Months drift.
+    // I4 — rolling 12-month window must be exactly 12 entries
+    // (current month + 11 forward). If get12Months() drifts to 13
+    // (the pre-fix off-by-one) or anything else, charts that map
+    // the array plot the wrong bar count and consumers that slice
+    // make silent off-by-one errors. The strictly-future sibling
+    // is checked separately below.
     const m = months.next12();
-    if(!Array.isArray(m) || m.length !== 13){
-      v.push(`I4: months.next12() length ${m?.length} (expected 13)`);
+    if(!Array.isArray(m) || m.length !== 12){
+      v.push(`I4: months.next12() length ${m?.length} (expected 12)`);
+    }
+    // I4b — strictly-future 12-month window. Same size contract as
+    // the rolling window, different start month.
+    const mFwd = months.next12Forward();
+    if(!Array.isArray(mFwd) || mFwd.length !== 12){
+      v.push(`I4b: months.next12Forward() length ${mFwd?.length} (expected 12)`);
     }
     // I5 — runningFunFund[i] should equal m.funFund[i] for every i,
     // because runningFunFund is a thin projection of that field.
@@ -9694,13 +9733,14 @@ function renderTransactions() {
     }
 
     // ── RIGHT · NEXT 12 MONTHS ─────────────────────────────────────
-    // Forward 12-month projection driven live from FinancialEngine
-    // so the chart reflects exactly what the Fun Fund tab, the
-    // Dashboard, and the Monthly Review tab show. Slicing index 1+
-    // skips the current month so "Next" means strictly future.
+    // Strictly-future 12-month projection (CM+1..CM+12) so it pairs
+    // cleanly with the Past 12 chart on the left (which ends at the
+    // current month) without overlapping. Uses next12Forward() —
+    // the dedicated forward-only helper — so this chart stays
+    // independent of the rolling-12 window used everywhere else.
     const nextCtx = document.getElementById('tx-chart-next');
     if(nextCtx){
-      const fwd = FE.months.next12().slice(1);
+      const fwd = FE.months.next12Forward();
       const nextLabels   = fwd.map(m => m.short);
       const nextIncome   = fwd.map(m => m.pureIncome);
       const nextExpenses = fwd.map(m => m.pureExpenses);
@@ -11476,14 +11516,12 @@ function renderFunFund() {
   // cross-month carry-forward chain here so the chart, the per-month
   // list, and the headline KPIs all mirror exactly what the user typed
   // into each Monthly Review row — a single source of truth.
+  // 12-entry rolling window (current month + 11 forward) — matches
+  // the window every other tab uses. The Fun Fund tab's chart and
+  // running-balance table share this window with the headline KPI
+  // row above, so card, chart, and table can't disagree on which
+  // months are counted.
   const allMonths = FE.months.next12();
-  // Full 13-entry window (current month + 12 forward) — matches
-  // the window every other tab uses (Dashboard cash flow, Monthly
-  // Review forward charts, Transactions Next, etc.) so the Fun
-  // Fund tab's chart and running-balance table end at the same
-  // last month as the rest of the app. The headline 12-month Fun
-  // Fund KPI below still comes from funFundTwelveMoTotal() which
-  // is explicitly scoped to 12 months by definition.
   const months = allMonths;
   // Normalise status: the dropdown now only offers "planning" and
   // "booked". Any legacy state left over from the older four-option
@@ -11630,14 +11668,15 @@ function renderFunFund() {
             ${(()=>{
               // Read directly from the same FE.funFund.summary() that
               // feeds the BALANCE card so the table's last row and the
-              // BALANCE card are guaranteed to display the same number.
-              // Critically: the table iterates ff.windowMonths (12
-              // entries — current month + 11 forward), NOT the full
-              // 13-entry get12Months() window, so it ends on the same
-              // month the summary considers. The previous off-by-one
-              // bug — table showing month [12] (e.g. Apr 2027) while
-              // the BALANCE card stopped at month [11] (Mar 2027) —
-              // was the visible source of the $3,715 vs $3,693 drift.
+              // BALANCE card are guaranteed to display the same
+              // number. ff.windowMonths is the 12-entry rolling
+              // window (current month + 11 forward), so the table's
+              // last row is always the same month the BALANCE card
+              // considers. Previous off-by-one bug — table showing
+              // a 13th month while the BALANCE card stopped at month
+              // 12 — was the visible source of the $3,715 vs $3,693
+              // drift; it can't recur because get12Months() now
+              // returns exactly 12 entries at the root.
               const tableMonths = ff.windowMonths;
               const tableRunning = ff.runningBalance;
               let prev = 0;
