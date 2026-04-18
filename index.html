@@ -1543,6 +1543,38 @@ label.field-label-row {
 .ff-balance-legend .sw.pos { background:var(--accent-positive); }
 .ff-balance-legend .sw.neg { background:var(--accent-critical); }
 
+/* ── FUN FUND · TRIPS SECTION HEADER ───────────────────
+   Header row for the Trips section: title on the left,
+   filter chips in the middle, primary "+ New trip" button
+   on the right. Chips share the vocabulary of the dashboard
+   .mode-toggle pill so the app stays visually consistent. */
+.ff-trips-hd {
+  display:flex; align-items:center; gap:14px; flex-wrap:wrap;
+  margin:4px 0 12px;
+}
+.ff-trips-title { font-family:var(--ff); font-size:14px; font-weight:700; color:var(--text); }
+.ff-trips-chips {
+  display:inline-flex; gap:2px; background:var(--bg0);
+  border:1px solid var(--border); border-radius:6px; padding:2px;
+}
+.ff-trips-chip {
+  background:transparent; border:none;
+  color:var(--text3); font-family:var(--fm);
+  font-size:10px; font-weight:600; letter-spacing:.02em;
+  padding:5px 11px; border-radius:5px; cursor:pointer;
+  transition:background-color .15s, color .15s;
+  white-space:nowrap;
+}
+.ff-trips-chip:hover { color:var(--text); }
+.ff-trips-chip.active { background:var(--bg3); color:var(--text); }
+.ff-trips-new { margin-left:auto; }
+.ff-trips-empty {
+  padding:24px 16px; text-align:center;
+  color:var(--text3); font-size:12px; font-style:italic;
+  background:var(--bg2); border:1px dashed var(--border);
+  border-radius:10px;
+}
+
 /* ── FUN FUND · RUNNING BALANCE TABLE ──────────────────
    Two-column row: month label on the left, "+ delta" pill
    and running balance on the right. Deficit rows light up
@@ -4459,7 +4491,18 @@ const STRINGS = {
   'ff.callout.horizonNote': { en:'{out} of that sits outside the next 12 months and is NOT included in the deficit above.',
                               sv:'{out} av det ligger utanför de kommande 12 månaderna och ingår INTE i underskottet ovan.' },
   'ff.section.travelPlans': { en:'Travel Plans',          sv:'Resplaner' },
+  // Step 3 of the Fun Fund redesign — Trips section header: title,
+  // filter chips (All / Booked / Planning), and the primary
+  // "+ New trip" action. The count after each filter name reflects
+  // the number of trips that match that filter.
+  'ff.section.trips':       { en:'Trips',                 sv:'Resor' },
+  'ff.section.trips.filter.all':     { en:'All {n}',      sv:'Alla {n}' },
+  'ff.section.trips.filter.booked':  { en:'Booked {n}',   sv:'Bokade {n}' },
+  'ff.section.trips.filter.planning':{ en:'Planning {n}', sv:'Planerade {n}' },
+  'ff.section.trips.empty': { en:'No trips match this filter.',
+                              sv:'Inga resor matchar detta filter.' },
   'ff.btn.addTrip':         { en:'+ Add Trip',            sv:'+ Lägg till resa' },
+  'ff.btn.newTrip':         { en:'+ New trip',            sv:'+ Ny resa' },
   'ff.chart.title':         { en:'Fun Fund vs Travel Budget by Month',
                               sv:'Fun Fund mot resbudget per månad' },
   'ff.chart.series.fund':   { en:'Monthly Fun Fund capacity', sv:'Månatlig Fun Fund-kapacitet' },
@@ -5241,6 +5284,14 @@ function defaultState() {
 
     // Fun Fund & Trips
     funFundMonthly:27000,
+    // Fun Fund tab UI state (redesign step 3). funFundTripFilter
+    // controls which filter chip is active on the Trips section
+    // header — 'all' | 'booked' | 'planning'. funFundOpenTripId
+    // is the id of the trip whose inline detail panel is currently
+    // expanded, or null when none is open. Both are presentation-
+    // only and never feed FE calculations.
+    funFundTripFilter:'all',
+    funFundOpenTripId:null,
     trips:[
       // Each trip carries an `expenses` array — every entry has its
       // own month + amount so a single trip can spread costs across
@@ -5449,7 +5500,7 @@ window.dr = function(name){ return window.commitRender(name); };
 // ─── PERSISTENCE ────────────────────────────────────────────────────────────
 // State schema version. Bump this and add a branch to migrate() whenever the
 // shape of `state` changes in a backwards-incompatible way.
-const STATE_VERSION = 17;
+const STATE_VERSION = 18;
 function migrate(s) {
   const from = s.version || 1;
   if(from >= STATE_VERSION) { s.version = STATE_VERSION; return s; }
@@ -5603,6 +5654,22 @@ function migrate(s) {
   // Drop it cleanly so the field doesn't linger in saved blobs.
   if(from < 17) {
     delete s.dashDeepDive;
+  }
+  // v17 → v18: Fun Fund tab redesign · trip filter + detail toggle.
+  // Two new optional UI-state fields, both strings. Seeded to safe
+  // defaults so render paths never see `undefined`. funFundTripFilter
+  // is the active filter chip on the redesigned Trips header; valid
+  // values are 'all' | 'booked' | 'planning'. funFundOpenTripId is
+  // the id of the trip whose detail panel is currently expanded, or
+  // null when none is open. Additive only — no legacy field moved or
+  // removed.
+  if(from < 18) {
+    if(!('funFundTripFilter' in s) || typeof s.funFundTripFilter !== 'string') {
+      s.funFundTripFilter = 'all';
+    }
+    if(!('funFundOpenTripId' in s)) {
+      s.funFundOpenTripId = null;
+    }
   }
   s.version = STATE_VERSION;
   return s;
@@ -11637,7 +11704,21 @@ function renderFunFund() {
   const tripBudget = (t) => (t.expenses || []).reduce((s,ex)=>s + (Number(ex.amount)||0), 0);
   const r=rate(); const s=sym();
 
-  const tripCards=state.trips.map((tr)=>{
+  // Trip filter (Step 3). state.funFundTripFilter is 'all' | 'booked'
+  // | 'planning'. Counts feed the chip labels so the user can see how
+  // many trips live behind each filter before clicking. The filter
+  // only affects which cards render below — the KPI row, banner,
+  // AI outlook, and balance chart still reflect ALL trips so the
+  // headline numbers don't lie while the user is scoping.
+  const _tripsAll = state.trips || [];
+  const _tripCountBooked   = _tripsAll.filter(t => t.status === 'booked').length;
+  const _tripCountPlanning = _tripsAll.filter(t => t.status === 'planning').length;
+  const _tripFilter = state.funFundTripFilter || 'all';
+  const _tripsToRender = _tripFilter === 'all'
+    ? _tripsAll
+    : _tripsAll.filter(t => t.status === _tripFilter);
+
+  const tripCards=_tripsToRender.map((tr)=>{
     const budget = tripBudget(tr);
     const spentPct = budget > 0 ? Math.round((Number(tr.spent)||0) / budget * 100) : 0;
     // Per-expense rows — each carries its own month + amount so a
@@ -11781,9 +11862,21 @@ function renderFunFund() {
 
     <div class="two-col">
       <div>
-        <div style="font-family:var(--ff);font-size:14px;font-weight:700;margin-bottom:10px">${esc2(t('ff.section.travelPlans'))}</div>
-        ${tripCards}
-        <button class="btn-add" onclick="addTrip()">${esc2(t('ff.btn.addTrip'))}</button>
+        <!-- Trips section header (redesign step 3). Title · filter
+             chips (All N / Booked N / Planning N) · primary "+ New
+             trip" action. The chip count reflects the full trip set
+             so the user sees how many are hidden behind each filter
+             before committing to a click. -->
+        <div class="ff-trips-hd">
+          <div class="ff-trips-title">${esc2(t('ff.section.trips'))}</div>
+          <div class="ff-trips-chips" role="group">
+            <button class="ff-trips-chip ${_tripFilter==='all'?'active':''}" onclick="setFunFundTripFilter('all')">${esc2(t('ff.section.trips.filter.all', { n: _tripsAll.length }))}</button>
+            <button class="ff-trips-chip ${_tripFilter==='booked'?'active':''}" onclick="setFunFundTripFilter('booked')">${esc2(t('ff.section.trips.filter.booked', { n: _tripCountBooked }))}</button>
+            <button class="ff-trips-chip ${_tripFilter==='planning'?'active':''}" onclick="setFunFundTripFilter('planning')">${esc2(t('ff.section.trips.filter.planning', { n: _tripCountPlanning }))}</button>
+          </div>
+          <button class="btn btn-g btn-sm ff-trips-new" onclick="addTrip()">${esc2(t('ff.btn.newTrip'))}</button>
+        </div>
+        ${tripCards || `<div class="ff-trips-empty">${esc2(t('ff.section.trips.empty'))}</div>`}
       </div>
       <div>
         <div class="card">
@@ -12029,6 +12122,17 @@ Return plain markdown only. IMPORTANT: this is an inline analysis card, not a ch
 // stay in lockstep. Each mutation ends in save() — the live-render
 // listener then patches every table, chart, and summary without
 // stealing focus.
+// Trip filter chip handler (redesign step 3). Clamps the incoming
+// value against the allow-list so a bad persisted value from an
+// older state snapshot can't crash the renderer — any unknown value
+// falls back to 'all'.
+window.setFunFundTripFilter = function(key){
+  const allowed = { all:1, booked:1, planning:1 };
+  state.funFundTripFilter = allowed[key] ? key : 'all';
+  save();
+  if(typeof renderFunFund === 'function') renderFunFund();
+};
+
 window.addTrip = function(){
   if(!Array.isArray(state.trips)) state.trips = [];
   const d = new Date(CY, CM + 1, 1);
