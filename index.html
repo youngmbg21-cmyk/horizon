@@ -4763,10 +4763,17 @@ const STRINGS = {
                               sv:'Inga resor matchar detta filter.' },
   'ff.btn.addTrip':         { en:'+ Add Trip',            sv:'+ Lägg till resa' },
   'ff.btn.newTrip':         { en:'+ New trip',            sv:'+ Ny resa' },
-  'ff.chart.title':         { en:'Fun Fund vs Travel Budget by Month',
-                              sv:'Fun Fund mot resbudget per månad' },
+  'ff.chart.title':         { en:'Monthly allocation & running balance',
+                              sv:'Månatlig tilldelning & löpande saldo' },
   'ff.chart.series.fund':   { en:'Monthly Fun Fund capacity', sv:'Månatlig Fun Fund-kapacitet' },
   'ff.chart.series.budget': { en:'Trip spend that month',     sv:'Resekostnad den månaden' },
+  // New (redesign follow-up) — chart next to running-balance now
+  // visualises the same two numeric columns the table shows:
+  // per-month allocation delta + chained running balance.
+  'ff.chart.series.allocation': { en:'Monthly allocation', sv:'Månatlig tilldelning' },
+  'ff.chart.series.balance':    { en:'Running balance',    sv:'Löpande saldo' },
+  'ff.chart.sub':               { en:'One bar per month for each column of the running-balance table below — allocation (green / red) and chained balance (cyan).',
+                                  sv:'En stapel per månad för varje kolumn i tabellen nedan — tilldelning (grön / röd) och löpande saldo (cyan).' },
 
   // ── Yearly Forecast body ───────────────────────────────
   'yearly.window':          { en:'Window: {start}\u2013{end} · age {cur}\u2192{ret}',
@@ -7710,23 +7717,26 @@ function _liveSyncCharts(){
     'Savings':  () => FE.months.runningSavingsForward(),
     'Fun Fund': () => fwd.map(m => m.funFund),
   });
-  // Fun Fund vs Travel Budget by Month chart — pairs gross monthly
-  // capacity (blue) with trip spend per month (orange). The patch
-  // map keys MUST match the translated dataset labels used at
-  // Chart.js construction (t('ff.chart.series.fund') /
-  // t('ff.chart.series.budget')) so live-sync finds the right
-  // datasets in the active language. Reads tripByMonth from a
-  // fresh per-call reduce so any in-flight expense edit lands
-  // without waiting for the next renderFunFund.
-  const _ffTripByMonth = {};
-  (state.trips || []).forEach(t => (t.expenses || []).forEach(ex => {
-    const k = (ex.date || '').slice(0, 7);
-    if(k) _ffTripByMonth[k] = (_ffTripByMonth[k] || 0) + (Number(ex.amount) || 0);
-  }));
-  patch('ff', {
-    [t('ff.chart.series.fund')]:   () => first12.map((m, i) => (m.pureFunFund || 0) + (_ffTripByMonth[m.key] || 0)),
-    [t('ff.chart.series.budget')]: () => first12.map(m => _ffTripByMonth[m.key] || 0),
-  });
+  // Monthly allocation & running balance chart (ff-chart) —
+  // generic patch() only updates ds.data, but the allocation
+  // dataset carries value-dependent backgroundColor/borderColor
+  // arrays (green vs red per sign). A sign flip on any month
+  // means the colour arrays have to recompute alongside the
+  // numbers. Custom handler below does both in lockstep; label
+  // ordering (allocation first, balance second) matches the
+  // construction order in renderFunFund's setTimeout block.
+  const ffCh = charts && charts['ff'];
+  if(ffCh && ffCh.data && Array.isArray(ffCh.data.datasets) && ffCh.data.datasets.length >= 2){
+    const balances    = first12.map(m => m.funFund || 0);
+    const allocations = balances.map((v, i) => i === 0 ? v : v - balances[i-1]);
+    const ds0 = ffCh.data.datasets[0];
+    ds0.data = allocations;
+    ds0.backgroundColor = allocations.map(v => v >= 0 ? '#22c55e33' : '#ef444433');
+    ds0.borderColor     = allocations.map(v => v >= 0 ? '#22c55e'   : '#ef4444');
+    const ds1 = ffCh.data.datasets[1];
+    ds1.data = balances;
+    try { ffCh.update('none'); } catch(_e){}
+  }
   // Running balance chart (ff-balance) — patches in place when the
   // user edits a trip expense or monthly item. Per-bar colour has
   // to be recomputed alongside the data because each bar's hue is a
@@ -12228,24 +12238,43 @@ function renderFunFund() {
   setTimeout(()=>{
     destroyChart('ff');
     destroyChart('ff-balance');
-    // Fun Fund vs Travel Budget by Month (ff-chart) — pairs gross
-    // monthly capacity (blue) with trip spend per month (orange).
-    // Reads straight from FE.funFund.summary() so the bars and the
-    // KPI row agree by construction. Series labels double as the
-    // _liveSyncCharts patch keys.
+    // Monthly allocation & running balance (ff-chart) — visualises
+    // the same two numeric columns shown in the Running-Balance
+    // table below it. Dataset 1: monthly allocation deltas (per-bar
+    // green when the month added cash, red when it drained the
+    // piggy bank). Dataset 2: chained running balance in cyan.
+    // Grouped bars so the two series sit side-by-side per month.
+    // Labels source from t() so _liveSyncCharts matches the
+    // translated dataset names at patch time.
     const ctx = document.getElementById('ff-chart');
     if(ctx){
+      const cd = chartDefaults();
       const windowMonths = ff.windowMonths;
+      // Monthly allocation = month-over-month delta of the chained
+      // running balance. The first month starts at 0, so its delta
+      // equals the first value itself. Matches the table column
+      // exactly.
+      const allocations = ff.runningBalance.map((v, i) =>
+        i === 0 ? v : v - ff.runningBalance[i-1]
+      );
+      const allocFill = allocations.map(v => v >= 0 ? '#22c55e33' : '#ef444433');
+      const allocLine = allocations.map(v => v >= 0 ? '#22c55e'   : '#ef4444');
       charts['ff'] = new Chart(ctx.getContext('2d'), {
         type:'bar',
         data:{
           labels: windowMonths.map(m => m.short),
           datasets:[
-            { label:t('ff.chart.series.fund'),   data: ff.monthlyAllocation,                              backgroundColor:'#00d4ff18', borderColor:'#00d4ff', borderWidth:1.5, borderRadius:3 },
-            { label:t('ff.chart.series.budget'), data: windowMonths.map(m => ff.tripByMonth[m.key] || 0), backgroundColor:'#f5a62325', borderColor:'#f5a623', borderWidth:1.5, borderRadius:3 },
+            { label:t('ff.chart.series.allocation'), data: allocations,        backgroundColor: allocFill, borderColor: allocLine, borderWidth:1.5, borderRadius:3 },
+            { label:t('ff.chart.series.balance'),    data: ff.runningBalance,  backgroundColor:'#00d4ff22', borderColor:'#00d4ff', borderWidth:1.5, borderRadius:3 },
           ],
         },
-        options: chartPreset(),
+        options: chartPreset({
+          plugins:{ legend:{ position:'top', labels:{ color:cd.textColor, font:cd.tickFont } }, tooltip:{ enabled:true } },
+          scales:{
+            x:{ ticks:{ color:cd.textColor, font:cd.tickFont, maxTicksLimit:12 }, grid:{ display:false } },
+            y:{ ticks:{ color:cd.textColor, font:cd.tickFont, callback:v=>fmtC(v) }, grid:{ color:cd.gridColor } },
+          },
+        }),
       });
     }
     // Running balance chart (ff-balance) — promoted from the buried
