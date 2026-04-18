@@ -1575,6 +1575,84 @@ label.field-label-row {
   border-radius:10px;
 }
 
+/* ── FUN FUND · SLIM TRIP CARDS ────────────────────────
+   Redesign Step 4. Cards strip back to what the user
+   needs at a glance: name, timing, status, budget,
+   spent, a 4px fit bar, and a contextual footer.
+   All inline editing (budget/spent/status dropdown,
+   expense sub-table, delete) has moved into the
+   expandable detail panel (Step 5). The entire card is
+   clickable so the interaction mirrors the Dashboard's
+   clickable-KPI pattern. Two-column grid on wide screens
+   keeps the cards visually balanced; single column below
+   600 px. Height stays stable whether or not OVER
+   CAPACITY fires — the badge swaps, the border swaps,
+   the card doesn't grow. */
+.ff-trip-grid {
+  display:grid;
+  grid-template-columns:repeat(auto-fill, minmax(320px, 1fr));
+  gap:10px;
+  margin-bottom:10px;
+}
+.ff-trip-card {
+  background:var(--bg2);
+  border:1px solid var(--border);
+  border-radius:10px;
+  padding:14px 16px;
+  cursor:pointer;
+  display:flex; flex-direction:column; gap:10px;
+  transition:background-color .15s, border-color .15s, transform .15s, box-shadow .15s;
+}
+.ff-trip-card:hover {
+  background:var(--bg3);
+  border-color:var(--text3);
+  transform:translateY(-1px);
+  box-shadow:0 6px 18px -10px rgba(0,0,0,0.45);
+}
+body.light .ff-trip-card:hover { box-shadow:0 6px 18px -10px rgba(60,40,10,0.18); }
+.ff-trip-card.is-alert { border-color:var(--accent-critical); }
+.ff-trip-card.is-open  { background:var(--bg3); border-color:var(--text3); }
+.ff-trip-card-hd { display:flex; align-items:flex-start; gap:10px; }
+.ff-trip-card-title { display:flex; align-items:flex-start; gap:10px; flex:1; min-width:0; }
+.ff-trip-card-icon { font-size:20px; line-height:1.2; flex-shrink:0; }
+.ff-trip-card-name { font-family:var(--ff); font-size:14px; font-weight:500; color:var(--text); line-height:1.25; word-break:break-word; }
+.ff-trip-card-meta { font-size:11px; color:var(--text2); margin-top:2px; line-height:1.3; }
+.ff-trip-card-badge {
+  font-family:var(--fm); font-size:9px; font-weight:700;
+  letter-spacing:.08em; text-transform:uppercase;
+  padding:3px 8px; border-radius:4px;
+  white-space:nowrap; flex-shrink:0;
+}
+.ff-trip-card-badge.booked   { background:rgba(34,197,94,.14); color:var(--green); border:1px solid rgba(34,197,94,.35); }
+.ff-trip-card-badge.planning { background:var(--bg3); color:var(--text2); border:1px solid var(--border); }
+.ff-trip-card-badge.alert    { background:rgba(239,68,68,.14); color:var(--red); border:1px solid rgba(239,68,68,.45); }
+.ff-trip-card-body {
+  display:flex; align-items:baseline; justify-content:space-between;
+  gap:10px; flex-wrap:wrap;
+}
+.ff-trip-card-budget { font-family:var(--fm); font-size:18px; font-weight:700; color:var(--text); font-variant-numeric:tabular-nums; }
+.ff-trip-card-spent { font-size:11px; color:var(--text3); }
+.ff-trip-card-bar {
+  height:4px; background:var(--bg4); border-radius:2px; overflow:hidden;
+}
+.ff-trip-card-bar-fill {
+  height:100%; border-radius:2px;
+  transition:width .2s, background-color .2s;
+}
+.ff-trip-card-bar-fill.tone-pos  { background:var(--accent-positive); }
+.ff-trip-card-bar-fill.tone-warn { background:var(--accent-warning); }
+.ff-trip-card-bar-fill.tone-neg  { background:var(--accent-critical); }
+.ff-trip-card-foot {
+  display:flex; align-items:center; justify-content:space-between;
+  gap:10px; font-size:10px; color:var(--text3);
+  font-family:var(--fm); letter-spacing:.02em;
+}
+.ff-trip-card-fit { font-weight:600; }
+.ff-trip-card-fit.tone-pos  { color:var(--green); }
+.ff-trip-card-fit.tone-warn { color:var(--amber); }
+.ff-trip-card-fit.tone-neg  { color:var(--red); }
+.ff-trip-card-fit.tone-dim  { color:var(--text3); font-weight:500; }
+
 /* ── FUN FUND · RUNNING BALANCE TABLE ──────────────────
    Two-column row: month label on the left, "+ delta" pill
    and running balance on the right. Deficit rows light up
@@ -4419,6 +4497,23 @@ const STRINGS = {
   // its own caps treatment.
   'ff.trip.statusPill.planning':{ en:'PLANNING',          sv:'PLANERAS' },
   'ff.trip.statusPill.booked':  { en:'BOOKED',            sv:'BOKAD' },
+  // Redesign Step 4 — slim card surface. Status badge can show the
+  // raw trip status OR an OVER CAPACITY override when the trip's
+  // in-window expenses push the chained running balance negative.
+  'ff.trip.badge.overCapacity': { en:'OVER CAPACITY',     sv:'ÖVER KAPACITET' },
+  'ff.trip.spent.suffix':       { en:'{amt} spent',       sv:'{amt} spenderat' },
+  'ff.trip.expLines':           { en:'{n} expense lines', sv:'{n} utgiftsrader' },
+  'ff.trip.expLines.one':       { en:'1 expense line',    sv:'1 utgiftsrad' },
+  'ff.trip.expLines.none':      { en:'No expense lines',  sv:'Inga utgiftsrader' },
+  'ff.trip.fit.empty':          { en:'No planned spend yet',
+                                  sv:'Ingen planerad utgift än' },
+  'ff.trip.fit.oneMonth':       { en:'Fits one month\u2019s surplus',
+                                  sv:'Ryms i en månads överskott' },
+  'ff.trip.fit.absorbs':        { en:'~{n} months to absorb',
+                                  sv:'~{n} månader att absorbera' },
+  'ff.trip.fit.pushesDeficit':  { en:'Pushes balance to {amt}',
+                                  sv:'Pressar saldot till {amt}' },
+  'ff.trip.untitled':           { en:'Untitled trip',     sv:'Namnlös resa' },
   'ff.trip.expenses.title': { en:'EXPENSES BY MONTH',     sv:'UTGIFTER PER MÅNAD' },
   'ff.trip.expenses.add':   { en:'+ Add expense',         sv:'+ Lägg till utgift' },
   'ff.trip.expenses.empty': { en:'No expenses yet — add one to allocate costs to specific months.',
@@ -11718,63 +11813,55 @@ function renderFunFund() {
     ? _tripsAll
     : _tripsAll.filter(t => t.status === _tripFilter);
 
-  const tripCards=_tripsToRender.map((tr)=>{
-    const budget = tripBudget(tr);
-    const spentPct = budget > 0 ? Math.round((Number(tr.spent)||0) / budget * 100) : 0;
-    // Per-expense rows — each carries its own month + amount so a
-    // single trip can spread costs across several months (e.g.
-    // flights in May, hotel in August). Each row is wired straight
-    // back to state.trips[].expenses via handler helpers, and
-    // get12Months() mirrors them into the Monthly Review tab as
-    // purple/lime "linked" lines.
-    const expenseRows = (tr.expenses || []).map((ex, exIdx) => {
-      const ym = (ex.date || '').slice(0,7);
-      return `<div class="trip-exp-row">
-        <input class="trip-exp-name" value="${esc(ex.name || '')}" placeholder="${esc2(t('ff.trip.exp.namePlaceholder'))}" oninput="updateTripExpense('${tr.id}','${ex.id}','name',this.value)">
-        <input type="month" class="trip-exp-date" value="${ym}" onclick="try{this.showPicker&&this.showPicker()}catch(_){}" onfocus="try{this.showPicker&&this.showPicker()}catch(_){}" onchange="updateTripExpense('${tr.id}','${ex.id}','date',this.value)" title="${esc2(t('ff.trip.exp.dateTitle'))}">
-        <div class="trip-exp-amt-wrap"><span class="trip-exp-cur">${s}</span><input class="trip-exp-amt" type="text" inputmode="decimal" data-lang-num="1" value="${Math.round((Number(ex.amount)||0)*r)}" oninput="updateTripExpense('${tr.id}','${ex.id}','amount',parseNum(this.value)/${r})"></div>
-        <button class="line-rm" onclick="removeTripExpense('${tr.id}','${ex.id}')" title="${esc2(t('ff.trip.exp.removeTitle'))}">×</button>
-      </div>`;
-    }).join('');
-    return `<div class="trip-card">
-      <div class="trip-card-head">
-        <span class="trip-card-icon">${tr.icon||'✈️'}</span>
-        <div class="trip-card-hd-body">
-          <input class="trip-card-name" value="${esc(tr.name)}" placeholder="${esc2(t('ff.trip.namePlaceholder'))}" oninput="updateTripField('${tr.id}','name',this.value)">
-          <input class="trip-card-country" value="${esc(tr.country||'')}" placeholder="${esc2(t('ff.trip.countryPlaceholder'))}" oninput="updateTripField('${tr.id}','country',this.value)">
+  // Slim trip card (Step 4). The card surface strips back to a
+  // glance layer — name, timing, status badge, budget, 4px fit
+  // bar, footer — with every editing control relocated into the
+  // (Step-5) detail panel. Fit status is computed via
+  // _computeTripFit() so the badge and footer agree on capacity
+  // by construction. The entire card is clickable; the click
+  // handler is a stub in Step 4 and will open the detail panel in
+  // Step 5.
+  const openTripId = state.funFundOpenTripId || null;
+  const tripCards=_tripsToRender.map((tr) => {
+    const fit = _computeTripFit(tr, ff);
+    const monthRange = _tripMonthRange(tr);
+    const expenseCount = (tr.expenses || []).length;
+    // Status badge: OVER CAPACITY supersedes the user-chosen
+    // booked/planning status so a trip that breaks the budget pops
+    // visually regardless of its lifecycle state.
+    const badgeKey  = fit.overCapacity ? 'alert' : (tr.status === 'booked' ? 'booked' : 'planning');
+    const badgeText = fit.overCapacity
+      ? t('ff.trip.badge.overCapacity')
+      : t('ff.trip.statusPill.' + (tr.status || 'planning'));
+    const spentText = t('ff.trip.spent.suffix', { amt: fmt(Number(tr.spent) || 0) });
+    const linesText = expenseCount === 0 ? t('ff.trip.expLines.none')
+                    : expenseCount === 1 ? t('ff.trip.expLines.one')
+                    : t('ff.trip.expLines', { n: expenseCount });
+    const fitText = t(fit.fitMessageKey, fit.fitMessageArgs);
+    const alertCls = fit.overCapacity ? ' is-alert' : '';
+    const openCls  = openTripId === tr.id ? ' is-open' : '';
+    const titleSub = [esc(tr.country || ''), esc(monthRange || '')].filter(Boolean).join(' · ');
+    return `<div class="ff-trip-card${alertCls}${openCls}" role="button" tabindex="0" data-trip-id="${tr.id}" onclick="toggleFunFundTrip('${tr.id}')">
+      <div class="ff-trip-card-hd">
+        <div class="ff-trip-card-title">
+          <span class="ff-trip-card-icon">${tr.icon || '✈️'}</span>
+          <div style="min-width:0;flex:1">
+            <div class="ff-trip-card-name">${esc(tr.name || t('ff.trip.untitled'))}</div>
+            ${titleSub ? `<div class="ff-trip-card-meta">${titleSub}</div>` : ''}
+          </div>
         </div>
-        <span class="trip-status ${tr.status}">${esc2(t('ff.trip.statusPill.'+tr.status))}</span>
-        <button class="line-rm" onclick="removeTrip('${tr.id}')" title="${esc2(t('ff.trip.removeTitle'))}">×</button>
+        <span class="ff-trip-card-badge ${badgeKey}">${esc2(badgeText)}</span>
       </div>
-      <div class="trip-card-meta">
-        <div class="trip-meta-field">
-          <div class="trip-meta-lbl">${esc2(t('ff.trip.statusLbl'))}</div>
-          <select class="trip-meta-sel" onchange="updateTripField('${tr.id}','status',this.value)">
-            <option value="planning" ${tr.status==='planning'?'selected':''}>${esc2(t('ff.trip.status.planning'))}</option>
-            <option value="booked" ${tr.status==='booked'?'selected':''}>${esc2(t('ff.trip.status.booked'))}</option>
-          </select>
-        </div>
-        <div class="trip-meta-field">
-          <div class="trip-meta-lbl">${esc2(t('ff.trip.budgetLbl'))}</div>
-          <div class="trip-meta-val" style="color:var(--amber)">${fmt(budget)}</div>
-        </div>
-        <div class="trip-meta-field">
-          <div class="trip-meta-lbl">${esc2(t('ff.trip.spentLbl'))}</div>
-          <div class="trip-meta-val-wrap"><span class="trip-meta-cur">${s}</span><input class="trip-meta-amt" type="text" inputmode="decimal" data-lang-num="1" value="${Math.round((Number(tr.spent)||0)*r)}" oninput="updateTripField('${tr.id}','spent',parseNum(this.value)/${r})"></div>
-        </div>
+      <div class="ff-trip-card-body">
+        <div class="ff-trip-card-budget">${fmt(fit.budget)}</div>
+        <div class="ff-trip-card-spent">${esc2(spentText)}</div>
       </div>
-      <div class="trip-exp-list">
-        <div class="trip-exp-hd">
-          <span class="trip-exp-hd-lbl">${esc2(t('ff.trip.expenses.title'))}</span>
-          <button class="trip-exp-add" onclick="addTripExpense('${tr.id}')">${esc2(t('ff.trip.expenses.add'))}</button>
-        </div>
-        ${expenseRows || `<div class="trip-exp-empty">${esc2(t('ff.trip.expenses.empty'))}</div>`}
+      <div class="ff-trip-card-bar">
+        <div class="ff-trip-card-bar-fill tone-${fit.barTone}" style="width:${Math.min(100, Math.round(fit.spentPct))}%"></div>
       </div>
-      <div class="trip-progress">
-        <div class="trip-progress-bar" style="width:${Math.min(100,spentPct)}%;background:${spentPct<75?'var(--green)':spentPct<100?'var(--amber)':'var(--red)'}"></div>
-      </div>
-      <div class="trip-progress-meta">
-        <span>${esc2(t('ff.trip.progress.spent', { pct: spentPct }))}</span><span>${esc2(t('ff.trip.progress.remaining', { amt: fmt(budget-(Number(tr.spent)||0)) }))}</span>
+      <div class="ff-trip-card-foot">
+        <span>${esc2(linesText)}</span>
+        <span class="ff-trip-card-fit tone-${fit.fitToneKey}">${esc2(fitText)}</span>
       </div>
     </div>`;
   }).join('');
@@ -11876,7 +11963,9 @@ function renderFunFund() {
           </div>
           <button class="btn btn-g btn-sm ff-trips-new" onclick="addTrip()">${esc2(t('ff.btn.newTrip'))}</button>
         </div>
-        ${tripCards || `<div class="ff-trips-empty">${esc2(t('ff.section.trips.empty'))}</div>`}
+        ${tripCards
+          ? `<div class="ff-trip-grid">${tripCards}</div>`
+          : `<div class="ff-trips-empty">${esc2(t('ff.section.trips.empty'))}</div>`}
       </div>
       <div>
         <div class="card">
@@ -12132,6 +12221,100 @@ window.setFunFundTripFilter = function(key){
   save();
   if(typeof renderFunFund === 'function') renderFunFund();
 };
+
+// Trip card expand / collapse (redesign step 4 stub; detail panel
+// wired in step 5). One trip is open at a time — clicking a second
+// trip's card switches the open panel rather than stacking, and
+// clicking the same card again collapses it.
+window.toggleFunFundTrip = function(id){
+  state.funFundOpenTripId = (state.funFundOpenTripId === id) ? null : id;
+  save();
+  if(typeof renderFunFund === 'function') renderFunFund();
+};
+
+// Compute the "fit" story for a single trip given the current Fun
+// Fund summary model. Returns a descriptor the slim card + detail
+// panel both read:
+//   overCapacity  — true when any in-window expense month of this
+//                   trip sits below zero on ff.runningBalance.
+//   barTone       — 'pos' | 'warn' | 'neg' for the 4px progress bar.
+//   fitToneKey    — 'pos' | 'warn' | 'neg' | 'dim' — drives the
+//                   footer tone colour.
+//   fitMessageKey — the i18n key for the footer text.
+//   fitMessageArgs— interpolation args for the key above.
+// All reads are presentation-only (no FE math inside — we just
+// consult the existing summary). Safe to call inside the map over
+// the filtered trip list.
+function _computeTripFit(tr, ff){
+  const budget = (tr.expenses || []).reduce((s,ex) => s + (Number(ex.amount) || 0), 0);
+  const spent  = Number(tr.spent) || 0;
+  // In-window running balances at the months this trip's expenses
+  // land in. If any are < 0, the trip has pushed the piggy bank
+  // below zero by that month.
+  const keys = new Set((tr.expenses || [])
+    .map(ex => (ex.date || '').slice(0,7))
+    .filter(k => k && ff.windowKeys.has(k)));
+  let minAtTripMonths = Infinity;
+  ff.windowMonths.forEach((m, i) => {
+    if(keys.has(m.key) && ff.runningBalance[i] < minAtTripMonths){
+      minAtTripMonths = ff.runningBalance[i];
+    }
+  });
+  const overCapacity = isFinite(minAtTripMonths) && minAtTripMonths < 0;
+  // Progress bar tone — tracks spent/budget ratio the same way the
+  // previous card did (green < 75%, amber < 100%, red ≥ 100%). The
+  // "fit" tone below is independent and tracks capacity, not spend.
+  const spentPct = budget > 0 ? (spent / budget) * 100 : 0;
+  const barTone  = spentPct < 75 ? 'pos' : spentPct < 100 ? 'warn' : 'neg';
+  // Fit tone + message.
+  let fitToneKey = 'dim';
+  let fitMessageKey = 'ff.trip.fit.empty';
+  let fitMessageArgs = {};
+  if(budget <= 0){
+    fitToneKey = 'dim';
+    fitMessageKey = 'ff.trip.fit.empty';
+  } else if(overCapacity){
+    fitToneKey = 'neg';
+    fitMessageKey = 'ff.trip.fit.pushesDeficit';
+    fitMessageArgs = { amt: fmt(minAtTripMonths) };
+  } else {
+    const avg = ff.avgMonthly || 0;
+    if(avg > 0 && budget <= avg){
+      fitToneKey = 'pos';
+      fitMessageKey = 'ff.trip.fit.oneMonth';
+    } else if(avg > 0){
+      const n = Math.max(1, Math.round(budget / avg));
+      fitToneKey = n <= 2 ? 'pos' : n <= 4 ? 'warn' : 'neg';
+      fitMessageKey = 'ff.trip.fit.absorbs';
+      fitMessageArgs = { n };
+    } else {
+      fitToneKey = 'warn';
+      fitMessageKey = 'ff.trip.fit.absorbs';
+      fitMessageArgs = { n: '?' };
+    }
+  }
+  return { budget, spent, spentPct, barTone, overCapacity, fitToneKey, fitMessageKey, fitMessageArgs };
+}
+
+// Human-readable month label from a 'YYYY-MM' key. Used on the slim
+// trip card to show a single-month or multi-month range under the
+// trip name, without touching state.trips.
+function _tripMonthLabel(key){
+  if(!key) return '';
+  const d = new Date(key + '-01');
+  if(isNaN(d.getTime())) return key;
+  return `${monthNames()[d.getMonth()]} '${String(d.getFullYear()).slice(2)}`;
+}
+function _tripMonthRange(tr){
+  const ks = (tr.expenses || [])
+    .map(ex => (ex.date || '').slice(0,7))
+    .filter(Boolean)
+    .sort();
+  if(ks.length === 0) return '';
+  const first = _tripMonthLabel(ks[0]);
+  const last  = _tripMonthLabel(ks[ks.length - 1]);
+  return (first === last) ? first : `${first} – ${last}`;
+}
 
 window.addTrip = function(){
   if(!Array.isArray(state.trips)) state.trips = [];
