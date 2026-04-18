@@ -1661,7 +1661,13 @@ body.light .ff-trip-card:hover { box-shadow:0 6px 18px -10px rgba(60,40,10,0.18)
    window.toggleFunFundTrip). Subtle slide-in matches the
    dashboard-style expansion that was prototyped earlier. */
 .ff-trip-detail {
-  margin-top:6px;
+  /* The panel lives INSIDE .ff-trip-grid, right after the card it
+     edits, so the editor stays anchored to the selected card no
+     matter where in the list that card sits. grid-column: 1 / -1
+     makes it span the full row; CSS Grid then pushes any trailing
+     cards down to the next row without disturbing the ones above. */
+  grid-column:1 / -1;
+  margin-top:2px;
   background:var(--bg2);
   border:1px solid var(--border);
   border-left:3px solid var(--text3);
@@ -11984,7 +11990,7 @@ function renderFunFund() {
     const alertCls = fit.overCapacity ? ' is-alert' : '';
     const openCls  = activeOpenId === tr.id ? ' is-open' : '';
     const titleSub = [esc(tr.country || ''), esc(monthRange || '')].filter(Boolean).join(' · ');
-    return `<div class="ff-trip-card${alertCls}${openCls}" role="button" tabindex="0" data-trip-id="${tr.id}" onclick="toggleFunFundTrip('${tr.id}')">
+    const cardHtml = `<div class="ff-trip-card${alertCls}${openCls}" role="button" tabindex="0" data-trip-id="${tr.id}" onclick="toggleFunFundTrip('${tr.id}')">
       <div class="ff-trip-card-hd">
         <div class="ff-trip-card-title">
           <span class="ff-trip-card-icon">${tr.icon || '✈️'}</span>
@@ -12007,6 +12013,17 @@ function renderFunFund() {
         <span class="ff-trip-card-fit tone-${fit.fitToneKey}">${esc2(fitText)}</span>
       </div>
     </div>`;
+    // Anchor the detail panel directly to the clicked card by
+    // injecting it immediately after the matching card in the
+    // grid stream. The panel carries grid-column: 1 / -1 so it
+    // spans the full row and CSS Grid naturally pushes any
+    // cards after it to the next line. This keeps the editor
+    // visually attached to the card it edits, no matter how
+    // deep in the list the card sits.
+    if(activeOpenId === tr.id){
+      return cardHtml + _renderFunFundTripDetail(tr, { r, s });
+    }
+    return cardHtml;
   }).join('');
 
   document.getElementById('panel-funfund').innerHTML=`
@@ -12109,17 +12126,6 @@ function renderFunFund() {
         ${tripCards
           ? `<div class="ff-trip-grid">${tripCards}</div>`
           : `<div class="ff-trips-empty">${esc2(t('ff.section.trips.empty'))}</div>`}
-        ${(() => {
-          // Inline detail panel for the open trip (redesign step 5).
-          // Renders only when state.funFundOpenTripId points at a
-          // trip that's in the currently-filtered view — if the
-          // filter hides the open trip, we close the panel
-          // gracefully (see activeOpenId above).
-          if(!activeOpenId) return '';
-          const tr = _tripsToRender.find(x => x.id === activeOpenId);
-          if(!tr) return '';
-          return _renderFunFundTripDetail(tr, { r, s });
-        })()}
       </div>
       <div>
         <details class="card ff-run-details">
