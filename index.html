@@ -9702,16 +9702,21 @@ function renderTransactions() {
     const cd = chartDefaults();
 
     // ── LEFT · PAST 12 MONTHS ──────────────────────────────────────
-    // Rolling 12-month retrospective driven by a canonical demo
-    // array so the chart always has a full, realistic shape
-    // regardless of how much live transaction data is loaded. Three
-    // series the actual-transaction data can justify:
-    // Income (bars), Expenses (bars), Net Flow (line).
+    // Strictly past 12 calendar months — [CM-12 .. CM-1]. Excludes
+    // the current month so the "past" label is honest, and so the
+    // Next-12 chart on the right can own the current month under
+    // the app-wide rolling-12 convention (month 1 = current, month
+    // 12 = current + 11). Together the pair covers 24 distinct
+    // months with no overlap on the current month.
+    // Canonical demo array so the chart always has a full,
+    // realistic shape regardless of how much live transaction data
+    // is loaded. Three series: Income + Expenses bars, Net Flow
+    // line.
     const pastCtx = document.getElementById('tx-chart-past');
     if(pastCtx){
       const pastLabels = [];
       const _mn = monthNames();
-      for(let i = 11; i >= 0; i--){
+      for(let i = 12; i >= 1; i--){
         const d = new Date(CY, CM - i, 1);
         pastLabels.push(`${_mn[d.getMonth()]} '${String(d.getFullYear()).slice(2)}`);
       }
@@ -9733,14 +9738,15 @@ function renderTransactions() {
     }
 
     // ── RIGHT · NEXT 12 MONTHS ─────────────────────────────────────
-    // Strictly-future 12-month projection (CM+1..CM+12) so it pairs
-    // cleanly with the Past 12 chart on the left (which ends at the
-    // current month) without overlapping. Uses next12Forward() —
-    // the dedicated forward-only helper — so this chart stays
-    // independent of the rolling-12 window used everywhere else.
+    // Rolling 12-month forward projection [CM..CM+11] — matches the
+    // app-wide rolling-12 convention every other tab uses, so the
+    // current month appears ONCE across the Past/Next pair (owned by
+    // this chart). Paired with Past 12 [CM-12..CM-1] on the left,
+    // the two halves cover 24 distinct months end-to-end with no
+    // overlap and no gap.
     const nextCtx = document.getElementById('tx-chart-next');
     if(nextCtx){
-      const fwd = FE.months.next12Forward();
+      const fwd = FE.months.next12();
       const nextLabels   = fwd.map(m => m.short);
       const nextIncome   = fwd.map(m => m.pureIncome);
       const nextExpenses = fwd.map(m => m.pureExpenses);
@@ -11644,6 +11650,14 @@ function renderFunFund() {
       return '';
     })()}
 
+    <!-- AI fund outlook — sits directly under the 4 KPI cards (and
+         the optional over-budget callout) so the interpretation
+         lands where the user's eye already is. Previously this card
+         was at the BOTTOM of the tab, below the trip list and the
+         monthly table, which made the analysis feel disconnected
+         from the headline figures it's commenting on. -->
+    <div id="ff-ai-report" class="card ff-ai">${renderFunFundAIBody()}</div>
+
     <div class="two-col">
       <div>
         <div style="font-family:var(--ff);font-size:14px;font-weight:700;margin-bottom:10px">${esc2(t('ff.section.travelPlans'))}</div>
@@ -11706,14 +11720,7 @@ function renderFunFund() {
           </div>
         </div>
       </div>
-    </div>
-
-    <!-- AI fund outlook — pulls from monthly cash-flow, planned trips,
-         and the running Fun Fund balance to advise on discretionary
-         funding. Same tone/shape as the Dashboard AI Financial
-         Analysis, scaled down so it never overshadows the trip list
-         and chart above. -->
-    <div id="ff-ai-report" class="card ff-ai">${renderFunFundAIBody()}</div>`;
+    </div>`;
 
   setTimeout(()=>{
     destroyChart('ff');
