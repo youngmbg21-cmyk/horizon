@@ -1653,6 +1653,95 @@ body.light .ff-trip-card:hover { box-shadow:0 6px 18px -10px rgba(60,40,10,0.18)
 .ff-trip-card-fit.tone-neg  { color:var(--red); }
 .ff-trip-card-fit.tone-dim  { color:var(--text3); font-weight:500; }
 
+/* ── FUN FUND · TRIP DETAIL PANEL ──────────────────────
+   Redesign Step 5. Inline editor that replaces the old
+   card-surface controls — status, name, country, spent,
+   expenses, delete. Sits BELOW the trip grid (single
+   detail open at a time, toggle via
+   window.toggleFunFundTrip). Subtle slide-in matches the
+   dashboard-style expansion that was prototyped earlier. */
+.ff-trip-detail {
+  margin-top:6px;
+  background:var(--bg2);
+  border:1px solid var(--border);
+  border-left:3px solid var(--text3);
+  border-radius:10px;
+  padding:16px 18px;
+  animation:ffDetailSlide .24s cubic-bezier(.2,.7,.2,1);
+}
+@keyframes ffDetailSlide {
+  from { opacity:0; transform:translateY(-6px); }
+  to   { opacity:1; transform:none; }
+}
+@media (prefers-reduced-motion: reduce) { .ff-trip-detail { animation:none; } }
+.ff-trip-detail-hd {
+  display:flex; align-items:baseline; justify-content:space-between;
+  gap:10px; margin-bottom:14px;
+  font-family:var(--fm); font-size:10px; font-weight:700;
+  letter-spacing:.08em; text-transform:uppercase;
+  color:var(--text2);
+}
+.ff-trip-detail-hd .name { color:var(--text); text-transform:none; font-weight:600; font-size:13px; letter-spacing:0; font-family:var(--ff); }
+.ff-trip-detail-close {
+  background:transparent; border:none;
+  color:var(--text3); cursor:pointer;
+  font-family:var(--fm); font-size:11px;
+  padding:4px 8px; border-radius:5px;
+  transition:background-color .15s, color .15s;
+}
+.ff-trip-detail-close:hover { background:var(--bg3); color:var(--text); }
+.ff-trip-detail-grid {
+  display:grid; grid-template-columns:repeat(auto-fit, minmax(200px, 1fr));
+  gap:12px; margin-bottom:14px;
+}
+.ff-trip-detail-field { display:flex; flex-direction:column; gap:4px; min-width:0; }
+.ff-trip-detail-field label {
+  font-family:var(--fm); font-size:9px;
+  letter-spacing:.08em; text-transform:uppercase;
+  color:var(--text3); font-weight:600;
+}
+.ff-trip-detail-field input,
+.ff-trip-detail-field select {
+  width:100%; box-sizing:border-box;
+  background:var(--bg3); border:1px solid var(--border);
+  border-radius:6px; padding:8px 10px;
+  color:var(--text); font-family:var(--ff); font-size:13px;
+  outline:none; transition:border-color .15s;
+}
+.ff-trip-detail-field input:focus,
+.ff-trip-detail-field select:focus { border-color:var(--text3); }
+.ff-trip-detail-money {
+  display:flex; align-items:center; gap:6px;
+  background:var(--bg3); border:1px solid var(--border);
+  border-radius:6px; padding:2px 10px;
+}
+.ff-trip-detail-money:focus-within { border-color:var(--text3); }
+.ff-trip-detail-money .sym { color:var(--text3); font-family:var(--fm); font-size:12px; flex-shrink:0; }
+.ff-trip-detail-money input {
+  flex:1 1 0; min-width:0; width:100%;
+  background:transparent; border:none; padding:8px 0; outline:none;
+  color:var(--text); font-family:var(--fm); font-size:13px; font-weight:600;
+  text-align:right;
+}
+.ff-trip-detail-budget {
+  display:flex; align-items:baseline; gap:10px;
+  padding:10px 12px; margin-bottom:14px;
+  background:var(--bg3); border:1px solid var(--border); border-radius:8px;
+}
+.ff-trip-detail-budget .lbl { font-family:var(--fm); font-size:9px; letter-spacing:.08em; text-transform:uppercase; color:var(--text3); font-weight:600; }
+.ff-trip-detail-budget .val { font-family:var(--fm); font-size:18px; font-weight:700; color:var(--amber); font-variant-numeric:tabular-nums; }
+.ff-trip-detail-budget .hint { margin-left:auto; font-size:10px; color:var(--text3); font-style:italic; }
+.ff-trip-detail-exps { margin-bottom:14px; }
+.ff-trip-detail-exps-hd {
+  display:flex; align-items:center; justify-content:space-between;
+  gap:10px; margin-bottom:8px;
+}
+.ff-trip-detail-exps-lbl { font-family:var(--fm); font-size:9px; letter-spacing:.08em; text-transform:uppercase; color:var(--text3); font-weight:600; }
+.ff-trip-detail-actions {
+  display:flex; justify-content:flex-end;
+  padding-top:12px; border-top:1px dashed var(--border);
+}
+
 /* ── FUN FUND · RUNNING BALANCE TABLE ──────────────────
    Two-column row: month label on the left, "+ delta" pill
    and running balance on the right. Deficit rows light up
@@ -4514,6 +4603,15 @@ const STRINGS = {
   'ff.trip.fit.pushesDeficit':  { en:'Pushes balance to {amt}',
                                   sv:'Pressar saldot till {amt}' },
   'ff.trip.untitled':           { en:'Untitled trip',     sv:'Namnlös resa' },
+  // Detail panel (redesign step 5). Inline editor that replaces the
+  // old card-surface controls. One trip open at a time.
+  'ff.trip.detail.heading':     { en:'Editing · {name}',  sv:'Redigerar · {name}' },
+  'ff.trip.detail.close':       { en:'Close',             sv:'Stäng' },
+  'ff.trip.detail.name':        { en:'Trip name',         sv:'Resans namn' },
+  'ff.trip.detail.country':     { en:'Country / region',  sv:'Land / region' },
+  'ff.trip.detail.delete':      { en:'Delete trip',       sv:'Ta bort resa' },
+  'ff.trip.removeConfirm':      { en:'Delete "{name}"? This cannot be undone.',
+                                  sv:'Radera "{name}"? Det går inte att ångra.' },
   'ff.trip.expenses.title': { en:'EXPENSES BY MONTH',     sv:'UTGIFTER PER MÅNAD' },
   'ff.trip.expenses.add':   { en:'+ Add expense',         sv:'+ Lägg till utgift' },
   'ff.trip.expenses.empty': { en:'No expenses yet — add one to allocate costs to specific months.',
@@ -11822,6 +11920,12 @@ function renderFunFund() {
   // handler is a stub in Step 4 and will open the detail panel in
   // Step 5.
   const openTripId = state.funFundOpenTripId || null;
+  // If the open trip has been filtered out of view, close the panel
+  // so the user doesn't end up with an inline editor for a card
+  // that isn't on screen. The re-render is free — we're already
+  // inside it.
+  const openTripStillVisible = openTripId && _tripsToRender.some(x => x.id === openTripId);
+  const activeOpenId = openTripStillVisible ? openTripId : null;
   const tripCards=_tripsToRender.map((tr) => {
     const fit = _computeTripFit(tr, ff);
     const monthRange = _tripMonthRange(tr);
@@ -11839,7 +11943,7 @@ function renderFunFund() {
                     : t('ff.trip.expLines', { n: expenseCount });
     const fitText = t(fit.fitMessageKey, fit.fitMessageArgs);
     const alertCls = fit.overCapacity ? ' is-alert' : '';
-    const openCls  = openTripId === tr.id ? ' is-open' : '';
+    const openCls  = activeOpenId === tr.id ? ' is-open' : '';
     const titleSub = [esc(tr.country || ''), esc(monthRange || '')].filter(Boolean).join(' · ');
     return `<div class="ff-trip-card${alertCls}${openCls}" role="button" tabindex="0" data-trip-id="${tr.id}" onclick="toggleFunFundTrip('${tr.id}')">
       <div class="ff-trip-card-hd">
@@ -11966,6 +12070,17 @@ function renderFunFund() {
         ${tripCards
           ? `<div class="ff-trip-grid">${tripCards}</div>`
           : `<div class="ff-trips-empty">${esc2(t('ff.section.trips.empty'))}</div>`}
+        ${(() => {
+          // Inline detail panel for the open trip (redesign step 5).
+          // Renders only when state.funFundOpenTripId points at a
+          // trip that's in the currently-filtered view — if the
+          // filter hides the open trip, we close the panel
+          // gracefully (see activeOpenId above).
+          if(!activeOpenId) return '';
+          const tr = _tripsToRender.find(x => x.id === activeOpenId);
+          if(!tr) return '';
+          return _renderFunFundTripDetail(tr, { r, s });
+        })()}
       </div>
       <div>
         <div class="card">
@@ -12232,6 +12347,19 @@ window.toggleFunFundTrip = function(id){
   if(typeof renderFunFund === 'function') renderFunFund();
 };
 
+// Delete-trip wrapper (redesign step 5). The underlying removeTrip()
+// helper intentionally does not confirm (it's called from several
+// surfaces), so the detail-panel delete button routes through this
+// wrapper to show the confirm and close the panel afterwards.
+window.removeFunFundTripWithConfirm = function(id){
+  const tr = (state.trips || []).find(x => x.id === id);
+  const name = (tr && tr.name) || t('ff.trip.untitled');
+  if(!confirm(t('ff.trip.removeConfirm', { name }))) return;
+  state.funFundOpenTripId = null;
+  removeTrip(id);
+  if(typeof renderFunFund === 'function') renderFunFund();
+};
+
 // Compute the "fit" story for a single trip given the current Fun
 // Fund summary model. Returns a descriptor the slim card + detail
 // panel both read:
@@ -12296,6 +12424,73 @@ function _computeTripFit(tr, ff){
   return { budget, spent, spentPct, barTone, overCapacity, fitToneKey, fitMessageKey, fitMessageArgs };
 }
 
+// Detail-panel markup for a single trip (redesign step 5). The
+// panel renders BELOW the trip grid when state.funFundOpenTripId
+// points at a trip that's currently in the filtered view. All the
+// editor controls that used to crowd the card surface live here:
+// trip name, country, status, spent, per-expense table, delete.
+// Display currency handled via the closure (r, s) arguments so
+// this stays consistent with how the rest of renderFunFund
+// formats inputs.
+function _renderFunFundTripDetail(tr, { r, s }) {
+  const budget = (tr.expenses || []).reduce((sum, ex) => sum + (Number(ex.amount) || 0), 0);
+  const expenseRows = (tr.expenses || []).map(ex => {
+    const ym = (ex.date || '').slice(0,7);
+    return `<div class="trip-exp-row">
+      <input class="trip-exp-name" value="${esc(ex.name || '')}" placeholder="${esc2(t('ff.trip.exp.namePlaceholder'))}" oninput="updateTripExpense('${tr.id}','${ex.id}','name',this.value)">
+      <input type="month" class="trip-exp-date" value="${ym}" onclick="try{this.showPicker&&this.showPicker()}catch(_){}" onfocus="try{this.showPicker&&this.showPicker()}catch(_){}" onchange="updateTripExpense('${tr.id}','${ex.id}','date',this.value)" title="${esc2(t('ff.trip.exp.dateTitle'))}">
+      <div class="trip-exp-amt-wrap"><span class="trip-exp-cur">${s}</span><input class="trip-exp-amt" type="text" inputmode="decimal" data-lang-num="1" value="${Math.round((Number(ex.amount)||0)*r)}" oninput="updateTripExpense('${tr.id}','${ex.id}','amount',parseNum(this.value)/${r})"></div>
+      <button class="line-rm" onclick="removeTripExpense('${tr.id}','${ex.id}')" title="${esc2(t('ff.trip.exp.removeTitle'))}">×</button>
+    </div>`;
+  }).join('');
+  const displayName = tr.name || t('ff.trip.untitled');
+  return `<div class="ff-trip-detail" data-trip-id="${tr.id}">
+    <div class="ff-trip-detail-hd">
+      <span class="name">${esc2(t('ff.trip.detail.heading', { name: displayName }))}</span>
+      <button class="ff-trip-detail-close" onclick="toggleFunFundTrip('${tr.id}')">${esc2(t('ff.trip.detail.close'))} ×</button>
+    </div>
+    <div class="ff-trip-detail-grid">
+      <div class="ff-trip-detail-field">
+        <label>${esc2(t('ff.trip.detail.name'))}</label>
+        <input type="text" value="${esc(tr.name || '')}" placeholder="${esc2(t('ff.trip.namePlaceholder'))}" oninput="updateTripField('${tr.id}','name',this.value)">
+      </div>
+      <div class="ff-trip-detail-field">
+        <label>${esc2(t('ff.trip.detail.country'))}</label>
+        <input type="text" value="${esc(tr.country || '')}" placeholder="${esc2(t('ff.trip.countryPlaceholder'))}" oninput="updateTripField('${tr.id}','country',this.value)">
+      </div>
+      <div class="ff-trip-detail-field">
+        <label>${esc2(t('ff.trip.statusLbl'))}</label>
+        <select onchange="updateTripField('${tr.id}','status',this.value)">
+          <option value="planning" ${tr.status==='planning'?'selected':''}>${esc2(t('ff.trip.status.planning'))}</option>
+          <option value="booked" ${tr.status==='booked'?'selected':''}>${esc2(t('ff.trip.status.booked'))}</option>
+        </select>
+      </div>
+      <div class="ff-trip-detail-field">
+        <label>${esc2(t('ff.trip.spentLbl'))}</label>
+        <div class="ff-trip-detail-money">
+          <span class="sym">${s}</span>
+          <input type="text" inputmode="decimal" data-lang-num="1" value="${Math.round((Number(tr.spent)||0)*r)}" oninput="updateTripField('${tr.id}','spent',parseNum(this.value)/${r})">
+        </div>
+      </div>
+    </div>
+    <div class="ff-trip-detail-budget">
+      <span class="lbl">${esc2(t('ff.trip.budgetLbl'))}</span>
+      <span class="val">${fmt(budget)}</span>
+      <span class="hint">${esc2(t('ff.trip.expenses.title'))}</span>
+    </div>
+    <div class="ff-trip-detail-exps">
+      <div class="ff-trip-detail-exps-hd">
+        <span class="ff-trip-detail-exps-lbl">${esc2(t('ff.trip.expenses.title'))}</span>
+        <button class="trip-exp-add" onclick="addTripExpense('${tr.id}')">${esc2(t('ff.trip.expenses.add'))}</button>
+      </div>
+      ${expenseRows || `<div class="trip-exp-empty">${esc2(t('ff.trip.expenses.empty'))}</div>`}
+    </div>
+    <div class="ff-trip-detail-actions">
+      <button class="btn btn-danger btn-sm" onclick="removeFunFundTripWithConfirm('${tr.id}')">${esc2(t('ff.trip.detail.delete'))}</button>
+    </div>
+  </div>`;
+}
+
 // Human-readable month label from a 'YYYY-MM' key. Used on the slim
 // trip card to show a single-month or multi-month range under the
 // trip name, without touching state.trips.
@@ -12321,8 +12516,15 @@ window.addTrip = function(){
   const d = new Date(CY, CM + 1, 1);
   const y = d.getFullYear();
   const mo = String(d.getMonth()+1).padStart(2,'0');
+  // Generate the id up front so we can open the detail panel on the
+  // newly-created trip immediately — otherwise the user lands on a
+  // blank "Untitled trip" card with no obvious next step. Also flip
+  // the filter to 'all' or 'planning' if the active filter would
+  // hide a fresh planning trip, so the user actually SEES the card
+  // they just created.
+  const newId = genId();
   state.trips.push({
-    id: genId(),
+    id: newId,
     name: t('ff.trip.newName'),
     country: '',
     spent: 0,
@@ -12332,7 +12534,10 @@ window.addTrip = function(){
       { id: genId(), name: t('ff.trip.newExpenseName'), date: `${y}-${mo}`, amount: 20000 },
     ],
   });
+  if(state.funFundTripFilter === 'booked') state.funFundTripFilter = 'all';
+  state.funFundOpenTripId = newId;
   save();
+  if(typeof renderFunFund === 'function' && state.activePanel === 'funfund') renderFunFund();
 };
 window.removeTrip = function(tripId){
   const i = (state.trips || []).findIndex(x => x.id === tripId);
