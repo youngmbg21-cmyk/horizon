@@ -1512,6 +1512,37 @@ label.field-label-row {
   font-size:12px; font-family:var(--fm);
 }
 
+/* ── FUN FUND · STRATEGIC ROW & BALANCE CHART ──────────
+   Two-column row directly under the KPI tiles: AI outlook
+   on the left, per-month running balance chart on the
+   right. The pair is fixed-height so the row doesn't drift
+   as the AI card grows. Collapses to one column below
+   780 px. */
+.ff-strategic {
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:12px;
+  align-items:stretch;
+  margin-bottom:12px;
+}
+@media (max-width: 780px){ .ff-strategic { grid-template-columns:1fr; } }
+.ff-strategic > .card { margin-bottom:0; }
+.ff-balance-card { display:flex; flex-direction:column; border-left:3px solid var(--border2); }
+.ff-balance-hd { display:flex; align-items:baseline; justify-content:space-between; gap:10px; margin-bottom:4px; }
+.ff-balance-title { font-family:var(--ff); font-size:14px; font-weight:700; color:var(--text); }
+.ff-balance-sub { font-size:11px; color:var(--text2); margin:0 0 10px; line-height:1.5; }
+.ff-balance-chart-wrap {
+  position:relative; width:100%; height:220px;
+  background:var(--bg3); border:1px solid var(--border);
+  border-radius:8px; padding:8px;
+  box-sizing:border-box;
+}
+.ff-balance-chart-wrap canvas { width:100% !important; height:100% !important; }
+.ff-balance-legend { display:flex; gap:14px; margin-top:10px; font-size:11px; color:var(--text2); flex-wrap:wrap; }
+.ff-balance-legend .sw { display:inline-block; width:10px; height:10px; border-radius:2px; margin-right:6px; vertical-align:middle; }
+.ff-balance-legend .sw.pos { background:var(--accent-positive); }
+.ff-balance-legend .sw.neg { background:var(--accent-critical); }
+
 /* ── FUN FUND · RUNNING BALANCE TABLE ──────────────────
    Two-column row: month label on the left, "+ delta" pill
    and running balance on the right. Deficit rows light up
@@ -4401,6 +4432,15 @@ const STRINGS = {
                               sv:'Slutet av kommande 12 månader · matchar tabellen' },
   'ff.kpi.yearEnd.sub.deficit':{ en:'Piggy bank ends {amt} below zero',
                                  sv:'Sparkassan slutar {amt} under noll' },
+  // Running-balance chart (Step 2 of the Fun Fund redesign). Sits on
+  // the right of the strategic row so the AI prose on the left has a
+  // visual to reference.
+  'ff.balanceChart.title':  { en:'Running balance · next 12 months',
+                              sv:'Löpande saldo · kommande 12 månader' },
+  'ff.balanceChart.sub':    { en:'Where the deficit lives. Red bars carry forward until later surpluses absorb them.',
+                              sv:'Där underskottet bor. Röda staplar förs vidare tills senare överskott absorberar dem.' },
+  'ff.balanceChart.legend.surplus': { en:'Surplus month', sv:'Överskottsmånad' },
+  'ff.balanceChart.legend.deficit': { en:'Deficit carry', sv:'Underskott' },
   'ff.kpi.travelBudget':    { en:'TOTAL TRAVEL BUDGET',   sv:'TOTAL RESBUDGET' },
   'ff.kpi.travelBudget.sub':{ en:'{n} planned trips',     sv:'{n} planerade resor' },
   'ff.kpi.travelBudget.sub.split':{ en:'{n} trips · {inw} in next 12 mo · {out} beyond',
@@ -7353,6 +7393,22 @@ function _liveSyncCharts(){
     'Fun Fund':    () => first12.map(m => Math.max(0, m.funFund)),
     'Trip Budget': () => first12.map(m => tripByMonth[m.key] || 0),
   });
+  // Running balance chart (ff-balance) — patches in place when the
+  // user edits a trip expense or monthly item. Per-bar colour has
+  // to be recomputed alongside the data because each bar's hue is a
+  // function of its own value (green if >= 0, red if < 0). The
+  // dataset label is the translated chart title; patch() matches by
+  // label so live-sync reaches the right dataset even if the title
+  // copy changes later.
+  const ffBalCh = charts && charts['ff-balance'];
+  if(ffBalCh && ffBalCh.data && ffBalCh.data.datasets && ffBalCh.data.datasets[0]){
+    const ds = ffBalCh.data.datasets[0];
+    const bars = first12.map(m => m.funFund || 0);
+    ds.data = bars;
+    ds.backgroundColor = bars.map(v => v >= 0 ? '#22c55e33' : '#ef444433');
+    ds.borderColor     = bars.map(v => v >= 0 ? '#22c55e'   : '#ef4444');
+    try { ffBalCh.update('none'); } catch(_e){}
+  }
 }
 if(typeof bus !== 'undefined'){
   bus.on('state:liveSync', _liveSyncCharts);
@@ -11703,13 +11759,25 @@ function renderFunFund() {
       return '';
     })()}
 
-    <!-- AI fund outlook — sits directly under the 4 KPI cards (and
-         the optional over-budget callout) so the interpretation
-         lands where the user's eye already is. Previously this card
-         was at the BOTTOM of the tab, below the trip list and the
-         monthly table, which made the analysis feel disconnected
-         from the headline figures it's commenting on. -->
-    <div id="ff-ai-report" class="card ff-ai">${renderFunFundAIBody()}</div>
+    <!-- Strategic row — AI outlook LEFT, running balance chart RIGHT.
+         The AI prose interprets the numbers; the chart on the right
+         shows exactly where the deficit lives across the 12-month
+         window. Fixed-height container so the row won't drift as
+         the AI card grows. -->
+    <div class="ff-strategic">
+      <div id="ff-ai-report" class="card ff-ai">${renderFunFundAIBody()}</div>
+      <div class="card ff-balance-card">
+        <div class="ff-balance-hd">
+          <div class="ff-balance-title">${esc2(t('ff.balanceChart.title'))}</div>
+        </div>
+        <p class="ff-balance-sub">${esc2(t('ff.balanceChart.sub'))}</p>
+        <div class="ff-balance-chart-wrap"><canvas id="ff-balance"></canvas></div>
+        <div class="ff-balance-legend">
+          <span><span class="sw pos"></span>${esc2(t('ff.balanceChart.legend.surplus'))}</span>
+          <span><span class="sw neg"></span>${esc2(t('ff.balanceChart.legend.deficit'))}</span>
+        </div>
+      </div>
+    </div>
 
     <div class="two-col">
       <div>
@@ -11777,6 +11845,7 @@ function renderFunFund() {
 
   setTimeout(()=>{
     destroyChart('ff');
+    destroyChart('ff-balance');
     const ctx=document.getElementById('ff-chart');
     if(ctx){
       // Data comes from the same FE.funFund.summary() that feeds the
@@ -11792,6 +11861,42 @@ function renderFunFund() {
         {label:t('ff.chart.series.fund'),  data:ff.monthlyAllocation,                              backgroundColor:'#00d4ff18',borderColor:'#00d4ff',borderWidth:1.5,borderRadius:3},
         {label:t('ff.chart.series.budget'),data:windowMonths.map(m => ff.tripByMonth[m.key] || 0), backgroundColor:'#f5a62325',borderColor:'#f5a623',borderWidth:1.5,borderRadius:3},
       ]},options:chartPreset()});
+    }
+    // Running balance chart (ff-balance) — promoted from the buried
+    // table into the strategic row. Per-bar colour flips between
+    // green (month ends in surplus) and red (deficit carrying
+    // forward). Single dataset so the legend line collapses to
+    // "bar colour = surplus/deficit" and the chart stays readable.
+    const balCtx = document.getElementById('ff-balance');
+    if(balCtx){
+      const cd = chartDefaults();
+      const windowMonths = ff.windowMonths;
+      const bars  = ff.runningBalance;
+      const green = '#22c55e';
+      const red   = '#ef4444';
+      const bgFill= v => v >= 0 ? '#22c55e33' : '#ef444433';
+      const bgLine= v => v >= 0 ? green : red;
+      charts['ff-balance'] = new Chart(balCtx.getContext('2d'), {
+        type:'bar',
+        data:{
+          labels: windowMonths.map(m => m.short),
+          datasets:[{
+            label: t('ff.balanceChart.title'),
+            data: bars,
+            backgroundColor: bars.map(bgFill),
+            borderColor:     bars.map(bgLine),
+            borderWidth: 1.5,
+            borderRadius: 3,
+          }],
+        },
+        options: chartPreset({
+          plugins:{ legend:{ display:false }, tooltip:{ enabled:true } },
+          scales:{
+            x:{ ticks:{ color:cd.textColor, font:cd.tickFont, maxTicksLimit:12 }, grid:{ display:false } },
+            y:{ ticks:{ color:cd.textColor, font:cd.tickFont, callback:v=>fmtC(v) }, grid:{ color:cd.gridColor } },
+          },
+        }),
+      });
     }
   },50);
 }
