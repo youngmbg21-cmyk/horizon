@@ -784,7 +784,7 @@ body.light .chart-tooltip { box-shadow:0 6px 18px -6px rgba(60,40,10,0.2); }
 .runway-milestones-wrap { margin-top:14px; padding-top:12px; border-top:1px dashed var(--border); }
 .runway-ms-hd { font-family:var(--fm); font-size:9px; letter-spacing:.14em; text-transform:uppercase; color:var(--text3); margin-bottom:8px; }
 .runway-milestones { display:grid; grid-template-columns:repeat(auto-fill, minmax(108px, 1fr)); gap:8px; }
-.runway-ms { position:relative; background:var(--bg3); border:1px solid var(--border); border-radius:8px; padding:10px 10px 8px; font-size:10px; transition:all .2s; }
+.runway-ms { position:relative; background:var(--bg3); border:1px solid var(--border); border-radius:8px; padding:10px 10px 8px; font-size:10px; transition:background-color .15s, border-color .15s, transform .15s; }
 .runway-ms:hover { border-color:var(--border2); transform:translateY(-1px); }
 .runway-ms.pos { border-left:3px solid var(--accent-positive); }
 .runway-ms.neg { border-left:3px solid var(--accent-critical); }
@@ -4535,10 +4535,10 @@ const STRINGS = {
   // Subtitle under the runway chart — two templates depending on
   // whether a pension gap exists between retirement age and the
   // earliest pension start age.
-  'runway.sub.noGap':       { en:'How long your nest egg lasts on {scenario} expenses ({mo}/mo) — withdrawing {gross}/mo gross at {rate}% real growth · today\u2019s money',
-                              sv:'Hur länge ditt pensionskapital räcker vid {scenario} utgifter ({mo}/mån) — uttag {gross}/mån brutto vid {rate}% reell tillväxt · dagens penningvärde' },
-  'runway.sub.gap':         { en:'How long your nest egg lasts on {scenario} expenses ({mo}/mo) — Phase 1: {gross}/mo (age {a}\u2013{b}), Phase 2: reduced withdrawal + pension (age {c}+) at {rate}% real growth · today\u2019s money',
-                              sv:'Hur länge ditt pensionskapital räcker vid {scenario} utgifter ({mo}/mån) — Fas 1: {gross}/mån (ålder {a}\u2013{b}), Fas 2: minskat uttag + pension (ålder {c}+) vid {rate}% reell tillväxt · dagens penningvärde' },
+  'runway.sub.noGap':       { en:'How long your nest egg lasts on {scenario} expenses ({mo}/mo) — withdrawing {gross}/mo gross at {rate}% real growth · {lens}',
+                              sv:'Hur länge ditt pensionskapital räcker vid {scenario} utgifter ({mo}/mån) — uttag {gross}/mån brutto vid {rate}% reell tillväxt · {lens}' },
+  'runway.sub.gap':         { en:'How long your nest egg lasts on {scenario} expenses ({mo}/mo) — Phase 1: {gross}/mo (age {a}\u2013{b}), Phase 2: reduced withdrawal + pension (age {c}+) at {rate}% real growth · {lens}',
+                              sv:'Hur länge ditt pensionskapital räcker vid {scenario} utgifter ({mo}/mån) — Fas 1: {gross}/mån (ålder {a}\u2013{b}), Fas 2: minskat uttag + pension (ålder {c}+) vid {rate}% reell tillväxt · {lens}' },
   // Age snapshot rows
   'runway.ms.age':          { en:'Age {age}',         sv:'Ålder {age}' },
   'runway.ms.depleted':     { en:'Depleted',          sv:'Tömt' },
@@ -4546,12 +4546,12 @@ const STRINGS = {
   'runway.ms.badge.lifeExp':{ en:'Life exp.',         sv:'Livsläng.' },
   'runway.ms.badge.pension':{ en:'+pension',          sv:'+pension' },
   // Legend swatches
-  'runway.legend.balance':  { en:'Portfolio balance · today\u2019s money (left axis)',
-                              sv:'Portföljsaldo · dagens penningvärde (vänster axel)' },
-  'runway.legend.withdraw': { en:'Portfolio withdrawal · today\u2019s money/yr',
-                              sv:'Portföljuttag · dagens penningvärde/år' },
-  'runway.legend.pension':  { en:'Pension income · today\u2019s money/yr',
-                              sv:'Pensionsinkomst · dagens penningvärde/år' },
+  'runway.legend.balance':  { en:'Portfolio balance · {lens} (left axis)',
+                              sv:'Portföljsaldo · {lens} (vänster axel)' },
+  'runway.legend.withdraw': { en:'Portfolio withdrawal · {lens}/yr',
+                              sv:'Portföljuttag · {lens}/år' },
+  'runway.legend.pension':  { en:'Pension income · {lens}/yr',
+                              sv:'Pensionsinkomst · {lens}/år' },
   'runway.legend.shortfall':{ en:'Shortfall vs need · pension below expenses',
                               sv:'Underskott mot behov · pension under utgifter' },
   'runway.legend.gap':      { en:'⚡ Pension starts at age {age} ({yrs}yr gap)',
@@ -4560,6 +4560,8 @@ const STRINGS = {
   'runway.tt.title':        { en:'Age {age}',         sv:'Ålder {age}' },
   'runway.tt.todaysMoney':  { en:'· today\u2019s money',
                               sv:'· dagens penningvärde' },
+  'runway.tt.lens':         { en:'· {lens}',
+                              sv:'· {lens}' },
   'runway.tt.depletedBadge':{ en:'· depleted',        sv:'· tömd' },
   'runway.tt.balance':      { en:'Portfolio balance',  sv:'Portföljsaldo' },
   'runway.tt.withdrawal':   { en:'Portfolio withdrawal',
@@ -4803,8 +4805,8 @@ const STRINGS = {
   's1.runway.sub':          { en:'How long your nest egg lasts on {scenario} expenses',
                               sv:'Hur länge ditt pensionskapital räcker vid {scenario} utgifter' },
   's1.runway.lifeExpChip':  { en:'Life exp. {age}',           sv:'Förv. livslängd {age}' },
-  's1.runway.ageSnapshots': { en:'Age snapshots · today\u2019s money',
-                              sv:'Åldersnedslag · dagens penningvärde' },
+  's1.runway.ageSnapshots': { en:'Age snapshots · {lens}',
+                              sv:'Åldersnedslag · {lens}' },
 
   // ── Retirement · page header + scenario bar ────────────
   'ret.page.tag':           { en:'RETIREMENT PLANNING',    sv:'PENSIONSPLANERING' },
@@ -10194,7 +10196,10 @@ function toggleRetSec(n){
     header.setAttribute('aria-expanded', open?'true':'false');
     header.setAttribute('title', open?'Click to collapse':'Click to expand');
   }
-  if(n===1&&open) setTimeout(renderRunwayChart,60);
+  // Render synchronously the moment the section becomes visible —
+  // no 60ms gap means no empty-rectangle blink when the user
+  // expands the Sustainability section.
+  if(n===1&&open) renderRunwayChart();
 }
 
 // Open the AI chatbot and send a pre-built question explaining a
@@ -10463,7 +10468,7 @@ function renderRetirement() {
         <div class="runway-svg-host" id="runway-svg-host"></div>
         <div class="runway-legend" id="runway-legend"></div>
         <div class="runway-milestones-wrap">
-          <div class="runway-ms-hd">${t('s1.runway.ageSnapshots')}</div>
+          <div class="runway-ms-hd">${t('s1.runway.ageSnapshots', { lens: FE.display.label() })}</div>
           <div class="runway-milestones" id="runway-milestones"></div>
         </div>
       </div>
@@ -10868,8 +10873,15 @@ function renderRetirement() {
     ${sectionWrap(2,'📝',t('ret.sec2.title'),sec2Subtitle,s3)}
     ${sectionWrap(3,'◈',t('ret.sec3.title'),sec3Subtitle,s2)}`;
 
-  // Render Chart.js runway after DOM settles
-  if(window.retSecOpen.s1) setTimeout(renderRunwayChart,80);
+  // Render the runway SVG synchronously in the same tick as the
+  // innerHTML swap above. The previous setTimeout(…, 80) created an
+  // 80ms window in which the .runway-svg-host rectangle was reserved
+  // but empty — producing the visible "shake" when the user toggled
+  // display mode (or scenario, or any other trigger that re-runs
+  // renderRetirement). Running synchronously means the SVG, bars,
+  // legend, milestones, and verdict chip all land in ONE paint, so
+  // there is no intermediate empty-card frame to shake past.
+  if(window.retSecOpen.s1) renderRunwayChart();
 }
 
 // ─── FOCUS PRESERVATION ACROSS RE-RENDERS ───────────────────────────────────
@@ -10933,9 +10945,52 @@ function renderRunwayChart(){
   if(!host) return;
 
   const nums = getRetirementNumbers();
-  const cdata = buildRunwayChartData(nums);
+  const rawSim = buildRunwayChartData(nums);
   const lifeExp = state.lifeExp || 90;
   const retAge = state.retirementAge;
+  // Lens-aware scaling: the simulation runs in real (today's money)
+  // terms — _simulateRetirementYears uses the real post-growth rate
+  // and real expenses, so every balData / portWithdrawal /
+  // pensionData / shortfall / needed value is in today's kr. To
+  // render in Nominal, each year is scaled by its OWN inflation
+  // factor because age N is further in the future than age N−1 —
+  // a flat multiplier would understate later years.
+  //
+  //   yearsFromNow_for_age(age) = ytr + (age − retAge)
+  //   nominalFactor(age)        = (1 + i/100)^yearsFromNow
+  //
+  // In Real mode scalers collapse to 1.0 and the original data is
+  // used unchanged. cdata is built by cloning rawSim and mapping
+  // each numeric array so the downstream SVG code keeps working
+  // with a single `cdata.*` object — the lens branch lives here,
+  // the rest of renderRunwayChart stays lens-agnostic.
+  const ytr = FE.retirement.yearsToRetirement();
+  const isNom = FE.display.isNominal();
+  const scaleYear = (age) => {
+    if(!isNom) return 1;
+    const y = Math.max(0, ytr + (age - retAge));
+    return FE.inflation.factor(y);
+  };
+  const cdata = (() => {
+    if(!isNom || !rawSim || !rawSim.labels) return rawSim;
+    const factors = rawSim.labels.map(scaleYear);
+    const scaleArr = (arr) => Array.isArray(arr)
+      ? arr.map((v, i) => Math.round((v || 0) * factors[i]))
+      : arr;
+    return {
+      ...rawSim,
+      balData:        scaleArr(rawSim.balData),
+      portWithdrawal: scaleArr(rawSim.portWithdrawal),
+      pensionData:    scaleArr(rawSim.pensionData),
+      shortfall:      scaleArr(rawSim.shortfall),
+      actualIncome:   scaleArr(rawSim.actualIncome),
+      needed:         scaleArr(rawSim.needed),
+      // Scalar fields — annualGrossNeeded is flat across the sim in
+      // real mode; scale by the factor at retireAge (first year).
+      annualGrossNeeded: rawSim.annualGrossNeeded ? Math.round(rawSim.annualGrossNeeded * factors[0]) : rawSim.annualGrossNeeded,
+      _lensScaled: true,
+    };
+  })();
 
   // ── EMPTY STATE ──────────────────────────────────────────────────────────
   if(!cdata.labels || cdata.labels.length === 0){
@@ -11223,7 +11278,7 @@ function _attachRunwayHover(host, {cdata, pad, pw, ph, xScale, yBal}){
       ? `<span style="color:#ff4d6d;font-weight:600">${esc2(t('runway.tt.depletedBadge'))}</span>`
       : '';
     tooltip.innerHTML = `
-      <div class="chart-tt-title">${esc2(t('runway.tt.title', { age }))} <span style="color:var(--text3);font-weight:500">${esc2(t('runway.tt.todaysMoney'))}</span> ${depBadge}</div>
+      <div class="chart-tt-title">${esc2(t('runway.tt.title', { age }))} <span style="color:var(--text3);font-weight:500">${esc2(t('runway.tt.lens', { lens: FE.display.label() }))}</span> ${depBadge}</div>
       <div class="chart-tt-row"><span class="chart-tt-sw" style="background:${dep?'#ff4d6d':'#00e8a0'}"></span><span>${esc2(t('runway.tt.balance'))}</span><span class="chart-tt-val">${fmt(balance)}</span></div>
       ${!dep ? `<div class="chart-tt-row"><span class="chart-tt-sw" style="background:#f5a623"></span><span>${esc2(t('runway.tt.withdrawal'))}</span><span class="chart-tt-val">${fmt(port)}/yr</span></div>` : ''}
       ${pen > 0 ? `<div class="chart-tt-row"><span class="chart-tt-sw" style="background:#4d9fff"></span><span>${esc2(t('runway.tt.pension'))}</span><span class="chart-tt-val">${fmt(pen)}/yr</span></div>` : ''}
@@ -11267,28 +11322,36 @@ function _runwayUpdateChrome(cdata, nums, lifeExp, lineColor){
   const modeChip = document.getElementById('runway-mode-chip');
   if(modeChip) modeChip.textContent = modeLabel;
 
-  // Subtitle — adapts to whether there's a pension gap period
+  // Subtitle — adapts to whether there's a pension gap period. The
+  // {mo} / {gross} figures are scaled via FE.display.scaleReal so the
+  // subtitle numbers read in the SAME lens as the chart bars and the
+  // age-snapshot cards below. {lens} prints "Today's money" or
+  // "Nominal" at the end of the line so the frame is explicit.
   const pensions = getPensionAssets();
   const sub = document.getElementById('runway-subtitle');
   if(sub){
     const realRate = Math.max(0, (state.retirementPostGrowth || 4) - state.inflationRate);
     const hasPenGap = pensions.length > 0 && cdata.earliestPension !== null && cdata.earliestPension > state.retirementAge;
+    const sR = (v) => FE.display.scaleReal(v);
+    const lens = FE.display.label();
     if(hasPenGap){
       sub.textContent = t('runway.sub.gap', {
         scenario: plainModeLabel,
-        mo: fmt(nums.totalExp),
-        gross: fmt(nums.grossNeeded),
+        mo: fmt(sR(nums.totalExp)),
+        gross: fmt(sR(nums.grossNeeded)),
         a: state.retirementAge,
         b: cdata.earliestPension - 1,
         c: cdata.earliestPension,
         rate: realRate.toFixed(1),
+        lens,
       });
     } else {
       sub.textContent = t('runway.sub.noGap', {
         scenario: plainModeLabel,
-        mo: fmt(nums.totalExp),
-        gross: fmt(nums.grossNeeded),
+        mo: fmt(sR(nums.totalExp)),
+        gross: fmt(sR(nums.grossNeeded)),
         rate: realRate.toFixed(1),
+        lens,
       });
     }
   }
@@ -11344,10 +11407,11 @@ function _runwayUpdateChrome(cdata, nums, lifeExp, lineColor){
     const shortSwatch = hasShortfall
       ? `<span class="runway-legend-item"><span class="runway-legend-sq" style="background:repeating-linear-gradient(45deg,#ff4d6d,#ff4d6d 2px,#ff4d6d44 2px,#ff4d6d44 4px);border:1px solid #ff4d6d"></span>${t('runway.legend.shortfall')}</span>`
       : '';
+    const legLens = FE.display.label();
     legEl.innerHTML = `
-      <span class="runway-legend-item"><span class="runway-legend-line" style="background:${color}"></span>${t('runway.legend.balance')}</span>
-      <span class="runway-legend-item"><span class="runway-legend-sq" style="background:#f5a623"></span>${t('runway.legend.withdraw')}</span>
-      <span class="runway-legend-item"><span class="runway-legend-sq" style="background:#4d9fff"></span>${t('runway.legend.pension')}</span>
+      <span class="runway-legend-item"><span class="runway-legend-line" style="background:${color}"></span>${t('runway.legend.balance',  { lens: legLens })}</span>
+      <span class="runway-legend-item"><span class="runway-legend-sq" style="background:#f5a623"></span>${t('runway.legend.withdraw', { lens: legLens })}</span>
+      <span class="runway-legend-item"><span class="runway-legend-sq" style="background:#4d9fff"></span>${t('runway.legend.pension',  { lens: legLens })}</span>
       ${shortSwatch}
       ${gap}
     `;
