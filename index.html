@@ -9133,9 +9133,97 @@ function _sanitizeAIMarkdown(md){
 // Every AI-generated markdown body MUST pass through the sanitizer
 // first so a model that slips a chart spec into an analysis card
 // can't dump raw JSON at the user.
+// Middle-zone bulletizer. The dashboard AI prompt asks for a
+// template: **Takeaway:** opener, then 3–5 bulleted points, then
+// **Bottom line:** closer. In practice models sometimes comply on
+// one card and emit dense paragraphs on the others, so the card
+// row reads unevenly. This post-processor enforces the structure
+// client-side: any section whose middle zone (between the
+// Takeaway and Bottom line) has zero bullet lines gets its
+// prose sentences split into bullets. Idempotent — if the model
+// already produced bullets, the function is a no-op.
+//
+// Heuristic:
+//   1. Split on blank lines into blocks.
+//   2. Identify the Takeaway block (starts with **Takeaway:**) and
+//      the Bottom line block (starts with **Bottom line:**).
+//   3. Middle = blocks between them. If any middle block already
+//      contains a bullet line ("- "), trust the model and bail.
+//   4. Otherwise, concatenate the middle prose, split it into
+//      sentences (regex preserves terminal punctuation), and
+//      rewrite the middle zone as a bulleted list. Cap at 6 so
+//      one runaway paragraph doesn't produce a 10-line list.
+//
+// The opener and closer blocks are left alone. Bolded numbers,
+// tone markers, and inline formatting inside sentences are
+// preserved by construction because we slice the string — we
+// don't rebuild it.
+function _bulletizeSection(md){
+  const text = String(md || '').trim();
+  if(!text) return text;
+  // Detect the structural beacons. Case-insensitive + tolerant of
+  // whitespace variations around the colon.
+  const takeawayRe = /\*\*\s*Takeaway\s*:?\s*\*\*/i;
+  const bottomRe   = /\*\*\s*Bottom\s*line\s*:?\s*\*\*/i;
+  const blocks = text.split(/\n{2,}/).map(b => b.trim()).filter(Boolean);
+  const takeawayIdx = blocks.findIndex(b => takeawayRe.test(b));
+  const bottomIdx   = blocks.findIndex(b => bottomRe.test(b));
+  // No structural markers at all → leave the text alone (it's a
+  // legacy cached paragraph report; renders fine through mdParse).
+  if(takeawayIdx < 0 && bottomIdx < 0) return text;
+  // Markers exist but middle is ambiguous (bottom before takeaway,
+  // missing opener, etc.) → leave alone rather than guess.
+  if(takeawayIdx < 0 || bottomIdx < 0 || bottomIdx <= takeawayIdx) return text;
+  const middle = blocks.slice(takeawayIdx + 1, bottomIdx);
+  if(middle.length === 0) return text;
+  // Does the middle already have bullets? If yes, trust the model.
+  const hasBullets = middle.some(b => /^(?:\s*)-\s+/m.test(b));
+  if(hasBullets) return text;
+  // Prose-only middle — split into sentences. The regex captures
+  // chunks ending in ., !, or ? followed by whitespace or the end
+  // of string; it's deliberately simple (no abbreviation
+  // handling) because the model writes clean prose and the worst
+  // case is a bullet gets over-split.
+  const prose = middle.join(' ').replace(/\s+/g, ' ').trim();
+  const sentenceMatches = prose.match(/[^.!?]+[.!?]+(?=\s|$)/g);
+  const sentences = (sentenceMatches && sentenceMatches.length > 0)
+    ? sentenceMatches.map(s => s.trim()).filter(Boolean)
+    : [prose];
+  // Filter out stubs (< 4 words) that come from regex edge cases;
+  // merge them back into the previous bullet.
+  const merged = [];
+  sentences.forEach(s => {
+    const wc = s.split(/\s+/).length;
+    if(wc < 4 && merged.length){
+      merged[merged.length - 1] += ' ' + s;
+    } else {
+      merged.push(s);
+    }
+  });
+  // Cap at 6 so a paragraph-soup response doesn't produce a wall
+  // of 10+ bullets. If the cap kicks in, append the surplus to
+  // the last retained bullet so no prose is lost.
+  const CAP = 6;
+  let bullets = merged;
+  if(bullets.length > CAP){
+    const head = bullets.slice(0, CAP - 1);
+    const tail = bullets.slice(CAP - 1).join(' ');
+    bullets = head.concat(tail);
+  }
+  const bulletList = bullets.map(s => `- ${s}`).join('\n');
+  const head = blocks.slice(0, takeawayIdx + 1);
+  const foot = blocks.slice(bottomIdx);
+  return head.concat([bulletList]).concat(foot).join('\n\n');
+}
+
 function _renderAISectionBody(md){
   const sanitized = _sanitizeAIMarkdown(md);
-  const capped = _capWordsPerSection(sanitized, DASH_REPORT_WORD_CAP);
+  // Enforce the Takeaway → bullets → Bottom line template
+  // regardless of whether the model complied. Runs at render
+  // time so cached paragraph-shape reports also benefit without
+  // requiring the user to click Re-run first.
+  const structured = _bulletizeSection(sanitized);
+  const capped = _capWordsPerSection(structured, DASH_REPORT_WORD_CAP);
   const parsed = mdParse(capped);
   return _enhanceAIMarkup(parsed);
 }
@@ -9669,7 +9757,7 @@ STRUCTURE · EXACTLY these four markdown H2 headings, in this order, nothing bef
 ## Areas of concern
 ## Recommendations
 
-CARD TEMPLATE · HARD CONSTRAINT: under EVERY heading use this fixed shape, and nothing else. No prose paragraphs outside the opener and closer lines. No nested bullets. No sub-headings. No intros, no sign-offs.
+CARD TEMPLATE · HARD CONSTRAINT: under EVERY heading use this fixed shape, and nothing else. No prose paragraphs outside the opener and closer lines. No nested bullets. No sub-headings. No intros, no sign-offs. ⚠️ THE MIDDLE ZONE IS ALWAYS A BULLETED LIST — never a paragraph, never multi-sentence prose. If you find yourself writing a paragraph between the Takeaway and the Bottom line, STOP and convert it into bullets. Every card obeys this, not just the first one.
 
 ## <heading>
 **Takeaway:** <one verdict sentence, 15–25 words, sets the tone>
