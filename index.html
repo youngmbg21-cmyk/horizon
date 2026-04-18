@@ -1742,6 +1742,49 @@ body.light .ff-trip-card:hover { box-shadow:0 6px 18px -10px rgba(60,40,10,0.18)
   padding-top:12px; border-top:1px dashed var(--border);
 }
 
+/* ── FUN FUND · COLLAPSED RUNNING-BALANCE TABLE ────────
+   Redesign step 6. The per-month running-balance table
+   used to be always-visible at the bottom of the tab,
+   but the new ff-balance chart (step 2) already encodes
+   its information visually. Collapsing by default cuts
+   density without removing the data — the user can
+   expand on demand.
+
+   Styled as a .card with a disclosure-aware summary:
+   chevron rotates on open, default marker suppressed,
+   summary reads like the old card title. */
+.ff-run-details { padding:0; }
+.ff-run-details > summary {
+  list-style:none;
+  cursor:pointer;
+  padding:14px 16px;
+  display:flex; align-items:center; gap:10px;
+  user-select:none;
+  transition:background-color .15s;
+}
+.ff-run-details > summary::-webkit-details-marker { display:none; }
+.ff-run-details > summary::marker { display:none; content:''; }
+.ff-run-details > summary:hover { background:var(--bg3); }
+.ff-run-details[open] > summary { border-bottom:1px solid var(--border); }
+.ff-run-details > summary .caret {
+  display:inline-block; width:12px; text-align:center;
+  font-size:11px; color:var(--text3);
+  transition:transform .15s;
+  flex-shrink:0;
+}
+.ff-run-details[open] > summary .caret { transform:rotate(90deg); }
+.ff-run-details > summary .label {
+  font-size:11px; letter-spacing:.05em; font-weight:600;
+  text-transform:uppercase; color:var(--text2);
+}
+.ff-run-details > summary .hint {
+  margin-left:auto;
+  font-family:var(--fm); font-size:10px;
+  color:var(--text3); font-style:italic;
+}
+.ff-run-details > .ff-run-body { padding:14px 16px; }
+.ff-run-details > .ff-run-body > p { font-size:12px; color:var(--text2); margin:0 0 10px; }
+
 /* ── FUN FUND · RUNNING BALANCE TABLE ──────────────────
    Two-column row: month label on the left, "+ delta" pill
    and running balance on the right. Deficit rows light up
@@ -4563,6 +4606,12 @@ const STRINGS = {
   // ── Fun Fund · running balance table ───────────────────
   'ff.run.title':           { en:'Monthly Fun Fund — Running Balance',
                               sv:'Månadsvis Fun Fund — löpande saldo' },
+  // Summary-row hint for the collapsed-by-default running-balance
+  // table (redesign step 6). The chart above already encodes this
+  // data visually; the table stays available for users who want
+  // the exact month-by-month numbers.
+  'ff.run.summary.hint':    { en:'{n} rows · click to expand',
+                              sv:'{n} rader · klicka för att visa' },
   'ff.run.blurb':           { en:"Each month's allocation (Income − Expenses − Savings) rolls into a continuous running balance. A negative month carries its deficit forward until later surpluses pay it off.",
                               sv:'Varje månads tilldelning (Inkomst − Utgifter − Sparande) rullar in i ett löpande saldo. En minusmånad bär sitt underskott vidare tills senare överskott betalar av det.' },
   'ff.run.col.month':       { en:'Month',                 sv:'Månad' },
@@ -12087,16 +12136,21 @@ function renderFunFund() {
           <div class="card-title">${esc2(t('ff.chart.title'))}</div>
           <div class="chart-wrap md"><canvas id="ff-chart"></canvas></div>
         </div>
-        <div class="card">
-          <div class="card-title">${esc2(t('ff.run.title'))}</div>
-          <p style="font-size:12px;color:var(--text2);margin-bottom:10px">${esc2(t('ff.run.blurb'))}</p>
-          <div class="ff-run-list">
-            <div class="ff-run-row ff-run-head" aria-hidden="true">
-              <span class="ff-run-h-label">${esc2(t('ff.run.col.month'))}</span>
-              <span class="ff-run-h-delta">${esc2(t('ff.run.col.delta'))}</span>
-              <span class="ff-run-h-bal">${esc2(t('ff.run.col.balance'))}</span>
-              <span class="ff-run-h-status">${esc2(t('ff.run.col.status'))}</span>
-            </div>
+        <details class="card ff-run-details">
+          <summary>
+            <span class="caret" aria-hidden="true">▸</span>
+            <span class="label">${esc2(t('ff.run.title'))}</span>
+            <span class="hint">${esc2(t('ff.run.summary.hint', { n: ff.runningBalance.length }))}</span>
+          </summary>
+          <div class="ff-run-body">
+            <p>${esc2(t('ff.run.blurb'))}</p>
+            <div class="ff-run-list">
+              <div class="ff-run-row ff-run-head" aria-hidden="true">
+                <span class="ff-run-h-label">${esc2(t('ff.run.col.month'))}</span>
+                <span class="ff-run-h-delta">${esc2(t('ff.run.col.delta'))}</span>
+                <span class="ff-run-h-bal">${esc2(t('ff.run.col.balance'))}</span>
+                <span class="ff-run-h-status">${esc2(t('ff.run.col.status'))}</span>
+              </div>
             ${(()=>{
               // Read directly from the same FE.funFund.summary() that
               // feeds the BALANCE card so the table's last row and the
@@ -12135,8 +12189,9 @@ function renderFunFund() {
                 </div>`;
               }).join('');
             })()}
+            </div>
           </div>
-        </div>
+        </details>
       </div>
     </div>`;
 
