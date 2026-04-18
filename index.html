@@ -1377,17 +1377,39 @@ label.field-label-row {
   color:var(--text2); margin-bottom:10px;
 }
 .dash-ai-sec-hd .ic { font-size:13px; }
+/* Markup body for each AI-card section. The prompt generates a
+   three-zone template — Takeaway paragraph, bullet list, Bottom-
+   line paragraph — and the gap on this flex container is the
+   primary visual rhythm between those zones. Increased from 8 px
+   to 14 px so the zones read as distinct bands, which is what
+   makes the card feel composed rather than dumped. */
 .dash-ai-sec .md {
   flex:1 1 auto; min-width:0;
   font-size:12.5px; line-height:1.65; color:var(--text);
-  display:flex; flex-direction:column; gap:8px;
+  display:flex; flex-direction:column; gap:14px;
 }
 .dash-ai-sec .md > *:first-child { margin-top:0; }
 .dash-ai-sec .md > *:last-child  { margin-bottom:0; }
 .dash-ai-sec .md p { margin:0; }
+/* Takeaway opener + Bottom-line closer — these lines lead with
+   "**Takeaway:**" / "**Bottom line:**". The leading <strong>
+   picks up a muted, mono label treatment so the labels read as
+   section markers rather than compete with the body text. */
+.dash-ai-sec .md p > strong:first-child {
+  font-family:var(--fm); font-size:10px; font-weight:700;
+  letter-spacing:.08em; text-transform:uppercase;
+  color:var(--text3); margin-right:6px;
+}
+.dash-ai-sec .md p > strong:first-child ~ strong { color:var(--text); }
 .dash-ai-sec .md ul,
-.dash-ai-sec .md ol { margin:0 0 0 20px; padding:0; }
-.dash-ai-sec .md li { margin:3px 0; }
+.dash-ai-sec .md ol { margin:0; padding:0 0 0 18px; }
+/* Generous bullet spacing — the bullets are the middle zone of
+   the card template, so the breathing room between them is what
+   makes the card scannable. 7 px between items, 1.55 line-height
+   within each item. */
+.dash-ai-sec .md li { margin:7px 0; line-height:1.55; }
+.dash-ai-sec .md li:first-child { margin-top:0; }
+.dash-ai-sec .md li:last-child  { margin-bottom:0; }
 .dash-ai-sec .md strong { color:var(--text); font-weight:700; }
 /* ── AI Financial Analysis · inline tone markers ──────
    The model emits {+…} / {-…} / {!…} / {~…} and the
@@ -9638,7 +9660,7 @@ window.runDashboardAIReport = async function(){
     // A focused prompt: one-shot, structured, with enough numeric
     // context to make the advice specific. The system prompt from
     // buildAIContext() already injects the full financial snapshot.
-    const prompt = `Write a punchy, scannable financial analysis for me based on the snapshot in the system prompt. This is a brief — not an essay.
+    const prompt = `Write a structured executive-brief financial analysis for me based on the snapshot in the system prompt. Four short, scannable cards — not four essays.
 
 STRUCTURE · EXACTLY these four markdown H2 headings, in this order, nothing before or after:
 
@@ -9647,11 +9669,26 @@ STRUCTURE · EXACTLY these four markdown H2 headings, in this order, nothing bef
 ## Areas of concern
 ## Recommendations
 
-WORD BUDGET · HARD CONSTRAINT: every section MUST be between 230 and 250 words. Not 220, not 260 — strictly 230–250. Every section should land in the same narrow range so the four cards read as a balanced brief. Count words carefully; drafts outside this range will be rejected and regenerated, so do it right the first time. Do not pad with filler — if a section feels short, add another grounded insight, concrete number, or tone-marked observation. If it runs long, cut the weakest sentence rather than compressing every line into dense clauses.
+CARD TEMPLATE · HARD CONSTRAINT: under EVERY heading use this fixed shape, and nothing else. No prose paragraphs outside the opener and closer lines. No nested bullets. No sub-headings. No intros, no sign-offs.
 
-FORMATTING · Follow these rules exactly. No walls of prose.
+## <heading>
+**Takeaway:** <one verdict sentence, 15–25 words, sets the tone>
 
-1. **Bold** every currency figure, percentage, rate, ratio, and key metric. Example: "Your **29% savings rate** produces **kr 27 000/mo** of surplus."
+- <bullet 1 — 15–30 words, grounded in at least one specific number>
+- <bullet 2>
+- <bullet 3>
+- <bullet 4>
+- <bullet 5, optional; aim for 4 bullets per card so the four cards read as a balanced set>
+
+**Bottom line:** <one implication or next-action sentence, 15–25 words>
+
+A blank line separates the Takeaway, the bullet list, and the Bottom line so the three zones breathe. Every card uses this template — the cards MUST share a visual silhouette.
+
+WORD BUDGET · HARD CONSTRAINT: every section MUST be between 230 and 250 words. Count words carefully. Allocate roughly: **Takeaway** ~20 words · **4 bullets** ~45 words each · **Bottom line** ~20 words. If a draft runs short, add another grounded bullet rather than padding prose. If it runs long, trim bullet verbosity before cutting the opener/closer lines — the card silhouette must stay intact.
+
+FORMATTING · Follow these rules exactly.
+
+1. **Bold** every currency figure, percentage, rate, ratio, and key metric. Example: "Your **29% savings rate** produces **27 000 kr/mo** of surplus."
 
 2. Use these inline colour markers to tone-code numbers and verdicts (the UI renders them as coloured spans):
    · {+text} → POSITIVE signal (green). Surpluses, strong savings rates, coverage above target, good trends.
@@ -9660,13 +9697,13 @@ FORMATTING · Follow these rules exactly. No walls of prose.
    · {~text} → NEUTRAL (muted). Context figures you want to de-emphasise.
    Example: "You're {+on track to retire at 60} with **78% coverage**, though {!housing still eats 34% of income}."
 
-3. Use bulleted lists (\`- \`) for 2–4 sub-points per section wherever it improves scannability.
+3. Short, analytical sentences — 12–22 words each. No filler. No hedging phrases ("it might be worth considering…"). State the finding.
 
-4. Short sentences — aim for 10–18 words on average. Cut every filler word.
+4. Every bullet references at least one concrete number from the snapshot so the advice can't feel generic.
 
-5. Reference specific numbers from the snapshot so the advice feels grounded — not generic.
+5. Recommendations card: every bullet is a **concrete action the user can take this month**. Start each bullet with an imperative verb ("Automate…", "Redirect…", "Rebalance…", "Book…").
 
-6. Recommendations must contain **3–5 concrete, actionable bullets** the user can act on THIS month.
+6. The Takeaway opens the card's thesis. The Bottom line closes with an implication, not a summary.
 
 Display lens · The user is currently viewing every future-dated amount in ${FE.display.isNominal() ? '**nominal (future kr)** — values have NOT been discounted for inflation' : '**today\u2019s money** — future amounts are inflation-adjusted back to present purchasing power'}. Frame your commentary in that lens; if you reference the opposite frame, label it explicitly so the reader never has to guess which kr is which.
 
