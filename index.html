@@ -7692,16 +7692,6 @@ function _liveSyncCharts(){
     'Savings':  () => FE.months.runningSavingsForward(),
     'Fun Fund': () => fwd.map(m => m.funFund),
   });
-  // Fun Fund vs Travel Budget by Month
-  const tripByMonth = {};
-  (state.trips || []).forEach(t => (t.expenses || []).forEach(ex => {
-    const k = (ex.date || '').slice(0, 7);
-    if(k) tripByMonth[k] = (tripByMonth[k] || 0) + (Number(ex.amount) || 0);
-  }));
-  patch('ff', {
-    'Fun Fund':    () => first12.map(m => Math.max(0, m.funFund)),
-    'Trip Budget': () => first12.map(m => tripByMonth[m.key] || 0),
-  });
   // Running balance chart (ff-balance) — patches in place when the
   // user edits a trip expense or monthly item. Per-bar colour has
   // to be recomputed alongside the data because each bar's hue is a
@@ -12132,10 +12122,6 @@ function renderFunFund() {
         })()}
       </div>
       <div>
-        <div class="card">
-          <div class="card-title">${esc2(t('ff.chart.title'))}</div>
-          <div class="chart-wrap md"><canvas id="ff-chart"></canvas></div>
-        </div>
         <details class="card ff-run-details">
           <summary>
             <span class="caret" aria-hidden="true">▸</span>
@@ -12196,24 +12182,7 @@ function renderFunFund() {
     </div>`;
 
   setTimeout(()=>{
-    destroyChart('ff');
     destroyChart('ff-balance');
-    const ctx=document.getElementById('ff-chart');
-    if(ctx){
-      // Data comes from the same FE.funFund.summary() that feeds the
-      // KPI row + banner + AI card, so the bars + cards can't disagree
-      // by construction. Blue bar = GROSS monthly Fun Fund allocation
-      // (what the summary cards call "12-month capacity" divided per
-      // month). Orange bar = trip spend that month. The cumulative
-      // running balance — post-trip, with deficits carried forward —
-      // lives in the Running Balance table below; plotting it as bars
-      // here would confuse "cumulative balance" with "monthly flow".
-      const windowMonths = ff.windowMonths;
-      charts['ff']=new Chart(ctx.getContext('2d'),{type:'bar',data:{labels:windowMonths.map(m=>m.short),datasets:[
-        {label:t('ff.chart.series.fund'),  data:ff.monthlyAllocation,                              backgroundColor:'#00d4ff18',borderColor:'#00d4ff',borderWidth:1.5,borderRadius:3},
-        {label:t('ff.chart.series.budget'),data:windowMonths.map(m => ff.tripByMonth[m.key] || 0), backgroundColor:'#f5a62325',borderColor:'#f5a623',borderWidth:1.5,borderRadius:3},
-      ]},options:chartPreset()});
-    }
     // Running balance chart (ff-balance) — promoted from the buried
     // table into the strategic row. Per-bar colour flips between
     // green (month ends in surplus) and red (deficit carrying
