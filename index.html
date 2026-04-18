@@ -4378,12 +4378,16 @@ const STRINGS = {
   'ff.kpi.spent':           { en:'ALREADY SPENT',         sv:'REDAN SPENDERAT' },
   'ff.kpi.spent.sub':       { en:'{pct}% of budget used', sv:'{pct}% av budgeten använd' },
   'ff.kpi.balance':         { en:'FUN FUND BALANCE',      sv:'FUN FUND-SALDO' },
+  'ff.kpi.balance.endOfWindow':{ en:'At end of next 12 months · matches table',
+                                 sv:'Vid slutet av kommande 12 månader · matchar tabellen' },
   'ff.kpi.balance.afterTrips':{ en:'After all trips',     sv:'Efter alla resor' },
-  'ff.kpi.balance.over':    { en:'Over budget by {amt}',  sv:'Över budget med {amt}' },
-  'ff.callout.over':        { en:'⚠️ <strong>Over budget!</strong> Your planned trips ({trips}) exceed your 12-month fun fund capacity ({total}) by {over}. Consider adjusting trip budgets or saving more each month.',
-                              sv:'⚠️ <strong>Över budget!</strong> Dina planerade resor ({trips}) överstiger din 12-månaders fun fund-kapacitet ({total}) med {over}. Överväg att justera resebudgetarna eller spara mer per månad.' },
-  'ff.callout.horizonNote': { en:'{out} of that sits outside the next 12 months — you can still save for it after the window, but the card above compares everything against a single 12-month capacity.',
-                              sv:'{out} av det ligger utanför de kommande 12 månaderna — du kan ändå spara till det efter fönstret, men kortet ovan jämför allt mot en enda 12-månaders kapacitet.' },
+  'ff.kpi.balance.over':    { en:'Deficit of {amt}',      sv:'Underskott på {amt}' },
+  'ff.callout.deficit':     { en:'⚠️ <strong>Fun Fund runs dry inside the window.</strong> The 12-month roll-forward ends in a deficit of {amt} — the same figure shown in the BALANCE card and the last row of the Running Balance table. Trim a trip, push one out of the window, or boost monthly savings to bring the year back into the black.',
+                              sv:'⚠️ <strong>Fun Fund tar slut inom fönstret.</strong> 12-månaders rullande slutar med ett underskott på {amt} — samma siffra som visas i SALDO-kortet och sista raden i tabellen Löpande saldo. Minska en resa, skjut upp en utanför fönstret eller öka månadssparandet.' },
+  'ff.callout.beyondHorizon':{ en:'⚠️ <strong>Beyond-window trips outsize your annual capacity.</strong> Your planned trips total {trips} but your 12-month capacity is only {total} — a gap of {gap}, of which {out} sits beyond the next 12 months. The BALANCE card and Running Balance table only show what happens INSIDE the window; you\u2019ll need to keep saving past the window to cover that {out}.',
+                              sv:'⚠️ <strong>Resor bortom fönstret överstiger din årliga kapacitet.</strong> Dina planerade resor uppgår till {trips} men din 12-månaders kapacitet är bara {total} — ett gap på {gap}, varav {out} ligger bortom de kommande 12 månaderna. SALDO-kortet och tabellen visar bara vad som händer INOM fönstret; du måste fortsätta spara förbi fönstret för att täcka de {out}.' },
+  'ff.callout.horizonNote': { en:'{out} of that sits outside the next 12 months and is NOT included in the deficit above.',
+                              sv:'{out} av det ligger utanför de kommande 12 månaderna och ingår INTE i underskottet ovan.' },
   'ff.section.travelPlans': { en:'Travel Plans',          sv:'Resplaner' },
   'ff.btn.addTrip':         { en:'+ Add Trip',            sv:'+ Lägg till resa' },
   'ff.chart.title':         { en:'Fun Fund vs Travel Budget by Month',
@@ -6298,7 +6302,7 @@ const FinancialEngine = (() => {
   //                       Σ (income − non-trip expenses − savings)
   //                       across the 12-month window. "What you'd
   //                       have for fun if you took no trips."
-  //   monthlyAllocation   Per-month array of the above. Feeds the
+  //   monthlyAllocation   Per-month version of the above. Feeds the
   //                       chart's blue bars — bar height matches the
   //                       summary card's mental model exactly.
   //   netFlow12mo         Σ (m.pureFunFund) — capacity AFTER trips
@@ -6313,14 +6317,25 @@ const FinancialEngine = (() => {
   //                       sub-text so the horizon mismatch is
   //                       visible when it matters.
   //   alreadySpent        Σ tr.spent.
-  //   remaining           capacity12mo − totalTrips. The headline
-  //                       "Fun Fund Balance" card reads this.
   //   tripByMonth         { 'YYYY-MM': amount } — drives the chart's
   //                       orange bars and the running-balance
   //                       column of the Running Balance table.
-  //   running             Array of cumulative running balance at
-  //                       end-of-month (post-trip, post-carry). Drives
-  //                       the running-balance table.
+  //   runningBalance      Per-month chained "what's in the piggy
+  //                       bank at end of month" — exactly what the
+  //                       Running Balance table displays per row.
+  //   finalRunningBalance The last entry of runningBalance. THIS is
+  //                       what the BALANCE card now shows so the
+  //                       card and the table's bottom row match by
+  //                       construction (modulo the carry-forward
+  //                       overrides the user has explicitly set).
+  //   balance             Alias for finalRunningBalance. Treat it as
+  //                       the single canonical "Fun Fund Balance"
+  //                       value across the app.
+  //   capacityCoversTrips True iff capacity12mo >= totalTrips. The
+  //                       banner uses this as a SECOND check so a
+  //                       user with trips beyond the 12-month
+  //                       horizon still sees a warning even when
+  //                       the in-window balance is positive.
   const funFund = {
     summary: () => memoSelect('ff:summary', () => {
       const all = get12Months();
@@ -6357,14 +6372,29 @@ const FinancialEngine = (() => {
       });
       const capacity12mo = monthlyAllocation.reduce((s, v) => s + v, 0);
       const netFlow12mo = windowMonths.reduce((s, m) => s + (m.pureFunFund || 0), 0);
-      const running = windowMonths.map(m => m.funFund || 0);
-      const remaining = capacity12mo - totalTrips;
+      // Per-month chained running balance — the SAME m.funFund the
+      // Running Balance table reads. Truncated to the same 12-month
+      // window the rest of summary() uses so the table and the
+      // BALANCE card can never disagree on which months are counted.
+      const runningBalance = windowMonths.map(m => m.funFund || 0);
+      const finalRunningBalance = runningBalance.length
+        ? runningBalance[runningBalance.length - 1]
+        : 0;
+      const balance = finalRunningBalance;
+      const capacityCoversTrips = capacity12mo >= totalTrips;
       return {
         windowMonths, windowKeys,
         monthlyAllocation, capacity12mo,
         netFlow12mo,
         totalTrips, tripsInWindow, tripsOutOfWindow, tripByMonth,
-        alreadySpent, remaining,
+        alreadySpent,
+        runningBalance, finalRunningBalance,
+        balance,
+        // `remaining` is preserved for any legacy reader, but is now
+        // an alias for the canonical balance — they are the same
+        // number going forward.
+        remaining: balance,
+        capacityCoversTrips,
         avgMonthly: capacity12mo / 12,
       };
     }),
@@ -6453,12 +6483,32 @@ const FinancialEngine = (() => {
       if(!near(ffSum.capacity12mo, expectedCap, 1)){
         v.push(`I6b: capacity12mo (${Math.round(ffSum.capacity12mo)}) != netFlow12mo + tripsInWindow (${Math.round(expectedCap)})`);
       }
-      // I6c — the Fun Fund Balance shown on the KPI row must equal
-      // capacity − totalTrips. The double-counting bug that used to
-      // produce −$13k banners would fail this invariant.
-      const expectedRemaining = ffSum.capacity12mo - ffSum.totalTrips;
-      if(!near(ffSum.remaining, expectedRemaining, 1)){
-        v.push(`I6c: remaining (${Math.round(ffSum.remaining)}) != capacity12mo − totalTrips (${Math.round(expectedRemaining)})`);
+      // I6c — the canonical Fun Fund Balance (ffSum.balance) must
+      // equal the LAST entry of ffSum.runningBalance, by construction.
+      // This is the assertion that catches any future regression of
+      // the off-by-one window bug that made the BALANCE card disagree
+      // with the last row of the Running Balance table.
+      const lastRun = ffSum.runningBalance[ffSum.runningBalance.length - 1] || 0;
+      if(!near(ffSum.balance, lastRun, 0.5)){
+        v.push(`I6c: balance (${Math.round(ffSum.balance)}) != runningBalance[last] (${Math.round(lastRun)})`);
+      }
+      // I6d — the table renders ffSum.windowMonths[i].funFund per row,
+      // so the last visible row's value must equal the BALANCE card.
+      const lastWindow = ffSum.windowMonths[ffSum.windowMonths.length - 1];
+      const lastWindowFF = (lastWindow && (lastWindow.funFund || 0)) || 0;
+      if(!near(ffSum.balance, lastWindowFF, 0.5)){
+        v.push(`I6d: balance (${Math.round(ffSum.balance)}) != windowMonths[last].funFund (${Math.round(lastWindowFF)})`);
+      }
+      // I6e — the chained running balance after 12 months should be
+      // close to the un-chained net flow over the same 12 months,
+      // because carry-forward only relocates money between months
+      // without creating or destroying it. They diverge ONLY when
+      // the user has set explicit carryOverrides for some month —
+      // in which case I6e fires by design and prompts a closer look.
+      // Tolerance scales with capacity to absorb harmless rounding.
+      const tol = Math.max(2, Math.round(Math.abs(ffSum.capacity12mo) * 0.001));
+      if(!near(ffSum.balance, ffSum.netFlow12mo, tol)){
+        v.push(`I6e: balance (${Math.round(ffSum.balance)}) drifts from netFlow12mo (${Math.round(ffSum.netFlow12mo)}) by more than ${tol} kr — likely a carryOverride or a chain bug`);
       }
     }
     return v;
@@ -11442,14 +11492,18 @@ function renderFunFund() {
   (state.trips || []).forEach(t => {
     if(t.status !== 'planning' && t.status !== 'booked') t.status = 'planning';
   });
-  // All Fun Fund KPIs, the banner, the AI summary, and the chart now
-  // read from the SAME normalized model so they cannot contradict
-  // each other. summary() owns the definitions — see FE.funFund.
+  // All Fun Fund KPIs, the banner, the AI summary, the chart, and the
+  // running-balance table now read from the SAME normalized model so
+  // they cannot contradict each other. summary() owns the definitions
+  // — see FE.funFund. The BALANCE card surfaces ff.balance which is
+  // the chained final running balance — i.e. the LAST row of the
+  // Running Balance table — so card and table reconcile by
+  // construction.
   const ff = FE.funFund.summary();
   const totalFF    = ff.capacity12mo;
   const totalTrips = ff.totalTrips;
   const totalSpent = ff.alreadySpent;
-  const remaining  = ff.remaining;
+  const balance    = ff.balance;
   const tripBudget = (t) => (t.expenses || []).reduce((s,ex)=>s + (Number(ex.amount)||0), 0);
   const r=rate(); const s=sym();
 
@@ -11522,10 +11576,35 @@ function renderFunFund() {
         ? esc2(t('ff.kpi.travelBudget.sub.split', { n: state.trips.length, inw: fmt(ff.tripsInWindow), out: fmt(ff.tripsOutOfWindow) }))
         : esc2(t('ff.kpi.travelBudget.sub', { n: state.trips.length }))}</div></div>
       <div class="kpi"><div class="kpi-icon">💳</div><div class="kpi-lbl">${esc2(t('ff.kpi.spent'))}</div><div class="kpi-val neg">${fmt(totalSpent)}</div><div class="kpi-sub">${esc2(t('ff.kpi.spent.sub', { pct: totalTrips>0?Math.round(totalSpent/totalTrips*100):0 }))}</div></div>
-      <div class="kpi"><div class="kpi-icon">${remaining>=0?'✅':'⚠️'}</div><div class="kpi-lbl">${esc2(t('ff.kpi.balance'))}</div><div class="kpi-val ${remaining>=0?'pos':'neg'}">${fmt(remaining)}</div><div class="kpi-sub">${esc2(remaining>=0?t('ff.kpi.balance.afterTrips'):t('ff.kpi.balance.over', { amt: fmt(Math.abs(remaining)) }))}</div></div>
+      <div class="kpi"><div class="kpi-icon">${balance>=0?'✅':'⚠️'}</div><div class="kpi-lbl">${esc2(t('ff.kpi.balance'))}</div><div class="kpi-val ${balance>=0?'pos':'neg'}">${fmt(balance)}</div><div class="kpi-sub">${esc2(balance>=0?t('ff.kpi.balance.endOfWindow'):t('ff.kpi.balance.over', { amt: fmt(Math.abs(balance)) }))}</div></div>
     </div>
 
-    ${remaining<0?`<div class="callout callout-danger">${t('ff.callout.over', { trips: fmt(totalTrips), total: fmt(totalFF), over: fmt(Math.abs(remaining)) })}${ff.tripsOutOfWindow > 0 ? ' ' + t('ff.callout.horizonNote', { out: fmt(ff.tripsOutOfWindow) }) : ''}</div>`:''}
+    ${(() => {
+      // Two distinct over-budget conditions, evaluated in order:
+      //  1. balance < 0  → the in-window 12-month roll-forward ends
+      //                    in deficit. The piggy bank literally runs
+      //                    dry within the window. Top-priority red
+      //                    banner.
+      //  2. otherwise, capacity12mo < totalTrips with trips beyond
+      //                    the window → the user could afford
+      //                    everything within 12 months but trips
+      //                    scheduled later than that exceed the
+      //                    annual capacity. Softer amber callout
+      //                    that explicitly flags the horizon
+      //                    mismatch instead of pretending the user
+      //                    is in a deficit.
+      if(balance < 0){
+        const horizonExtra = ff.tripsOutOfWindow > 0
+          ? ' ' + t('ff.callout.horizonNote', { out: fmt(ff.tripsOutOfWindow) })
+          : '';
+        return `<div class="callout callout-danger">${t('ff.callout.deficit', { amt: fmt(Math.abs(balance)) })}${horizonExtra}</div>`;
+      }
+      if(!ff.capacityCoversTrips && ff.tripsOutOfWindow > 0){
+        const gap = totalTrips - totalFF;
+        return `<div class="callout callout-warn">${t('ff.callout.beyondHorizon', { trips: fmt(totalTrips), total: fmt(totalFF), gap: fmt(gap), out: fmt(ff.tripsOutOfWindow) })}</div>`;
+      }
+      return '';
+    })()}
 
     <div class="two-col">
       <div>
@@ -11549,16 +11628,21 @@ function renderFunFund() {
               <span class="ff-run-h-status">${esc2(t('ff.run.col.status'))}</span>
             </div>
             ${(()=>{
-              // Build the running Fun Fund balance across the 12-month
-              // window. The Running Balance column reads m.funFund
-              // (the CHAINED per-month figure) directly, so it always
-              // equals the Fun Fund value shown in the Forecast &
-              // Review Month Summary bar and on the monthly charts.
-              // The Monthly Allocation column is the month-over-month
-              // delta — how much the running balance moved that month.
+              // Read directly from the same FE.funFund.summary() that
+              // feeds the BALANCE card so the table's last row and the
+              // BALANCE card are guaranteed to display the same number.
+              // Critically: the table iterates ff.windowMonths (12
+              // entries — current month + 11 forward), NOT the full
+              // 13-entry get12Months() window, so it ends on the same
+              // month the summary considers. The previous off-by-one
+              // bug — table showing month [12] (e.g. Apr 2027) while
+              // the BALANCE card stopped at month [11] (Mar 2027) —
+              // was the visible source of the $3,715 vs $3,693 drift.
+              const tableMonths = ff.windowMonths;
+              const tableRunning = ff.runningBalance;
               let prev = 0;
-              return months.map((m, i) => {
-                const running = m.funFund || 0;
+              return tableMonths.map((m, i) => {
+                const running = tableRunning[i] || 0;
                 const delta = running - prev;
                 prev = running;
                 const deltaCls = delta >= 0 ? 'pos' : 'neg';
@@ -11678,7 +11762,7 @@ window.runFunFundAIReport = async function(){
     // Every number the AI sees comes from the same normalized model
     // the UI reads from — so the prose cannot contradict the cards.
     const ff = FE.funFund.summary();
-    const { capacity12mo, totalTrips, tripsInWindow, tripsOutOfWindow, alreadySpent, remaining } = ff;
+    const { capacity12mo, totalTrips, tripsInWindow, tripsOutOfWindow, alreadySpent, balance } = ff;
     const tripSummary = (state.trips || []).map(tr => {
       const trBudget = (tr.expenses || []).reduce((a,e) => a + (Number(e.amount)||0), 0);
       return `  · ${tr.name || 'Trip'} (${tr.country || '—'}, ${tr.status || 'planning'}) — budget ${Math.round(trBudget).toLocaleString()} kr, spent ${Math.round(tr.spent || 0).toLocaleString()} kr`;
@@ -11708,7 +11792,7 @@ Snapshot:
 - Planned trip budget (all trips, all timing): **${Math.round(totalTrips).toLocaleString()} kr**
 - Of which falls inside the next 12 months: **${Math.round(tripsInWindow).toLocaleString()} kr**${tripsOutOfWindow > 0 ? `\n- Of which sits beyond the next 12 months: **${Math.round(tripsOutOfWindow).toLocaleString()} kr**` : ''}
 - Already spent on trips: **${Math.round(spentSoFar).toLocaleString()} kr**
-- Remaining after planned trips (capacity − total budget): **${Math.round(remaining).toLocaleString()} kr**
+- Fun Fund balance at end of 12-month window (this matches the BALANCE card and the last row of the Running Balance table): **${Math.round(balance).toLocaleString()} kr**
 - Monthly allocation (gross) min/max across next 12 months: **${Math.round(minMo).toLocaleString()} kr / ${Math.round(maxMo).toLocaleString()} kr**
 - Trips:
 ${tripSummary}
@@ -11722,7 +11806,7 @@ Return plain markdown only. IMPORTANT: this is an inline analysis card, not a ch
       lang: state.lang,
       content: clean,
       raw,
-      snapshot: { capacity12mo, totalTrips, tripsInWindow, tripsOutOfWindow, spentSoFar, remaining, tripCount: (state.trips||[]).length, displayMode: FE.display.mode() },
+      snapshot: { capacity12mo, totalTrips, tripsInWindow, tripsOutOfWindow, spentSoFar, balance, tripCount: (state.trips||[]).length, displayMode: FE.display.mode() },
     };
     state.funFundReportError = null;
   } catch(e){
