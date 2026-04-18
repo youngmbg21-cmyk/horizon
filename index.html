@@ -12157,25 +12157,10 @@ function renderFunFund() {
 
     <div class="two-col">
       <div>
-        <!-- Trips section header (redesign step 3). Title · filter
-             chips (All N / Booked N / Planning N) · primary "+ New
-             trip" action. The chip count reflects the full trip set
-             so the user sees how many are hidden behind each filter
-             before committing to a click. -->
-        <div class="ff-trips-hd">
-          <div class="ff-trips-title">${esc2(t('ff.section.trips'))}</div>
-          <div class="ff-trips-chips" role="group">
-            <button class="ff-trips-chip ${_tripFilter==='all'?'active':''}" onclick="setFunFundTripFilter('all')">${esc2(t('ff.section.trips.filter.all', { n: _tripsAll.length }))}</button>
-            <button class="ff-trips-chip ${_tripFilter==='booked'?'active':''}" onclick="setFunFundTripFilter('booked')">${esc2(t('ff.section.trips.filter.booked', { n: _tripCountBooked }))}</button>
-            <button class="ff-trips-chip ${_tripFilter==='planning'?'active':''}" onclick="setFunFundTripFilter('planning')">${esc2(t('ff.section.trips.filter.planning', { n: _tripCountPlanning }))}</button>
-          </div>
-          <button class="btn btn-g btn-sm ff-trips-new" onclick="addTrip()">${esc2(t('ff.btn.newTrip'))}</button>
-        </div>
-        ${tripCards
-          ? `<div class="ff-trip-grid">${tripCards}</div>`
-          : `<div class="ff-trips-empty">${esc2(t('ff.section.trips.empty'))}</div>`}
-      </div>
-      <div>
+        <!-- Monthly running-balance table on the LEFT — per the
+             user's placement preference the detail table sits
+             beside the trips, not under them. Collapsed by default;
+             the chart row above carries the glance signal. -->
         <details class="card ff-run-details">
           <summary>
             <span class="caret" aria-hidden="true">▸</span>
@@ -12232,6 +12217,24 @@ function renderFunFund() {
             </div>
           </div>
         </details>
+      </div>
+      <div>
+        <!-- Trips section (redesign step 3) — header · filter chips
+             (All N / Booked N / Planning N) · primary "+ New trip".
+             Chip counts reflect the full trip set so the user sees
+             how many are hidden behind each filter before clicking. -->
+        <div class="ff-trips-hd">
+          <div class="ff-trips-title">${esc2(t('ff.section.trips'))}</div>
+          <div class="ff-trips-chips" role="group">
+            <button class="ff-trips-chip ${_tripFilter==='all'?'active':''}" onclick="setFunFundTripFilter('all')">${esc2(t('ff.section.trips.filter.all', { n: _tripsAll.length }))}</button>
+            <button class="ff-trips-chip ${_tripFilter==='booked'?'active':''}" onclick="setFunFundTripFilter('booked')">${esc2(t('ff.section.trips.filter.booked', { n: _tripCountBooked }))}</button>
+            <button class="ff-trips-chip ${_tripFilter==='planning'?'active':''}" onclick="setFunFundTripFilter('planning')">${esc2(t('ff.section.trips.filter.planning', { n: _tripCountPlanning }))}</button>
+          </div>
+          <button class="btn btn-g btn-sm ff-trips-new" onclick="addTrip()">${esc2(t('ff.btn.newTrip'))}</button>
+        </div>
+        ${tripCards
+          ? `<div class="ff-trip-grid">${tripCards}</div>`
+          : `<div class="ff-trips-empty">${esc2(t('ff.section.trips.empty'))}</div>`}
       </div>
     </div>`;
 
