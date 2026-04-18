@@ -1518,15 +1518,27 @@ label.field-label-row {
    right. The pair is fixed-height so the row doesn't drift
    as the AI card grows. Collapses to one column below
    780 px. */
+/* Full-width AI Outlook slot. Sits directly under the 4 KPI tiles
+   so the interpretation lands where the eye already is, then the
+   chart row below provides the visual evidence. */
 .ff-strategic {
+  display:block;
+  margin-bottom:12px;
+}
+.ff-strategic > .card { margin-bottom:0; }
+/* Chart row — Fund vs Travel Budget on the left, Running balance
+   on the right. Two equal columns on desktop, stacks on narrow.
+   Cards inside align stretch so charts share the same height. */
+.ff-chart-row {
   display:grid;
   grid-template-columns:1fr 1fr;
   gap:12px;
   align-items:stretch;
   margin-bottom:12px;
 }
-@media (max-width: 780px){ .ff-strategic { grid-template-columns:1fr; } }
-.ff-strategic > .card { margin-bottom:0; }
+@media (max-width: 780px){ .ff-chart-row { grid-template-columns:1fr; } }
+.ff-chart-row > .card { margin-bottom:0; display:flex; flex-direction:column; }
+.ff-chart-row .chart-wrap { flex:1 1 auto; }
 .ff-balance-card { display:flex; flex-direction:column; border-left:3px solid var(--border2); }
 .ff-balance-hd { display:flex; align-items:baseline; justify-content:space-between; gap:10px; margin-bottom:4px; }
 .ff-balance-title { font-family:var(--ff); font-size:14px; font-weight:700; color:var(--text); }
@@ -7698,6 +7710,23 @@ function _liveSyncCharts(){
     'Savings':  () => FE.months.runningSavingsForward(),
     'Fun Fund': () => fwd.map(m => m.funFund),
   });
+  // Fun Fund vs Travel Budget by Month chart — pairs gross monthly
+  // capacity (blue) with trip spend per month (orange). The patch
+  // map keys MUST match the translated dataset labels used at
+  // Chart.js construction (t('ff.chart.series.fund') /
+  // t('ff.chart.series.budget')) so live-sync finds the right
+  // datasets in the active language. Reads tripByMonth from a
+  // fresh per-call reduce so any in-flight expense edit lands
+  // without waiting for the next renderFunFund.
+  const _ffTripByMonth = {};
+  (state.trips || []).forEach(t => (t.expenses || []).forEach(ex => {
+    const k = (ex.date || '').slice(0, 7);
+    if(k) _ffTripByMonth[k] = (_ffTripByMonth[k] || 0) + (Number(ex.amount) || 0);
+  }));
+  patch('ff', {
+    [t('ff.chart.series.fund')]:   () => first12.map((m, i) => (m.pureFunFund || 0) + (_ffTripByMonth[m.key] || 0)),
+    [t('ff.chart.series.budget')]: () => first12.map(m => _ffTripByMonth[m.key] || 0),
+  });
   // Running balance chart (ff-balance) — patches in place when the
   // user edits a trip expense or monthly item. Per-bar colour has
   // to be recomputed alongside the data because each bar's hue is a
@@ -12087,13 +12116,22 @@ function renderFunFund() {
       return '';
     })()}
 
-    <!-- Strategic row — AI outlook LEFT, running balance chart RIGHT.
-         The AI prose interprets the numbers; the chart on the right
-         shows exactly where the deficit lives across the 12-month
-         window. Fixed-height container so the row won't drift as
-         the AI card grows. -->
+    <!-- AI fund outlook — full-width slot directly under the 4
+         KPI tiles. The interpretation lands where the eye already
+         is, then the chart row below provides the visual evidence. -->
     <div class="ff-strategic">
       <div id="ff-ai-report" class="card ff-ai">${renderFunFundAIBody()}</div>
+    </div>
+
+    <!-- Chart row — Fund vs Travel Budget on the left (gross
+         monthly capacity vs trip spend), Running balance on the
+         right (chained piggy-bank balance month-by-month). Two
+         equal columns on desktop, stacks on narrow viewports. -->
+    <div class="ff-chart-row">
+      <div class="card">
+        <div class="card-title">${esc2(t('ff.chart.title'))}</div>
+        <div class="chart-wrap md"><canvas id="ff-chart"></canvas></div>
+      </div>
       <div class="card ff-balance-card">
         <div class="ff-balance-hd">
           <div class="ff-balance-title">${esc2(t('ff.balanceChart.title'))}</div>
@@ -12188,7 +12226,28 @@ function renderFunFund() {
     </div>`;
 
   setTimeout(()=>{
+    destroyChart('ff');
     destroyChart('ff-balance');
+    // Fun Fund vs Travel Budget by Month (ff-chart) — pairs gross
+    // monthly capacity (blue) with trip spend per month (orange).
+    // Reads straight from FE.funFund.summary() so the bars and the
+    // KPI row agree by construction. Series labels double as the
+    // _liveSyncCharts patch keys.
+    const ctx = document.getElementById('ff-chart');
+    if(ctx){
+      const windowMonths = ff.windowMonths;
+      charts['ff'] = new Chart(ctx.getContext('2d'), {
+        type:'bar',
+        data:{
+          labels: windowMonths.map(m => m.short),
+          datasets:[
+            { label:t('ff.chart.series.fund'),   data: ff.monthlyAllocation,                              backgroundColor:'#00d4ff18', borderColor:'#00d4ff', borderWidth:1.5, borderRadius:3 },
+            { label:t('ff.chart.series.budget'), data: windowMonths.map(m => ff.tripByMonth[m.key] || 0), backgroundColor:'#f5a62325', borderColor:'#f5a623', borderWidth:1.5, borderRadius:3 },
+          ],
+        },
+        options: chartPreset(),
+      });
+    }
     // Running balance chart (ff-balance) — promoted from the buried
     // table into the strategic row. Per-bar colour flips between
     // green (month ends in surplus) and red (deficit carrying
