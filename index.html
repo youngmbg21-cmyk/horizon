@@ -339,6 +339,15 @@ body.light .card.card-clickable:hover {
 .kpi-lens { font-size:8px; color:var(--text3); letter-spacing:.04em; font-weight:500; text-transform:none; opacity:.7; }
 .kpi-val { font-family:var(--fm); font-size:20px; font-weight:700; color:var(--text); line-height:1.15; word-break:break-word; }
 .kpi-sub { font-size:10px; color:var(--text2); margin-top:3px; line-height:1.3; }
+/* Sentiment-accent modifiers for KPI tiles that carry a directional
+   message (shortfall / headroom, deficit / surplus, etc.). A 3px
+   left accent picks up the var(--accent-*) palette used elsewhere
+   on the app (ret-asset, ff-ai, dash-ai-sec borders). The base
+   .kpi box otherwise stays neutral so hover + pulse animations
+   still apply uniformly. */
+.kpi.kpi-alert    { border-left:3px solid var(--accent-critical); }
+.kpi.kpi-positive { border-left:3px solid var(--accent-positive); }
+.kpi.kpi-warn     { border-left:3px solid var(--accent-warning); }
 
 /* ── GRIDS ───────────────────────────────────────────── */
 .two-col { display:grid; grid-template-columns:1fr 1fr; gap:12px; align-items:stretch; margin-bottom:10px; }
@@ -4371,6 +4380,27 @@ const STRINGS = {
   'ff.kpi.total':           { en:'12-MONTH FUN FUND',     sv:'12-MÅNADERS FUN FUND' },
   'ff.kpi.total.sub':       { en:'{mo}/mo capacity, before trips',
                               sv:'{mo}/mån kapacitet, före resor' },
+  // Redesigned KPI row (Step 1 of the Fun Fund tab refactor). The
+  // four tiles now read: 12-month Capacity → Trips Budgeted →
+  // Shortfall|Headroom → Year-end Balance. All four source from
+  // the same FE.funFund.summary() model the rest of the page uses.
+  'ff.kpi.capacity':        { en:'12-MONTH CAPACITY',     sv:'12-MÅN KAPACITET' },
+  'ff.kpi.capacity.sub':    { en:'{mo}/mo before trips',  sv:'{mo}/mån före resor' },
+  'ff.kpi.trips':           { en:'TRIPS BUDGETED',        sv:'RESOR BUDGETERADE' },
+  'ff.kpi.trips.sub':       { en:'{n} planned trips',     sv:'{n} planerade resor' },
+  'ff.kpi.trips.sub.split': { en:'{n} trips · {inw} in next 12 mo · {out} beyond',
+                              sv:'{n} resor · {inw} inom 12 mån · {out} bortom' },
+  'ff.kpi.shortfall':       { en:'SHORTFALL',             sv:'UNDERSKOTT' },
+  'ff.kpi.shortfall.sub':   { en:'Trips exceed capacity by {amt}',
+                              sv:'Resorna överstiger kapaciteten med {amt}' },
+  'ff.kpi.headroom':        { en:'HEADROOM',              sv:'MARGINAL' },
+  'ff.kpi.headroom.sub':    { en:'Capacity covers trips with {amt} to spare',
+                              sv:'Kapaciteten täcker resorna med {amt} till övers' },
+  'ff.kpi.yearEnd':         { en:'YEAR-END BALANCE',      sv:'SALDO VID ÅRSSLUT' },
+  'ff.kpi.yearEnd.sub':     { en:'End of next 12 months · matches running table',
+                              sv:'Slutet av kommande 12 månader · matchar tabellen' },
+  'ff.kpi.yearEnd.sub.deficit':{ en:'Piggy bank ends {amt} below zero',
+                                 sv:'Sparkassan slutar {amt} under noll' },
   'ff.kpi.travelBudget':    { en:'TOTAL TRAVEL BUDGET',   sv:'TOTAL RESBUDGET' },
   'ff.kpi.travelBudget.sub':{ en:'{n} planned trips',     sv:'{n} planerade resor' },
   'ff.kpi.travelBudget.sub.split':{ en:'{n} trips · {inw} in next 12 mo · {out} beyond',
@@ -11614,14 +11644,37 @@ function renderFunFund() {
 
   document.getElementById('panel-funfund').innerHTML=`
     <div class="ph"><div class="ph-tag">${t('ff.page.tag')}</div><div class="ph-title">${esc2(t('ff.page.title'))}</div><div class="ph-sub">${esc2(t('ff.page.sub'))}</div></div>
-    <div class="kpi-row">
-      <div class="kpi"><div class="kpi-icon">💫</div><div class="kpi-lbl">${esc2(t('ff.kpi.total'))}</div><div class="kpi-val" style="color:var(--cyan)">${fmt(totalFF)}</div><div class="kpi-sub">${esc2(t('ff.kpi.total.sub', { mo: fmt(ff.avgMonthly) }))}</div></div>
-      <div class="kpi"><div class="kpi-icon">✈️</div><div class="kpi-lbl">${esc2(t('ff.kpi.travelBudget'))}</div><div class="kpi-val" style="color:var(--amber)">${fmt(totalTrips)}</div><div class="kpi-sub">${ff.tripsOutOfWindow > 0
-        ? esc2(t('ff.kpi.travelBudget.sub.split', { n: state.trips.length, inw: fmt(ff.tripsInWindow), out: fmt(ff.tripsOutOfWindow) }))
-        : esc2(t('ff.kpi.travelBudget.sub', { n: state.trips.length }))}</div></div>
-      <div class="kpi"><div class="kpi-icon">💳</div><div class="kpi-lbl">${esc2(t('ff.kpi.spent'))}</div><div class="kpi-val neg">${fmt(totalSpent)}</div><div class="kpi-sub">${esc2(t('ff.kpi.spent.sub', { pct: totalTrips>0?Math.round(totalSpent/totalTrips*100):0 }))}</div></div>
-      <div class="kpi"><div class="kpi-icon">${balance>=0?'✅':'⚠️'}</div><div class="kpi-lbl">${esc2(t('ff.kpi.balance'))}</div><div class="kpi-val ${balance>=0?'pos':'neg'}">${fmt(balance)}</div><div class="kpi-sub">${esc2(balance>=0?t('ff.kpi.balance.endOfWindow'):t('ff.kpi.balance.over', { amt: fmt(Math.abs(balance)) }))}</div></div>
-    </div>
+    ${(() => {
+      // KPI row — Step 1 of the Fun Fund redesign. All four tiles
+      // source from FE.funFund.summary() directly (via the locals
+      // above). The story this row tells: "here's what you've got
+      // → here's what you've committed → here's the gap or room →
+      // here's where the year lands." No inline math, no stale
+      // references to get12Months() or independent reducers.
+      const shortfallAmt = ff.capacity12mo - ff.totalTrips;
+      const isShortfall  = shortfallAmt < 0;
+      const tripsSub = ff.tripsOutOfWindow > 0
+        ? esc2(t('ff.kpi.trips.sub.split', { n: state.trips.length, inw: fmt(ff.tripsInWindow), out: fmt(ff.tripsOutOfWindow) }))
+        : esc2(t('ff.kpi.trips.sub', { n: state.trips.length }));
+      // Tile C flips identity between SHORTFALL (red accent) and
+      // HEADROOM (green accent). Value is signed so the "+" / "−"
+      // prefix from fmt() carries the direction even without colour.
+      const gapTile = isShortfall
+        ? `<div class="kpi kpi-alert"><div class="kpi-icon">⚠️</div><div class="kpi-lbl">${esc2(t('ff.kpi.shortfall'))}</div><div class="kpi-val neg">−${fmt(Math.abs(shortfallAmt))}</div><div class="kpi-sub">${esc2(t('ff.kpi.shortfall.sub', { amt: fmt(Math.abs(shortfallAmt)) }))}</div></div>`
+        : `<div class="kpi kpi-positive"><div class="kpi-icon">✨</div><div class="kpi-lbl">${esc2(t('ff.kpi.headroom'))}</div><div class="kpi-val pos">${fmt(shortfallAmt)}</div><div class="kpi-sub">${esc2(t('ff.kpi.headroom.sub', { amt: fmt(shortfallAmt) }))}</div></div>`;
+      // Tile D: year-end piggy-bank balance — exactly the last row
+      // of the Running Balance table. Green / red accent based on
+      // sign so the tile carries the same sentiment as the banner.
+      const yearEndTile = balance >= 0
+        ? `<div class="kpi kpi-positive"><div class="kpi-icon">✅</div><div class="kpi-lbl">${esc2(t('ff.kpi.yearEnd'))}</div><div class="kpi-val pos">${fmt(balance)}</div><div class="kpi-sub">${esc2(t('ff.kpi.yearEnd.sub'))}</div></div>`
+        : `<div class="kpi kpi-alert"><div class="kpi-icon">⚠️</div><div class="kpi-lbl">${esc2(t('ff.kpi.yearEnd'))}</div><div class="kpi-val neg">${fmt(balance)}</div><div class="kpi-sub">${esc2(t('ff.kpi.yearEnd.sub.deficit', { amt: fmt(Math.abs(balance)) }))}</div></div>`;
+      return `<div class="kpi-row">
+        <div class="kpi"><div class="kpi-icon">💫</div><div class="kpi-lbl">${esc2(t('ff.kpi.capacity'))}</div><div class="kpi-val" style="color:var(--cyan)">${fmt(ff.capacity12mo)}</div><div class="kpi-sub">${esc2(t('ff.kpi.capacity.sub', { mo: fmt(ff.avgMonthly) }))}</div></div>
+        <div class="kpi"><div class="kpi-icon">✈️</div><div class="kpi-lbl">${esc2(t('ff.kpi.trips'))}</div><div class="kpi-val" style="color:var(--amber)">${fmt(ff.totalTrips)}</div><div class="kpi-sub">${tripsSub}</div></div>
+        ${gapTile}
+        ${yearEndTile}
+      </div>`;
+    })()}
 
     ${(() => {
       // Two distinct over-budget conditions, evaluated in order:
