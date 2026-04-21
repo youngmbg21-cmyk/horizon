@@ -792,7 +792,7 @@ body.light .chart-tooltip { box-shadow:0 6px 18px -6px rgba(60,40,10,0.2); }
 .chart-tt-total .chart-tt-val { font-family:var(--fm); font-variant-numeric:tabular-nums; }
 .runway-milestones-wrap { margin-top:14px; padding-top:12px; border-top:1px dashed var(--border); }
 .runway-ms-hd { font-family:var(--fm); font-size:9px; letter-spacing:.14em; text-transform:uppercase; color:var(--text3); margin-bottom:8px; }
-.runway-milestones { display:grid; grid-template-columns:repeat(auto-fill, minmax(108px, 1fr)); gap:8px; }
+.runway-milestones { display:flex; flex-wrap:nowrap; overflow-x:auto; gap:8px; }
 .runway-ms { position:relative; background:var(--bg3); border:1px solid var(--border); border-radius:8px; padding:10px 10px 8px; font-size:10px; transition:background-color .15s, border-color .15s, transform .15s; }
 .runway-ms:hover { border-color:var(--border2); transform:translateY(-1px); }
 .runway-ms.pos { border-left:3px solid var(--accent-positive); }
@@ -12410,6 +12410,7 @@ function _runwayUpdateChrome(cdata, nums, lifeExp, lineColor){
       snapshotAges.push(nums.runoutAge);
       snapshotAges.sort((a, b) => a - b);
     }
+    const fmt1 = v => { const c=v*rate(); const sy=sym(); if(c>=1e6) return `${sy}${(c/1e6).toFixed(1)}M`; if(c>=1e3) return `${sy}${(c/1e3).toFixed(1)}K`; return `${sy}${Math.round(c).toLocaleString()}`; };
     msEl.innerHTML = snapshotAges.slice(0, 10).map(a => {
       const idx = cdata.labels.indexOf(a);
       const bal = idx >= 0 ? cdata.balData[idx] : 0;
@@ -12417,14 +12418,18 @@ function _runwayUpdateChrome(cdata, nums, lifeExp, lineColor){
       const isLifeExp = a === lifeExp;
       const isRunout  = nums.runoutAge && a === nums.runoutAge;
       const tone = bal > 0 ? 'pos' : 'neg';
-      const badge = isRunout ? `<span class="runway-ms-badge neg">${esc2(t('runway.ms.badge.runout'))}</span>`
-                  : isLifeExp ? `<span class="runway-ms-badge info">${esc2(t('runway.ms.badge.lifeExp'))}</span>`
-                  : pen > 0 ? `<span class="runway-ms-badge muted">${esc2(t('runway.ms.badge.pension'))}</span>`
-                  : '';
+      const statusBadge = isRunout
+        ? `<span class="runway-ms-badge neg">${esc2(t('runway.ms.badge.runout'))}</span>`
+        : isLifeExp
+        ? `<span class="runway-ms-badge info">${esc2(t('runway.ms.badge.lifeExp'))}</span>`
+        : '';
+      const penLine = pen > 0
+        ? `<div style="font-size:9px;color:var(--cyan);font-family:var(--fm);font-weight:600;margin-top:2px;white-space:nowrap">${fmt1(pen)}/yr pension</div>`
+        : '';
       return `<div class="runway-ms ${tone}${isLifeExp?' is-lifeexp':''}${isRunout?' is-runout':''}">
         <div class="runway-ms-age">${esc2(t('runway.ms.age', { age: a }))}</div>
-        <div class="runway-ms-val">${bal > 0 ? fmt(bal) : esc2(t('runway.ms.depleted'))}</div>
-        ${badge}
+        <div class="runway-ms-val">${bal > 0 ? fmt1(bal) : esc2(t('runway.ms.depleted'))}</div>
+        ${penLine}${statusBadge}
       </div>`;
     }).join('');
   }
