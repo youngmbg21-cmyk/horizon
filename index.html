@@ -6707,13 +6707,15 @@ function getRetirementNumbers() {
 // drawdown math.
 function _lwBuildInsight({ verdict, anyDepleted, anyShortfall, isRetTransition,
   hasPensionStart, tripDisruptive, isCurrent, inRetirement, savingsRate,
-  windowEvents, retAge, startAge, endAge, totalExp, pensionAvgMonthly }) {
+  windowEvents, retAge, startAge, endAge, totalExp, pensionAvgMonthly, pensionCoversPct }) {
   const parts = [];
   if (isCurrent) {
     parts.push("You're in this window right now. Your Monthly Review figures drive these numbers directly — any change you save shows up here immediately.");
   }
-  if (anyDepleted) {
-    const cov = totalExp > 0 ? Math.round((pensionAvgMonthly / totalExp) * 100) : 0;
+  if (anyDepleted && pensionCoversPct >= 100) {
+    parts.push(`<strong>Portfolio depleted — pension covers expenses.</strong> The investment portfolio reaches zero in this window, but your pension income (${fmtC((pensionAvgMonthly||0)*12)}/yr) fully covers projected retirement expenses. You are not at financial risk — the portfolio is simply no longer needed as a top-up.`);
+  } else if (anyDepleted) {
+    const cov = pensionCoversPct || (totalExp > 0 ? Math.round((pensionAvgMonthly / totalExp) * 100) : 0);
     parts.push(`<strong>Portfolio depleted.</strong> By age ${startAge}–${endAge} the investment accounts are projected to reach zero. Pension income covers roughly ${cov}% of retirement expenses — the remainder is a structural shortfall. Increasing contributions now or reducing the retirement expense target are the two highest-leverage levers.`);
   } else if (anyShortfall) {
     parts.push(`<strong>Income shortfall.</strong> Pension income alone doesn't cover projected expenses in this window. Review your pension payout figures in Settings → External Assets, or adjust the retirement expense scenario.`);
@@ -6840,9 +6842,25 @@ function getLifeWallData(gran) {
       const windowTripSpend  = windowEvents.filter(e => e.type === 'trip').reduce((s, e) => s + e.amount, 0);
       const tripDisruptive   = !allRetired && avgAnnualContrib > 0 && windowTripSpend > avgAnnualContrib * 0.5;
 
+      const avgIncome   = Math.round(slice.reduce((s, y) => s + y.actualIncome,   0) / slice.length);
+      const avgExpenses = Math.round(slice.reduce((s, y) => s + y.annualExpenses,  0) / slice.length);
+      const avgContrib  = Math.round(avgAnnualContrib);
+      const savingsRate = avgIncome > 0 ? Math.round(avgContrib / avgIncome * 100) : 0;
+
+      const pensionAnnual     = (nums.pensionAvgMonthly || 0) * 12;
+      const pensionCoversPct  = avgExpenses > 0
+        ? Math.min(100, Math.round(pensionAnnual / avgExpenses * 100))
+        : 0;
+
+      // Shortfall is checked first: it means total income (pension + portfolio)
+      // is still insufficient — a real gap. Depletion alone (portfolio hits zero
+      // but pension covers all expenses) is a softer state: amber, not red.
       let verdict, verdictReason;
-      if      (anyDepleted)     { verdict = 'red';   verdictReason = 'Portfolio depletion'; }
-      else if (anyShortfall)    { verdict = 'red';   verdictReason = 'Income shortfall'; }
+      if      (anyShortfall)    { verdict = 'red';   verdictReason = 'Income shortfall'; }
+      else if (anyDepleted) {
+        if (pensionCoversPct >= 100) { verdict = 'amber'; verdictReason = 'Pension-funded'; }
+        else                         { verdict = 'red';   verdictReason = 'Portfolio depleted'; }
+      }
       else if (isRetTransition) { verdict = 'amber'; verdictReason = 'Retirement transition'; }
       else if (hasPensionStart) { verdict = 'amber'; verdictReason = 'Pension begins'; }
       else if (tripDisruptive)  { verdict = 'amber'; verdictReason = 'High planned spend'; }
@@ -6853,16 +6871,12 @@ function getLifeWallData(gran) {
       else if (isRetTransition)                   badge = { cls:'ret',  text:'RETIRE' };
       else if (end.age >= lifeExp - 1)            badge = { cls:'life', text:'LIFE EXP.' };
 
-      const avgIncome   = Math.round(slice.reduce((s, y) => s + y.actualIncome,   0) / slice.length);
-      const avgExpenses = Math.round(slice.reduce((s, y) => s + y.annualExpenses,  0) / slice.length);
-      const avgContrib  = Math.round(avgAnnualContrib);
-      const savingsRate = avgIncome > 0 ? Math.round(avgContrib / avgIncome * 100) : 0;
-
       const insight = _lwBuildInsight({
         verdict, anyDepleted, anyShortfall, isRetTransition, hasPensionStart,
         tripDisruptive, isCurrent, inRetirement: allRetired, savingsRate,
         windowEvents, retAge, startAge: start.age, endAge: end.age,
         totalExp: nums.totalExp, pensionAvgMonthly: nums.pensionAvgMonthly,
+        pensionCoversPct,
       });
 
       bricks.push({
@@ -6871,7 +6885,7 @@ function getLifeWallData(gran) {
         isCurrent, verdict, verdictReason, badge,
         startNetWorth: start.netWorth, endNetWorth: end.netWorth,
         realEndNetWorth: end.realNetWorth,
-        avgIncome, avgExpenses, avgContrib, savingsRate,
+        avgIncome, avgExpenses, avgContrib, savingsRate, pensionCoversPct,
         inRetirement: allRetired, anyDepleted, anyShortfall,
         events: windowEvents,
         years: slice.map(y => ({ year: y.year, age: y.age,
@@ -11407,9 +11421,20 @@ function renderRetirement() {
   const fundDepletionLabel = nums.runoutAge
     ? t('ireq.kpi.depletion.age', { age: Math.round(nums.runoutAge) })
     : t('ireq.kpi.depletion.never');
-  const fundDepletionTone  = nums.runoutAge ? 'neg' : 'pos';
+  const _pensionMonthly    = nums.pensionAvgMonthly || 0;
+  const _expMonthly        = nums.totalExp || 0;
+  const _depPensionCovPct  = _expMonthly > 0
+    ? Math.min(100, Math.round(_pensionMonthly / _expMonthly * 100))
+    : 0;
+  // Portfolio depletion is only truly red when pension can't cover the gap.
+  // If pension >= expenses after the portfolio runs out, tone shifts to amber.
+  const fundDepletionTone  = nums.runoutAge
+    ? (_depPensionCovPct >= 100 ? 'amb' : 'neg')
+    : 'pos';
   const fundDepletionSub   = nums.runoutAge
-    ? t('ireq.kpi.depletion.runs')
+    ? (_depPensionCovPct >= 100
+        ? `Pension covers 100% of expenses — no income gap after portfolio ends`
+        : `Pension covers ${_depPensionCovPct}% of expenses · ${100 - _depPensionCovPct}% gap remains`)
     : t('ireq.kpi.depletion.surplus', { age: lifeExpReq });
 
   // ── SECTION 1: SUSTAINABILITY & RUNWAY ──────────────────────────────────────
@@ -11791,7 +11816,7 @@ function renderRetirement() {
         </div>
         <div class="ireq-kpi">
           <div class="ireq-kpi-lbl">${esc2(t('ireq.kpi.depletion'))}</div>
-          <div class="ireq-kpi-val ${fundDepletionTone==='neg'?'ireq-red':'ireq-green'}">${esc2(fundDepletionLabel)}</div>
+          <div class="ireq-kpi-val ${fundDepletionTone==='neg'?'ireq-red':fundDepletionTone==='amb'?'ireq-amber':'ireq-green'}">${esc2(fundDepletionLabel)}</div>
           <div class="ireq-kpi-sub">${esc2(fundDepletionSub)}</div>
         </div>
       </div>
@@ -13373,7 +13398,7 @@ function renderLifeWall() {
         ? (b.verdict === 'green' ? 'pos' : b.verdict === 'amber' ? 'amb' : 'neg')
         : (b.savingsRate > 20 ? 'pos' : b.savingsRate > 10 ? 'amb' : 'neg');
       const savingsLbl = b.inRetirement
-        ? (b.anyDepleted ? 'Depleted' : 'Drawdown')
+        ? `${b.pensionCoversPct}% pension`
         : `${b.savingsRate}% saved`;
 
       const warnIcon = b.verdict === 'amber' && !b.badge
