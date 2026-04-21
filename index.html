@@ -13190,10 +13190,131 @@ window.updateTripExpense = function(tripId, expenseId, field, val){
 
 // ══ LIFE WALL ════════════════════════════════════════════════════════════════
 let _lwBricks = [];
+let _lwActiveBrick = null;
 
 function lwOpenBrick(idx) {
-  // Stubbed in Batch 2 — wired in Batch 3
-  void idx;
+  const b = _lwBricks[idx];
+  if (!b) return;
+  _lwActiveBrick = b;
+
+  // ── Header ────────────────────────────────────────────────────────
+  const toneBar  = document.getElementById('lw-tone-bar');
+  const eyebrow  = document.getElementById('lw-so-eyebrow');
+  const titleEl  = document.getElementById('lw-so-title');
+  const subEl    = document.getElementById('lw-so-sub');
+  const hintEl   = document.getElementById('lw-so-hint');
+  if (!toneBar) return;
+
+  toneBar.className = 'lw-tone-bar ' + b.verdict;
+  eyebrow.textContent = (b.badge ? b.badge.text + ' · ' : '') + b.verdictReason.toUpperCase();
+  titleEl.textContent = b.startYear + '–' + b.endYear + ' · Age ' + b.startAge + '–' + b.endAge;
+  subEl.textContent   = b.inRetirement
+    ? 'Retirement drawdown phase.' + (b.events.filter(e=>e.type!=='retirement').length ? ' ' + b.events.filter(e=>e.type!=='retirement').length + ' planned event(s).' : '')
+    : 'Accumulation phase · ' + b.savingsRate + '% of income saved.' + (b.events.filter(e=>e.type!=='retirement').length ? ' ' + b.events.filter(e=>e.type!=='retirement').length + ' planned event(s).' : '');
+
+  hintEl.textContent = b.inRetirement
+    ? 'Edit opens the last pre-retirement year in the Yearly Forecast.'
+    : 'Adjust income, expenses, or plan major events in the yearly view.';
+
+  // ── Stat grid ─────────────────────────────────────────────────────
+  const nwTone     = b.verdict === 'red' ? 'neg' : b.verdict === 'amber' ? 'amb' : 'pos';
+  const flowAmt    = b.inRetirement ? b.avgIncome - b.avgExpenses : b.avgContrib;
+  const flowTone   = flowAmt >= 0 ? 'pos' : 'neg';
+  const flowLbl    = b.inRetirement ? 'Net flow · avg' : 'Savings · avg';
+  const flowSub    = b.inRetirement
+    ? (flowAmt >= 0 ? 'Monthly surplus' : 'Monthly shortfall')
+    : b.savingsRate + '% of income';
+
+  const statGrid = `
+    <div class="retire-so-fact-grid">
+      <div class="retire-so-fact">
+        <div class="retire-so-fact-lbl">Net worth · today's money</div>
+        <div class="retire-so-fact-val ${nwTone}">${fmtC(b.realEndNetWorth)}</div>
+        <div style="font-family:var(--fm);font-size:10px;color:var(--text3);margin-top:2px">Nominal: ${fmtC(b.endNetWorth)}</div>
+      </div>
+      <div class="retire-so-fact">
+        <div class="retire-so-fact-lbl">${b.inRetirement ? 'Retirement income · avg' : 'Income · avg'}</div>
+        <div class="retire-so-fact-val">${fmtC(b.avgIncome)}/yr</div>
+        <div style="font-family:var(--fm);font-size:10px;color:var(--text3);margin-top:2px">${fmtC(Math.round(b.avgIncome/12))}/mo</div>
+      </div>
+      <div class="retire-so-fact">
+        <div class="retire-so-fact-lbl">Expenses · avg</div>
+        <div class="retire-so-fact-val">${fmtC(b.avgExpenses)}/yr</div>
+        <div style="font-family:var(--fm);font-size:10px;color:var(--text3);margin-top:2px">${fmtC(Math.round(b.avgExpenses/12))}/mo</div>
+      </div>
+      <div class="retire-so-fact">
+        <div class="retire-so-fact-lbl">${flowLbl}</div>
+        <div class="retire-so-fact-val ${flowTone}">${fmtC(Math.abs(flowAmt))}/yr</div>
+        <div style="font-family:var(--fm);font-size:10px;color:var(--text3);margin-top:2px">${esc2(flowSub)}</div>
+      </div>
+    </div>`;
+
+  // ── Insight card ──────────────────────────────────────────────────
+  const insightTone = b.verdict === 'green' ? '' : b.verdict === 'amber' ? 'amb' : 'neg';
+  const insightIcon = b.verdict === 'green' ? '✓' : b.verdict === 'amber' ? '⚠️' : '🚨';
+  const insightLbl  = b.verdict === 'green' ? 'Insight · On track'
+    : b.verdict === 'amber' ? 'Insight · Watch this window'
+    : 'Insight · Action needed';
+  const insightCard = `
+    <div class="lw-insight ${insightTone}">
+      <div class="lw-insight-hd">
+        <span class="lw-insight-ic">${insightIcon}</span>
+        <span class="lw-insight-tag">${esc2(insightLbl)}</span>
+      </div>
+      <div class="lw-insight-body">${b.insight}</div>
+    </div>`;
+
+  // ── Events list ───────────────────────────────────────────────────
+  const nonRetEvts = b.events.filter(e => e.type !== 'retirement');
+  const eventsHtml = nonRetEvts.length ? `
+    <div class="retire-so-section">
+      <div class="retire-so-section-hd">Planned events in this window · ${nonRetEvts.length}</div>
+      <div class="lw-evt-list">
+        ${nonRetEvts.map(e => `
+          <div class="lw-evt ${esc2(e.type)}">
+            <div class="lw-evt-ic">${e.icon}</div>
+            <div class="lw-evt-body">
+              <div class="lw-evt-title">${esc2(e.title)}</div>
+              <div class="lw-evt-sub">${esc2(e.sub)}</div>
+              <div class="lw-evt-when">${esc2(e.when)}</div>
+            </div>
+          </div>`).join('')}
+      </div>
+    </div>` : '';
+
+  // ── Year-by-year breakdown ────────────────────────────────────────
+  const yrRows = b.years.map(y =>
+    `<div class="retire-so-fact">
+      <div class="retire-so-fact-lbl">Year ${y.year} · Age ${y.age}</div>
+      <div class="retire-so-fact-val" style="font-size:13px">${fmtC(y.netWorth)}</div>
+      <div style="font-family:var(--fm);font-size:10px;color:var(--text3);margin-top:2px">Real: ${fmtC(y.realNetWorth)}</div>
+    </div>`).join('');
+
+  // ── Assemble body ─────────────────────────────────────────────────
+  document.getElementById('lw-so-body').innerHTML = `
+    <div class="retire-so-section">
+      <div class="retire-so-section-hd">Financial snapshot · end of window</div>
+      ${statGrid}
+    </div>
+    <div class="retire-so-section">
+      <div class="retire-so-section-hd">Insight</div>
+      ${insightCard}
+    </div>
+    ${eventsHtml}
+    <div class="retire-so-section">
+      <div class="retire-so-section-hd">Year-by-year · net worth</div>
+      <div class="retire-so-fact-grid" style="grid-template-columns:1fr 1fr">${yrRows}</div>
+    </div>`;
+
+  // ── Open panel ────────────────────────────────────────────────────
+  const so = document.getElementById('lw-slideover');
+  const bd = document.getElementById('lw-backdrop');
+  so.classList.add('open');
+  bd.classList.add('open');
+  so.setAttribute('aria-hidden', 'false');
+  // Scroll body to top on open
+  const body = document.getElementById('lw-so-body');
+  if (body) body.scrollTop = 0;
 }
 
 function renderLifeWall() {
@@ -13377,8 +13498,6 @@ function lwEditYear() {
 document.addEventListener('keydown', e => {
   if (e.key === 'Escape') lwClosePanel();
 });
-
-let _lwActiveBrick = null;
 
 // ══ RETIRE ANYWHERE ══════════════════════════════════════════════════════════
 let retireMap=null;
