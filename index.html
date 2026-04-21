@@ -66,10 +66,10 @@ body.light {
   --card-shadow:0 1px 0 rgba(255,255,255,0.4) inset;
   --card-shadow-hover:0 6px 20px -10px rgba(60,40,10,0.18);
 }
-/* ── LIFE WALL — forced dark scope ──────────────────────
-   Always renders in dark mode regardless of body.light so
-   the neon accent colours (#00e8a0, #f5a623, #ff4d6d) read
-   against a near-black background exactly as designed.      */
+/* ── LIFE WALL — forced dark scope (dark mode) ───────────
+   In dark mode the panel stays dark so neon accents pop.
+   In light mode a separate override below reinstates the
+   light theme with the platform's light-mode green.        */
 #panel-lifewall {
   --bg0:#05080f; --bg1:#090d18; --bg2:#0d1220; --bg3:#111828; --bg4:#18243a;
   --border:#1a2640; --border2:#263850;
@@ -84,6 +84,25 @@ body.light {
   --accent-warning:var(--amber);  --accent-warning-dim:var(--amber-dim);
   --accent-critical:var(--red);   --accent-critical-dim:var(--red-dim);
   --accent-info:var(--blue);
+  background:var(--bg0);
+  color:var(--text);
+}
+/* ── LIFE WALL — light mode override ────────────────────
+   Cancels the dark scope above. Brick edges and colored
+   text use #00a870 (the platform light-mode green) only.  */
+body.light #panel-lifewall {
+  --bg0:#F0EBE1; --bg1:#F7F3ED; --bg2:#FDFAF6; --bg3:#EDE8DF; --bg4:#E4DDD2;
+  --border:#D6CFBF; --border2:#B8AD99;
+  --text:#1a1208; --text2:#4a3f2e; --text3:#8a7d6a;
+  --green:#00a870; --green-dim:rgba(0,168,112,0.12); --green-glow:0 2px 14px rgba(0,168,112,0.15);
+  --amber:#c47a00; --amber-dim:rgba(196,122,0,0.12);
+  --blue:#2563a8;  --blue-dim:rgba(37,99,168,0.10);
+  --cyan:#0e7a8a;  --cyan-dim:rgba(14,122,138,0.10);
+  --red:#c0392b;   --red-dim:rgba(192,57,43,0.10);
+  --violet:#6d3fad; --violet-dim:rgba(109,63,173,0.10);
+  --accent-positive:#00a870; --accent-positive-dim:rgba(0,168,112,0.12);
+  --accent-warning:#c47a00;  --accent-warning-dim:rgba(196,122,0,0.12);
+  --accent-critical:#c0392b; --accent-critical-dim:rgba(192,57,43,0.10);
   background:var(--bg0);
   color:var(--text);
 }
