@@ -6528,6 +6528,186 @@ function getRetirementNumbers() {
   });
 }
 
+// ─── LIFE WALL DATA LAYER ────────────────────────────────────────────────────
+// Builds the array of 2-year brick objects that drives the Life Wall panel.
+// Chains getProjection() for accumulation years and getRetirementNumbers()
+// ._simResult for retirement years — never reimplements compounding or
+// drawdown math.
+function _lwBuildInsight({ verdict, anyDepleted, anyShortfall, isRetTransition,
+  hasPensionStart, tripDisruptive, isCurrent, inRetirement, savingsRate,
+  windowEvents, retAge, startAge, endAge, totalExp, pensionAvgMonthly }) {
+  const parts = [];
+  if (isCurrent) {
+    parts.push("You're in this window right now. Your Monthly Review figures drive these numbers directly — any change you save shows up here immediately.");
+  }
+  if (anyDepleted) {
+    const cov = totalExp > 0 ? Math.round((pensionAvgMonthly / totalExp) * 100) : 0;
+    parts.push(`<strong>Portfolio depleted.</strong> By age ${startAge}–${endAge} the investment accounts are projected to reach zero. Pension income covers roughly ${cov}% of retirement expenses — the remainder is a structural shortfall. Increasing contributions now or reducing the retirement expense target are the two highest-leverage levers.`);
+  } else if (anyShortfall) {
+    parts.push(`<strong>Income shortfall.</strong> Pension income alone doesn't cover projected expenses in this window. Review your pension payout figures in Settings → External Assets, or adjust the retirement expense scenario.`);
+  } else if (isRetTransition) {
+    const covPct = totalExp > 0 ? Math.round((pensionAvgMonthly / totalExp) * 100) : 0;
+    parts.push(`<strong>Retirement transition.</strong> Your salary ends and portfolio drawdown begins here. Pension income covers ${covPct}% of your retirement expenses — the portfolio tops up the rest. Sequence-of-returns risk peaks in the first 3–5 years of retirement; a market downturn in this window has an outsized long-term impact.`);
+  } else if (hasPensionStart) {
+    const pNames = windowEvents.filter(e => e.type === 'pension').map(e => e.title.replace(' begins', '')).join(', ');
+    parts.push(`<strong>Pension activation.</strong> ${pNames} starts in this window, reducing the portfolio withdrawal burden from this point forward.`);
+  } else if (tripDisruptive) {
+    const tripTotal = windowEvents.filter(e => e.type === 'trip').reduce((s, e) => s + e.amount, 0);
+    const tripNames = [...new Set(windowEvents.filter(e => e.type === 'trip').map(e => e.title))].join(', ');
+    parts.push(`<strong>High planned spend.</strong> ${tripNames} — totalling ${fmtC(tripTotal)} — represents a significant draw in this window. A cost overrun flows directly into the next window's starting balance.`);
+  } else if (inRetirement) {
+    parts.push(`Portfolio withdrawals are within the sustainable range. Pension covers a meaningful share of expenses and the balance is holding steady.`);
+  } else {
+    parts.push(`Accumulation phase on track — ${savingsRate}% of income saved, compounding at ${state.growthRate || 7}% nominal.`);
+  }
+  const nonRetEvts = windowEvents.filter(e => e.type !== 'retirement').length;
+  if (nonRetEvts > 0 && !isCurrent) {
+    parts.push(`<strong>${nonRetEvts} planned event${nonRetEvts > 1 ? 's' : ''}</strong> in this window — see the events list below.`);
+  }
+  return parts.join('<br><br>');
+}
+
+function getLifeWallData() {
+  return memoSelect('lifewall', () => {
+    const proj    = getProjection();
+    const nums    = getRetirementNumbers();
+    const sim     = nums._simResult;
+    const retAge  = state.retirementAge;
+    const lifeExp = state.lifeExp || 90;
+    const inf     = (state.inflationRate || 2) / 100;
+    const retYear = CY + Math.max(0, retAge - state.currentAge);
+
+    // ── Events from real state ──────────────────────────────────────────
+    const eventsByYear = {};
+    const addEvt = (yr, evt) => {
+      if (!isFinite(yr)) return;
+      (eventsByYear[yr] = eventsByYear[yr] || []).push(evt);
+    };
+
+    // Group each trip's expenses by year so a multi-expense trip (flights
+    // + hotel booked in the same year) appears as one event entry, not two.
+    (state.trips || []).forEach(trip => {
+      const byYear = {};
+      (trip.expenses || []).forEach(exp => {
+        if (!exp.date) return;
+        const yr = parseInt(exp.date.split('-')[0], 10);
+        if (!isFinite(yr)) return;
+        if (!byYear[yr]) byYear[yr] = { total: 0, items: [] };
+        byYear[yr].total += (exp.amount || 0);
+        byYear[yr].items.push(exp.name);
+      });
+      Object.entries(byYear).forEach(([yr, g]) => {
+        const y = Number(yr);
+        addEvt(y, { type:'trip', icon: trip.icon || '✈️',
+          title: trip.name,
+          sub: g.items.length === 1 ? `${g.items[0]} · ${fmtC(g.total)}` : `${fmtC(g.total)} across ${g.items.length} items`,
+          when: String(yr), year: y, amount: g.total });
+      });
+    });
+
+    getPensionAssets().forEach(p => {
+      const pAge = p.startAge ?? retAge;
+      const yr   = CY + (pAge - state.currentAge);
+      addEvt(yr, { type:'pension', icon:'🏛', title:`${p.name} begins`,
+        sub:`${fmt(p.monthlyPayout || 0)}/mo`, when:`Age ${pAge}`, year: yr, amount: 0 });
+    });
+
+    addEvt(retYear, { type:'retirement', icon:'🌅', title:'Retirement',
+      sub:`Age ${retAge} — portfolio drawdown begins`, when: String(retYear), year: retYear, amount: 0 });
+
+    // ── Build unified year list ─────────────────────────────────────────
+    const yearMap = {};
+
+    proj.forEach(p => {
+      const annualIncome   = getEffective(p.year, 0).income   * 12;
+      const annualExpenses = getEffective(p.year, 0).expenses * 12;
+      yearMap[p.year] = { year: p.year, age: p.age,
+        netWorth: p.total, realNetWorth: p.realTotal,
+        inRetirement: false, depleted: false, shortfall: 0,
+        actualIncome: annualIncome, annualExpenses, annualContrib: p.yearlyContrib };
+    });
+
+    if (sim) {
+      sim.labels.forEach((age, i) => {
+        const yr          = retYear + (age - retAge);
+        const yearsOut    = Math.max(0, yr - CY);
+        const realFactor  = Math.pow(1 + inf, yearsOut);
+        yearMap[yr] = { year: yr, age,
+          netWorth: sim.balData[i], realNetWorth: Math.round(sim.balData[i] / realFactor),
+          inRetirement: true, depleted: sim.depletedFlag[i], shortfall: sim.shortfall[i],
+          actualIncome: sim.actualIncome[i], annualExpenses: Math.round(nums.totalExp * 12),
+          annualContrib: 0 };
+      });
+    }
+
+    const sortedYears = Object.values(yearMap).sort((a, b) => a.year - b.year);
+
+    // ── 2-year bricks ──────────────────────────────────────────────────
+    const bricks = [];
+    for (let i = 0; i < sortedYears.length; i += 2) {
+      const slice = sortedYears.slice(i, i + 2);
+      if (!slice.length) break;
+      const start = slice[0];
+      const end   = slice[slice.length - 1];
+
+      const anyDepleted     = slice.some(y => y.depleted);
+      const anyShortfall    = slice.some(y => y.shortfall > 0);
+      const isRetTransition = slice.some(y => y.age === retAge - 1 || y.age === retAge);
+      const isCurrent       = slice.some(y => y.year === CY);
+      const allRetired      = slice.every(y => y.inRetirement);
+
+      const windowEvents = [];
+      slice.forEach(y => (eventsByYear[y.year] || []).forEach(e => windowEvents.push(e)));
+      const hasPensionStart = windowEvents.some(e => e.type === 'pension');
+
+      const avgAnnualContrib = slice.reduce((s, y) => s + y.annualContrib, 0) / slice.length;
+      const windowTripSpend  = windowEvents.filter(e => e.type === 'trip').reduce((s, e) => s + e.amount, 0);
+      const tripDisruptive   = !allRetired && avgAnnualContrib > 0 && windowTripSpend > avgAnnualContrib * 0.5;
+
+      let verdict, verdictReason;
+      if      (anyDepleted)     { verdict = 'red';   verdictReason = 'Portfolio depletion'; }
+      else if (anyShortfall)    { verdict = 'red';   verdictReason = 'Income shortfall'; }
+      else if (isRetTransition) { verdict = 'amber'; verdictReason = 'Retirement transition'; }
+      else if (hasPensionStart) { verdict = 'amber'; verdictReason = 'Pension begins'; }
+      else if (tripDisruptive)  { verdict = 'amber'; verdictReason = 'High planned spend'; }
+      else                      { verdict = 'green'; verdictReason = 'On track'; }
+
+      let badge = null;
+      if      (isCurrent)                        badge = { cls:'now',  text:'NOW' };
+      else if (isRetTransition)                   badge = { cls:'ret',  text:'RETIRE' };
+      else if (end.age >= lifeExp - 1)            badge = { cls:'life', text:'LIFE EXP.' };
+
+      const avgIncome   = Math.round(slice.reduce((s, y) => s + y.actualIncome,   0) / slice.length);
+      const avgExpenses = Math.round(slice.reduce((s, y) => s + y.annualExpenses,  0) / slice.length);
+      const avgContrib  = Math.round(avgAnnualContrib);
+      const savingsRate = avgIncome > 0 ? Math.round(avgContrib / avgIncome * 100) : 0;
+
+      const insight = _lwBuildInsight({
+        verdict, anyDepleted, anyShortfall, isRetTransition, hasPensionStart,
+        tripDisruptive, isCurrent, inRetirement: allRetired, savingsRate,
+        windowEvents, retAge, startAge: start.age, endAge: end.age,
+        totalExp: nums.totalExp, pensionAvgMonthly: nums.pensionAvgMonthly,
+      });
+
+      bricks.push({
+        startYear: start.year, endYear: end.year,
+        startAge: start.age,   endAge: end.age,
+        isCurrent, verdict, verdictReason, badge,
+        startNetWorth: start.netWorth, endNetWorth: end.netWorth,
+        realEndNetWorth: end.realNetWorth,
+        avgIncome, avgExpenses, avgContrib, savingsRate,
+        inRetirement: allRetired, anyDepleted, anyShortfall,
+        events: windowEvents,
+        years: slice.map(y => ({ year: y.year, age: y.age,
+          netWorth: y.netWorth, realNetWorth: y.realNetWorth })),
+        insight,
+      });
+    }
+
+    return bricks;
+  });
+}
+
 function getMonthlyFunFundBalance() {
   // GROSS 12-month Fun Fund capacity — the headline figure every
   // "12-month Fun Fund" label across the app refers to. Equivalent to
