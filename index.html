@@ -4003,6 +4003,29 @@ body.light .piq-country-menu { box-shadow:0 12px 28px -10px rgba(60,40,10,0.22);
   </div>
 </div>
 
+<!-- Life Wall — brick detail modal (body-level so position:fixed works correctly) -->
+<div class="retire-slideover-backdrop" id="lw-backdrop" onclick="lwClosePanel()"></div>
+<div class="lw-modal" id="lw-slideover" role="dialog" aria-modal="true" aria-hidden="true">
+  <button class="lw-modal-close" onclick="lwClosePanel()" aria-label="Close">✕</button>
+  <div class="retire-so-head" id="lw-so-head" style="padding-right:52px">
+    <div class="retire-so-head-main">
+      <div class="lw-tone-bar" id="lw-tone-bar"></div>
+      <div class="retire-so-head-text">
+        <div class="retire-so-sub" id="lw-so-eyebrow">LIFE CHAPTER</div>
+        <div class="retire-so-title" id="lw-so-title">—</div>
+        <div class="retire-so-sub" id="lw-so-sub" style="margin-top:4px">—</div>
+      </div>
+    </div>
+  </div>
+  <div class="retire-so-body" id="lw-so-body"></div>
+  <div class="retire-so-footer">
+    <div class="retire-so-footer-hint" id="lw-so-hint">Click any brick to explore · Esc closes</div>
+    <div class="retire-so-footer-actions">
+      <button class="btn btn-g" id="lw-edit-btn" onclick="lwEditYear()">✎ Edit in Yearly</button>
+    </div>
+  </div>
+</div>
+
 <!-- Retire Anywhere — Location Analysis slide-over panel -->
 <div class="retire-slideover-backdrop" id="retire-slideover-backdrop"></div>
 <div class="retire-slideover" id="retire-slideover" aria-hidden="true" role="dialog" data-i18n-aria-label="ra.so.dialogLabel" aria-label="Location analysis">
@@ -13591,27 +13614,6 @@ function renderLifeWall() {
       </div>
     </div>
 
-    <div class="retire-slideover-backdrop" id="lw-backdrop" onclick="lwClosePanel()"></div>
-    <div class="lw-modal" id="lw-slideover" role="dialog" aria-modal="true" aria-hidden="true">
-      <button class="lw-modal-close" onclick="lwClosePanel()" aria-label="Close">✕</button>
-      <div class="retire-so-head" id="lw-so-head" style="padding-right:52px">
-        <div class="retire-so-head-main">
-          <div class="lw-tone-bar" id="lw-tone-bar"></div>
-          <div class="retire-so-head-text">
-            <div class="retire-so-sub" id="lw-so-eyebrow">LIFE CHAPTER</div>
-            <div class="retire-so-title" id="lw-so-title">—</div>
-            <div class="retire-so-sub" id="lw-so-sub" style="margin-top:4px">—</div>
-          </div>
-        </div>
-      </div>
-      <div class="retire-so-body" id="lw-so-body"></div>
-      <div class="retire-so-footer">
-        <div class="retire-so-footer-hint" id="lw-so-hint">Click any brick to explore · Esc closes</div>
-        <div class="retire-so-footer-actions">
-          <button class="btn btn-g" id="lw-edit-btn" onclick="lwEditYear()">✎ Edit in Yearly</button>
-        </div>
-      </div>
-    </div>
   `;
 }
 
