@@ -6848,8 +6848,13 @@ function getLifeWallData(gran) {
       const savingsRate = avgIncome > 0 ? Math.round(avgContrib / avgIncome * 100) : 0;
 
       const pensionAnnual     = (nums.pensionAvgMonthly || 0) * 12;
+      // Pension-only coverage — used for verdict logic (is depletion softened by pension?)
       const pensionCoversPct  = avgExpenses > 0
         ? Math.min(100, Math.round(pensionAnnual / avgExpenses * 100))
+        : 0;
+      // Combined coverage: pension + portfolio withdrawal vs expenses
+      const totalCoversPct    = allRetired && avgExpenses > 0
+        ? Math.min(100, Math.round(avgIncome / avgExpenses * 100))
         : 0;
 
       // Shortfall is checked first: it means total income (pension + portfolio)
@@ -6885,7 +6890,7 @@ function getLifeWallData(gran) {
         isCurrent, verdict, verdictReason, badge,
         startNetWorth: start.netWorth, endNetWorth: end.netWorth,
         realEndNetWorth: end.realNetWorth,
-        avgIncome, avgExpenses, avgContrib, savingsRate, pensionCoversPct,
+        avgIncome, avgExpenses, avgContrib, savingsRate, pensionCoversPct, totalCoversPct,
         pensionAnnual: pensionAnnual,
         inRetirement: allRetired, anyDepleted, anyShortfall,
         events: windowEvents,
@@ -13399,7 +13404,7 @@ function renderLifeWall() {
         ? (b.verdict === 'green' ? 'pos' : b.verdict === 'amber' ? 'amb' : 'neg')
         : (b.savingsRate > 20 ? 'pos' : b.savingsRate > 10 ? 'amb' : 'neg');
       const savingsLbl = b.inRetirement
-        ? `${b.pensionCoversPct}% of expenses covered`
+        ? `${b.totalCoversPct}% of expenses covered`
         : `${b.savingsRate}% saved`;
 
       const warnIcon = b.verdict === 'amber' && !b.badge
