@@ -13238,9 +13238,9 @@ function lwOpenBrick(idx) {
   const statGrid = `
     <div class="retire-so-fact-grid">
       <div class="retire-so-fact">
-        <div class="retire-so-fact-lbl">Net worth · today's money</div>
-        <div class="retire-so-fact-val ${nwTone}">${fmtC(b.realEndNetWorth)}</div>
-        <div style="font-family:var(--fm);font-size:10px;color:var(--text3);margin-top:2px">Nominal: ${fmtC(b.endNetWorth)}</div>
+        <div class="retire-so-fact-lbl">Net worth · nominal</div>
+        <div class="retire-so-fact-val ${nwTone}">${fmtC(b.endNetWorth)}</div>
+        <div style="font-family:var(--fm);font-size:10px;color:var(--text3);margin-top:2px">Today's money: ${fmtC(b.realEndNetWorth)}</div>
       </div>
       <div class="retire-so-fact">
         <div class="retire-so-fact-lbl">${b.inRetirement ? 'Retirement income · avg' : 'Income · avg'}</div>
@@ -13391,8 +13391,8 @@ function renderLifeWall() {
           ${b.badge ? `<span class="lw-b-badge ${b.badge.cls}">${b.badge.text}</span>` : ''}
         </div>
         <div class="lw-b-networth">
-          <span class="lw-b-nw-lbl">Net worth · real</span>
-          ${fmtC(b.realEndNetWorth)}
+          <span class="lw-b-nw-lbl">Net worth</span>
+          ${fmtC(b.endNetWorth)}
         </div>
         <div class="lw-b-foot">
           <span class="lw-b-savings ${savingsCls}">${esc2(savingsLbl)}</span>
@@ -13405,57 +13405,31 @@ function renderLifeWall() {
     return `<div class="lw-brick-row${offsetCls}">${cells}</div>`;
   }).join('');
 
-  const granPicker = `<div style="display:flex;align-items:center;gap:10px;margin-bottom:16px">
-    <span style="font-family:var(--fm);font-size:9px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--text3)">Brick size</span>
-    <div style="display:flex;gap:3px;background:var(--bg2);border:1px solid var(--border);border-radius:7px;padding:3px">
-      ${[1,2,4,5,10].map(n => `<button class="mode-btn${_lwGranularity===n?' active':''}" onclick="lwSetGranularity(${n})">${n}yr</button>`).join('')}
-    </div>
-  </div>`;
+  const firstRiskText = firstRed
+    ? `<span style="color:var(--accent-critical)">⬛ Risk age ${firstRed.startAge}–${firstRed.endAge}</span>`
+    : firstAmber
+      ? `<span style="color:var(--accent-warning)">⬛ Watch age ${firstAmber.startAge}–${firstAmber.endAge}</span>`
+      : `<span style="color:var(--accent-positive)">No structural risk</span>`;
 
   document.getElementById('panel-lifewall').innerHTML = `
-    ${ui.ph({
-      tag: 'PERSONAL FINANCES · LIFE WALL',
-      titleHtml: 'Your life, brick by brick.',
-      sub: `Each brick covers a ${_lwGranularity}-year window of your projected financial life. Green means you're on track. Amber flags a disturbance. Red means the wall can't hold — portfolio shortfall or depletion. Click any brick for the detail panel.`,
-    })}
-
-    ${granPicker}
-
-    <div class="lw-summary">
-      <div class="lw-kpi ${intTone}">
-        <div class="lw-kpi-lbl">Wall Integrity</div>
-        <div class="lw-kpi-val" style="color:${intColor}">${integrityPct}%</div>
-        <div class="lw-kpi-sub">${nGreen} green · ${nAmber} amber · ${nRed} red</div>
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:10px;flex-wrap:wrap">
+      <div style="display:flex;align-items:baseline;gap:10px">
+        <span style="font-family:var(--fm);font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--text2)">Life Wall</span>
+        <span style="font-family:var(--fm);font-size:11px;color:var(--text3)">${esc2(ageRange)} · ${total} bricks</span>
       </div>
-      <div class="lw-kpi">
-        <div class="lw-kpi-lbl">Time Horizon</div>
-        <div class="lw-kpi-val">${esc2(ageRange)}</div>
-        <div class="lw-kpi-sub">${esc2(yearRange)}</div>
+      <div style="display:flex;gap:3px;background:var(--bg2);border:1px solid var(--border);border-radius:7px;padding:3px">
+        ${[1,2,4,5,10].map(n => `<button class="mode-btn${_lwGranularity===n?' active':''}" onclick="lwSetGranularity(${n})">${n}yr</button>`).join('')}
       </div>
-      ${firstAmber ? `
-      <div class="lw-kpi amb">
-        <div class="lw-kpi-lbl">First Disturbance</div>
-        <div class="lw-kpi-val" style="color:var(--accent-warning)">Age ${firstAmber.startAge}–${firstAmber.endAge}</div>
-        <div class="lw-kpi-sub">${esc2(firstAmber.verdictReason)}</div>
-      </div>` : ''}
-      ${firstRed ? `
-      <div class="lw-kpi neg">
-        <div class="lw-kpi-lbl">Structural Risk</div>
-        <div class="lw-kpi-val" style="color:var(--accent-critical)">Age ${firstRed.startAge}–${firstRed.endAge}</div>
-        <div class="lw-kpi-sub">${esc2(firstRed.verdictReason)}</div>
-      </div>` : `
-      <div class="lw-kpi">
-        <div class="lw-kpi-lbl">Structural Risk</div>
-        <div class="lw-kpi-val" style="color:var(--accent-positive)">None detected</div>
-        <div class="lw-kpi-sub">Portfolio sustains to life expectancy</div>
-      </div>`}
     </div>
 
-    <div class="lw-legend">
-      <span class="lw-leg-item"><span class="lw-leg-sw green"></span>On track — portfolio covers lifestyle</span>
-      <span class="lw-leg-item"><span class="lw-leg-sw amber"></span>Disturbance — coverage tight or transitioning</span>
-      <span class="lw-leg-item"><span class="lw-leg-sw red"></span>Structural failure — shortfall or depletion</span>
-      <span class="lw-leg-hint">Click any brick for detail · Esc closes</span>
+    <div style="display:flex;align-items:center;gap:16px;margin-bottom:14px;flex-wrap:wrap;font-family:var(--fm);font-size:11px;color:var(--text2)">
+      <span style="font-weight:700;color:${intColor}">${integrityPct}% intact</span>
+      <span style="color:var(--text3)">·</span>
+      <span><span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:var(--accent-positive);margin-right:4px;vertical-align:middle"></span>${nGreen} green</span>
+      <span><span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:var(--accent-warning);margin-right:4px;vertical-align:middle"></span>${nAmber} amber</span>
+      <span><span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:var(--accent-critical);margin-right:4px;vertical-align:middle"></span>${nRed} red</span>
+      <span style="color:var(--text3)">·</span>
+      ${firstRiskText}
     </div>
 
     <div class="lw-wall">
@@ -13464,10 +13438,6 @@ function renderLifeWall() {
         <span>TODAY · ${monthStr} · AGE ${state.currentAge}</span>
       </div>
       <div class="lw-brick-rows">${brickRows}</div>
-      <div class="lw-foot-hint">
-        <span>💡</span>
-        <div><strong>How bricks are scored:</strong> accumulation years pull from <code>getProjection()</code>; retirement years from <code>_simulateRetirementYears()</code>. A brick turns red if any year in the window shows portfolio depletion or a shortfall. Amber covers the retirement-transition period, pension activations, and windows with high planned spend.</div>
-      </div>
     </div>
 
     <div class="retire-slideover-backdrop" id="lw-backdrop" onclick="lwClosePanel()"></div>
