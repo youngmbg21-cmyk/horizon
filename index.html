@@ -5244,6 +5244,8 @@ const STRINGS = {
   's2.card.typeChange':     { en:'Change account type',  sv:'Ändra kontotyp' },
   's2.card.type.investment':{ en:'Investment',           sv:'Investering' },
   's2.card.type.pension':   { en:'Pension',              sv:'Pension' },
+  's2.card.owner.me':       { en:'Me',                   sv:'Jag' },
+  's2.card.owner.spouse':   { en:'Spouse',               sv:'Partner' },
   's2.card.removeTitle':    { en:'Remove account',       sv:'Ta bort konto' },
   // Field cell labels
   's2.card.field.balance':      { en:'Balance',          sv:'Saldo' },
@@ -11622,9 +11624,9 @@ function renderRetirement() {
       <div class="ret-asset-top">
         <span class="ret-asset-badge">${isInv?t('s2.card.badge.investment'):t('s2.card.badge.pension')}</span>
         <input class="ret-asset-name" value="${esc(a.name)}" placeholder="${esc2(t('s2.card.namePlaceholder'))}" oninput="state.externalAssets[${idx}].name=this.value;save()" onchange="commitRender('renderRetirement')">
-        <select class="ret-asset-type" onchange="state.externalAssets[${idx}].assetType=this.value;save();renderRetirement()" title="${esc2(t('s2.card.typeChange'))}">
-          <option value="investment" ${isInv?'selected':''}>${esc2(t('s2.card.type.investment'))}</option>
-          <option value="pension" ${!isInv?'selected':''}>${esc2(t('s2.card.type.pension'))}</option>
+        <select class="ret-asset-type" onchange="state.externalAssets[${idx}].owner=this.value;save();renderRetirement()" title="Asset owner">
+          <option value="me" ${(a.owner||'me')==='me'?'selected':''}>${esc2(t('s2.card.owner.me'))}</option>
+          <option value="spouse" ${(a.owner||'me')==='spouse'?'selected':''}>${esc2(t('s2.card.owner.spouse'))}</option>
         </select>
         <button class="ret-asset-rm" onclick="state.externalAssets.splice(${idx},1);save();renderRetirement()" title="${esc2(t('s2.card.removeTitle'))}">×</button>
       </div>
