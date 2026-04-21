@@ -2460,6 +2460,176 @@ body.light .retire-slideover { box-shadow:-10px 0 32px -10px rgba(60,40,10,0.25)
   font-family:var(--fm); font-size:12px; color:var(--accent-positive);
 }
 
+/* ══════════════════════════════════════════════════════════════════
+   LIFE WALL — scoped .lw-* classes
+   Slide-over chrome reuses .retire-slideover + .retire-so-* entirely.
+══════════════════════════════════════════════════════════════════ */
+.lw-summary {
+  display:grid; grid-template-columns:repeat(auto-fit,minmax(200px,1fr));
+  gap:10px; margin-bottom:14px;
+}
+.lw-kpi {
+  background:var(--bg2); border:1px solid var(--border);
+  border-radius:var(--r); padding:13px 15px; position:relative; overflow:hidden;
+}
+.lw-kpi::before { content:''; position:absolute; left:0; top:0; bottom:0; width:3px; background:var(--accent-positive); }
+.lw-kpi.amb::before { background:var(--accent-warning); }
+.lw-kpi.neg::before { background:var(--accent-critical); }
+.lw-kpi-lbl { font-family:var(--fm); font-size:9px; letter-spacing:.1em; text-transform:uppercase; color:var(--text3); font-weight:700; margin-bottom:3px; }
+.lw-kpi-val { font-family:var(--fm); font-size:19px; font-weight:700; }
+.lw-kpi-sub { font-family:var(--fm); font-size:10px; color:var(--text2); margin-top:2px; }
+
+.lw-legend {
+  display:flex; gap:16px; flex-wrap:wrap; align-items:center;
+  padding:9px 13px; background:var(--bg2); border:1px solid var(--border);
+  border-radius:var(--r); margin-bottom:14px; font-size:11px;
+}
+.lw-leg-item { display:inline-flex; align-items:center; gap:7px; font-family:var(--fm); color:var(--text2); }
+.lw-leg-sw { width:13px; height:9px; border-radius:2px; border:1px solid; flex-shrink:0; }
+.lw-leg-sw.green { background:rgba(0,232,160,.15); border-color:var(--green); }
+.lw-leg-sw.amber { background:rgba(245,166,35,.15); border-color:var(--amber); }
+.lw-leg-sw.red   { background:rgba(255,77,109,.15);  border-color:var(--red);  }
+.lw-leg-hint { margin-left:auto; color:var(--text3); font-family:var(--fm); font-size:10px; }
+
+.lw-wall {
+  background:var(--bg1); border:1px solid var(--border); border-radius:var(--rl);
+  padding:28px 20px;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.02), inset 0 -30px 50px -30px rgba(0,232,160,.04);
+}
+.lw-wall-marker {
+  display:flex; align-items:center; gap:8px;
+  font-family:var(--fm); font-size:10px; color:var(--text3);
+  letter-spacing:.08em; text-transform:uppercase; margin-bottom:14px;
+}
+.lw-wall-marker .lw-dot {
+  width:6px; height:6px; border-radius:50%;
+  background:var(--accent-positive); box-shadow:0 0 8px var(--accent-positive);
+}
+.lw-brick-rows { display:flex; flex-direction:column; gap:7px; }
+.lw-brick-row  { display:flex; gap:7px; flex-wrap:wrap; }
+.lw-brick-row.offset { padding-left:56px; }
+@media (max-width:900px) { .lw-brick-row.offset { padding-left:0; } }
+
+.lw-brick {
+  flex:1 1 155px; min-width:155px; max-width:220px; min-height:100px;
+  padding:9px 11px 10px; border-radius:7px; border:1px solid;
+  cursor:pointer; position:relative; background:var(--bg2);
+  display:flex; flex-direction:column; justify-content:space-between;
+  font-family:var(--ff); text-align:left; overflow:hidden;
+  transition:transform .18s cubic-bezier(.2,.7,.2,1), box-shadow .18s, border-color .18s;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.04), 0 1px 0 rgba(0,0,0,.4), 0 2px 5px -2px rgba(0,0,0,.35);
+}
+.lw-brick:hover {
+  transform:translateY(-2px);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.06), 0 1px 0 rgba(0,0,0,.4), 0 8px 18px -4px rgba(0,0,0,.55);
+  z-index:3;
+}
+.lw-brick:focus-visible { outline:2px solid var(--accent-positive); outline-offset:2px; }
+.lw-brick.current { border-width:2px; }
+
+.lw-brick.green {
+  border-color:rgba(0,232,160,.4);
+  background:linear-gradient(180deg, rgba(0,232,160,.10) 0%, rgba(0,232,160,.03) 55%, var(--bg2) 100%);
+}
+.lw-brick.green.current {
+  border-color:var(--green);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.06), 0 0 0 1px rgba(0,232,160,.28), 0 0 20px -4px rgba(0,232,160,.28);
+}
+.lw-brick.amber {
+  border-color:rgba(245,166,35,.45);
+  background:linear-gradient(180deg, rgba(245,166,35,.11) 0%, rgba(245,166,35,.03) 55%, var(--bg2) 100%);
+}
+.lw-brick.amber.current { border-color:var(--amber); }
+.lw-brick.red {
+  border-color:rgba(255,77,109,.5);
+  background:linear-gradient(180deg, rgba(255,77,109,.12) 0%, rgba(255,77,109,.03) 55%, var(--bg2) 100%);
+  transform:rotate(-.4deg) translateY(1px);
+}
+.lw-brick.red.current { border-color:var(--red); }
+.lw-brick.red:hover { transform:rotate(-.4deg) translateY(-1px); }
+
+.lw-brick.red::before {
+  content:''; position:absolute; inset:0; pointer-events:none; opacity:.5;
+  background:url("data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 200 100' preserveAspectRatio='none'%3E%3Cg fill='none' stroke='%23ff4d6d' stroke-width='.7' stroke-linecap='round'%3E%3Cpath d='M18 8 L34 28 L28 48 L50 54 L44 78 L66 90'/%3E%3Cpath d='M118 3 L126 18 L114 34 L130 50'/%3E%3Cpath d='M156 68 L168 78 L162 94'/%3E%3C/g%3E%3C/svg%3E") no-repeat center/100% 100%;
+}
+.lw-brick.red::after {
+  content:''; position:absolute; top:0; right:0; width:16px; height:16px;
+  background:linear-gradient(135deg, transparent 48%, var(--bg1) 50%);
+  pointer-events:none;
+}
+
+.lw-b-head { display:flex; justify-content:space-between; align-items:flex-start; gap:5px; margin-bottom:5px; }
+.lw-b-years { font-family:var(--fm); font-size:10px; font-weight:700; color:var(--text); letter-spacing:.02em; }
+.lw-b-ages  { font-family:var(--fm); font-size:9px; color:var(--text3); letter-spacing:.05em; text-transform:uppercase; margin-top:1px; }
+.lw-b-badge { font-family:var(--fm); font-size:8px; font-weight:700; letter-spacing:.1em; padding:2px 5px; border-radius:3px; text-transform:uppercase; flex-shrink:0; }
+.lw-b-badge.now  { background:rgba(77,159,255,.12); color:var(--blue); border:1px solid rgba(77,159,255,.28); }
+.lw-b-badge.ret  { background:var(--amber-dim); color:var(--amber); border:1px solid rgba(245,166,35,.28); }
+.lw-b-badge.life { background:rgba(139,92,246,.12); color:#8b5cf6; border:1px solid rgba(139,92,246,.28); }
+.lw-b-warn { position:absolute; top:5px; right:5px; font-size:10px; opacity:.7; }
+
+.lw-b-networth { font-family:var(--fm); font-size:14px; font-weight:700; line-height:1.15; }
+.lw-b-nw-lbl   { font-family:var(--fm); font-size:8px; font-weight:700; color:var(--text3); letter-spacing:.09em; text-transform:uppercase; display:block; margin-bottom:1px; }
+.lw-brick.green .lw-b-networth { color:var(--accent-positive); }
+.lw-brick.amber .lw-b-networth { color:var(--accent-warning); }
+.lw-brick.red   .lw-b-networth { color:var(--accent-critical); }
+
+.lw-b-foot     { display:flex; justify-content:space-between; align-items:center; gap:5px; margin-top:5px; }
+.lw-b-savings  { font-family:var(--fm); font-size:10px; font-weight:600; }
+.lw-b-savings.pos { color:var(--accent-positive); }
+.lw-b-savings.amb { color:var(--accent-warning); }
+.lw-b-savings.neg { color:var(--accent-critical); }
+.lw-b-event { display:inline-flex; align-items:center; gap:3px; font-family:var(--fm); font-size:10px; color:var(--text2); }
+
+/* Tone accent bar in slide-over header */
+.lw-tone-bar { width:8px; border-radius:4px; align-self:stretch; min-height:44px; flex-shrink:0; }
+.lw-tone-bar.green { background:var(--accent-positive); box-shadow:0 0 12px rgba(0,232,160,.35); }
+.lw-tone-bar.amber { background:var(--accent-warning);  box-shadow:0 0 12px rgba(245,166,35,.3); }
+.lw-tone-bar.red   { background:var(--accent-critical); box-shadow:0 0 12px rgba(255,77,109,.3); }
+
+/* Insight card */
+.lw-insight {
+  background:linear-gradient(135deg, rgba(0,232,160,.06), rgba(77,159,255,.03));
+  border:1px solid rgba(0,232,160,.2); border-radius:10px; padding:13px 15px;
+}
+.lw-insight.amb { background:linear-gradient(135deg, rgba(245,166,35,.08), rgba(255,184,77,.03)); border-color:rgba(245,166,35,.26); }
+.lw-insight.neg { background:linear-gradient(135deg, rgba(255,77,109,.08), rgba(255,107,139,.03)); border-color:rgba(255,77,109,.28); }
+.lw-insight-hd  { display:flex; align-items:center; gap:8px; margin-bottom:8px; }
+.lw-insight-ic  { font-size:15px; }
+.lw-insight-tag { font-family:var(--fm); font-size:10px; letter-spacing:.09em; text-transform:uppercase; font-weight:700; color:var(--accent-positive); }
+.lw-insight.amb .lw-insight-tag { color:var(--accent-warning); }
+.lw-insight.neg .lw-insight-tag { color:var(--accent-critical); }
+.lw-insight-body { font-size:13px; line-height:1.65; color:var(--text); }
+
+/* Event list */
+.lw-evt-list { display:flex; flex-direction:column; gap:7px; }
+.lw-evt {
+  background:var(--bg3); border:1px solid var(--border); border-left:3px solid var(--text3);
+  border-radius:7px; padding:9px 12px; display:flex; gap:11px; align-items:flex-start;
+}
+.lw-evt.trip       { border-left-color:#a3e635; }
+.lw-evt.pension    { border-left-color:var(--accent-warning); }
+.lw-evt.retirement { border-left-color:var(--accent-positive); }
+.lw-evt.warning    { border-left-color:var(--accent-critical); }
+.lw-evt-ic    { font-size:15px; line-height:1; flex-shrink:0; padding-top:1px; }
+.lw-evt-body  { flex:1; min-width:0; }
+.lw-evt-title { font-size:13px; font-weight:700; color:var(--text); line-height:1.3; }
+.lw-evt-sub   { font-size:11px; color:var(--text2); margin-top:2px; line-height:1.5; }
+.lw-evt-when  { font-family:var(--fm); font-size:10px; color:var(--text3); margin-top:2px; letter-spacing:.03em; }
+
+.lw-foot-hint {
+  margin-top:14px; padding:11px 14px;
+  background:var(--bg2); border:1px dashed var(--border);
+  border-radius:var(--r); font-size:11px; color:var(--text2);
+  line-height:1.55; display:flex; gap:9px; align-items:flex-start;
+}
+.lw-foot-hint code { font-family:var(--fm); font-size:10px; background:var(--bg3); padding:1px 5px; border-radius:3px; }
+
+@media (prefers-reduced-motion: reduce) {
+  .lw-brick { transition:none; }
+  .lw-brick.red { transform:none; }
+  .lw-brick.red:hover { transform:translateY(-2px); }
+}
+
 /* ── VAULT — library layout ─────────────────────────────────────────── */
 .vault-grid { display:grid; grid-template-columns:380px 1fr; gap:16px; align-items:start; }
 @media (max-width:1000px){ .vault-grid { grid-template-columns:1fr; } }
@@ -3544,6 +3714,7 @@ body.light .piq-country-menu { box-shadow:0 12px 28px -10px rgba(60,40,10,0.22);
       <div class="sb-section" data-i18n="sb.group.planning">PLANNING</div>
       <div class="nav-item" data-panel="funfund" onclick="nav('funfund')"><span class="nav-icon">✦</span><span class="nav-lbl" data-i18n="panel.funfund">Fun Fund</span></div>
       <div class="nav-item" data-panel="retireanywhere" onclick="nav('retireanywhere')"><span class="nav-icon">🌍</span><span class="nav-lbl" data-i18n="panel.retireanywhere">Retire Anywhere</span></div>
+      <div class="nav-item" data-panel="lifewall" onclick="nav('lifewall')"><span class="nav-icon">🧱</span><span class="nav-lbl">Life Wall</span></div>
       <div class="nav-item" data-panel="propiq" onclick="nav('propiq')"><span class="nav-icon">🏠</span><span class="nav-lbl" data-i18n="panel.propiq">Property IQ</span></div>
 
       <div class="sb-sep"></div>
@@ -3580,6 +3751,7 @@ body.light .piq-country-menu { box-shadow:0 12px 28px -10px rgba(60,40,10,0.22);
       <div class="panel" id="panel-retirement"></div>
       <div class="panel" id="panel-funfund"></div>
       <div class="panel" id="panel-retireanywhere"></div>
+      <div class="panel" id="panel-lifewall"></div>
       <div class="panel" id="panel-propiq"></div>
       <div class="panel" id="panel-journal"></div>
       <div class="panel" id="panel-vault"></div>
@@ -7607,7 +7779,7 @@ function scoreLocation(loc) {
 // KPI cards continue to work — they redirect into `review` with the right
 // scope preset inside nav(). The Forecast & Review tab is the new unified
 // home for both views.
-const VALID_PANELS = ['dashboard','transactions','review','monthly','yearly','retirement','funfund','retireanywhere','propiq','journal','vault','settings'];
+const VALID_PANELS = ['dashboard','transactions','review','monthly','yearly','retirement','funfund','retireanywhere','lifewall','propiq','journal','vault','settings'];
 let _navFromHash = false;
 function parseHash() {
   const raw = (location.hash||'').replace(/^#/,'');
@@ -8053,6 +8225,7 @@ function renderPanel(panel) {
     retirement:renderRetirement,
     funfund:renderFunFund,
     retireanywhere:renderRetireAnywhere,
+    lifewall:renderLifeWall,
     propiq:typeof renderPropIQ==='function'?renderPropIQ:null,
     journal:renderJournal,
     vault:renderVault,
@@ -8074,6 +8247,7 @@ const PANEL_META = {
   retirement:     {label:'Retirement Plan',  group:'Personal Finances', icon:'🌅'},
   funfund:        {label:'Fun Fund',         group:'Planning',          icon:'✦'},
   retireanywhere: {label:'Retire Anywhere',  group:'Planning',          icon:'🌍'},
+  lifewall:       {label:'Life Wall',        group:'Planning',          icon:'🧱'},
   propiq:         {label:'Property IQ',      group:'Planning',          icon:'🏠'},
   journal:        {label:'Journal',          group:'Library',           icon:'📓'},
   vault:          {label:'Vault',            group:'Library',           icon:'🗄'},
@@ -8088,8 +8262,9 @@ const RELATED_MAP = {
   yearly:         ['review','retirement','funfund'],
   retirement:     ['retireanywhere','review','funfund'],
   funfund:        ['review','retireanywhere','dashboard'],
-  retireanywhere: ['retirement','propiq','vault'],
-  propiq:         ['retireanywhere','retirement','vault'],
+  retireanywhere: ['lifewall','retirement','propiq'],
+  lifewall:       ['retirement','retireanywhere','review'],
+  propiq:         ['lifewall','retireanywhere','retirement'],
   journal:        ['dashboard','review','retirement'],
   vault:          ['retireanywhere','retirement','propiq'],
   settings:       ['dashboard','retirement','transactions'],
@@ -13012,6 +13187,198 @@ window.updateTripExpense = function(tripId, expenseId, field, val){
   ex[field] = (field === 'amount') ? (parseNum(val) || 0) : val;
   save();
 };
+
+// ══ LIFE WALL ════════════════════════════════════════════════════════════════
+let _lwBricks = [];
+
+function lwOpenBrick(idx) {
+  // Stubbed in Batch 2 — wired in Batch 3
+  void idx;
+}
+
+function renderLifeWall() {
+  const bricks = getLifeWallData();
+  _lwBricks = bricks;
+
+  // ── Summary stats ───────────────────────────────────────────────────
+  const total      = bricks.length;
+  const nGreen     = bricks.filter(b => b.verdict === 'green').length;
+  const nAmber     = bricks.filter(b => b.verdict === 'amber').length;
+  const nRed       = bricks.filter(b => b.verdict === 'red').length;
+  const integrityPct = total > 0 ? Math.round(nGreen / total * 100) : 100;
+  const intTone    = integrityPct >= 90 ? '' : integrityPct >= 70 ? 'amb' : 'neg';
+  const intColor   = integrityPct >= 90 ? 'var(--accent-positive)' : integrityPct >= 70 ? 'var(--accent-warning)' : 'var(--accent-critical)';
+
+  const firstAmber = bricks.find(b => b.verdict === 'amber');
+  const firstRed   = bricks.find(b => b.verdict === 'red');
+  const nowBrick   = bricks.find(b => b.isCurrent);
+  const lifeBrick  = bricks.find(b => b.badge?.cls === 'life');
+
+  const ageRange   = nowBrick && lifeBrick
+    ? `Age ${nowBrick.startAge} → ${lifeBrick.endAge}`
+    : `${total} × 2-yr bricks`;
+  const yearRange  = nowBrick && lifeBrick
+    ? `${nowBrick.startYear} → ${lifeBrick.endYear} · ${total} bricks`
+    : `${total} bricks`;
+
+  const today = new Date();
+  const monthStr = today.toLocaleString('en', {month:'short',year:'numeric'}).toUpperCase();
+
+  // ── Render ──────────────────────────────────────────────────────────
+  const BRICKS_PER_ROW = 6;
+  const rows = [];
+  for (let i = 0; i < bricks.length; i += BRICKS_PER_ROW) {
+    rows.push(bricks.slice(i, i + BRICKS_PER_ROW).map((b, colIdx) => ({b, idx: i + colIdx})));
+  }
+
+  const brickRows = rows.map((row, rowIdx) => {
+    const offsetCls = rowIdx % 2 === 1 ? ' offset' : '';
+    const cells = row.map(({b, idx}) => {
+      const nonRetEvts = b.events.filter(e => e.type !== 'retirement');
+      const firstEvt   = nonRetEvts[0];
+      const extraEvts  = nonRetEvts.length - 1;
+
+      const savingsCls = b.inRetirement
+        ? (b.verdict === 'green' ? 'pos' : b.verdict === 'amber' ? 'amb' : 'neg')
+        : (b.savingsRate > 20 ? 'pos' : b.savingsRate > 10 ? 'amb' : 'neg');
+      const savingsLbl = b.inRetirement
+        ? (b.anyDepleted ? 'Depleted' : 'Drawdown')
+        : `${b.savingsRate}% saved`;
+
+      const warnIcon = b.verdict === 'amber' && !b.badge
+        ? `<span class="lw-b-warn">⚠</span>` : '';
+
+      return `<button class="lw-brick ${b.verdict}${b.isCurrent ? ' current' : ''}"
+          onclick="lwOpenBrick(${idx})"
+          aria-label="${esc2(b.startYear + '–' + b.endYear + ', Age ' + b.startAge + '–' + b.endAge + ', ' + b.verdictReason)}">
+        ${warnIcon}
+        <div class="lw-b-head">
+          <div>
+            <div class="lw-b-years">${b.startYear}–${b.endYear}</div>
+            <div class="lw-b-ages">Age ${b.startAge}–${b.endAge}</div>
+          </div>
+          ${b.badge ? `<span class="lw-b-badge ${b.badge.cls}">${b.badge.text}</span>` : ''}
+        </div>
+        <div class="lw-b-networth">
+          <span class="lw-b-nw-lbl">Net worth · real</span>
+          ${fmtC(b.realEndNetWorth)}
+        </div>
+        <div class="lw-b-foot">
+          <span class="lw-b-savings ${savingsCls}">${esc2(savingsLbl)}</span>
+          ${firstEvt
+            ? `<span class="lw-b-event">${firstEvt.icon}${extraEvts > 0 ? `<span>+${extraEvts}</span>` : ''}</span>`
+            : ''}
+        </div>
+      </button>`;
+    }).join('');
+    return `<div class="lw-brick-row${offsetCls}">${cells}</div>`;
+  }).join('');
+
+  document.getElementById('panel-lifewall').innerHTML = `
+    ${ui.ph({
+      tag: 'PLANNING · LIFE WALL',
+      titleHtml: 'Your life, brick by brick.',
+      sub: 'Each brick covers a 2-year window of your projected financial life. Green means you\'re on track. Amber flags a disturbance. Red means the wall can\'t hold — portfolio shortfall or depletion. Click any brick for the detail panel.',
+    })}
+
+    <div class="lw-summary">
+      <div class="lw-kpi ${intTone}">
+        <div class="lw-kpi-lbl">Wall Integrity</div>
+        <div class="lw-kpi-val" style="color:${intColor}">${integrityPct}%</div>
+        <div class="lw-kpi-sub">${nGreen} green · ${nAmber} amber · ${nRed} red</div>
+      </div>
+      <div class="lw-kpi">
+        <div class="lw-kpi-lbl">Time Horizon</div>
+        <div class="lw-kpi-val">${esc2(ageRange)}</div>
+        <div class="lw-kpi-sub">${esc2(yearRange)}</div>
+      </div>
+      ${firstAmber ? `
+      <div class="lw-kpi amb">
+        <div class="lw-kpi-lbl">First Disturbance</div>
+        <div class="lw-kpi-val" style="color:var(--accent-warning)">Age ${firstAmber.startAge}–${firstAmber.endAge}</div>
+        <div class="lw-kpi-sub">${esc2(firstAmber.verdictReason)}</div>
+      </div>` : ''}
+      ${firstRed ? `
+      <div class="lw-kpi neg">
+        <div class="lw-kpi-lbl">Structural Risk</div>
+        <div class="lw-kpi-val" style="color:var(--accent-critical)">Age ${firstRed.startAge}–${firstRed.endAge}</div>
+        <div class="lw-kpi-sub">${esc2(firstRed.verdictReason)}</div>
+      </div>` : `
+      <div class="lw-kpi">
+        <div class="lw-kpi-lbl">Structural Risk</div>
+        <div class="lw-kpi-val" style="color:var(--accent-positive)">None detected</div>
+        <div class="lw-kpi-sub">Portfolio sustains to life expectancy</div>
+      </div>`}
+    </div>
+
+    <div class="lw-legend">
+      <span class="lw-leg-item"><span class="lw-leg-sw green"></span>On track — portfolio covers lifestyle</span>
+      <span class="lw-leg-item"><span class="lw-leg-sw amber"></span>Disturbance — coverage tight or transitioning</span>
+      <span class="lw-leg-item"><span class="lw-leg-sw red"></span>Structural failure — shortfall or depletion</span>
+      <span class="lw-leg-hint">Click any brick for detail · Esc closes</span>
+    </div>
+
+    <div class="lw-wall">
+      <div class="lw-wall-marker">
+        <span class="lw-dot"></span>
+        <span>TODAY · ${monthStr} · AGE ${state.currentAge}</span>
+      </div>
+      <div class="lw-brick-rows">${brickRows}</div>
+      <div class="lw-foot-hint">
+        <span>💡</span>
+        <div><strong>How bricks are scored:</strong> accumulation years pull from <code>getProjection()</code>; retirement years from <code>_simulateRetirementYears()</code>. A brick turns red if any year in the window shows portfolio depletion or a shortfall. Amber covers the retirement-transition period, pension activations, and windows with high planned spend.</div>
+      </div>
+    </div>
+
+    <div class="retire-slideover-backdrop" id="lw-backdrop" onclick="lwClosePanel()"></div>
+    <div class="retire-slideover" id="lw-slideover" role="dialog" aria-modal="true" aria-hidden="true">
+      <div class="retire-so-head" id="lw-so-head">
+        <div class="retire-so-head-main">
+          <div class="lw-tone-bar" id="lw-tone-bar"></div>
+          <div class="retire-so-head-text">
+            <div class="retire-so-sub" id="lw-so-eyebrow">LIFE CHAPTER</div>
+            <div class="retire-so-title" id="lw-so-title">—</div>
+            <div class="retire-so-sub" id="lw-so-sub" style="margin-top:4px">—</div>
+          </div>
+        </div>
+        <button class="retire-so-close" onclick="lwClosePanel()" aria-label="Close">✕</button>
+      </div>
+      <div class="retire-so-body" id="lw-so-body"></div>
+      <div class="retire-so-footer">
+        <div class="retire-so-footer-hint" id="lw-so-hint">Adjust income, expenses, or plan major events in the yearly view.</div>
+        <div class="retire-so-footer-actions">
+          <button class="btn btn-o" onclick="lwClosePanel()">Close</button>
+          <button class="btn btn-g" id="lw-edit-btn" onclick="lwEditYear()">✎ Edit in Yearly</button>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function lwClosePanel() {
+  const so = document.getElementById('lw-slideover');
+  const bd = document.getElementById('lw-backdrop');
+  if (!so || !bd) return;
+  so.classList.remove('open');
+  bd.classList.remove('open');
+  so.setAttribute('aria-hidden', 'true');
+}
+
+function lwEditYear() {
+  const b = _lwActiveBrick;
+  if (!b) return;
+  lwClosePanel();
+  const retireYear = CY + Math.max(0, state.retirementAge - state.currentAge);
+  state.selectedYear = Math.min(b.startYear, retireYear);
+  nav('yearly');
+}
+
+// Escape-key handler — only active when panel is open
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') lwClosePanel();
+});
+
+let _lwActiveBrick = null;
 
 // ══ RETIRE ANYWHERE ══════════════════════════════════════════════════════════
 let retireMap=null;
