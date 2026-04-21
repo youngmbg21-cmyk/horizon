@@ -2460,6 +2460,176 @@ body.light .retire-slideover { box-shadow:-10px 0 32px -10px rgba(60,40,10,0.25)
   font-family:var(--fm); font-size:12px; color:var(--accent-positive);
 }
 
+/* ══════════════════════════════════════════════════════════════════
+   LIFE WALL — scoped .lw-* classes
+   Slide-over chrome reuses .retire-slideover + .retire-so-* entirely.
+══════════════════════════════════════════════════════════════════ */
+.lw-summary {
+  display:grid; grid-template-columns:repeat(auto-fit,minmax(200px,1fr));
+  gap:10px; margin-bottom:14px;
+}
+.lw-kpi {
+  background:var(--bg2); border:1px solid var(--border);
+  border-radius:var(--r); padding:13px 15px; position:relative; overflow:hidden;
+}
+.lw-kpi::before { content:''; position:absolute; left:0; top:0; bottom:0; width:3px; background:var(--accent-positive); }
+.lw-kpi.amb::before { background:var(--accent-warning); }
+.lw-kpi.neg::before { background:var(--accent-critical); }
+.lw-kpi-lbl { font-family:var(--fm); font-size:9px; letter-spacing:.1em; text-transform:uppercase; color:var(--text3); font-weight:700; margin-bottom:3px; }
+.lw-kpi-val { font-family:var(--fm); font-size:19px; font-weight:700; }
+.lw-kpi-sub { font-family:var(--fm); font-size:10px; color:var(--text2); margin-top:2px; }
+
+.lw-legend {
+  display:flex; gap:16px; flex-wrap:wrap; align-items:center;
+  padding:9px 13px; background:var(--bg2); border:1px solid var(--border);
+  border-radius:var(--r); margin-bottom:14px; font-size:11px;
+}
+.lw-leg-item { display:inline-flex; align-items:center; gap:7px; font-family:var(--fm); color:var(--text2); }
+.lw-leg-sw { width:13px; height:9px; border-radius:2px; border:1px solid; flex-shrink:0; }
+.lw-leg-sw.green { background:rgba(0,232,160,.15); border-color:var(--green); }
+.lw-leg-sw.amber { background:rgba(245,166,35,.15); border-color:var(--amber); }
+.lw-leg-sw.red   { background:rgba(255,77,109,.15);  border-color:var(--red);  }
+.lw-leg-hint { margin-left:auto; color:var(--text3); font-family:var(--fm); font-size:10px; }
+
+.lw-wall {
+  background:var(--bg1); border:1px solid var(--border); border-radius:var(--rl);
+  padding:28px 20px;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.02), inset 0 -30px 50px -30px rgba(0,232,160,.04);
+}
+.lw-wall-marker {
+  display:flex; align-items:center; gap:8px;
+  font-family:var(--fm); font-size:10px; color:var(--text3);
+  letter-spacing:.08em; text-transform:uppercase; margin-bottom:14px;
+}
+.lw-wall-marker .lw-dot {
+  width:6px; height:6px; border-radius:50%;
+  background:var(--accent-positive); box-shadow:0 0 8px var(--accent-positive);
+}
+.lw-brick-rows { display:flex; flex-direction:column; gap:7px; }
+.lw-brick-row  { display:flex; gap:7px; flex-wrap:wrap; }
+.lw-brick-row.offset { padding-left:56px; }
+@media (max-width:900px) { .lw-brick-row.offset { padding-left:0; } }
+
+.lw-brick {
+  flex:1 1 155px; min-width:155px; max-width:220px; min-height:100px;
+  padding:9px 11px 10px; border-radius:7px; border:1px solid;
+  cursor:pointer; position:relative; background:var(--bg2);
+  display:flex; flex-direction:column; justify-content:space-between;
+  font-family:var(--ff); text-align:left; overflow:hidden;
+  transition:transform .18s cubic-bezier(.2,.7,.2,1), box-shadow .18s, border-color .18s;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.04), 0 1px 0 rgba(0,0,0,.4), 0 2px 5px -2px rgba(0,0,0,.35);
+}
+.lw-brick:hover {
+  transform:translateY(-2px);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.06), 0 1px 0 rgba(0,0,0,.4), 0 8px 18px -4px rgba(0,0,0,.55);
+  z-index:3;
+}
+.lw-brick:focus-visible { outline:2px solid var(--accent-positive); outline-offset:2px; }
+.lw-brick.current { border-width:2px; }
+
+.lw-brick.green {
+  border-color:rgba(0,232,160,.4);
+  background:linear-gradient(180deg, rgba(0,232,160,.10) 0%, rgba(0,232,160,.03) 55%, var(--bg2) 100%);
+}
+.lw-brick.green.current {
+  border-color:var(--green);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.06), 0 0 0 1px rgba(0,232,160,.28), 0 0 20px -4px rgba(0,232,160,.28);
+}
+.lw-brick.amber {
+  border-color:rgba(245,166,35,.45);
+  background:linear-gradient(180deg, rgba(245,166,35,.11) 0%, rgba(245,166,35,.03) 55%, var(--bg2) 100%);
+}
+.lw-brick.amber.current { border-color:var(--amber); }
+.lw-brick.red {
+  border-color:rgba(255,77,109,.5);
+  background:linear-gradient(180deg, rgba(255,77,109,.12) 0%, rgba(255,77,109,.03) 55%, var(--bg2) 100%);
+  transform:rotate(-.4deg) translateY(1px);
+}
+.lw-brick.red.current { border-color:var(--red); }
+.lw-brick.red:hover { transform:rotate(-.4deg) translateY(-1px); }
+
+.lw-brick.red::before {
+  content:''; position:absolute; inset:0; pointer-events:none; opacity:.5;
+  background:url("data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 200 100' preserveAspectRatio='none'%3E%3Cg fill='none' stroke='%23ff4d6d' stroke-width='.7' stroke-linecap='round'%3E%3Cpath d='M18 8 L34 28 L28 48 L50 54 L44 78 L66 90'/%3E%3Cpath d='M118 3 L126 18 L114 34 L130 50'/%3E%3Cpath d='M156 68 L168 78 L162 94'/%3E%3C/g%3E%3C/svg%3E") no-repeat center/100% 100%;
+}
+.lw-brick.red::after {
+  content:''; position:absolute; top:0; right:0; width:16px; height:16px;
+  background:linear-gradient(135deg, transparent 48%, var(--bg1) 50%);
+  pointer-events:none;
+}
+
+.lw-b-head { display:flex; justify-content:space-between; align-items:flex-start; gap:5px; margin-bottom:5px; }
+.lw-b-years { font-family:var(--fm); font-size:10px; font-weight:700; color:var(--text); letter-spacing:.02em; }
+.lw-b-ages  { font-family:var(--fm); font-size:9px; color:var(--text3); letter-spacing:.05em; text-transform:uppercase; margin-top:1px; }
+.lw-b-badge { font-family:var(--fm); font-size:8px; font-weight:700; letter-spacing:.1em; padding:2px 5px; border-radius:3px; text-transform:uppercase; flex-shrink:0; }
+.lw-b-badge.now  { background:rgba(77,159,255,.12); color:var(--blue); border:1px solid rgba(77,159,255,.28); }
+.lw-b-badge.ret  { background:var(--amber-dim); color:var(--amber); border:1px solid rgba(245,166,35,.28); }
+.lw-b-badge.life { background:rgba(139,92,246,.12); color:#8b5cf6; border:1px solid rgba(139,92,246,.28); }
+.lw-b-warn { position:absolute; top:5px; right:5px; font-size:10px; opacity:.7; }
+
+.lw-b-networth { font-family:var(--fm); font-size:14px; font-weight:700; line-height:1.15; }
+.lw-b-nw-lbl   { font-family:var(--fm); font-size:8px; font-weight:700; color:var(--text3); letter-spacing:.09em; text-transform:uppercase; display:block; margin-bottom:1px; }
+.lw-brick.green .lw-b-networth { color:var(--accent-positive); }
+.lw-brick.amber .lw-b-networth { color:var(--accent-warning); }
+.lw-brick.red   .lw-b-networth { color:var(--accent-critical); }
+
+.lw-b-foot     { display:flex; justify-content:space-between; align-items:center; gap:5px; margin-top:5px; }
+.lw-b-savings  { font-family:var(--fm); font-size:10px; font-weight:600; }
+.lw-b-savings.pos { color:var(--accent-positive); }
+.lw-b-savings.amb { color:var(--accent-warning); }
+.lw-b-savings.neg { color:var(--accent-critical); }
+.lw-b-event { display:inline-flex; align-items:center; gap:3px; font-family:var(--fm); font-size:10px; color:var(--text2); }
+
+/* Tone accent bar in slide-over header */
+.lw-tone-bar { width:8px; border-radius:4px; align-self:stretch; min-height:44px; flex-shrink:0; }
+.lw-tone-bar.green { background:var(--accent-positive); box-shadow:0 0 12px rgba(0,232,160,.35); }
+.lw-tone-bar.amber { background:var(--accent-warning);  box-shadow:0 0 12px rgba(245,166,35,.3); }
+.lw-tone-bar.red   { background:var(--accent-critical); box-shadow:0 0 12px rgba(255,77,109,.3); }
+
+/* Insight card */
+.lw-insight {
+  background:linear-gradient(135deg, rgba(0,232,160,.06), rgba(77,159,255,.03));
+  border:1px solid rgba(0,232,160,.2); border-radius:10px; padding:13px 15px;
+}
+.lw-insight.amb { background:linear-gradient(135deg, rgba(245,166,35,.08), rgba(255,184,77,.03)); border-color:rgba(245,166,35,.26); }
+.lw-insight.neg { background:linear-gradient(135deg, rgba(255,77,109,.08), rgba(255,107,139,.03)); border-color:rgba(255,77,109,.28); }
+.lw-insight-hd  { display:flex; align-items:center; gap:8px; margin-bottom:8px; }
+.lw-insight-ic  { font-size:15px; }
+.lw-insight-tag { font-family:var(--fm); font-size:10px; letter-spacing:.09em; text-transform:uppercase; font-weight:700; color:var(--accent-positive); }
+.lw-insight.amb .lw-insight-tag { color:var(--accent-warning); }
+.lw-insight.neg .lw-insight-tag { color:var(--accent-critical); }
+.lw-insight-body { font-size:13px; line-height:1.65; color:var(--text); }
+
+/* Event list */
+.lw-evt-list { display:flex; flex-direction:column; gap:7px; }
+.lw-evt {
+  background:var(--bg3); border:1px solid var(--border); border-left:3px solid var(--text3);
+  border-radius:7px; padding:9px 12px; display:flex; gap:11px; align-items:flex-start;
+}
+.lw-evt.trip       { border-left-color:#a3e635; }
+.lw-evt.pension    { border-left-color:var(--accent-warning); }
+.lw-evt.retirement { border-left-color:var(--accent-positive); }
+.lw-evt.warning    { border-left-color:var(--accent-critical); }
+.lw-evt-ic    { font-size:15px; line-height:1; flex-shrink:0; padding-top:1px; }
+.lw-evt-body  { flex:1; min-width:0; }
+.lw-evt-title { font-size:13px; font-weight:700; color:var(--text); line-height:1.3; }
+.lw-evt-sub   { font-size:11px; color:var(--text2); margin-top:2px; line-height:1.5; }
+.lw-evt-when  { font-family:var(--fm); font-size:10px; color:var(--text3); margin-top:2px; letter-spacing:.03em; }
+
+.lw-foot-hint {
+  margin-top:14px; padding:11px 14px;
+  background:var(--bg2); border:1px dashed var(--border);
+  border-radius:var(--r); font-size:11px; color:var(--text2);
+  line-height:1.55; display:flex; gap:9px; align-items:flex-start;
+}
+.lw-foot-hint code { font-family:var(--fm); font-size:10px; background:var(--bg3); padding:1px 5px; border-radius:3px; }
+
+@media (prefers-reduced-motion: reduce) {
+  .lw-brick { transition:none; }
+  .lw-brick.red { transform:none; }
+  .lw-brick.red:hover { transform:translateY(-2px); }
+}
+
 /* ── VAULT — library layout ─────────────────────────────────────────── */
 .vault-grid { display:grid; grid-template-columns:380px 1fr; gap:16px; align-items:start; }
 @media (max-width:1000px){ .vault-grid { grid-template-columns:1fr; } }
@@ -3544,6 +3714,7 @@ body.light .piq-country-menu { box-shadow:0 12px 28px -10px rgba(60,40,10,0.22);
       <div class="sb-section" data-i18n="sb.group.planning">PLANNING</div>
       <div class="nav-item" data-panel="funfund" onclick="nav('funfund')"><span class="nav-icon">✦</span><span class="nav-lbl" data-i18n="panel.funfund">Fun Fund</span></div>
       <div class="nav-item" data-panel="retireanywhere" onclick="nav('retireanywhere')"><span class="nav-icon">🌍</span><span class="nav-lbl" data-i18n="panel.retireanywhere">Retire Anywhere</span></div>
+      <div class="nav-item" data-panel="lifewall" onclick="nav('lifewall')"><span class="nav-icon">🧱</span><span class="nav-lbl">Life Wall</span></div>
       <div class="nav-item" data-panel="propiq" onclick="nav('propiq')"><span class="nav-icon">🏠</span><span class="nav-lbl" data-i18n="panel.propiq">Property IQ</span></div>
 
       <div class="sb-sep"></div>
@@ -3580,6 +3751,7 @@ body.light .piq-country-menu { box-shadow:0 12px 28px -10px rgba(60,40,10,0.22);
       <div class="panel" id="panel-retirement"></div>
       <div class="panel" id="panel-funfund"></div>
       <div class="panel" id="panel-retireanywhere"></div>
+      <div class="panel" id="panel-lifewall"></div>
       <div class="panel" id="panel-propiq"></div>
       <div class="panel" id="panel-journal"></div>
       <div class="panel" id="panel-vault"></div>
@@ -6528,6 +6700,186 @@ function getRetirementNumbers() {
   });
 }
 
+// ─── LIFE WALL DATA LAYER ────────────────────────────────────────────────────
+// Builds the array of 2-year brick objects that drives the Life Wall panel.
+// Chains getProjection() for accumulation years and getRetirementNumbers()
+// ._simResult for retirement years — never reimplements compounding or
+// drawdown math.
+function _lwBuildInsight({ verdict, anyDepleted, anyShortfall, isRetTransition,
+  hasPensionStart, tripDisruptive, isCurrent, inRetirement, savingsRate,
+  windowEvents, retAge, startAge, endAge, totalExp, pensionAvgMonthly }) {
+  const parts = [];
+  if (isCurrent) {
+    parts.push("You're in this window right now. Your Monthly Review figures drive these numbers directly — any change you save shows up here immediately.");
+  }
+  if (anyDepleted) {
+    const cov = totalExp > 0 ? Math.round((pensionAvgMonthly / totalExp) * 100) : 0;
+    parts.push(`<strong>Portfolio depleted.</strong> By age ${startAge}–${endAge} the investment accounts are projected to reach zero. Pension income covers roughly ${cov}% of retirement expenses — the remainder is a structural shortfall. Increasing contributions now or reducing the retirement expense target are the two highest-leverage levers.`);
+  } else if (anyShortfall) {
+    parts.push(`<strong>Income shortfall.</strong> Pension income alone doesn't cover projected expenses in this window. Review your pension payout figures in Settings → External Assets, or adjust the retirement expense scenario.`);
+  } else if (isRetTransition) {
+    const covPct = totalExp > 0 ? Math.round((pensionAvgMonthly / totalExp) * 100) : 0;
+    parts.push(`<strong>Retirement transition.</strong> Your salary ends and portfolio drawdown begins here. Pension income covers ${covPct}% of your retirement expenses — the portfolio tops up the rest. Sequence-of-returns risk peaks in the first 3–5 years of retirement; a market downturn in this window has an outsized long-term impact.`);
+  } else if (hasPensionStart) {
+    const pNames = windowEvents.filter(e => e.type === 'pension').map(e => e.title.replace(' begins', '')).join(', ');
+    parts.push(`<strong>Pension activation.</strong> ${pNames} starts in this window, reducing the portfolio withdrawal burden from this point forward.`);
+  } else if (tripDisruptive) {
+    const tripTotal = windowEvents.filter(e => e.type === 'trip').reduce((s, e) => s + e.amount, 0);
+    const tripNames = [...new Set(windowEvents.filter(e => e.type === 'trip').map(e => e.title))].join(', ');
+    parts.push(`<strong>High planned spend.</strong> ${tripNames} — totalling ${fmtC(tripTotal)} — represents a significant draw in this window. A cost overrun flows directly into the next window's starting balance.`);
+  } else if (inRetirement) {
+    parts.push(`Portfolio withdrawals are within the sustainable range. Pension covers a meaningful share of expenses and the balance is holding steady.`);
+  } else {
+    parts.push(`Accumulation phase on track — ${savingsRate}% of income saved, compounding at ${state.growthRate || 7}% nominal.`);
+  }
+  const nonRetEvts = windowEvents.filter(e => e.type !== 'retirement').length;
+  if (nonRetEvts > 0 && !isCurrent) {
+    parts.push(`<strong>${nonRetEvts} planned event${nonRetEvts > 1 ? 's' : ''}</strong> in this window — see the events list below.`);
+  }
+  return parts.join('<br><br>');
+}
+
+function getLifeWallData() {
+  return memoSelect('lifewall', () => {
+    const proj    = getProjection();
+    const nums    = getRetirementNumbers();
+    const sim     = nums._simResult;
+    const retAge  = state.retirementAge;
+    const lifeExp = state.lifeExp || 90;
+    const inf     = (state.inflationRate || 2) / 100;
+    const retYear = CY + Math.max(0, retAge - state.currentAge);
+
+    // ── Events from real state ──────────────────────────────────────────
+    const eventsByYear = {};
+    const addEvt = (yr, evt) => {
+      if (!isFinite(yr)) return;
+      (eventsByYear[yr] = eventsByYear[yr] || []).push(evt);
+    };
+
+    // Group each trip's expenses by year so a multi-expense trip (flights
+    // + hotel booked in the same year) appears as one event entry, not two.
+    (state.trips || []).forEach(trip => {
+      const byYear = {};
+      (trip.expenses || []).forEach(exp => {
+        if (!exp.date) return;
+        const yr = parseInt(exp.date.split('-')[0], 10);
+        if (!isFinite(yr)) return;
+        if (!byYear[yr]) byYear[yr] = { total: 0, items: [] };
+        byYear[yr].total += (exp.amount || 0);
+        byYear[yr].items.push(exp.name);
+      });
+      Object.entries(byYear).forEach(([yr, g]) => {
+        const y = Number(yr);
+        addEvt(y, { type:'trip', icon: trip.icon || '✈️',
+          title: trip.name,
+          sub: g.items.length === 1 ? `${g.items[0]} · ${fmtC(g.total)}` : `${fmtC(g.total)} across ${g.items.length} items`,
+          when: String(yr), year: y, amount: g.total });
+      });
+    });
+
+    getPensionAssets().forEach(p => {
+      const pAge = p.startAge ?? retAge;
+      const yr   = CY + (pAge - state.currentAge);
+      addEvt(yr, { type:'pension', icon:'🏛', title:`${p.name} begins`,
+        sub:`${fmt(p.monthlyPayout || 0)}/mo`, when:`Age ${pAge}`, year: yr, amount: 0 });
+    });
+
+    addEvt(retYear, { type:'retirement', icon:'🌅', title:'Retirement',
+      sub:`Age ${retAge} — portfolio drawdown begins`, when: String(retYear), year: retYear, amount: 0 });
+
+    // ── Build unified year list ─────────────────────────────────────────
+    const yearMap = {};
+
+    proj.forEach(p => {
+      const annualIncome   = getEffective(p.year, 0).income   * 12;
+      const annualExpenses = getEffective(p.year, 0).expenses * 12;
+      yearMap[p.year] = { year: p.year, age: p.age,
+        netWorth: p.total, realNetWorth: p.realTotal,
+        inRetirement: false, depleted: false, shortfall: 0,
+        actualIncome: annualIncome, annualExpenses, annualContrib: p.yearlyContrib };
+    });
+
+    if (sim) {
+      sim.labels.forEach((age, i) => {
+        const yr          = retYear + (age - retAge);
+        const yearsOut    = Math.max(0, yr - CY);
+        const realFactor  = Math.pow(1 + inf, yearsOut);
+        yearMap[yr] = { year: yr, age,
+          netWorth: sim.balData[i], realNetWorth: Math.round(sim.balData[i] / realFactor),
+          inRetirement: true, depleted: sim.depletedFlag[i], shortfall: sim.shortfall[i],
+          actualIncome: sim.actualIncome[i], annualExpenses: Math.round(nums.totalExp * 12),
+          annualContrib: 0 };
+      });
+    }
+
+    const sortedYears = Object.values(yearMap).sort((a, b) => a.year - b.year);
+
+    // ── 2-year bricks ──────────────────────────────────────────────────
+    const bricks = [];
+    for (let i = 0; i < sortedYears.length; i += 2) {
+      const slice = sortedYears.slice(i, i + 2);
+      if (!slice.length) break;
+      const start = slice[0];
+      const end   = slice[slice.length - 1];
+
+      const anyDepleted     = slice.some(y => y.depleted);
+      const anyShortfall    = slice.some(y => y.shortfall > 0);
+      const isRetTransition = slice.some(y => y.age === retAge - 1 || y.age === retAge);
+      const isCurrent       = slice.some(y => y.year === CY);
+      const allRetired      = slice.every(y => y.inRetirement);
+
+      const windowEvents = [];
+      slice.forEach(y => (eventsByYear[y.year] || []).forEach(e => windowEvents.push(e)));
+      const hasPensionStart = windowEvents.some(e => e.type === 'pension');
+
+      const avgAnnualContrib = slice.reduce((s, y) => s + y.annualContrib, 0) / slice.length;
+      const windowTripSpend  = windowEvents.filter(e => e.type === 'trip').reduce((s, e) => s + e.amount, 0);
+      const tripDisruptive   = !allRetired && avgAnnualContrib > 0 && windowTripSpend > avgAnnualContrib * 0.5;
+
+      let verdict, verdictReason;
+      if      (anyDepleted)     { verdict = 'red';   verdictReason = 'Portfolio depletion'; }
+      else if (anyShortfall)    { verdict = 'red';   verdictReason = 'Income shortfall'; }
+      else if (isRetTransition) { verdict = 'amber'; verdictReason = 'Retirement transition'; }
+      else if (hasPensionStart) { verdict = 'amber'; verdictReason = 'Pension begins'; }
+      else if (tripDisruptive)  { verdict = 'amber'; verdictReason = 'High planned spend'; }
+      else                      { verdict = 'green'; verdictReason = 'On track'; }
+
+      let badge = null;
+      if      (isCurrent)                        badge = { cls:'now',  text:'NOW' };
+      else if (isRetTransition)                   badge = { cls:'ret',  text:'RETIRE' };
+      else if (end.age >= lifeExp - 1)            badge = { cls:'life', text:'LIFE EXP.' };
+
+      const avgIncome   = Math.round(slice.reduce((s, y) => s + y.actualIncome,   0) / slice.length);
+      const avgExpenses = Math.round(slice.reduce((s, y) => s + y.annualExpenses,  0) / slice.length);
+      const avgContrib  = Math.round(avgAnnualContrib);
+      const savingsRate = avgIncome > 0 ? Math.round(avgContrib / avgIncome * 100) : 0;
+
+      const insight = _lwBuildInsight({
+        verdict, anyDepleted, anyShortfall, isRetTransition, hasPensionStart,
+        tripDisruptive, isCurrent, inRetirement: allRetired, savingsRate,
+        windowEvents, retAge, startAge: start.age, endAge: end.age,
+        totalExp: nums.totalExp, pensionAvgMonthly: nums.pensionAvgMonthly,
+      });
+
+      bricks.push({
+        startYear: start.year, endYear: end.year,
+        startAge: start.age,   endAge: end.age,
+        isCurrent, verdict, verdictReason, badge,
+        startNetWorth: start.netWorth, endNetWorth: end.netWorth,
+        realEndNetWorth: end.realNetWorth,
+        avgIncome, avgExpenses, avgContrib, savingsRate,
+        inRetirement: allRetired, anyDepleted, anyShortfall,
+        events: windowEvents,
+        years: slice.map(y => ({ year: y.year, age: y.age,
+          netWorth: y.netWorth, realNetWorth: y.realNetWorth })),
+        insight,
+      });
+    }
+
+    return bricks;
+  });
+}
+
 function getMonthlyFunFundBalance() {
   // GROSS 12-month Fun Fund capacity — the headline figure every
   // "12-month Fun Fund" label across the app refers to. Equivalent to
@@ -7427,7 +7779,7 @@ function scoreLocation(loc) {
 // KPI cards continue to work — they redirect into `review` with the right
 // scope preset inside nav(). The Forecast & Review tab is the new unified
 // home for both views.
-const VALID_PANELS = ['dashboard','transactions','review','monthly','yearly','retirement','funfund','retireanywhere','propiq','journal','vault','settings'];
+const VALID_PANELS = ['dashboard','transactions','review','monthly','yearly','retirement','funfund','retireanywhere','lifewall','propiq','journal','vault','settings'];
 let _navFromHash = false;
 function parseHash() {
   const raw = (location.hash||'').replace(/^#/,'');
@@ -7873,6 +8225,7 @@ function renderPanel(panel) {
     retirement:renderRetirement,
     funfund:renderFunFund,
     retireanywhere:renderRetireAnywhere,
+    lifewall:renderLifeWall,
     propiq:typeof renderPropIQ==='function'?renderPropIQ:null,
     journal:renderJournal,
     vault:renderVault,
@@ -7894,6 +8247,7 @@ const PANEL_META = {
   retirement:     {label:'Retirement Plan',  group:'Personal Finances', icon:'🌅'},
   funfund:        {label:'Fun Fund',         group:'Planning',          icon:'✦'},
   retireanywhere: {label:'Retire Anywhere',  group:'Planning',          icon:'🌍'},
+  lifewall:       {label:'Life Wall',        group:'Planning',          icon:'🧱'},
   propiq:         {label:'Property IQ',      group:'Planning',          icon:'🏠'},
   journal:        {label:'Journal',          group:'Library',           icon:'📓'},
   vault:          {label:'Vault',            group:'Library',           icon:'🗄'},
@@ -7908,8 +8262,9 @@ const RELATED_MAP = {
   yearly:         ['review','retirement','funfund'],
   retirement:     ['retireanywhere','review','funfund'],
   funfund:        ['review','retireanywhere','dashboard'],
-  retireanywhere: ['retirement','propiq','vault'],
-  propiq:         ['retireanywhere','retirement','vault'],
+  retireanywhere: ['lifewall','retirement','propiq'],
+  lifewall:       ['retirement','retireanywhere','review'],
+  propiq:         ['lifewall','retireanywhere','retirement'],
   journal:        ['dashboard','review','retirement'],
   vault:          ['retireanywhere','retirement','propiq'],
   settings:       ['dashboard','retirement','transactions'],
@@ -12832,6 +13187,317 @@ window.updateTripExpense = function(tripId, expenseId, field, val){
   ex[field] = (field === 'amount') ? (parseNum(val) || 0) : val;
   save();
 };
+
+// ══ LIFE WALL ════════════════════════════════════════════════════════════════
+let _lwBricks = [];
+let _lwActiveBrick = null;
+
+function lwOpenBrick(idx) {
+  const b = _lwBricks[idx];
+  if (!b) return;
+  _lwActiveBrick = b;
+
+  // ── Header ────────────────────────────────────────────────────────
+  const toneBar  = document.getElementById('lw-tone-bar');
+  const eyebrow  = document.getElementById('lw-so-eyebrow');
+  const titleEl  = document.getElementById('lw-so-title');
+  const subEl    = document.getElementById('lw-so-sub');
+  const hintEl   = document.getElementById('lw-so-hint');
+  if (!toneBar) return;
+
+  toneBar.className = 'lw-tone-bar ' + b.verdict;
+  eyebrow.textContent = (b.badge ? b.badge.text + ' · ' : '') + b.verdictReason.toUpperCase();
+  titleEl.textContent = b.startYear + '–' + b.endYear + ' · Age ' + b.startAge + '–' + b.endAge;
+  subEl.textContent   = b.inRetirement
+    ? 'Retirement drawdown phase.' + (b.events.filter(e=>e.type!=='retirement').length ? ' ' + b.events.filter(e=>e.type!=='retirement').length + ' planned event(s).' : '')
+    : 'Accumulation phase · ' + b.savingsRate + '% of income saved.' + (b.events.filter(e=>e.type!=='retirement').length ? ' ' + b.events.filter(e=>e.type!=='retirement').length + ' planned event(s).' : '');
+
+  hintEl.textContent = b.inRetirement
+    ? 'Edit opens the last pre-retirement year in the Yearly Forecast.'
+    : 'Adjust income, expenses, or plan major events in the yearly view.';
+
+  // ── Stat grid ─────────────────────────────────────────────────────
+  const nwTone     = b.verdict === 'red' ? 'neg' : b.verdict === 'amber' ? 'amb' : 'pos';
+  const flowAmt    = b.inRetirement ? b.avgIncome - b.avgExpenses : b.avgContrib;
+  const flowTone   = flowAmt >= 0 ? 'pos' : 'neg';
+  const flowLbl    = b.inRetirement ? 'Net flow · avg' : 'Savings · avg';
+  const flowSub    = b.inRetirement
+    ? (flowAmt >= 0 ? 'Monthly surplus' : 'Monthly shortfall')
+    : b.savingsRate + '% of income';
+
+  const statGrid = `
+    <div class="retire-so-fact-grid">
+      <div class="retire-so-fact">
+        <div class="retire-so-fact-lbl">Net worth · today's money</div>
+        <div class="retire-so-fact-val ${nwTone}">${fmtC(b.realEndNetWorth)}</div>
+        <div style="font-family:var(--fm);font-size:10px;color:var(--text3);margin-top:2px">Nominal: ${fmtC(b.endNetWorth)}</div>
+      </div>
+      <div class="retire-so-fact">
+        <div class="retire-so-fact-lbl">${b.inRetirement ? 'Retirement income · avg' : 'Income · avg'}</div>
+        <div class="retire-so-fact-val">${fmtC(b.avgIncome)}/yr</div>
+        <div style="font-family:var(--fm);font-size:10px;color:var(--text3);margin-top:2px">${fmtC(Math.round(b.avgIncome/12))}/mo</div>
+      </div>
+      <div class="retire-so-fact">
+        <div class="retire-so-fact-lbl">Expenses · avg</div>
+        <div class="retire-so-fact-val">${fmtC(b.avgExpenses)}/yr</div>
+        <div style="font-family:var(--fm);font-size:10px;color:var(--text3);margin-top:2px">${fmtC(Math.round(b.avgExpenses/12))}/mo</div>
+      </div>
+      <div class="retire-so-fact">
+        <div class="retire-so-fact-lbl">${flowLbl}</div>
+        <div class="retire-so-fact-val ${flowTone}">${fmtC(Math.abs(flowAmt))}/yr</div>
+        <div style="font-family:var(--fm);font-size:10px;color:var(--text3);margin-top:2px">${esc2(flowSub)}</div>
+      </div>
+    </div>`;
+
+  // ── Insight card ──────────────────────────────────────────────────
+  const insightTone = b.verdict === 'green' ? '' : b.verdict === 'amber' ? 'amb' : 'neg';
+  const insightIcon = b.verdict === 'green' ? '✓' : b.verdict === 'amber' ? '⚠️' : '🚨';
+  const insightLbl  = b.verdict === 'green' ? 'Insight · On track'
+    : b.verdict === 'amber' ? 'Insight · Watch this window'
+    : 'Insight · Action needed';
+  const insightCard = `
+    <div class="lw-insight ${insightTone}">
+      <div class="lw-insight-hd">
+        <span class="lw-insight-ic">${insightIcon}</span>
+        <span class="lw-insight-tag">${esc2(insightLbl)}</span>
+      </div>
+      <div class="lw-insight-body">${b.insight}</div>
+    </div>`;
+
+  // ── Events list ───────────────────────────────────────────────────
+  const nonRetEvts = b.events.filter(e => e.type !== 'retirement');
+  const eventsHtml = nonRetEvts.length ? `
+    <div class="retire-so-section">
+      <div class="retire-so-section-hd">Planned events in this window · ${nonRetEvts.length}</div>
+      <div class="lw-evt-list">
+        ${nonRetEvts.map(e => `
+          <div class="lw-evt ${esc2(e.type)}">
+            <div class="lw-evt-ic">${e.icon}</div>
+            <div class="lw-evt-body">
+              <div class="lw-evt-title">${esc2(e.title)}</div>
+              <div class="lw-evt-sub">${esc2(e.sub)}</div>
+              <div class="lw-evt-when">${esc2(e.when)}</div>
+            </div>
+          </div>`).join('')}
+      </div>
+    </div>` : '';
+
+  // ── Year-by-year breakdown ────────────────────────────────────────
+  const yrRows = b.years.map(y =>
+    `<div class="retire-so-fact">
+      <div class="retire-so-fact-lbl">Year ${y.year} · Age ${y.age}</div>
+      <div class="retire-so-fact-val" style="font-size:13px">${fmtC(y.netWorth)}</div>
+      <div style="font-family:var(--fm);font-size:10px;color:var(--text3);margin-top:2px">Real: ${fmtC(y.realNetWorth)}</div>
+    </div>`).join('');
+
+  // ── Assemble body ─────────────────────────────────────────────────
+  document.getElementById('lw-so-body').innerHTML = `
+    <div class="retire-so-section">
+      <div class="retire-so-section-hd">Financial snapshot · end of window</div>
+      ${statGrid}
+    </div>
+    <div class="retire-so-section">
+      <div class="retire-so-section-hd">Insight</div>
+      ${insightCard}
+    </div>
+    ${eventsHtml}
+    <div class="retire-so-section">
+      <div class="retire-so-section-hd">Year-by-year · net worth</div>
+      <div class="retire-so-fact-grid" style="grid-template-columns:1fr 1fr">${yrRows}</div>
+    </div>`;
+
+  // ── Open panel ────────────────────────────────────────────────────
+  const so = document.getElementById('lw-slideover');
+  const bd = document.getElementById('lw-backdrop');
+  so.classList.add('open');
+  bd.classList.add('open');
+  so.setAttribute('aria-hidden', 'false');
+  // Scroll body to top on open
+  const body = document.getElementById('lw-so-body');
+  if (body) body.scrollTop = 0;
+}
+
+function renderLifeWall() {
+  const bricks = getLifeWallData();
+  _lwBricks = bricks;
+
+  // ── Summary stats ───────────────────────────────────────────────────
+  const total      = bricks.length;
+  const nGreen     = bricks.filter(b => b.verdict === 'green').length;
+  const nAmber     = bricks.filter(b => b.verdict === 'amber').length;
+  const nRed       = bricks.filter(b => b.verdict === 'red').length;
+  const integrityPct = total > 0 ? Math.round(nGreen / total * 100) : 100;
+  const intTone    = integrityPct >= 90 ? '' : integrityPct >= 70 ? 'amb' : 'neg';
+  const intColor   = integrityPct >= 90 ? 'var(--accent-positive)' : integrityPct >= 70 ? 'var(--accent-warning)' : 'var(--accent-critical)';
+
+  const firstAmber = bricks.find(b => b.verdict === 'amber');
+  const firstRed   = bricks.find(b => b.verdict === 'red');
+  const nowBrick   = bricks.find(b => b.isCurrent);
+  const lifeBrick  = bricks.find(b => b.badge?.cls === 'life');
+
+  const ageRange   = nowBrick && lifeBrick
+    ? `Age ${nowBrick.startAge} → ${lifeBrick.endAge}`
+    : `${total} × 2-yr bricks`;
+  const yearRange  = nowBrick && lifeBrick
+    ? `${nowBrick.startYear} → ${lifeBrick.endYear} · ${total} bricks`
+    : `${total} bricks`;
+
+  const today = new Date();
+  const monthStr = today.toLocaleString('en', {month:'short',year:'numeric'}).toUpperCase();
+
+  // ── Render ──────────────────────────────────────────────────────────
+  const BRICKS_PER_ROW = 6;
+  const rows = [];
+  for (let i = 0; i < bricks.length; i += BRICKS_PER_ROW) {
+    rows.push(bricks.slice(i, i + BRICKS_PER_ROW).map((b, colIdx) => ({b, idx: i + colIdx})));
+  }
+
+  const brickRows = rows.map((row, rowIdx) => {
+    const offsetCls = rowIdx % 2 === 1 ? ' offset' : '';
+    const cells = row.map(({b, idx}) => {
+      const nonRetEvts = b.events.filter(e => e.type !== 'retirement');
+      const firstEvt   = nonRetEvts[0];
+      const extraEvts  = nonRetEvts.length - 1;
+
+      const savingsCls = b.inRetirement
+        ? (b.verdict === 'green' ? 'pos' : b.verdict === 'amber' ? 'amb' : 'neg')
+        : (b.savingsRate > 20 ? 'pos' : b.savingsRate > 10 ? 'amb' : 'neg');
+      const savingsLbl = b.inRetirement
+        ? (b.anyDepleted ? 'Depleted' : 'Drawdown')
+        : `${b.savingsRate}% saved`;
+
+      const warnIcon = b.verdict === 'amber' && !b.badge
+        ? `<span class="lw-b-warn">⚠</span>` : '';
+
+      return `<button class="lw-brick ${b.verdict}${b.isCurrent ? ' current' : ''}"
+          onclick="lwOpenBrick(${idx})"
+          aria-label="${esc2(b.startYear + '–' + b.endYear + ', Age ' + b.startAge + '–' + b.endAge + ', ' + b.verdictReason)}">
+        ${warnIcon}
+        <div class="lw-b-head">
+          <div>
+            <div class="lw-b-years">${b.startYear}–${b.endYear}</div>
+            <div class="lw-b-ages">Age ${b.startAge}–${b.endAge}</div>
+          </div>
+          ${b.badge ? `<span class="lw-b-badge ${b.badge.cls}">${b.badge.text}</span>` : ''}
+        </div>
+        <div class="lw-b-networth">
+          <span class="lw-b-nw-lbl">Net worth · real</span>
+          ${fmtC(b.realEndNetWorth)}
+        </div>
+        <div class="lw-b-foot">
+          <span class="lw-b-savings ${savingsCls}">${esc2(savingsLbl)}</span>
+          ${firstEvt
+            ? `<span class="lw-b-event">${firstEvt.icon}${extraEvts > 0 ? `<span>+${extraEvts}</span>` : ''}</span>`
+            : ''}
+        </div>
+      </button>`;
+    }).join('');
+    return `<div class="lw-brick-row${offsetCls}">${cells}</div>`;
+  }).join('');
+
+  document.getElementById('panel-lifewall').innerHTML = `
+    ${ui.ph({
+      tag: 'PLANNING · LIFE WALL',
+      titleHtml: 'Your life, brick by brick.',
+      sub: 'Each brick covers a 2-year window of your projected financial life. Green means you\'re on track. Amber flags a disturbance. Red means the wall can\'t hold — portfolio shortfall or depletion. Click any brick for the detail panel.',
+    })}
+
+    <div class="lw-summary">
+      <div class="lw-kpi ${intTone}">
+        <div class="lw-kpi-lbl">Wall Integrity</div>
+        <div class="lw-kpi-val" style="color:${intColor}">${integrityPct}%</div>
+        <div class="lw-kpi-sub">${nGreen} green · ${nAmber} amber · ${nRed} red</div>
+      </div>
+      <div class="lw-kpi">
+        <div class="lw-kpi-lbl">Time Horizon</div>
+        <div class="lw-kpi-val">${esc2(ageRange)}</div>
+        <div class="lw-kpi-sub">${esc2(yearRange)}</div>
+      </div>
+      ${firstAmber ? `
+      <div class="lw-kpi amb">
+        <div class="lw-kpi-lbl">First Disturbance</div>
+        <div class="lw-kpi-val" style="color:var(--accent-warning)">Age ${firstAmber.startAge}–${firstAmber.endAge}</div>
+        <div class="lw-kpi-sub">${esc2(firstAmber.verdictReason)}</div>
+      </div>` : ''}
+      ${firstRed ? `
+      <div class="lw-kpi neg">
+        <div class="lw-kpi-lbl">Structural Risk</div>
+        <div class="lw-kpi-val" style="color:var(--accent-critical)">Age ${firstRed.startAge}–${firstRed.endAge}</div>
+        <div class="lw-kpi-sub">${esc2(firstRed.verdictReason)}</div>
+      </div>` : `
+      <div class="lw-kpi">
+        <div class="lw-kpi-lbl">Structural Risk</div>
+        <div class="lw-kpi-val" style="color:var(--accent-positive)">None detected</div>
+        <div class="lw-kpi-sub">Portfolio sustains to life expectancy</div>
+      </div>`}
+    </div>
+
+    <div class="lw-legend">
+      <span class="lw-leg-item"><span class="lw-leg-sw green"></span>On track — portfolio covers lifestyle</span>
+      <span class="lw-leg-item"><span class="lw-leg-sw amber"></span>Disturbance — coverage tight or transitioning</span>
+      <span class="lw-leg-item"><span class="lw-leg-sw red"></span>Structural failure — shortfall or depletion</span>
+      <span class="lw-leg-hint">Click any brick for detail · Esc closes</span>
+    </div>
+
+    <div class="lw-wall">
+      <div class="lw-wall-marker">
+        <span class="lw-dot"></span>
+        <span>TODAY · ${monthStr} · AGE ${state.currentAge}</span>
+      </div>
+      <div class="lw-brick-rows">${brickRows}</div>
+      <div class="lw-foot-hint">
+        <span>💡</span>
+        <div><strong>How bricks are scored:</strong> accumulation years pull from <code>getProjection()</code>; retirement years from <code>_simulateRetirementYears()</code>. A brick turns red if any year in the window shows portfolio depletion or a shortfall. Amber covers the retirement-transition period, pension activations, and windows with high planned spend.</div>
+      </div>
+    </div>
+
+    <div class="retire-slideover-backdrop" id="lw-backdrop" onclick="lwClosePanel()"></div>
+    <div class="retire-slideover" id="lw-slideover" role="dialog" aria-modal="true" aria-hidden="true">
+      <div class="retire-so-head" id="lw-so-head">
+        <div class="retire-so-head-main">
+          <div class="lw-tone-bar" id="lw-tone-bar"></div>
+          <div class="retire-so-head-text">
+            <div class="retire-so-sub" id="lw-so-eyebrow">LIFE CHAPTER</div>
+            <div class="retire-so-title" id="lw-so-title">—</div>
+            <div class="retire-so-sub" id="lw-so-sub" style="margin-top:4px">—</div>
+          </div>
+        </div>
+        <button class="retire-so-close" onclick="lwClosePanel()" aria-label="Close">✕</button>
+      </div>
+      <div class="retire-so-body" id="lw-so-body"></div>
+      <div class="retire-so-footer">
+        <div class="retire-so-footer-hint" id="lw-so-hint">Adjust income, expenses, or plan major events in the yearly view.</div>
+        <div class="retire-so-footer-actions">
+          <button class="btn btn-o" onclick="lwClosePanel()">Close</button>
+          <button class="btn btn-g" id="lw-edit-btn" onclick="lwEditYear()">✎ Edit in Yearly</button>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function lwClosePanel() {
+  const so = document.getElementById('lw-slideover');
+  const bd = document.getElementById('lw-backdrop');
+  if (!so || !bd) return;
+  so.classList.remove('open');
+  bd.classList.remove('open');
+  so.setAttribute('aria-hidden', 'true');
+}
+
+function lwEditYear() {
+  const b = _lwActiveBrick;
+  if (!b) return;
+  lwClosePanel();
+  const retireYear = CY + Math.max(0, state.retirementAge - state.currentAge);
+  state.selectedYear = Math.min(b.startYear, retireYear);
+  nav('yearly');
+}
+
+// Escape-key handler — only active when panel is open
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') lwClosePanel();
+});
 
 // ══ RETIRE ANYWHERE ══════════════════════════════════════════════════════════
 let retireMap=null;
