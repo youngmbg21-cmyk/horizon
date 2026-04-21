@@ -2511,7 +2511,7 @@ body.light .retire-slideover { box-shadow:-10px 0 32px -10px rgba(60,40,10,0.25)
 @media (max-width:900px) { .lw-brick-row.offset { padding-right:0; } }
 
 .lw-brick {
-  flex:1 1 155px; min-width:155px; max-width:220px; min-height:100px;
+  flex:1 1 155px; min-width:155px; max-width:220px; height:145px;
   padding:9px 11px 10px; border-radius:7px; border:1px solid;
   cursor:pointer; position:relative; background:var(--bg2);
   display:flex; flex-direction:column; justify-content:space-between;
@@ -13419,11 +13419,8 @@ function renderLifeWall() {
         <div class="lw-b-networth">
           <span class="lw-b-nw-lbl">Net worth</span>
           ${fmtC(FE.display.scaleReal(b.realEndNetWorth, b.endYear - CY))}
+          ${b.inRetirement && b.pensionAnnual > 0 ? `<div style="margin-top:3px"><span class="lw-b-nw-lbl">Annual pension</span><div style="font-family:var(--fm);font-size:12px;font-weight:700;color:var(--text1);line-height:1.15">${fmtC(FE.display.scaleReal(b.pensionAnnual, b.endYear - CY))}</div></div>` : ''}
         </div>
-        ${b.inRetirement && b.pensionAnnual > 0 ? `<div style="margin-top:4px">
-          <span class="lw-b-nw-lbl">Annual pension</span>
-          <div style="font-family:var(--fm);font-size:12px;font-weight:700;color:var(--text1);line-height:1.15">${fmtC(FE.display.scaleReal(b.pensionAnnual, b.endYear - CY))}</div>
-        </div>` : ''}
         <div class="lw-b-foot">
           <span class="lw-b-savings ${savingsCls}">${esc2(savingsLbl)}</span>
           ${firstEvt
