@@ -13428,12 +13428,10 @@ function renderLifeWall() {
           </div>
           ${b.badge ? `<span class="lw-b-badge ${b.badge.cls}">${b.badge.text}</span>` : ''}
         </div>
-        <div style="display:flex;gap:10px;align-items:flex-start">
-          <div class="lw-b-networth">
-            <span class="lw-b-nw-lbl">Net worth</span>
-            ${fmtC(FE.display.scaleReal(b.realEndNetWorth, b.endYear - CY))}
-          </div>
-          ${b.inRetirement && b.pensionAnnual > 0 ? `<div class="lw-b-networth" style="color:var(--cyan);font-size:12px"><span class="lw-b-nw-lbl">Annual pension</span>${fmtC(FE.display.scaleReal(b.pensionAnnual, b.endYear - CY))}</div>` : ''}
+        <div class="lw-b-networth">
+          <span class="lw-b-nw-lbl">Net worth</span>
+          ${fmtC(FE.display.scaleReal(b.realEndNetWorth, b.endYear - CY))}
+          ${b.inRetirement && b.pensionAnnual > 0 ? `<span style="display:block;font-size:9px;color:var(--cyan);font-family:var(--fm);font-weight:600;white-space:nowrap;margin-top:2px">${fmtC(FE.display.scaleReal(b.pensionAnnual, b.endYear - CY))}/yr pension</span>` : ''}
         </div>
         <div class="lw-b-foot">
           <span class="lw-b-savings ${savingsCls}">${esc2(savingsLbl)}</span>
