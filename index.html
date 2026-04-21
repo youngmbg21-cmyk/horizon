@@ -15880,7 +15880,14 @@ function aipRenderActiveThread(){
       return;
     }
     if(side === 'bot'){
-      wrap.innerHTML = `${labelHtml}<div class="${bubbleClass}">${mdParse(String(m.content || ''))}</div>`;
+      const msgIdx = _aiChartMsgCounter++;
+      const { text: cleaned, blocks } = _extractAIChartBlocks(String(m.content || ''), msgIdx);
+      let rendered = mdParse(cleaned);
+      if(blocks.length) rendered = _inlineAIChartPlaceholders(rendered, blocks);
+      wrap.innerHTML = `${labelHtml}<div class="${bubbleClass}">${rendered}</div>`;
+      msgs.appendChild(wrap);
+      if(blocks.length) _renderAIChartBlocks(wrap.querySelector('.ai-msg'), blocks);
+      return;
     } else {
       wrap.innerHTML = `<div class="${bubbleClass}">${esc(String(m.content || ''))}</div>`;
     }
