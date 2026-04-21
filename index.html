@@ -3709,12 +3709,12 @@ body.light .piq-country-menu { box-shadow:0 12px 28px -10px rgba(60,40,10,0.22);
       <div class="nav-item" data-panel="transactions" onclick="nav('transactions')"><span class="nav-icon">🏦</span><span class="nav-lbl" data-i18n="panel.transactions">Bank & Transactions</span></div>
       <div class="nav-item" data-panel="review" onclick="nav('review')"><span class="nav-icon">▦</span><span class="nav-lbl" data-i18n="panel.review">Forecast & Review</span></div>
       <div class="nav-item" data-panel="retirement" onclick="nav('retirement')"><span class="nav-icon">🌅</span><span class="nav-lbl" data-i18n="panel.retirement">Retirement Plan</span></div>
+      <div class="nav-item" data-panel="lifewall" onclick="nav('lifewall')"><span class="nav-icon">🧱</span><span class="nav-lbl">Life Wall</span></div>
 
       <div class="sb-sep"></div>
       <div class="sb-section" data-i18n="sb.group.planning">PLANNING</div>
       <div class="nav-item" data-panel="funfund" onclick="nav('funfund')"><span class="nav-icon">✦</span><span class="nav-lbl" data-i18n="panel.funfund">Fun Fund</span></div>
       <div class="nav-item" data-panel="retireanywhere" onclick="nav('retireanywhere')"><span class="nav-icon">🌍</span><span class="nav-lbl" data-i18n="panel.retireanywhere">Retire Anywhere</span></div>
-      <div class="nav-item" data-panel="lifewall" onclick="nav('lifewall')"><span class="nav-icon">🧱</span><span class="nav-lbl">Life Wall</span></div>
       <div class="nav-item" data-panel="propiq" onclick="nav('propiq')"><span class="nav-icon">🏠</span><span class="nav-lbl" data-i18n="panel.propiq">Property IQ</span></div>
 
       <div class="sb-sep"></div>
@@ -6739,8 +6739,9 @@ function _lwBuildInsight({ verdict, anyDepleted, anyShortfall, isRetTransition,
   return parts.join('<br><br>');
 }
 
-function getLifeWallData() {
-  return memoSelect('lifewall', () => {
+function getLifeWallData(gran) {
+  gran = gran || 2;
+  return memoSelect('lifewall:' + gran, () => {
     const proj    = getProjection();
     const nums    = getRetirementNumbers();
     const sim     = nums._simResult;
@@ -6805,7 +6806,10 @@ function getLifeWallData() {
         const yearsOut    = Math.max(0, yr - CY);
         const realFactor  = Math.pow(1 + inf, yearsOut);
         yearMap[yr] = { year: yr, age,
-          netWorth: sim.balData[i], realNetWorth: Math.round(sim.balData[i] / realFactor),
+          // sim.balData is in today's money (real) — nestEgg was realTotal,
+          // simulation uses the real rate. Nominal = real × cumulative inflation.
+          netWorth: Math.round(sim.balData[i] * realFactor),
+          realNetWorth: sim.balData[i],
           inRetirement: true, depleted: sim.depletedFlag[i], shortfall: sim.shortfall[i],
           actualIncome: sim.actualIncome[i], annualExpenses: Math.round(nums.totalExp * 12),
           annualContrib: 0 };
@@ -6814,10 +6818,10 @@ function getLifeWallData() {
 
     const sortedYears = Object.values(yearMap).sort((a, b) => a.year - b.year);
 
-    // ── 2-year bricks ──────────────────────────────────────────────────
+    // ── Bricks at `gran`-year windows ──────────────────────────────────
     const bricks = [];
-    for (let i = 0; i < sortedYears.length; i += 2) {
-      const slice = sortedYears.slice(i, i + 2);
+    for (let i = 0; i < sortedYears.length; i += gran) {
+      const slice = sortedYears.slice(i, i + gran);
       if (!slice.length) break;
       const start = slice[0];
       const end   = slice[slice.length - 1];
@@ -8247,7 +8251,7 @@ const PANEL_META = {
   retirement:     {label:'Retirement Plan',  group:'Personal Finances', icon:'🌅'},
   funfund:        {label:'Fun Fund',         group:'Planning',          icon:'✦'},
   retireanywhere: {label:'Retire Anywhere',  group:'Planning',          icon:'🌍'},
-  lifewall:       {label:'Life Wall',        group:'Planning',          icon:'🧱'},
+  lifewall:       {label:'Life Wall',        group:'Personal Finances', icon:'🧱'},
   propiq:         {label:'Property IQ',      group:'Planning',          icon:'🏠'},
   journal:        {label:'Journal',          group:'Library',           icon:'📓'},
   vault:          {label:'Vault',            group:'Library',           icon:'🗄'},
@@ -8262,9 +8266,9 @@ const RELATED_MAP = {
   yearly:         ['review','retirement','funfund'],
   retirement:     ['retireanywhere','review','funfund'],
   funfund:        ['review','retireanywhere','dashboard'],
-  retireanywhere: ['lifewall','retirement','propiq'],
-  lifewall:       ['retirement','retireanywhere','review'],
-  propiq:         ['lifewall','retireanywhere','retirement'],
+  retireanywhere: ['retirement','lifewall','propiq'],
+  lifewall:       ['retirement','review','retireanywhere'],
+  propiq:         ['retireanywhere','retirement','vault'],
   journal:        ['dashboard','review','retirement'],
   vault:          ['retireanywhere','retirement','propiq'],
   settings:       ['dashboard','retirement','transactions'],
@@ -13191,6 +13195,12 @@ window.updateTripExpense = function(tripId, expenseId, field, val){
 // ══ LIFE WALL ════════════════════════════════════════════════════════════════
 let _lwBricks = [];
 let _lwActiveBrick = null;
+let _lwGranularity = 2;
+
+function lwSetGranularity(n) {
+  _lwGranularity = n;
+  renderLifeWall();
+}
 
 function lwOpenBrick(idx) {
   const b = _lwBricks[idx];
@@ -13318,7 +13328,7 @@ function lwOpenBrick(idx) {
 }
 
 function renderLifeWall() {
-  const bricks = getLifeWallData();
+  const bricks = getLifeWallData(_lwGranularity);
   _lwBricks = bricks;
 
   // ── Summary stats ───────────────────────────────────────────────────
@@ -13395,12 +13405,21 @@ function renderLifeWall() {
     return `<div class="lw-brick-row${offsetCls}">${cells}</div>`;
   }).join('');
 
+  const granPicker = `<div style="display:flex;align-items:center;gap:10px;margin-bottom:16px">
+    <span style="font-family:var(--fm);font-size:9px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--text3)">Brick size</span>
+    <div style="display:flex;gap:3px;background:var(--bg2);border:1px solid var(--border);border-radius:7px;padding:3px">
+      ${[1,2,4,5,10].map(n => `<button class="mode-btn${_lwGranularity===n?' active':''}" onclick="lwSetGranularity(${n})">${n}yr</button>`).join('')}
+    </div>
+  </div>`;
+
   document.getElementById('panel-lifewall').innerHTML = `
     ${ui.ph({
-      tag: 'PLANNING · LIFE WALL',
+      tag: 'PERSONAL FINANCES · LIFE WALL',
       titleHtml: 'Your life, brick by brick.',
-      sub: 'Each brick covers a 2-year window of your projected financial life. Green means you\'re on track. Amber flags a disturbance. Red means the wall can\'t hold — portfolio shortfall or depletion. Click any brick for the detail panel.',
+      sub: `Each brick covers a ${_lwGranularity}-year window of your projected financial life. Green means you're on track. Amber flags a disturbance. Red means the wall can't hold — portfolio shortfall or depletion. Click any brick for the detail panel.`,
     })}
+
+    ${granPicker}
 
     <div class="lw-summary">
       <div class="lw-kpi ${intTone}">
