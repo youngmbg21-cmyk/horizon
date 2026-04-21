@@ -13591,8 +13591,7 @@ function renderLifeWall() {
     </div>
 
     <div class="retire-slideover-backdrop" id="lw-backdrop" onclick="lwClosePanel()"></div>
-    <div class="lw-modal" id="lw-slideover" role="dialog" aria-modal="true" aria-hidden="true">
-      <button class="lw-modal-close" onclick="lwClosePanel()" aria-label="Close">✕</button>
+    <div class="retire-slideover" id="lw-slideover" role="dialog" aria-modal="true" aria-hidden="true">
       <div class="retire-so-head" id="lw-so-head">
         <div class="retire-so-head-main">
           <div class="lw-tone-bar" id="lw-tone-bar"></div>
@@ -13602,11 +13601,13 @@ function renderLifeWall() {
             <div class="retire-so-sub" id="lw-so-sub" style="margin-top:4px">—</div>
           </div>
         </div>
+        <button class="retire-so-close" onclick="lwClosePanel()" aria-label="Close">✕</button>
       </div>
       <div class="retire-so-body" id="lw-so-body"></div>
       <div class="retire-so-footer">
         <div class="retire-so-footer-hint" id="lw-so-hint">Adjust income, expenses, or plan major events in the yearly view.</div>
         <div class="retire-so-footer-actions">
+          <button class="btn btn-o" onclick="lwClosePanel()">Close</button>
           <button class="btn btn-g" id="lw-edit-btn" onclick="lwEditYear()">✎ Edit in Yearly</button>
         </div>
       </div>
