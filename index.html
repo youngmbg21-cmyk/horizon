@@ -6886,6 +6886,7 @@ function getLifeWallData(gran) {
         startNetWorth: start.netWorth, endNetWorth: end.netWorth,
         realEndNetWorth: end.realNetWorth,
         avgIncome, avgExpenses, avgContrib, savingsRate, pensionCoversPct,
+        pensionAnnual: pensionAnnual,
         inRetirement: allRetired, anyDepleted, anyShortfall,
         events: windowEvents,
         years: slice.map(y => ({ year: y.year, age: y.age,
@@ -13398,7 +13399,7 @@ function renderLifeWall() {
         ? (b.verdict === 'green' ? 'pos' : b.verdict === 'amber' ? 'amb' : 'neg')
         : (b.savingsRate > 20 ? 'pos' : b.savingsRate > 10 ? 'amb' : 'neg');
       const savingsLbl = b.inRetirement
-        ? `${b.pensionCoversPct}% pension`
+        ? `${b.pensionCoversPct}% of expenses covered`
         : `${b.savingsRate}% saved`;
 
       const warnIcon = b.verdict === 'amber' && !b.badge
@@ -13419,6 +13420,10 @@ function renderLifeWall() {
           <span class="lw-b-nw-lbl">Net worth</span>
           ${fmtC(FE.display.scaleReal(b.realEndNetWorth, b.endYear - CY))}
         </div>
+        ${b.inRetirement && b.pensionAnnual > 0 ? `<div style="margin-top:4px">
+          <span class="lw-b-nw-lbl">Annual pension</span>
+          <div style="font-family:var(--fm);font-size:12px;font-weight:700;color:var(--text1);line-height:1.15">${fmtC(FE.display.scaleReal(b.pensionAnnual, b.endYear - CY))}</div>
+        </div>` : ''}
         <div class="lw-b-foot">
           <span class="lw-b-savings ${savingsCls}">${esc2(savingsLbl)}</span>
           ${firstEvt
