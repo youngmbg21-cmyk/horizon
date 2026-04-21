@@ -18790,6 +18790,12 @@ if(typeof state !== 'undefined' && state.piqCountry){
   piq_market  = piq_country;
 }
 
+// renderAll() runs before this script block is parsed, so renderPropIQ
+// was undefined at that point. Re-render now that it exists.
+if(typeof state !== 'undefined' && state.activePanel === 'propiq'){
+  renderPanel('propiq');
+}
+
 // propiq is now wired into renderPanel's fns map directly; we only need to
 // inject the Perplexity API key field when the user opens Settings.
 const _origNav = typeof nav === 'function' ? nav : null;
