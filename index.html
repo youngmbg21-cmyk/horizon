@@ -2541,6 +2541,7 @@ body.light .lw-modal {
 }
 .lw-summary > * { flex:1 1 0; min-width:0; }
 .lw-kpi {
+  flex:1 1 0; min-width:0;
   background:var(--bg2); border:1px solid var(--border);
   border-radius:var(--r); padding:13px 15px; position:relative; overflow:hidden;
 }
@@ -13541,7 +13542,7 @@ function renderLifeWall() {
 
     ${granPicker}
 
-    <div class="lw-summary">
+    <div class="lw-summary" style="display:flex;flex-direction:row;flex-wrap:nowrap;gap:10px;margin-bottom:14px">
       <div class="lw-kpi ${intTone}">
         <div class="lw-kpi-lbl">Wall Integrity</div>
         <div class="lw-kpi-val" style="color:${intColor}">${integrityPct}%</div>
