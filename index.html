@@ -2537,9 +2537,9 @@ body.light .lw-modal {
 .lw-modal-close:hover { background:var(--accent-critical-dim); border-color:var(--accent-critical); color:var(--accent-critical); }
 ══════════════════════════════════════════════════════════════════ */
 .lw-summary {
-  display:grid; grid-template-columns:repeat(4,1fr);
-  gap:10px; margin-bottom:14px;
+  display:flex; flex-direction:row; flex-wrap:nowrap; gap:10px; margin-bottom:14px;
 }
+.lw-summary > * { flex:1 1 0; min-width:0; }
 .lw-kpi {
   background:var(--bg2); border:1px solid var(--border);
   border-radius:var(--r); padding:13px 15px; position:relative; overflow:hidden;
