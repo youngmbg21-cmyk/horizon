@@ -66,6 +66,28 @@ body.light {
   --card-shadow:0 1px 0 rgba(255,255,255,0.4) inset;
   --card-shadow-hover:0 6px 20px -10px rgba(60,40,10,0.18);
 }
+/* ── LIFE WALL — forced dark scope ──────────────────────
+   Always renders in dark mode regardless of body.light so
+   the neon accent colours (#00e8a0, #f5a623, #ff4d6d) read
+   against a near-black background exactly as designed.      */
+#panel-lifewall {
+  --bg0:#05080f; --bg1:#090d18; --bg2:#0d1220; --bg3:#111828; --bg4:#18243a;
+  --border:#1a2640; --border2:#263850;
+  --text:#e4ecf7; --text2:#7a8fb0; --text3:#3d506e;
+  --green:#00e8a0; --green-dim:#00e8a012; --green-glow:0 0 20px #00e8a030;
+  --amber:#f5a623; --amber-dim:#f5a62312;
+  --blue:#4d9fff; --blue-dim:#4d9fff12;
+  --cyan:#00d4ff; --cyan-dim:#00d4ff10;
+  --red:#ff4d6d; --red-dim:#ff4d6d12;
+  --violet:#8b5cf6; --violet-dim:#8b5cf612;
+  --accent-positive:var(--green); --accent-positive-dim:var(--green-dim);
+  --accent-warning:var(--amber);  --accent-warning-dim:var(--amber-dim);
+  --accent-critical:var(--red);   --accent-critical-dim:var(--red-dim);
+  --accent-info:var(--blue);
+  background:var(--bg0);
+  color:var(--text);
+}
+
 * { margin:0; padding:0; box-sizing:border-box; }
 html,body { height:100%; overflow:hidden; }
 body { font-family:var(--fb); background:var(--bg0); color:var(--text); }
