@@ -13421,7 +13421,7 @@ function renderLifeWall() {
             <span class="lw-b-nw-lbl">Net worth</span>
             ${fmtC(FE.display.scaleReal(b.realEndNetWorth, b.endYear - CY))}
           </div>
-          ${b.inRetirement && b.pensionAnnual > 0 ? `<div class="lw-b-networth" style="color:var(--text1)"><span class="lw-b-nw-lbl">Annual pension</span>${fmtC(FE.display.scaleReal(b.pensionAnnual, b.endYear - CY))}</div>` : ''}
+          ${b.inRetirement && b.pensionAnnual > 0 ? `<div class="lw-b-networth" style="color:var(--cyan)"><span class="lw-b-nw-lbl">Annual pension</span>${fmtC(FE.display.scaleReal(b.pensionAnnual, b.endYear - CY))}</div>` : ''}
         </div>
         <div class="lw-b-foot">
           <span class="lw-b-savings ${savingsCls}">${esc2(savingsLbl)}</span>
