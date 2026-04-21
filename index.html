@@ -2516,7 +2516,7 @@ body.light .retire-slideover { box-shadow:-10px 0 32px -10px rgba(60,40,10,0.25)
   cursor:pointer; position:relative; background:var(--bg2);
   display:flex; flex-direction:column; justify-content:space-between;
   font-family:var(--ff); text-align:left; overflow:hidden;
-  -webkit-font-smoothing:auto; -moz-osx-font-smoothing:auto;
+  -webkit-font-smoothing:antialiased; -moz-osx-font-smoothing:grayscale;
   transition:transform .18s cubic-bezier(.2,.7,.2,1), box-shadow .18s, border-color .18s;
   box-shadow:inset 0 1px 0 rgba(255,255,255,.04), 0 1px 0 rgba(0,0,0,.4), 0 2px 5px -2px rgba(0,0,0,.35);
 }
@@ -2530,7 +2530,6 @@ body.light .retire-slideover { box-shadow:-10px 0 32px -10px rgba(60,40,10,0.25)
 
 .lw-brick.green {
   border-color:var(--accent-positive);
-  border-width:2px;
   background:var(--bg2);
 }
 .lw-brick.green.current {
@@ -2539,13 +2538,11 @@ body.light .retire-slideover { box-shadow:-10px 0 32px -10px rgba(60,40,10,0.25)
 }
 .lw-brick.amber {
   border-color:var(--accent-warning);
-  border-width:2px;
   background:var(--bg2);
 }
 .lw-brick.amber.current { border-color:var(--accent-warning); }
 .lw-brick.red {
   border-color:var(--accent-critical);
-  border-width:2px;
   background:var(--bg2);
 }
 .lw-brick.red.current { border-color:var(--accent-critical); }
