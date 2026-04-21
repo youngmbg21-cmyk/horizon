@@ -2503,7 +2503,38 @@ body.light .retire-slideover { box-shadow:-10px 0 32px -10px rgba(60,40,10,0.25)
 
 /* ══════════════════════════════════════════════════════════════════
    LIFE WALL — scoped .lw-* classes
-   Slide-over chrome reuses .retire-slideover + .retire-so-* entirely.
+   Brick detail uses .lw-modal (centred dialog) not the side drawer. */
+
+/* Centred modal replacing the right-side drawer */
+.lw-modal {
+  position:fixed; top:50%; left:50%;
+  transform:translate(-50%, -46%) scale(0.95);
+  width:min(500px, 92vw); max-height:82vh;
+  display:flex; flex-direction:column;
+  z-index:570;
+  background:var(--bg2); border:1px solid var(--border2);
+  border-radius:14px;
+  box-shadow:0 28px 64px -16px rgba(0,0,0,.7), 0 0 0 1px rgba(255,255,255,.04) inset;
+  opacity:0; pointer-events:none;
+  transition:opacity .22s ease, transform .22s cubic-bezier(.2,.7,.2,1);
+}
+.lw-modal.open {
+  opacity:1; pointer-events:auto;
+  transform:translate(-50%, -50%) scale(1);
+}
+body.light .lw-modal {
+  box-shadow:0 12px 40px -10px rgba(60,40,10,0.22), 0 0 0 1px rgba(0,0,0,.06) inset;
+}
+/* Close button — large, obvious, top-right */
+.lw-modal-close {
+  position:absolute; top:12px; right:12px;
+  width:32px; height:32px; border-radius:8px;
+  background:var(--bg3); border:1px solid var(--border);
+  color:var(--text2); font-size:16px; line-height:1;
+  display:flex; align-items:center; justify-content:center;
+  cursor:pointer; flex-shrink:0; transition:all .15s; z-index:2;
+}
+.lw-modal-close:hover { background:var(--accent-critical-dim); border-color:var(--accent-critical); color:var(--accent-critical); }
 ══════════════════════════════════════════════════════════════════ */
 .lw-summary {
   display:grid; grid-template-columns:repeat(auto-fit,minmax(200px,1fr));
@@ -13557,7 +13588,8 @@ function renderLifeWall() {
     </div>
 
     <div class="retire-slideover-backdrop" id="lw-backdrop" onclick="lwClosePanel()"></div>
-    <div class="retire-slideover" id="lw-slideover" role="dialog" aria-modal="true" aria-hidden="true">
+    <div class="lw-modal" id="lw-slideover" role="dialog" aria-modal="true" aria-hidden="true">
+      <button class="lw-modal-close" onclick="lwClosePanel()" aria-label="Close">✕</button>
       <div class="retire-so-head" id="lw-so-head">
         <div class="retire-so-head-main">
           <div class="lw-tone-bar" id="lw-tone-bar"></div>
@@ -13567,13 +13599,11 @@ function renderLifeWall() {
             <div class="retire-so-sub" id="lw-so-sub" style="margin-top:4px">—</div>
           </div>
         </div>
-        <button class="retire-so-close" onclick="lwClosePanel()" aria-label="Close">✕</button>
       </div>
       <div class="retire-so-body" id="lw-so-body"></div>
       <div class="retire-so-footer">
         <div class="retire-so-footer-hint" id="lw-so-hint">Adjust income, expenses, or plan major events in the yearly view.</div>
         <div class="retire-so-footer-actions">
-          <button class="btn btn-o" onclick="lwClosePanel()">Close</button>
           <button class="btn btn-g" id="lw-edit-btn" onclick="lwEditYear()">✎ Edit in Yearly</button>
         </div>
       </div>
