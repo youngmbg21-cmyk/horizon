@@ -5026,12 +5026,12 @@ const STRINGS = {
   // Running-balance chart (Step 2 of the Fun Fund redesign). Sits on
   // the right of the strategic row so the AI prose on the left has a
   // visual to reference.
-  'ff.balanceChart.title':  { en:'Running balance · next 12 months',
-                              sv:'Löpande saldo · kommande 12 månader' },
-  'ff.balanceChart.sub':    { en:'Where the deficit lives. Red bars carry forward until later surpluses absorb them.',
-                              sv:'Där underskottet bor. Röda staplar förs vidare tills senare överskott absorberar dem.' },
-  'ff.balanceChart.legend.surplus': { en:'Surplus month', sv:'Överskottsmånad' },
-  'ff.balanceChart.legend.deficit': { en:'Deficit carry', sv:'Underskott' },
+  'ff.balanceChart.title':  { en:'Fun fund · 12-month balance outlook',
+                              sv:'Fun fund · 12-månaders saldoutsikt' },
+  'ff.balanceChart.sub':    { en:'Each bar shows what your fun fund balance will be 12 months from that month. Green = in surplus; red = in deficit.',
+                              sv:'Varje stapel visar vad ditt fun fund-saldo kommer att vara 12 månader från den månaden. Grön = överskott; röd = underskott.' },
+  'ff.balanceChart.legend.surplus': { en:'Surplus in 12 months', sv:'Överskott om 12 månader' },
+  'ff.balanceChart.legend.deficit': { en:'Deficit in 12 months', sv:'Underskott om 12 månader' },
   'ff.kpi.travelBudget':    { en:'TOTAL TRAVEL BUDGET',   sv:'TOTAL RESBUDGET' },
   'ff.kpi.travelBudget.sub':{ en:'{n} planned trips',     sv:'{n} planerade resor' },
   'ff.kpi.travelBudget.sub.split':{ en:'{n} trips · {inw} in next 12 mo · {out} beyond',
@@ -6360,15 +6360,16 @@ function getEffective(year, month) {
 // share one chain with the rolling view (CM..CM+11) without
 // re-running the carry-forward pass twice per render.
 function _get13MonthChain() {
-  return memoSelect('13mo', () => {
+  return memoSelect('23mo', () => {
     const months = [];
-    // Pass 1: build the 13-month window (current + 12 forward) from
+    // Pass 1: build the 23-month window (current + 22 forward) from
     // the raw effective values. carryForward is computed in pass 2
     // so each month's totals INCLUDE the rollover from the previous
-    // month. The 13th entry is NOT shown to the user via the rolling
-    // view — it exists so getNext12Forward() can slice index 1..12
-    // and still get 12 entries.
-    for (let i=0; i<=12; i++) {
+    // month. Entries 0-11 form the visible rolling window.
+    // Entry 12 lets getNext12Forward() slice index 1..12.
+    // Entries 11-22 let the ff-balance chart compute each visible
+    // bar's 12-month-ahead ending balance: bar[i] = chain[i+11].funFund.
+    for (let i=0; i<=22; i++) {
       const d = new Date(CY, CM+i, 1);
       const year=d.getFullYear(), month=d.getMonth();
       const key=`${year}-${String(month+1).padStart(2,'0')}`;
@@ -7320,6 +7321,13 @@ const FinancialEngine = (() => {
         : 0;
       const balance = finalRunningBalance;
       const capacityCoversTrips = capacity12mo >= totalTrips;
+      // 12-month-ahead ending balance for each visible month.
+      // balanceBars[i] = chain[i+11].funFund: the carry-forward balance
+      // at the end of the 12 months following month i. A green bar means
+      // the fund is in surplus 12 months from that starting point; red
+      // means it is in deficit.
+      const fullChain = _get13MonthChain();
+      const balanceBars = fullChain.slice(11, 23).map(m => m.funFund || 0);
       return {
         windowMonths, windowKeys,
         monthlyAllocation, capacity12mo,
@@ -7328,6 +7336,7 @@ const FinancialEngine = (() => {
         alreadySpent,
         runningBalance, finalRunningBalance,
         balance,
+        balanceBars,
         // `remaining` is preserved for any legacy reader, but is now
         // an alias for the canonical balance — they are the same
         // number going forward.
@@ -8252,7 +8261,7 @@ function _liveSyncCharts(){
   const ffBalCh = charts && charts['ff-balance'];
   if(ffBalCh && ffBalCh.data && ffBalCh.data.datasets && ffBalCh.data.datasets[0]){
     const ds = ffBalCh.data.datasets[0];
-    const bars = first12.map(m => m.funFund || 0);
+    const bars = _get13MonthChain().slice(11, 23).map(m => m.funFund || 0);
     ds.data = bars;
     ds.backgroundColor = bars.map(v => v >= 0 ? '#22c55e33' : '#ef444433');
     ds.borderColor     = bars.map(v => v >= 0 ? '#22c55e'   : '#ef4444');
@@ -12907,16 +12916,15 @@ function renderFunFund() {
         }),
       });
     }
-    // Running balance chart (ff-balance) — promoted from the buried
-    // table into the strategic row. Per-bar colour flips between
-    // green (month ends in surplus) and red (deficit carrying
-    // forward). Single dataset so the legend line collapses to
-    // "bar colour = surplus/deficit" and the chart stays readable.
+    // Running balance chart (ff-balance) — each bar shows the
+    // carry-forward ending balance exactly 12 months ahead of that
+    // bar's month: bar[i] = chain[i+11].funFund. Green = fund is in
+    // surplus 12 months from this point; red = in deficit.
     const balCtx = document.getElementById('ff-balance');
     if(balCtx){
       const cd = chartDefaults();
       const windowMonths = ff.windowMonths;
-      const bars  = ff.runningBalance;
+      const bars  = ff.balanceBars;
       const green = '#22c55e';
       const red   = '#ef4444';
       const bgFill= v => v >= 0 ? '#22c55e33' : '#ef444433';
