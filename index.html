@@ -4387,11 +4387,11 @@ const STRINGS = {
   // These keys are resolved based on the active display mode so the
   // label matches the number shown. The nominal variant is picked
   // when state.displayMode === 'nominal'.
-  'dash.kpi.nestEgg':           { en:'NEST EGG · TODAY&rsquo;S MONEY',
+  'dash.kpi.nestEgg':           { en:'NEST EGG · TODAY\'S MONEY',
                                   sv:'PENSIONSKAPITAL · DAGENS PENNINGVÄRDE' },
   'dash.kpi.nestEgg.nominal':   { en:'NEST EGG · NOMINAL',
                                   sv:'PENSIONSKAPITAL · NOMINELLT' },
-  'dash.kpi.monthlyIncomeReal': { en:'MONTHLY RETIREMENT INCOME · TODAY&rsquo;S MONEY',
+  'dash.kpi.monthlyIncomeReal': { en:'MONTHLY RETIREMENT INCOME · TODAY\'S MONEY',
                                   sv:'MÅNATLIG PENSIONSINKOMST · DAGENS PENNINGVÄRDE' },
   'dash.kpi.monthlyIncomeReal.nominal': { en:'MONTHLY RETIREMENT INCOME · NOMINAL',
                                           sv:'MÅNATLIG PENSIONSINKOMST · NOMINELLT' },
@@ -4425,7 +4425,7 @@ const STRINGS = {
   'dash.chart.cashflow.title':{ en:'📈 12-Month Cash Flow',   sv:'📈 12-månaders kassaflöde' },
   'dash.chart.projection':  { en:'PROJECTION',                sv:'PROGNOS' },
   'dash.chart.nestegg.title':{ en:'🎯 Nest Egg Growth Curve', sv:'🎯 Tillväxtkurva för pensionskapital' },
-  'dash.chart.toggle.real': { en:'Today&rsquo;s Money',       sv:'Dagens penningvärde' },
+  'dash.chart.toggle.real': { en:'Today\'s Money',       sv:'Dagens penningvärde' },
   'dash.chart.toggle.nominal':{ en:'Nominal',                 sv:'Nominellt' },
 
   // ── Chart.js series / legend labels ────────────────────
@@ -13751,8 +13751,8 @@ window.showLocDetail=function(id){
     <div class="loc-affordability-bar" style="height:10px"><div class="loc-affordability-fill" style="width:${Math.round(loc.affordabilityScore*100)}%;background:${loc.verdict==='feasible'?'var(--green)':loc.verdict==='conditional'?'var(--amber)':'var(--red)'}"></div></div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:14px 0;font-size:13px">
       <div><span style="color:var(--text2)">Monthly cost of living</span><div style="font-family:var(--fm);font-weight:700;margin-top:2px">${fmt(loc.costOfLiving)}</div></div>
-      <div><span style="color:var(--text2)">Your income at retirement <span style="font-size:9px">(today&rsquo;s money)</span></span><div style="font-family:var(--fm);font-weight:700;color:var(--green);margin-top:2px">${fmt(monthlyIncome)}</div></div>
-      <div><span style="color:var(--text2)">Monthly surplus/deficit <span style="font-size:9px">(today&rsquo;s money)</span></span><div style="font-family:var(--fm);font-weight:700;color:${loc.surplus>=0?'var(--green)':'var(--red)'};margin-top:2px">${fmt(loc.surplus)}</div></div>
+      <div><span style="color:var(--text2)">Your income at retirement <span style="font-size:9px">(today's money)</span></span><div style="font-family:var(--fm);font-weight:700;color:var(--green);margin-top:2px">${fmt(monthlyIncome)}</div></div>
+      <div><span style="color:var(--text2)">Monthly surplus/deficit <span style="font-size:9px">(today's money)</span></span><div style="font-family:var(--fm);font-weight:700;color:${loc.surplus>=0?'var(--green)':'var(--red)'};margin-top:2px">${fmt(loc.surplus)}</div></div>
       <div><span style="color:var(--text2)">Local income tax</span><div style="font-family:var(--fm);font-weight:700;margin-top:2px">${loc.taxRate}%</div></div>
       <div><span style="color:var(--text2)">Climate</span><div style="font-weight:600;margin-top:2px">${loc.climate}</div></div>
       <div><span style="color:var(--text2)">Healthcare</span><div style="font-weight:600;margin-top:2px">${loc.healthcare}</div></div>
