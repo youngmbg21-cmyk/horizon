@@ -6562,7 +6562,8 @@ function getProjection() {
       const total=Math.round(appAcc+ext);
       const realTotal=Math.round(total/Math.pow(1+state.inflationRate/100,y));
       const yearlyContrib=Math.round(ms*months+investments.reduce((s,a)=>s+a.monthlyContribution*months,0));
-      data.push({ year, age:state.currentAge+y, appSavings:Math.round(appAcc), external:Math.round(ext), total, realTotal, yearlyContrib, perAccount });
+      const appYearlyContrib=Math.round(ms*months);
+      data.push({ year, age:state.currentAge+y, appSavings:Math.round(appAcc), external:Math.round(ext), total, realTotal, yearlyContrib, appYearlyContrib, perAccount });
     }
     return data;
   });
@@ -11653,7 +11654,7 @@ function renderRetirement() {
   // snapshotting the current month so a user who varies savings
   // monthly sees a representative figure.
   const savingsMonthlyAvg = savingsProj.length
-    ? Math.round(savingsProj.reduce((sum, p) => sum + (p.yearlyContrib || 0), 0) / (12 * savingsProj.length))
+    ? Math.round(savingsProj.reduce((sum, p) => sum + (p.appYearlyContrib || 0), 0) / (12 * savingsProj.length))
     : 0;
   // Savings Projection card — visually identical to the investment
   // cards (same .ret-asset vocabulary) but marked .is-derived so the
