@@ -404,6 +404,7 @@ body.light .card.card-clickable:hover {
 .btn-g:hover { filter:brightness(1.08); transform:translateY(-1px); }
 .btn-o { background:var(--bg4); color:var(--text); border:1px solid var(--border2); }
 .btn-o:hover { border-color:var(--green); color:var(--green); }
+.btn-running { background:var(--amber); color:#000; opacity:.85; cursor:not-allowed; }
 .btn-sm { padding:5px 11px; font-size:11px; }
 .btn-xs { padding:3px 8px; font-size:10px; }
 .btn-add { background:transparent; border:1px dashed var(--border2); color:var(--text2); font-size:11px; padding:6px 14px; border-radius:7px; cursor:pointer; transition:all .2s; width:100%; margin-top:4px; text-align:center; }
@@ -13677,9 +13678,11 @@ function renderRetireAnywhere() {
     // If so the primary CTA flips to "View Report" + shows a small "Re-run"
     // icon button so the user can refresh without losing the cached one.
     const cached = (state.vault||[]).find(v => v.type==='deepdive' && v.locationId===loc.id);
-    const primaryLabel = cached ? t('ra.card.cta.view') : t('ra.card.cta.run');
-    const primaryClass = cached ? 'btn btn-o' : 'btn btn-g';
-    const rerunBtn = cached
+    const running = _runningAnalysis.has(loc.id);
+    const primaryLabel = running ? '⏳ Analysis running…' : cached ? t('ra.card.cta.view') : t('ra.card.cta.run');
+    const primaryClass = running ? 'btn btn-running' : cached ? 'btn btn-o' : 'btn btn-g';
+    const primaryOnclick = running ? '' : `onclick="openLocAnalysis('${loc.id}')"`;
+    const rerunBtn = cached && !running
       ? `<button class="loc-card-rerun" onclick="event.stopPropagation();openLocAnalysis('${loc.id}',{rerun:true})" title="${esc2(t('ra.card.rerunTitle'))}">↻</button>`
       : '';
     // Verdict label translates via ra.verdict.<verdict>; the
@@ -13703,7 +13706,7 @@ function renderRetireAnywhere() {
       <div class="loc-stat"><span class="loc-stat-lbl">${esc2(t('ra.card.surplus'))}</span><span class="loc-stat-val ${loc.surplus>=0?'pos':'neg'}">${fmt(loc.surplus)}</span></div>
       <div class="loc-stat"><span class="loc-stat-lbl">${esc2(t('ra.card.climate'))}</span><span class="loc-stat-val muted">${esc(loc.climate||'')}</span></div>
       <div class="loc-card-actions">
-        <button class="${primaryClass} loc-card-cta" onclick="openLocAnalysis('${loc.id}')">${esc2(primaryLabel)}</button>
+        <button class="${primaryClass} loc-card-cta" ${primaryOnclick}>${esc2(primaryLabel)}</button>
         ${rerunBtn}
       </div>
     </div>`;
@@ -13792,6 +13795,7 @@ window.showLocDetail=function(id){
 // dimmer is pointer-events:none so the user can keep navigating the app
 // while the panel is open.
 let _slideoverLocId = null;
+const _runningAnalysis = new Set(); // location IDs with an active in-flight AI call
 function openLocAnalysis(id, opts){
   const loc = retirePlaces().find(l => l.id === id);
   if(!loc) return;
@@ -13929,6 +13933,7 @@ window.renderLocAnalysisSlideover = renderLocAnalysisSlideover;
 window.runLocAnalysis = function(id, opts){
   const loc = state.places.find(l => l.id === id);
   if(!loc) return;
+  if(_runningAnalysis.has(id)) return; // already in flight — ignore duplicate click
   const key = state.aiKeys?.claude;
   if(!key){ alert(t('ra.so.analysis.noKey')); return; }
   if(!state.citizenship || !state.homeBase){
@@ -13945,6 +13950,9 @@ window.runLocAnalysis = function(id, opts){
     state.vault = (state.vault||[]).filter(v => !(v.type==='deepdive' && v.locationId===id));
     saveVault();
   }
+  // Mark as in-flight and immediately update the card button
+  _runningAnalysis.add(id);
+  if(state.activePanel === 'retireanywhere') renderRetireAnywhere();
   // Show the loading state in the analysis section of the slide-over
   const body = document.getElementById('retire-so-body');
   const cta = document.getElementById('retire-so-analysis-cta');
@@ -14039,6 +14047,7 @@ MEDIAN_INCOME_USD: [median monthly gross personal income in USD for this city]${
       if(!Array.isArray(state.vault)) state.vault = [];
       state.vault.unshift(entry);
       if(state.vault.length > 50) state.vault = state.vault.slice(0, 50);
+      _runningAnalysis.delete(id);
       saveVault(); save();
       // Re-render the slide-over so the cached report appears in the
       // analysis section and the footer buttons enable.
@@ -14046,6 +14055,8 @@ MEDIAN_INCOME_USD: [median monthly gross personal income in USD for this city]${
       // Also re-render the card grid so the CTA flips to "View Report".
       if(state.activePanel === 'retireanywhere') renderRetireAnywhere();
     } catch(e) {
+      _runningAnalysis.delete(id);
+      if(state.activePanel === 'retireanywhere') renderRetireAnywhere();
       const cta2 = document.getElementById('retire-so-analysis-cta');
       if(cta2) cta2.outerHTML = `
         <div class="state state-error" id="retire-so-analysis-cta">
