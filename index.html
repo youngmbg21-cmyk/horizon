@@ -14001,10 +14001,22 @@ Buy vs rent economics at this income level. Typical purchase prices in the main 
 Two short markdown bullet lists. Be specific and concrete — no generic filler.
 
 ## Final Verdict
-One paragraph. Recommendation: "proceed", "proceed with caveats", or "reconsider". State the single biggest risk and the single biggest opportunity.${langSuffix()}`;
+One paragraph. Recommendation: "proceed", "proceed with caveats", or "reconsider". State the single biggest risk and the single biggest opportunity.
+
+After the Final Verdict, on its own line, append exactly this (integer only, no symbols, no explanation):
+MEDIAN_INCOME_USD: [median monthly gross personal income in USD for this city]${langSuffix()}`;
   (async () => {
     try {
       const reply = await callClaude(prompt, 3000, key);
+      // Extract and store median income so the card can show Top X% for any city.
+      const medianMatch = reply.match(/MEDIAN_INCOME_USD:\s*(\d+(?:\.\d+)?)/i);
+      if(medianMatch) {
+        const medianUSD = parseFloat(medianMatch[1]);
+        const usdToSek = 1 / (DEFAULT_RATES.USD || 0.11);
+        const locRef = state.places.find(l => l.id === id);
+        if(locRef && medianUSD > 0) locRef.medianMonthlyIncome = Math.round(medianUSD * usdToSek);
+      }
+      const cleanReply = reply.replace(/\nMEDIAN_INCOME_USD:\s*[\d.]+[^\n]*/gi, '');
       // Save to Vault automatically so the slide-over, the Vault tab,
       // and the card CTA all update in lockstep.
       const entry = {
@@ -14021,7 +14033,7 @@ One paragraph. Recommendation: "proceed", "proceed with caveats", or "reconsider
         lang: state.lang,
         citizenship: state.citizenship,
         homeBase: state.homeBase,
-        markdown: reply,
+        markdown: cleanReply,
       };
       if(!Array.isArray(state.vault)) state.vault = [];
       state.vault.unshift(entry);
@@ -14730,12 +14742,24 @@ Buy vs rent economics at this income level. Typical purchase prices in the main 
 Two short markdown bullet lists. Be specific and concrete — no generic filler.
 
 ## Final Verdict
-One paragraph. Recommendation: "proceed", "proceed with caveats", or "reconsider". State the single biggest risk and the single biggest opportunity.${langSuffix()}`;
+One paragraph. Recommendation: "proceed", "proceed with caveats", or "reconsider". State the single biggest risk and the single biggest opportunity.
+
+After the Final Verdict, on its own line, append exactly this (integer only, no symbols, no explanation):
+MEDIAN_INCOME_USD: [median monthly gross personal income in USD for this city]${langSuffix()}`;
   const controller = new AbortController();
   const startedAt = Date.now();
   (async () => {
     try {
       const reply = await callClaude(prompt, 3000, key);
+      // Extract and store median income so the card can show Top X% for any city.
+      const medianMatch2 = reply.match(/MEDIAN_INCOME_USD:\s*(\d+(?:\.\d+)?)/i);
+      if(medianMatch2) {
+        const medianUSD2 = parseFloat(medianMatch2[1]);
+        const usdToSek2 = 1 / (DEFAULT_RATES.USD || 0.11);
+        const locRef2 = state.places.find(l => l.id === id);
+        if(locRef2 && medianUSD2 > 0) locRef2.medianMonthlyIncome = Math.round(medianUSD2 * usdToSek2);
+      }
+      const cleanReply2 = reply.replace(/\nMEDIAN_INCOME_USD:\s*[\d.]+[^\n]*/gi, '');
       // Save to Vault (Retire Anywhere Deep Dive)
       const entry = {
         id: 'dd-' + Date.now(),
@@ -14750,7 +14774,7 @@ One paragraph. Recommendation: "proceed", "proceed with caveats", or "reconsider
         lang: state.lang,
         citizenship: state.citizenship,
         homeBase: state.homeBase,
-        markdown: reply,
+        markdown: cleanReply2,
       };
       if(!Array.isArray(state.vault)) state.vault = [];
       state.vault.unshift(entry);
