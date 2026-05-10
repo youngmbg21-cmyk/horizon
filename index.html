@@ -7913,17 +7913,17 @@ function scoreLocation(loc) {
   return memoSelect('loc:'+(loc.id||loc.name), () => {
     const nums = getRetirementNumbers();
     const monthlyIncome = nums.totalRetirementIncome;
-    const ratio = monthlyIncome>0 ? loc.costOfLiving/monthlyIncome : 2;
-    const taxPenalty = loc.taxRate/100;
-    const affordabilityScore = Math.max(0, Math.min(1, (1-ratio)*(1-taxPenalty*0.5)));
+    const netIncome = monthlyIncome * (1 - (loc.taxRate || 0) / 100);
+    const ratio = netIncome > 0 ? loc.costOfLiving / netIncome : 2;
+    const affordabilityScore = Math.max(0, Math.min(1, 1 - ratio));
     let verdict='infeasible', label='INFEASIBLE';
     if(ratio<=0.7){ verdict='feasible'; label='FEASIBLE'; }
     else if(ratio<=0.9){ verdict='conditional'; label='CONDITIONAL'; }
-    const surplus = monthlyIncome-loc.costOfLiving;
+    const surplus = netIncome - loc.costOfLiving;
     const dbEntry = CITY_DB.find(c => c.name === loc.name && c.country === loc.country);
     const medianIncome = loc.medianMonthlyIncome || (dbEntry && dbEntry.medianMonthlyIncome) || null;
     const incomePercentile = topIncomePercentile(monthlyIncome, medianIncome);
-    return { ...loc, verdict, label, ratio, surplus, affordabilityScore, monthlyIncome, incomePercentile };
+    return { ...loc, verdict, label, ratio, surplus, affordabilityScore, monthlyIncome, netIncome, incomePercentile };
   });
 }
 
@@ -13698,9 +13698,9 @@ function renderRetireAnywhere() {
       <div style="font-size:10px;color:var(--text3);font-family:var(--fm);margin-bottom:10px">${esc2(t('ra.card.affordable', { pct: Math.round(loc.affordabilityScore*100) }))}</div>
       ${loc.incomePercentile != null ? `<div class="loc-stat"><span class="loc-stat-lbl">Income rank · locally</span><span class="loc-stat-val" style="color:var(--text2)">Top ${loc.incomePercentile}% earner</span></div>` : ''}
       <div class="loc-stat"><span class="loc-stat-lbl">${esc2(t('ra.card.cost'))}</span><span class="loc-stat-val">${fmt(loc.costOfLiving)}</span></div>
-      <div class="loc-stat"><span class="loc-stat-lbl">${esc2(t('ra.card.income'))}</span><span class="loc-stat-val pos">${fmt(monthlyIncome)}</span></div>
+      <div class="loc-stat"><span class="loc-stat-lbl">Gross income · today's money</span><span class="loc-stat-val">${fmt(monthlyIncome)}</span></div>
+      <div class="loc-stat"><span class="loc-stat-lbl">Net income · after ${loc.taxRate}% local tax</span><span class="loc-stat-val pos">${fmt(loc.netIncome)}</span></div>
       <div class="loc-stat"><span class="loc-stat-lbl">${esc2(t('ra.card.surplus'))}</span><span class="loc-stat-val ${loc.surplus>=0?'pos':'neg'}">${fmt(loc.surplus)}</span></div>
-      <div class="loc-stat"><span class="loc-stat-lbl">${esc2(t('ra.card.tax'))}</span><span class="loc-stat-val">${loc.taxRate}%</span></div>
       <div class="loc-stat"><span class="loc-stat-lbl">${esc2(t('ra.card.climate'))}</span><span class="loc-stat-val muted">${esc(loc.climate||'')}</span></div>
       <div class="loc-card-actions">
         <button class="${primaryClass} loc-card-cta" onclick="openLocAnalysis('${loc.id}')">${esc2(primaryLabel)}</button>
@@ -13860,7 +13860,8 @@ function renderLocAnalysisSlideover(opts){
       <div class="retire-so-section-hd">${esc2(t('ra.so.facts.title'))}</div>
       <div class="retire-so-fact-grid">
         <div class="retire-so-fact"><div class="retire-so-fact-lbl">${esc2(t('ra.so.facts.cost'))}</div><div class="retire-so-fact-val">${fmt(loc.costOfLiving)}</div></div>
-        <div class="retire-so-fact"><div class="retire-so-fact-lbl">${esc2(t('ra.so.facts.income'))}</div><div class="retire-so-fact-val pos">${fmt(monthlyIncome)}</div></div>
+        <div class="retire-so-fact"><div class="retire-so-fact-lbl">Gross income</div><div class="retire-so-fact-val">${fmt(monthlyIncome)}</div></div>
+        <div class="retire-so-fact"><div class="retire-so-fact-lbl">Net income · after ${loc.taxRate}% tax</div><div class="retire-so-fact-val pos">${fmt(loc.netIncome)}</div></div>
         <div class="retire-so-fact"><div class="retire-so-fact-lbl">${esc2(t('ra.so.facts.surplus'))}</div><div class="retire-so-fact-val ${loc.surplus>=0?'pos':'neg'}">${fmt(loc.surplus)}</div></div>
         <div class="retire-so-fact"><div class="retire-so-fact-lbl">${esc2(t('ra.so.facts.tax'))}</div><div class="retire-so-fact-val">${loc.taxRate}%</div></div>
         <div class="retire-so-fact"><div class="retire-so-fact-lbl">${esc2(t('ra.so.facts.climate'))}</div><div class="retire-so-fact-val" style="font-size:12px">${esc(loc.climate||dash)}</div></div>
