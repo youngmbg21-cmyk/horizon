@@ -14686,7 +14686,7 @@ window.aiAnalyzeLocations=function(){
   const prompt=`${ctx}\n\nThe user is planning to retire with a monthly income of ${fmt(income)} (this is TODAY'S MONEY — real, inflation-adjusted purchasing power, not nominal future kr). Recommend the BEST retirement destinations globally based on this real income. Consider: cost of living, healthcare quality, climate, expat communities, visa/residency requirements, and lifestyle. Tailor visa and tax-treaty advice to the user's citizenship and home base. Give 5 specific recommendations with monthly cost estimates (also in today's money / local-currency-equivalent) and a viability score. Format as a structured list.${langSuffix()}`;
   // Kick off in the background (fire-and-forget); the UI is driven by the
   // bgtask:* event subscription below.
-  runBgTask(RETIRE_AI_KEY, () => callClaude(prompt, 1200, key)).catch(()=>{/* rendered via event */});
+  runBgTask(RETIRE_AI_KEY, () => callClaude(prompt, 2500, key)).catch(()=>{/* rendered via event */});
   renderRetireAIOutput();
 };
 // When the task progresses, re-render whichever surface is visible.
