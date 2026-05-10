@@ -7920,7 +7920,9 @@ function scoreLocation(loc) {
     if(ratio<=0.7){ verdict='feasible'; label='FEASIBLE'; }
     else if(ratio<=0.9){ verdict='conditional'; label='CONDITIONAL'; }
     const surplus = monthlyIncome-loc.costOfLiving;
-    const incomePercentile = topIncomePercentile(monthlyIncome, loc.medianMonthlyIncome);
+    const dbEntry = CITY_DB.find(c => c.name === loc.name && c.country === loc.country);
+    const medianIncome = loc.medianMonthlyIncome || (dbEntry && dbEntry.medianMonthlyIncome) || null;
+    const incomePercentile = topIncomePercentile(monthlyIncome, medianIncome);
     return { ...loc, verdict, label, ratio, surplus, affordabilityScore, monthlyIncome, incomePercentile };
   });
 }
