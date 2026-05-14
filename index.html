@@ -16325,8 +16325,9 @@ function buildAIContext() {
   // "what makes up my retirement expenses" can be answered without
   // guessing. Capped at 12 items to keep the prompt compact.
   const retExpItems = (state.retirementExpenses || []).slice(0, 12)
-    .map(e => `    · ${e.name}: ${Math.round(e.amount).toLocaleString()} kr/mo`)
+    .map(e => `    · ${e.name}: ${Math.round(e.amount).toLocaleString()} kr/mo [${e.type || 'variable'}]`)
     .join('\n');
+  // [fixed] = committed cost, won't scale with lifestyle; [variable] = discretionary, can be trimmed in Lean scenarios
   return `You are HORIZON AI — a personal finance and life planning assistant embedded in Horizon Finance OS.
 
 ${langDirective()}
@@ -16374,7 +16375,8 @@ ${scenLine('lean')}
 ${scenLine('baseline')}
 ${scenLine('comfortable')}
   → Active scenario: ${scenLabelMap[activeScen]}. The retirement figures below (totalExp, depletion, coverage, verdict) ALL reflect this scenario.
-${retExpItems ? '  Line items:\n' + retExpItems : ''}
+  Scenario guidance for the AI: Lean (×0.75) = stress-test / worst-case floor — use when advising on minimum savings needed or downside risk. Baseline (×1.0) = the user's best estimate of actual retirement spending — use as the default for projections and planning. Comfortable (×1.3) = aspirational / best-case — use when exploring "what if I want more". When the user asks "will I have enough?" default to Baseline unless they specify otherwise. When they ask "what's the minimum I need?" use Lean.
+${retExpItems ? `  Line items (amounts are per active scenario multiplier — Lean/Baseline/Comfortable scale them proportionally; [fixed] items are committed costs unlikely to be cut, [variable] items are discretionary):\n` + retExpItems : ''}
 
 Retirement plan figures — computed under the ACTIVE ${scenLabelMap[activeScen]} scenario (today's money):
 - Age: ${state.currentAge} | Retiring at: ${state.retirementAge} (${Math.max(0,state.retirementAge-state.currentAge)} years away) | Life expectancy: ${state.lifeExp || 90}
@@ -16383,7 +16385,7 @@ Retirement plan figures — computed under the ACTIVE ${scenLabelMap[activeScen]
 - Effective portfolio withdrawal tax rate: ${effectiveTaxPct}% (balance-weighted across investment accounts). Pension income is also taxable in Sweden at broadly the same marginal rate — treat pension payouts as gross figures subject to this tax when estimating net spending power.
 - Sustainable monthly retirement income (today's money, real): ${Math.round(realRetirementIncome).toLocaleString()} kr/mo total
     · Portfolio contribution: ${Math.round(nums.sustainableAfterTax).toLocaleString()} kr/mo — this is AFTER the ${effectiveTaxPct}% withdrawal tax has been deducted
-    · Pension contribution: ${Math.round(nums.pensionAvgMonthly).toLocaleString()} kr/mo — this is a GROSS figure (pre-tax), averaged across the full retirement period including zero-income years before each pension starts. Once each pension is active it pays more than this average; in pre-pension years it contributes zero.
+    · Pension contribution: ${Math.round(nums.pensionAvgMonthly).toLocaleString()} kr/mo — this is a GROSS figure (pre-tax). IMPORTANT: this number is a simple mean across ALL retirement years (age ${state.retirementAge}–${state.lifeExp||90}), including years where a pension has not yet started and contributes zero. It will be LOWER than what the pension actually pays once active. Use the per-pension start ages above to determine the actual payout in any given year. Do not quote this average as "your pension income" — always qualify it as a lifetime average.
 - Coverage: ${nums.coveragePct.toFixed(0)}% · Verdict: ${nums.verdict}${nums.pensionMaterial ? ` (pension covers ${nums.pensionShareOfNeed.toFixed(0)}% of need)` : ''}
 - Pre-retirement (accumulation) growth rate: ${state.growthRate||7}% nominal / ${Math.max(0,(state.growthRate||7)-state.inflationRate).toFixed(1)}% real — use this for savings growth projections before retirement
 - Post-retirement growth rate: ${state.retirementPostGrowth||4}% nominal / ${realRate.toFixed(1)}% real — use this only for portfolio drawdown after retirement
@@ -16394,7 +16396,17 @@ ${investmentAccountLines || '    (none)'}
 - Pension plans (${pensionAccounts.length} total, payouts are GROSS/pre-tax in today's kr):
 ${pensionAccountLines || '    (none)'}
   CRITICAL: Pension income is only available from each plan's start age. If retirement age is earlier than a pension's start age, the portfolio must cover 100% of expenses during the gap years with no pension offset. Do not assume any pension income before its listed start age.
-- Planned trips: ${state.trips.map(t=>{const b=(t.expenses||[]).reduce((s,ex)=>s+(Number(ex.amount)||0),0);return t.name+' ('+Math.round(b).toLocaleString()+' kr)';}).join(', ')}
+- Planned trips (${(state.trips||[]).length} total):
+${(state.trips||[]).length === 0 ? '    (none)' : (state.trips||[]).map(tr => {
+  const budget = (tr.expenses||[]).reduce((s,ex)=>s+(Number(ex.amount)||0),0);
+  const spent = Number(tr.spent)||0;
+  const remaining = budget - spent;
+  const dates = (tr.expenses||[]).map(ex=>ex.date||'').filter(Boolean).sort();
+  const earliest = dates[0] || 'no date set';
+  const latest = dates[dates.length-1] || earliest;
+  const dateRange = earliest === latest ? earliest : `${earliest} → ${latest}`;
+  return `    · ${tr.name} (${tr.status||'planning'}): budget ${Math.round(budget).toLocaleString()} kr | spent ${Math.round(spent).toLocaleString()} kr | remaining ${Math.round(remaining).toLocaleString()} kr | expense months: ${dateRange}`;
+}).join('\n')}
 - Retire Anywhere feasible destinations at current real income: ${scored.filter(l=>l.verdict==='feasible').map(l=>l.name).join(', ')||'none feasible at current income level'}
 
 INLINE CHARTS — OPTIONAL
