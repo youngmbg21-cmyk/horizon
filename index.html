@@ -1103,6 +1103,18 @@ body.light .loc-card:hover { box-shadow:0 5px 14px -8px rgba(60,40,10,0.18); }
   font-size:9px; color:var(--text3);
   margin-top:1px; white-space:nowrap;
 }
+.ret-asset-proj-post {
+  font-size:9px; color:var(--text2); font-weight:600;
+  margin-top:4px; white-space:nowrap;
+}
+.rac-taxtype {
+  background:transparent; border:none;
+  color:var(--text2); font-size:8px; font-family:var(--fm);
+  font-weight:700; letter-spacing:.04em;
+  padding:0 2px; cursor:pointer; outline:none;
+  vertical-align:middle; margin-left:3px;
+}
+.rac-taxtype option { background:var(--bg2); }
 
 /* ── RETIREMENT · PORTFOLIO COLUMN LAYOUT ────────────────
    Two-column card grid for Portfolio & Pension. Left column
@@ -6082,7 +6094,7 @@ window.dr = function(name){ return window.commitRender(name); };
 // ─── PERSISTENCE ────────────────────────────────────────────────────────────
 // State schema version. Bump this and add a branch to migrate() whenever the
 // shape of `state` changes in a backwards-incompatible way.
-const STATE_VERSION = 18;
+const STATE_VERSION = 19;
 function migrate(s) {
   const from = s.version || 1;
   if(from >= STATE_VERSION) { s.version = STATE_VERSION; return s; }
@@ -6252,6 +6264,15 @@ function migrate(s) {
     if(!('funFundOpenTripId' in s)) {
       s.funFundOpenTripId = null;
     }
+  }
+  // v18 → v19: per-investment tax-type toggle. 'withdrawal' = exit tax on
+  // gains; 'annual' = yearly tax on total value (e.g. Swedish ISK).
+  // Default to 'withdrawal' so existing cards are unchanged.
+  if(from < 19) {
+    (s.externalAssets || []).forEach(a => {
+      if((a.assetType || 'investment') !== 'investment') return;
+      if(!a.taxType) a.taxType = 'withdrawal';
+    });
   }
   s.version = STATE_VERSION;
   return s;
@@ -6597,14 +6618,17 @@ function getEffectiveWithdrawTaxRate() {
   let wSum = 0, bSum = 0;
   inv.forEach(a => {
     const b = Math.max(0, Number(a.balance) || 0);
-    const tr = Number.isFinite(a.taxRate) ? a.taxRate : 30;
+    // Annual-tax accounts (e.g. ISK) have no withdrawal tax — their tax
+    // has already been paid year by year during accumulation.
+    const tr = (a.taxType === 'annual') ? 0 : (Number.isFinite(a.taxRate) ? a.taxRate : 30);
     wSum += b * tr;
     bSum += b;
   });
   if(bSum <= 0) {
-    // No balances yet — simple mean so a user tweaking tax on an empty
-    // account still sees the headline figure respond.
-    const mean = inv.reduce((s,a)=>s+(Number.isFinite(a.taxRate)?a.taxRate:30),0)/inv.length;
+    const mean = inv.reduce((s,a) => {
+      const tr = (a.taxType === 'annual') ? 0 : (Number.isFinite(a.taxRate) ? a.taxRate : 30);
+      return s + tr;
+    }, 0) / inv.length;
     return mean;
   }
   return wSum / bSum;
@@ -11776,11 +11800,35 @@ function renderRetirement() {
         </div>
       </div>`;
     const tr4 = Number.isFinite(a.taxRate) ? a.taxRate : 30;
+    const taxType = a.taxType || 'withdrawal';
+    // Post-tax projected value: for annual-tax accounts recompute using the
+    // net effective growth rate (growth minus annual tax drag); for
+    // withdrawal-tax accounts apply the rate to the pre-tax lump sum.
+    const ytr = Math.max(0, state.retirementAge - state.currentAge);
+    let projPostTax;
+    if (taxType === 'annual') {
+      const effectiveRate = Math.max(0, (a.growthRate ?? state.growthRate) - tr4);
+      const nomPostTax = futureValue(a.balance, a.monthlyContribution, effectiveRate, ytr);
+      projPostTax = FE.display.isNominal() ? nomPostTax : FE.inflation.toTodaysMoney(nomPostTax, ytr);
+    } else {
+      projPostTax = projR * (1 - tr4 / 100);
+    }
+    const taxRateCell = `
+      <div class="ret-asset-cell">
+        <label>${t('s2.card.field.taxRate')}<select class="rac-taxtype" onchange="state.externalAssets[${idx}].taxType=this.value;save();renderRetirement()" title="Tax method">
+          <option value="withdrawal" ${taxType==='withdrawal'?'selected':''}>on exit</option>
+          <option value="annual" ${taxType==='annual'?'selected':''}>annual</option>
+        </select></label>
+        <div class="rac-input-wrap">
+          <input type="text" inputmode="decimal" data-lang-num="1" value="${tr4}" oninput="state.externalAssets[${idx}].taxRate=parseNum(this.value);save()" onchange="commitRender('renderRetirement')">
+          <span class="rac-suffix">%</span>
+        </div>
+      </div>`;
     const fields = isInv ? `
       ${numCell(t('s2.card.field.balance'),      Math.round(a.balance*r),             `state.externalAssets[${idx}].balance=parseNum(this.value)/${r};save()`, s)}
       ${numCell(t('s2.card.field.contribution'), Math.round(a.monthlyContribution*r), `state.externalAssets[${idx}].monthlyContribution=parseNum(this.value)/${r};save()`, s, '/mo')}
       ${numCell(t('s2.card.field.growthRate'),   gr,                                  `state.externalAssets[${idx}].growthRate=parseNum(this.value);save()`, '', '%')}
-      ${numCell(t('s2.card.field.taxRate'),      tr4,                                 `state.externalAssets[${idx}].taxRate=parseNum(this.value);save()`, '', '%')}
+      ${taxRateCell}
     ` : `
       ${numCell(t('s2.card.field.payout'),  Math.round((a.monthlyPayout||0)*r), `state.externalAssets[${idx}].monthlyPayout=parseNum(this.value)/${r};save()`, s, '/mo')}
       ${numCell(t('s2.card.field.fromAge'), a.startAge||state.retirementAge,    `state.externalAssets[${idx}].startAge=parseNum(this.value);save()`)}
@@ -11790,6 +11838,7 @@ function renderRetirement() {
         <div class="ret-asset-proj-lbl">${esc2(t('s2.card.proj.projected'))}</div>
         <div class="ret-asset-proj-val">${fmt(projR)}</div>
         <div class="ret-asset-proj-sub">${esc2(t('s2.card.proj.atAge', { s, age: state.retirementAge }))}</div>
+        <div class="ret-asset-proj-post">${fmt(projPostTax)} after tax</div>
       </div>
     ` : `
       <div class="ret-asset-proj">
@@ -11837,7 +11886,7 @@ function renderRetirement() {
   // that's already localised.
   const newAccountName = t('s2.new.account').replace(/'/g, "\\'");
   const newPensionName = t('s2.new.pension').replace(/'/g, "\\'");
-  const addInvestmentBtn = `<button class="ret-col-add" onclick="state.externalAssets.push({id:genId(),name:'${newAccountName}',balance:0,monthlyContribution:0,growthRate:7,taxRate:30,assetType:'investment'});save();renderRetirement()">${esc2(t('s2.col.addInvestment'))}</button>`;
+  const addInvestmentBtn = `<button class="ret-col-add" onclick="state.externalAssets.push({id:genId(),name:'${newAccountName}',balance:0,monthlyContribution:0,growthRate:7,taxRate:30,taxType:'withdrawal',assetType:'investment'});save();renderRetirement()">${esc2(t('s2.col.addInvestment'))}</button>`;
   const addPensionBtn    = `<button class="ret-col-add" onclick="state.externalAssets.push({id:genId(),name:'${newPensionName}',monthlyPayout:0,startAge:state.retirementAge,endAge:null,assetType:'pension'});save();renderRetirement()">${esc2(t('s2.col.addPension'))}</button>`;
   const emptyInv = `<div class="ret-col-empty">${t('s2.col.emptyInv')}</div>`;
   const emptyPen = `<div class="ret-col-empty">${t('s2.col.emptyPen')}</div>`;
