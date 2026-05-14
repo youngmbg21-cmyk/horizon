@@ -6767,13 +6767,16 @@ function getRetirementNumbers() {
     // after depletion, only years where pension alone covers need stay
     // funded. This replaces the prior annuity-math coverage, which
     // could report 107% on a simulation that depleted 10 years early.
+    // pensionAvgMonthlyAfterTax: pension weighted avg after applying the same
+    // home-country effective tax rate as the portfolio withdrawal, so both
+    // income sources are on the same after-tax basis.
     const pensionAvgMonthlyAfterTax = pensionAvgMonthly * (1 - taxRate);
-    // totalRetirementIncome is fully after-tax so it is directly comparable
-    // to totalExp (also after-tax). Previously mixed after-tax portfolio with
-    // gross pension, making gap/surplus wrong and overstating income.
+    // totalRetirementIncome: consistently after home-country tax so the gap
+    // vs totalExp (also after-tax) is a meaningful net surplus/shortfall.
     const totalRetirementIncome = sustainableAfterTax + pensionAvgMonthlyAfterTax;
-    // Gross income (pre-tax) used by Retire Anywhere scoring, where the
-    // destination country tax rate is applied to the full gross amount.
+    // grossRetirementIncome: total before any tax — used by Retire Anywhere
+    // which applies the destination tax separately, and by AI prompts that
+    // pass pre-tax income to be taxed at the destination rate.
     const grossRetirementIncome = sustainableMonthly + pensionAvgMonthly;
     const gap = totalRetirementIncome - totalExp;
     const coveragePct = simResult.totalYears > 0
@@ -7937,8 +7940,9 @@ function scoreLocation(loc) {
   // only recompute per-location fields and cache per id.
   return memoSelect('loc:'+(loc.id||loc.name), () => {
     const nums = getRetirementNumbers();
-    // Use gross income so destination tax rate is applied to the full
-    // pre-tax amount — correct for cross-border retirement scoring.
+    // Use gross income so destination tax is applied cleanly. The previous
+    // totalRetirementIncome mixed after-tax portfolio + gross pension, which
+    // double-counted the home-country tax when the destination rate was applied.
     const monthlyIncome = nums.grossRetirementIncome;
     const netIncome = monthlyIncome * (1 - (loc.taxRate || 0) / 100);
     const ratio = netIncome > 0 ? loc.costOfLiving / netIncome : 2;
@@ -13716,7 +13720,7 @@ function renderRetireAnywhere() {
   const scored=retirePlaces().map(scoreLocation);
   const r=rate();
   const nums=getRetirementNumbers();
-  const monthlyIncome=nums.totalRetirementIncome;
+  const monthlyIncome=nums.grossRetirementIncome;
 
   const locCards=scored.map(loc=>{
     // Is there a cached Deep Dive report for this location in the Vault?
@@ -13762,7 +13766,7 @@ function renderRetireAnywhere() {
 
     <div class="callout">
       <span>💡</span>
-      <div>${t('ra.callout', { income: fmt(monthlyIncome), port: fmt(nums.sustainableAfterTax), pen: fmt(nums.pensionAvgMonthly) })}</div>
+      <div>${t('ra.callout', { income: fmt(monthlyIncome), port: fmt(nums.sustainableMonthly), pen: fmt(nums.pensionAvgMonthly) })}</div>
     </div>
 
     ${ui.kpiRow([
@@ -13808,7 +13812,7 @@ window.showLocDetail=function(id){
   const r=rate(); const s=sym();
   const months=get12Months();
   const nums=getRetirementNumbers();
-  const monthlyIncome=nums.totalRetirementIncome;
+  const monthlyIncome=nums.grossRetirementIncome;
   document.getElementById('loc-modal-content').innerHTML=`
     <div style="font-size:28px;margin-bottom:6px">${loc.flag}</div>
     <div class="modal-title">${esc(loc.name)}, ${esc(loc.country)}</div>
@@ -13883,7 +13887,7 @@ function renderLocAnalysisSlideover(opts){
   if(!loc) return;
   const r = rate(); const s = sym();
   const nums = getRetirementNumbers();
-  const monthlyIncome = nums.totalRetirementIncome;
+  const monthlyIncome = nums.grossRetirementIncome;
   const cached = (state.vault||[]).find(v => v.type==='deepdive' && v.locationId===id);
 
   // Header
@@ -13989,7 +13993,7 @@ window.runLocAnalysis = function(id, opts){
   const cz = countryInfo(state.citizenship);
   const hb = countryInfo(state.homeBase);
   const nums = getRetirementNumbers();
-  const income = nums.totalRetirementIncome;
+  const income = nums.grossRetirementIncome;
   // If rerun, strip the previous cached entry so the new one replaces it
   if(opts && opts.force){
     state.vault = (state.vault||[]).filter(v => !(v.type==='deepdive' && v.locationId===id));
@@ -14731,7 +14735,7 @@ window.aiAnalyzeLocations=function(){
   const key=state.aiKeys?.claude;
   if(!key){toggleAIPanel();return;}
   const nums=getRetirementNumbers();
-  const income=nums.totalRetirementIncome;
+  const income=nums.grossRetirementIncome;
   const ctx = (typeof buildPersonalContext==='function') ? buildPersonalContext() : '';
   const prompt=`${ctx}\n\nThe user is planning to retire with a monthly income of ${fmt(income)} (this is TODAY'S MONEY — real, inflation-adjusted purchasing power, not nominal future kr). Recommend the BEST retirement destinations globally based on this real income. Consider: cost of living, healthcare quality, climate, expat communities, visa/residency requirements, and lifestyle. Tailor visa and tax-treaty advice to the user's citizenship and home base. Give 5 specific recommendations with monthly cost estimates (also in today's money / local-currency-equivalent) and a viability score. Format as a structured list.${langSuffix()}`;
   // Kick off in the background (fire-and-forget); the UI is driven by the
@@ -14773,7 +14777,7 @@ window.aiDeepDive = function(id){
   const cz = countryInfo(state.citizenship);
   const hb = countryInfo(state.homeBase);
   const nums = getRetirementNumbers();
-  const income = nums.totalRetirementIncome;
+  const income = nums.grossRetirementIncome;
   const el = document.getElementById('loc-ai-out');
   if(el) el.innerHTML = '<div class="card" style="padding:16px"><div class="state-spinner" style="display:inline-block;vertical-align:middle;margin-right:10px;width:16px;height:16px;border-width:2px"></div><span style="color:var(--accent-positive);font-family:var(--fm);font-size:12px">Generating Deep Dive report… this takes 20–40 seconds.</span></div>';
   const ctx = buildPersonalContext();
@@ -16312,7 +16316,7 @@ function buildAIContext() {
   // result so they can't drift.
   const realNestEgg          = FE.retirement.nestEggTodayMoney();
   const nominalNestEgg       = FE.projection.totalNominal();
-  const realRetirementIncome = nums.totalRetirementIncome;
+  const realRetirementIncome = nums.grossRetirementIncome;
   const realRate = Math.max(0, (state.retirementPostGrowth || 4) - state.inflationRate);
   const effectiveTaxPct = (nums.taxRate * 100).toFixed(1);
   // Per-investment-account detail for AI context (Bug 2 & 10)
@@ -16408,10 +16412,9 @@ Retirement plan figures — computed under the ACTIVE ${scenLabelMap[activeScen]
 - Age: ${state.currentAge} | Retiring at: ${state.retirementAge} (${Math.max(0,state.retirementAge-state.currentAge)} years away) | Life expectancy: ${state.lifeExp || 90}
 - Active retirement expenses (after-tax, ${scenLabelMap[activeScen]}): ${Math.round(nums.totalExp).toLocaleString()} kr/mo  ← this is figure (B), NOT figure (A)
 - Nest egg at retirement: ${Math.round(realNestEgg).toLocaleString()} kr (today's money) — equivalent to ${Math.round(nominalNestEgg).toLocaleString()} kr nominal/future kr at retirement
-- Effective portfolio withdrawal tax rate: ${effectiveTaxPct}% (balance-weighted across accounts — this is a blended estimate, not what the user will actually pay). IMPORTANT CAVEAT: actual tax paid depends on withdrawal order. If the user draws from lower-tax accounts first (tax-efficient sequencing), effective tax will be lower than this figure; if they draw from higher-tax accounts first, it will be higher. Do not present this rate as the exact tax they will pay — use it as a planning estimate and mention withdrawal-order flexibility if the user asks about tax optimisation. Pension income is also taxable at broadly the same marginal rate in Sweden — treat pension payouts as gross figures subject to income tax.
-- Sustainable monthly retirement income (today's money, real): ${Math.round(realRetirementIncome).toLocaleString()} kr/mo total — CAUTION: this total combines after-tax portfolio income with gross pre-tax pension income, so it is NOT directly comparable to the after-tax retirement expense figure. Net spendable income is lower once pension tax is applied.
-    · Portfolio contribution: ${Math.round(nums.sustainableAfterTax).toLocaleString()} kr/mo — AFTER ${effectiveTaxPct}% withdrawal tax
-    · Pension contribution: ${Math.round(nums.pensionAvgMonthly).toLocaleString()} kr/mo — GROSS pre-tax lifetime average (see pension plans above for per-plan start ages and actual payouts)
+- Effective portfolio withdrawal tax rate: ${effectiveTaxPct}% (balance-weighted across accounts — planning estimate, not exact; actual depends on withdrawal order).
+- Gross monthly retirement income: ${Math.round(realRetirementIncome).toLocaleString()} kr/mo (today's money, before any tax) — ${Math.round(nums.sustainableMonthly).toLocaleString()} kr gross from portfolio + ${Math.round(nums.pensionAvgMonthly).toLocaleString()} kr gross avg pension (weighted avg across full retirement period), all real
+- Net monthly retirement income (after home-country tax at ${Math.round(nums.taxRate*100)}%): ${Math.round(nums.totalRetirementIncome).toLocaleString()} kr/mo — ${Math.round(nums.sustainableAfterTax).toLocaleString()} kr net from portfolio + ${Math.round(nums.pensionAvgMonthlyAfterTax).toLocaleString()} kr net avg pension
 - Coverage: ${nums.coveragePct.toFixed(0)}% · Verdict: ${nums.verdict}${nums.pensionMaterial ? ` (pension covers ${nums.pensionShareOfNeed.toFixed(0)}% of need)` : ''}
 - Pre-retirement (accumulation) growth rate: ${state.growthRate||7}% nominal / ${Math.max(0,(state.growthRate||7)-state.inflationRate).toFixed(1)}% real — use this for savings growth projections before retirement
 - Post-retirement growth rate: ${state.retirementPostGrowth||4}% nominal / ${realRate.toFixed(1)}% real — use this only for portfolio drawdown after retirement
@@ -16978,7 +16981,7 @@ function buildSeriesCatalog(){
       },
     };
   };
-  addDestSeries('destinations.income',        'Monthly retirement income', 'currency', () => FE.retirement.numbers().totalRetirementIncome);
+  addDestSeries('destinations.income',        'Monthly retirement income (gross)', 'currency', () => FE.retirement.numbers().grossRetirementIncome);
   addDestSeries('destinations.costOfLiving',  'Cost of living · monthly',  'currency', l => l.costOfLiving);
   addDestSeries('destinations.surplus',       'Monthly surplus',           'currency', l => l.surplus);
   addDestSeries('destinations.taxRate',       'Tax rate · %',              'percent',  l => l.taxRate);
