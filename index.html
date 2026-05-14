@@ -6545,7 +6545,7 @@ function futureValue(P, PMT, r, years) {
 function getProjection() {
   return memoSelect('proj', () => {
     const ytr = Math.max(0, state.retirementAge - state.currentAge);
-    const investments = state.externalAssets.filter(a=>(a.assetType||'investment')==='investment');
+    const investments = (state.externalAssets||[]).filter(a=>(a.assetType||'investment')==='investment');
     const assetBals = investments.map(a=>a.balance);
     let appAcc=0;
     const data=[];
@@ -6726,7 +6726,11 @@ function getRetirementNumbers() {
     const nestEgg = proj.length?proj[proj.length-1].realTotal:0;
     const realRate = Math.max(0.001,(state.retirementPostGrowth||4)-state.inflationRate)/100/12;
     const retMonths = Math.max(1,(state.lifeExp-state.retirementAge)*12);
-    const sustainableMonthly = realRate>0?nestEgg*realRate/(1-Math.pow(1+realRate,-retMonths)):nestEgg/retMonths;
+    // When retirementAge >= lifeExp the user has set nonsensical ages;
+    // clamp sustainableMonthly to 0 rather than dividing nestEgg by 1 month.
+    const sustainableMonthly = retMonths <= 1 && state.lifeExp <= state.retirementAge
+      ? 0
+      : realRate>0?nestEgg*realRate/(1-Math.pow(1+realRate,-retMonths)):nestEgg/retMonths;
     const sustainableAfterTax = sustainableMonthly*(1-taxRate);
 
     // Run the pension-aware simulation once. runoutAge is taken from it
@@ -6763,7 +6767,14 @@ function getRetirementNumbers() {
     // after depletion, only years where pension alone covers need stay
     // funded. This replaces the prior annuity-math coverage, which
     // could report 107% on a simulation that depleted 10 years early.
-    const totalRetirementIncome = sustainableAfterTax + pensionAvgMonthly;
+    const pensionAvgMonthlyAfterTax = pensionAvgMonthly * (1 - taxRate);
+    // totalRetirementIncome is fully after-tax so it is directly comparable
+    // to totalExp (also after-tax). Previously mixed after-tax portfolio with
+    // gross pension, making gap/surplus wrong and overstating income.
+    const totalRetirementIncome = sustainableAfterTax + pensionAvgMonthlyAfterTax;
+    // Gross income (pre-tax) used by Retire Anywhere scoring, where the
+    // destination country tax rate is applied to the full gross amount.
+    const grossRetirementIncome = sustainableMonthly + pensionAvgMonthly;
     const gap = totalRetirementIncome - totalExp;
     const coveragePct = simResult.totalYears > 0
       ? (simResult.fundedYears / simResult.totalYears) * 100
@@ -6814,8 +6825,8 @@ function getRetirementNumbers() {
     const pensionMaterial = pensionAvgMonthly > 0 && pensionShareOfNeed >= 5;
 
     return {
-      totalExp, totalGross, pension, pensionAvgMonthly, grossNeeded,
-      nestEgg, sustainableMonthly, sustainableAfterTax, totalRetirementIncome,
+      totalExp, totalGross, pension, pensionAvgMonthly, pensionAvgMonthlyAfterTax, grossNeeded,
+      nestEgg, sustainableMonthly, sustainableAfterTax, totalRetirementIncome, grossRetirementIncome,
       gap, coveragePct, verdict, verdictIcon, verdictClass, verdictKey,
       pensionShareOfNeed, portfolioShareOfNeed, pensionMaterial,
       ytr, runoutAge, taxRate, sc, mult, _simResult: simResult,
@@ -7926,7 +7937,9 @@ function scoreLocation(loc) {
   // only recompute per-location fields and cache per id.
   return memoSelect('loc:'+(loc.id||loc.name), () => {
     const nums = getRetirementNumbers();
-    const monthlyIncome = nums.totalRetirementIncome;
+    // Use gross income so destination tax rate is applied to the full
+    // pre-tax amount — correct for cross-border retirement scoring.
+    const monthlyIncome = nums.grossRetirementIncome;
     const netIncome = monthlyIncome * (1 - (loc.taxRate || 0) / 100);
     const ratio = netIncome > 0 ? loc.costOfLiving / netIncome : 2;
     const affordabilityScore = Math.max(0, Math.min(1, 1 - ratio));
