@@ -14023,7 +14023,12 @@ MEDIAN_INCOME_USD: [median monthly gross personal income in USD for this city]${
         const medianUSD = parseFloat(medianMatch[1]);
         const usdToSek = 1 / (DEFAULT_RATES.USD || 0.11);
         const locRef = state.places.find(l => l.id === id);
-        if(locRef && medianUSD > 0) locRef.medianMonthlyIncome = Math.round(medianUSD * usdToSek);
+        if(locRef && medianUSD > 0){
+        locRef.medianMonthlyIncome = Math.round(medianUSD * usdToSek);
+        // Invalidate the memoSelect cache so scoreLocation() recomputes
+        // incomePercentile with the newly-stored median income.
+        invalidateSelectors();
+      }
       }
       const cleanReply = reply.replace(/\nMEDIAN_INCOME_USD:\s*[\d.]+[^\n]*/gi, '');
       // Save to Vault automatically so the slide-over, the Vault tab,
@@ -14696,7 +14701,7 @@ window.aiAnalyzeLoc=async function(id){
   const key=state.aiKeys?.claude;
   if(!key){alert('Add your Claude API key in Settings first.');return;}
   const nums=getRetirementNumbers();
-  const income=nums.totalRetirementIncome;
+  const income=nums.grossRetirementIncome;
   const el=document.getElementById('loc-ai-out'); el.innerHTML='<span class="pulse">🤖 Analyzing…</span>';
   const ctx = buildPersonalContext();
   const prompt=`${ctx}\n\nDetailed retirement feasibility analysis for ${loc.name}, ${loc.country}. The retiree has a monthly income of ${fmt(income)} (in today's money). Local cost of living: ${fmt(loc.costOfLiving)}/mo. Local income tax: ${loc.taxRate}%. Cover: actual cost of living breakdown, healthcare quality, visa/residency for the user's citizenship, quality of life, pros/cons, and an overall verdict. Be specific and practical. Under 250 words.${langSuffix()}`;
@@ -16047,7 +16052,7 @@ function aipRenderActiveThread(){
       if(blocks.length) rendered = _inlineAIChartPlaceholders(rendered, blocks);
       wrap.innerHTML = `${labelHtml}<div class="${bubbleClass} ai-msg-snapshot">${rendered}</div>`;
       msgs.appendChild(wrap);
-      if(blocks.length) _renderAIChartBlocks(wrap.querySelector('.ai-msg'), blocks);
+      _renderAIChartBlocks(wrap.querySelector('.ai-msg'), blocks);
       return;
     }
     if(side === 'bot'){
@@ -16057,7 +16062,7 @@ function aipRenderActiveThread(){
       if(blocks.length) rendered = _inlineAIChartPlaceholders(rendered, blocks);
       wrap.innerHTML = `${labelHtml}<div class="${bubbleClass}">${rendered}</div>`;
       msgs.appendChild(wrap);
-      if(blocks.length) _renderAIChartBlocks(wrap.querySelector('.ai-msg'), blocks);
+      _renderAIChartBlocks(wrap.querySelector('.ai-msg'), blocks);
       return;
     } else {
       wrap.innerHTML = `<div class="${bubbleClass}">${esc(String(m.content || ''))}</div>`;
@@ -17405,8 +17410,56 @@ function _inlineAIChartPlaceholders(html, blocks){
 // Given the list of extracted blocks, instantiate a Chart.js instance for
 // each placeholder currently in the DOM. Runs AFTER the bubble's innerHTML
 // has been set, so the placeholder nodes exist.
+// Also rescues any ```horizon-chart``` fenced blocks that slipped past the
+// text-phase extractor (they land as <pre data-lang="horizon-chart"> after
+// mdParse) so the user never sees raw JSON in the chat.
 function _renderAIChartBlocks(root, blocks){
-  if(!root || !blocks || !blocks.length) return;
+  if(!root) return;
+  // Rescue orphaned <pre data-lang="horizon-chart"> blocks that the text
+  // extractor missed. querySelectorAll returns a static NodeList so replacing
+  // outerHTML mid-loop is safe.
+  const orphans = root.querySelectorAll('pre[data-lang="horizon-chart"]');
+  orphans.forEach((pre, i) => {
+    const code = pre.querySelector('code');
+    const rawBody = (code ? code.textContent : pre.textContent).trim();
+    let payload = null;
+    try { payload = JSON.parse(rawBody); } catch(e) {
+      pre.outerHTML = `<div class="ai-chart-err">Chart parse error: ${esc(e.message)}</div>`;
+      return;
+    }
+    const kind = payload && payload.kind;
+    const recipe = kind && AI_CHART_RECIPES[kind];
+    if(!recipe){
+      pre.outerHTML = `<div class="ai-chart-err">Unknown chart kind: ${esc(String(kind||'(missing)'))}.</div>`;
+      return;
+    }
+    let cfg = null;
+    try { cfg = recipe(payload); } catch(e) {
+      pre.outerHTML = `<div class="ai-chart-err">Chart build error: ${esc(e.message)}</div>`;
+      return;
+    }
+    if(!cfg){
+      pre.outerHTML = `<div class="ai-chart-card"><div class="ai-chart-hd"><div class="ai-chart-title">${esc(payload?.title||kind)}</div></div><div class="ai-chart-empty">Not enough data to render this chart yet.</div></div>`;
+      return;
+    }
+    const title = cfg._title || kind;
+    const subtitle = cfg._subtitle || '';
+    delete cfg._title; delete cfg._subtitle;
+    const cardId = `aichart-rescue-${Date.now()}-${i}`;
+    pre.outerHTML = `
+      <div class="ai-chart-card" data-chart-id="${cardId}">
+        <div class="ai-chart-hd">
+          <div class="ai-chart-title">${esc(title)}</div>
+          ${subtitle ? `<div class="ai-chart-sub">${esc(subtitle)}</div>` : ''}
+        </div>
+        <div class="ai-chart-canvas-wrap"><canvas id="${cardId}-canvas"></canvas></div>
+      </div>`;
+    const canvas = document.getElementById(`${cardId}-canvas`);
+    if(!canvas) return;
+    try { destroyChart(cardId); charts[cardId] = new Chart(canvas.getContext('2d'), cfg); }
+    catch(e){ canvas.parentElement.innerHTML = `<div class="ai-chart-err">Chart.js error: ${esc(e.message)}</div>`; }
+  });
+  if(!blocks || !blocks.length) return;
   for(const blk of blocks){
     const host = root.querySelector(`.ai-chart-placeholder[data-chart-id="${blk.chartId}"]`);
     if(!host) continue;
@@ -17524,7 +17577,7 @@ async function sendToAI(thread, msg){
     let rendered = mdParse(cleanedText);
     if(blocks.length) rendered = _inlineAIChartPlaceholders(rendered, blocks);
     bubble.innerHTML = rendered;
-    if(blocks.length) _renderAIChartBlocks(bubble, blocks);
+    _renderAIChartBlocks(bubble, blocks);
   } catch(e){ typWrap.querySelector('.ai-msg').innerHTML=`<span style="color:var(--red);font-size:12px">Error: ${e.message}</span>`; }
   aipTyping=false;
   // Land the user at the TOP of the new response so long replies can
