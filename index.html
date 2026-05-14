@@ -5321,8 +5321,8 @@ const STRINGS = {
   // KPI row above the two-column card grid.
   's2.kpi.totalBalance':    { en:'TOTAL INVESTMENT BALANCE',
                               sv:'TOTAL INVESTERINGSSALDO' },
-  's2.kpi.totalBalance.sub':{ en:'{n} investment account{s} · incl. {savings} savings YTD',
-                              sv:'{n} investeringskonton · inkl. {savings} sparande hittills i år' },
+  's2.kpi.totalBalance.sub':{ en:'{n} investment account{s} · incl. {savings} est. savings this yr',
+                              sv:'{n} investeringskonton · inkl. {savings} beräknat sparande i år' },
   's2.kpi.monthlyContrib':  { en:'MONTHLY CONTRIBUTIONS',
                               sv:'MÅNATLIGA INSÄTTNINGAR' },
   's2.kpi.monthlyContrib.sub':{ en:'Investments + savings stream',
@@ -16401,6 +16401,7 @@ Retirement plan figures — computed under the ACTIVE ${scenLabelMap[activeScen]
 - Investment accounts (${investmentAccounts.length} total, balances in today's kr):
 ${investmentAccountLines || '    (none)'}
   NOTE: accounts with a custom growth rate use their own rate — do NOT apply the global pre-retirement rate to them. The global ${state.growthRate || 7}% is only the default for accounts without a custom rate.
+  The "Total Investment Balance" KPI on the Portfolio card = sum of current account balances + estimated savings for the remainder of the current calendar year (NOT year-to-date). The savings component is: monthly savings rate × months remaining in the current year (${12 - CM} months). It is a near-term forward projection, not a retrospective YTD figure.
 - Pension plans (${pensionAccounts.length} total, payouts are GROSS/pre-tax in today's kr):
 ${pensionAccountLines || '    (none)'}
   CRITICAL: Pension income is only available from each plan's start age. If retirement age is earlier than a pension's start age, the portfolio must cover 100% of expenses during the gap years with no pension offset. Do not assume any pension income before its listed start age.
