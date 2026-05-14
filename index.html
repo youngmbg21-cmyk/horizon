@@ -430,6 +430,10 @@ body.light .card.card-clickable:hover {
 .line-type { background:var(--bg3); border:1px solid var(--border); border-radius:4px; padding:6px 7px; color:var(--text2); font-size:10px; outline:none; }
 .line-rm { background:transparent; border:none; color:var(--red); font-size:15px; cursor:pointer; opacity:.5; transition:opacity .2s; padding:2px 5px; }
 .line-rm:hover { opacity:1; }
+.line-name-ro { flex:1; background:var(--bg3); border:1px solid var(--border); border-radius:4px; padding:6px 9px; color:var(--text2); font-size:12px; }
+.line-amt-wrap-scenario { border-color:rgba(245,158,11,.4); }
+.line-amt-scenario { width:85px; font-family:var(--fm); font-size:12px; font-weight:700; padding:6px 0; color:var(--amber); }
+.line-type-ro { background:var(--bg3); border:1px solid var(--border); border-radius:4px; padding:6px 7px; color:var(--text3); font-size:10px; }
 /* Actual-vs-budget variance pill (Transactions → Budget mapping) */
 .line-variance { font-family:var(--fm); font-size:10px; font-weight:600; padding:3px 8px; border-radius:4px; white-space:nowrap; cursor:help; letter-spacing:.01em; }
 .line-variance.pos { background:var(--accent-positive-dim); color:var(--accent-positive); border:1px solid var(--accent-positive-dim); }
@@ -11546,6 +11550,8 @@ function renderRetirement() {
   const retExp=state.retirementExpenses||[];
   const r=rate(); const s=sym();
   const sc=state.retirementScenario||'baseline';
+  const mult=RET_SCENARIOS[sc]||1.0;
+  const isBaseline=sc==='baseline';
   const investments=state.externalAssets.filter(a=>(a.assetType||'investment')==='investment');
   const pensions=getPensionAssets();
   const ytr=Math.max(0,state.retirementAge-state.currentAge);
@@ -11978,14 +11984,26 @@ function renderRetirement() {
     </div>`;
 
   // ── SECTION 3: EXPENSES & PARAMETERS ────────────────────────────────────────
-  const expRows = retExp.map((e,idx)=>`
+  const expRows = retExp.map((e,idx)=>{
+    if(!isBaseline){
+      // Non-baseline: show scenario-scaled amount in amber, all fields locked.
+      return `
+    <div class="line-item line-item-scenario">
+      <span style="font-size:14px;width:20px;text-align:center;flex-shrink:0">${e.icon||'💸'}</span>
+      <span class="line-name line-name-ro">${esc(e.name)}</span>
+      <div class="line-amt-wrap line-amt-wrap-scenario"><span class="line-cur">${s}</span><span class="line-amt-scenario">${Math.round(e.amount*mult*r).toLocaleString()}</span></div>
+      <span class="line-type line-type-ro">${e.type==='fixed'?'Fixed':'Variable'}</span>
+    </div>`;
+    }
+    return `
     <div class="line-item">
       <span style="font-size:14px;width:20px;text-align:center;flex-shrink:0">${e.icon||'💸'}</span>
       <input class="line-name" value="${esc(e.name)}" oninput="state.retirementExpenses[${idx}].name=this.value;save()" onchange="commitRender('renderRetirement')">
       <div class="line-amt-wrap"><span class="line-cur">${s}</span><input class="line-amt" type="text" inputmode="decimal" data-lang-num="1" value="${Math.round(e.amount*r)}" oninput="state.retirementExpenses[${idx}].amount=parseNum(this.value)/${r};save()" onchange="commitRender('renderRetirement')"></div>
       <select class="line-type" onchange="state.retirementExpenses[${idx}].type=this.value;save()"><option value="fixed" ${e.type==='fixed'?'selected':''}>Fixed</option><option value="variable" ${e.type==='variable'?'selected':''}>Variable</option></select>
       <button class="line-rm" onclick="state.retirementExpenses.splice(${idx},1);save();renderRetirement()">×</button>
-    </div>`).join('');
+    </div>`;
+  }).join('');
 
   // "Seeded from current budget" banner data. If the user has
   // clicked the Copy button, state.retirementExpensesSeededFrom holds
@@ -12016,14 +12034,14 @@ function renderRetirement() {
         <div class="card">
           <div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap">
             <span>${esc2(t('s3.exp.title'))} <span style="font-size:9px;color:var(--text2);font-weight:400;text-transform:none">${esc2(t('s3.exp.titleSub'))}</span></span>
-            <div style="display:flex;gap:6px;flex-wrap:wrap">
+            ${isBaseline?`<div style="display:flex;gap:6px;flex-wrap:wrap">
               <button class="btn btn-o btn-xs" onclick="copyBaselineToRetirementExpenses()" title="${esc2(t('s3.exp.copyTitle'))}">${esc2(t('s3.exp.copyBtn'))}</button>
               <button class="btn btn-o btn-xs" onclick="applyRetirementExpensesToBaseline()" title="${esc2(t('s3.exp.applyToBaselineTitle'))}">${esc2(t('s3.exp.applyToBaselineBtn'))}</button>
-            </div>
+            </div>`:`<span style="font-size:9px;color:var(--amber);font-family:var(--fm);font-weight:600">×${mult} · switch to Baseline to edit</span>`}
           </div>
           ${seededBanner}
           ${expRows}
-          <button class="btn-add" onclick="state.retirementExpenses.push({id:genId(),name:'${newExpenseName}',amount:0,type:'variable',icon:'💸'});save();renderRetirement()">${esc2(t('s3.exp.addExpense'))}</button>
+          ${isBaseline?`<button class="btn-add" onclick="state.retirementExpenses.push({id:genId(),name:'${newExpenseName}',amount:0,type:'variable',icon:'💸'});save();renderRetirement()">${esc2(t('s3.exp.addExpense'))}</button>`:''}
           <div style="margin-top:10px;padding:8px 10px;background:var(--bg3);border-radius:6px;font-size:10px;color:var(--text2);line-height:1.5">
             ${inflationHint}
           </div>
