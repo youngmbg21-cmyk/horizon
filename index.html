@@ -16864,25 +16864,25 @@ const AI_CHART_RECIPES = {
         datasets: [
           {
             type: 'bar', label: 'Portfolio withdrawal',
-            data: sim.portWithdrawal.map(v => v * r),
+            data: sim.portWithdrawal.map(v => v),
             backgroundColor: '#f5a62399', borderColor: '#f5a623',
             borderWidth: 1, stack: 'income', order: 3,
           },
           {
             type: 'bar', label: 'Pension',
-            data: sim.pensionData.map(v => v * r),
+            data: sim.pensionData.map(v => v),
             backgroundColor: '#4d9fff99', borderColor: '#4d9fff',
             borderWidth: 1, stack: 'income', order: 2,
           },
           {
             type: 'bar', label: 'Shortfall',
-            data: (sim.shortfall || []).map(v => v * r),
+            data: (sim.shortfall || []).map(v => v),
             backgroundColor: 'rgba(255,77,109,.35)', borderColor: '#ff4d6d',
             borderWidth: 1, stack: 'income', order: 1,
           },
           {
             type: 'line', label: 'Portfolio balance',
-            data: sim.balData.map(v => v * r),
+            data: sim.balData.map(v => v),
             borderColor: nums.runoutAge ? '#ff4d6d' : '#00e8a0',
             backgroundColor: 'transparent',
             borderWidth: 2, tension: .25, pointRadius: 0,
@@ -16909,14 +16909,14 @@ const AI_CHART_RECIPES = {
     const showNominal = params?.includeNominal === true;
     const datasets = [{
       label: 'Nest egg · today\u2019s money',
-      data: proj.map(p => (p.realTotal||0) * r),
+      data: proj.map(p => (p.realTotal||0)),
       borderColor: '#00e8a0', backgroundColor: 'rgba(0,232,160,.14)',
       borderWidth: 2, tension:.3, pointRadius:0, fill:true,
     }];
     if(showNominal){
       datasets.push({
         label: 'Nominal (future kr)',
-        data: proj.map(p => (p.total||0) * r),
+        data: proj.map(p => (p.total||0)),
         borderColor: '#4d9fff', backgroundColor: 'transparent',
         borderWidth: 1.5, borderDash:[4,3], tension:.3, pointRadius:0,
       });
@@ -16944,7 +16944,7 @@ const AI_CHART_RECIPES = {
         labels: months.map(m => m.short),
         datasets: [{
           label: 'Expenses',
-          data: months.map(m => (m.expenses||0) * r),
+          data: months.map(m => (m.expenses||0)),
           backgroundColor: 'rgba(245,166,35,.35)',
           borderColor: '#f5a623', borderWidth: 1.5, borderRadius: 3,
         }],
@@ -16968,19 +16968,19 @@ const AI_CHART_RECIPES = {
         datasets: [
           {
             label: 'Income',
-            data: months.map(m => (m.income||0) * r),
+            data: months.map(m => (m.income||0)),
             backgroundColor: 'rgba(0,232,160,.3)',
             borderColor: '#00e8a0', borderWidth: 1.5, borderRadius: 3,
           },
           {
             label: 'Expenses',
-            data: months.map(m => (m.expenses||0) * r),
+            data: months.map(m => (m.expenses||0)),
             backgroundColor: 'rgba(255,77,109,.25)',
             borderColor: '#ff4d6d', borderWidth: 1.5, borderRadius: 3,
           },
           {
             type:'line', label: 'Surplus',
-            data: months.map(m => (m.surplus||0) * r),
+            data: months.map(m => (m.surplus||0)),
             borderColor: '#4d9fff', backgroundColor: 'transparent',
             borderWidth: 2, tension:.3, pointRadius: 2,
           },
@@ -17007,7 +17007,7 @@ const AI_CHART_RECIPES = {
         labels: top.map(l => l.name),
         datasets: [{
           label: 'Monthly surplus',
-          data: top.map(l => (l.surplus||0) * r),
+          data: top.map(l => (l.surplus||0)),
           backgroundColor: top.map(l => l.verdict==='feasible' ? 'rgba(0,232,160,.35)' : l.verdict==='conditional' ? 'rgba(245,166,35,.35)' : 'rgba(255,77,109,.25)'),
           borderColor:    top.map(l => l.verdict==='feasible' ? '#00e8a0' : l.verdict==='conditional' ? '#f5a623' : '#ff4d6d'),
           borderWidth: 1.5, borderRadius: 3,
