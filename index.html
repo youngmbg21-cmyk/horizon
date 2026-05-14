@@ -1233,6 +1233,14 @@ body.light .loc-card:hover { box-shadow:0 5px 14px -8px rgba(60,40,10,0.18); }
   border-style:dashed;
   opacity:.85;
 }
+.ret-asset.is-derived .ret-asset-cell.is-editable .rac-input-wrap {
+  background:var(--bg3);
+  border-style:solid;
+  opacity:1;
+}
+.ret-asset.is-derived .ret-asset-cell.is-editable .rac-input-wrap:focus-within {
+  border-color:var(--text3);
+}
 .ret-asset.is-derived .ret-asset-cell .rac-static {
   flex:1; min-width:0;
   font-family:var(--fm); font-size:12px; font-weight:600;
@@ -5813,6 +5821,7 @@ function defaultState() {
     currency:'SEK', darkMode:true, lang:'en', activePanel:'dashboard',
     currentAge:44, retirementAge:69, growthRate:7, inflationRate:2,
     retirementPostGrowth:4, lifeExp:90,
+    savingsTaxRate:30, savingsTaxType:'withdrawal',
     retirementScenario:'baseline',
     // Global money-display mode. 'real' = every future-dated figure is
     // discounted back to today's purchasing power using inflationRate.
@@ -6094,7 +6103,7 @@ window.dr = function(name){ return window.commitRender(name); };
 // ─── PERSISTENCE ────────────────────────────────────────────────────────────
 // State schema version. Bump this and add a branch to migrate() whenever the
 // shape of `state` changes in a backwards-incompatible way.
-const STATE_VERSION = 19;
+const STATE_VERSION = 20;
 function migrate(s) {
   const from = s.version || 1;
   if(from >= STATE_VERSION) { s.version = STATE_VERSION; return s; }
@@ -6273,6 +6282,12 @@ function migrate(s) {
       if((a.assetType || 'investment') !== 'investment') return;
       if(!a.taxType) a.taxType = 'withdrawal';
     });
+  }
+  // v19 → v20: savings projection tax rate/type. Backfill defaults so
+  // existing users see no numeric change on first load.
+  if(from < 20) {
+    if(typeof s.savingsTaxRate !== 'number') s.savingsTaxRate = 30;
+    if(!s.savingsTaxType) s.savingsTaxType = 'withdrawal';
   }
   s.version = STATE_VERSION;
   return s;
@@ -6614,7 +6629,6 @@ function getInvestmentAssets() { return state.externalAssets.filter(a=>(a.assetT
 // investments (e.g. pension-only user).
 function getEffectiveWithdrawTaxRate() {
   const inv = getInvestmentAssets();
-  if(!inv.length) return 0;
   let wSum = 0, bSum = 0;
   inv.forEach(a => {
     const b = Math.max(0, Number(a.balance) || 0);
@@ -6624,12 +6638,18 @@ function getEffectiveWithdrawTaxRate() {
     wSum += b * tr;
     bSum += b;
   });
+  // Include in-app savings projection in the balance-weighted average.
+  const savProj = getProjection();
+  const savBal = Math.max(0, savProj.length ? (savProj[savProj.length-1].appSavings || 0) : 0);
+  const savTr = (state.savingsTaxType === 'annual') ? 0 : (typeof state.savingsTaxRate === 'number' ? state.savingsTaxRate : 30);
+  wSum += savBal * savTr;
+  bSum += savBal;
   if(bSum <= 0) {
-    const mean = inv.reduce((s,a) => {
-      const tr = (a.taxType === 'annual') ? 0 : (Number.isFinite(a.taxRate) ? a.taxRate : 30);
-      return s + tr;
-    }, 0) / inv.length;
-    return mean;
+    // No balances yet — simple mean across all sources.
+    const invMean = inv.length
+      ? inv.reduce((s,a) => s + ((a.taxType === 'annual') ? 0 : (Number.isFinite(a.taxRate) ? a.taxRate : 30)), 0) / inv.length
+      : savTr;
+    return invMean;
   }
   return wSum / bSum;
 }
@@ -11749,6 +11769,17 @@ function renderRetirement() {
   // upstream". Fields render as static spans instead of inputs since
   // the user cannot edit this row — they edit Monthly Review /
   // Yearly Forecast upstream and the row recomputes.
+  const savTaxRate = typeof state.savingsTaxRate === 'number' ? state.savingsTaxRate : 30;
+  const savTaxType = state.savingsTaxType || 'withdrawal';
+  const ytrSav = Math.max(0, state.retirementAge - state.currentAge);
+  let savPostTax;
+  if (savTaxType === 'annual') {
+    const effectiveRate = Math.max(0, state.growthRate - savTaxRate);
+    const nomPostTax = futureValue(0, savingsMonthlyAvg, effectiveRate, ytrSav);
+    savPostTax = Math.round(FE.display.isNominal() ? nomPostTax : FE.inflation.toTodaysMoney(nomPostTax, ytrSav));
+  } else {
+    savPostTax = Math.round(savingsFinalReal * (1 - savTaxRate / 100));
+  }
   const savingsProjRow = `<div class="ret-asset is-derived" title="${esc2(t('s2.derived.title'))}">
     <div class="ret-asset-top">
       <span class="ret-asset-badge">${t('s2.derived.badge')}</span>
@@ -11763,14 +11794,21 @@ function renderRetirement() {
         <label>${esc2(t('s2.derived.field.growthRate'))}</label>
         <div class="rac-input-wrap"><span class="rac-static">${state.growthRate}</span><span class="rac-suffix">%</span></div>
       </div>
-      <div class="ret-asset-cell">
-        <label>${esc2(t('s2.derived.field.source'))}</label>
-        <div class="rac-input-wrap"><span class="rac-static" style="text-align:left">${esc2(t('s2.derived.source.value'))}</span></div>
+      <div class="ret-asset-cell is-editable">
+        <label>${t('s2.card.field.taxRate')}<select class="rac-taxtype" onchange="state.savingsTaxType=this.value;save();renderRetirement()" title="Tax method">
+          <option value="withdrawal" ${savTaxType==='withdrawal'?'selected':''}>on exit</option>
+          <option value="annual" ${savTaxType==='annual'?'selected':''}>annual</option>
+        </select></label>
+        <div class="rac-input-wrap">
+          <input type="text" inputmode="decimal" data-lang-num="1" value="${savTaxRate}" oninput="state.savingsTaxRate=parseNum(this.value);save()" onchange="commitRender('renderRetirement')">
+          <span class="rac-suffix">%</span>
+        </div>
       </div>
       <div class="ret-asset-proj">
         <div class="ret-asset-proj-lbl">${esc2(t('s2.card.proj.projected'))}</div>
         <div class="ret-asset-proj-val">${fmt(savingsFinalReal)}</div>
         <div class="ret-asset-proj-sub">${esc2(t('s2.card.proj.atAge', { s, age: state.retirementAge }))}</div>
+        <div class="ret-asset-proj-post">${fmt(savPostTax)} after tax</div>
       </div>
     </div>
     <div class="ret-asset-note">${t('s2.derived.note')}</div>
