@@ -16288,6 +16288,22 @@ function buildAIContext() {
   const nominalNestEgg       = FE.projection.totalNominal();
   const realRetirementIncome = nums.totalRetirementIncome;
   const realRate = Math.max(0, (state.retirementPostGrowth || 4) - state.inflationRate);
+  const effectiveTaxPct = (nums.taxRate * 100).toFixed(1);
+  // Per-investment-account detail for AI context (Bug 2 & 10)
+  const investmentAccounts = (state.externalAssets || []).filter(a => (a.assetType || 'investment') === 'investment');
+  const investmentAccountLines = investmentAccounts.map(a => {
+    const gr = a.growthRate ?? (state.growthRate || 7);
+    const usesGlobal = (a.growthRate == null || a.growthRate === (state.growthRate || 7));
+    return `    · ${a.name}: balance ${Math.round(a.balance).toLocaleString()} kr | contrib ${Math.round(a.monthlyContribution || 0).toLocaleString()} kr/mo | growth ${gr}%${usesGlobal ? ' (global default)' : ' (custom)'} | tax on withdrawal ${a.taxRate ?? 30}%`;
+  }).join('\n');
+  // Per-pension detail for AI context (Bug 6)
+  const pensionAccounts = (state.externalAssets || []).filter(a => a.assetType === 'pension');
+  const pensionAccountLines = pensionAccounts.map(p => {
+    const pStart = p.startAge ?? state.retirementAge;
+    const pEnd = p.endAge ? `age ${p.endAge}` : 'no end';
+    const gapYears = pStart > state.retirementAge ? ` ← STARTS ${pStart - state.retirementAge} YRS AFTER RETIREMENT` : ' ← active at retirement';
+    return `    · ${p.name}: ${Math.round(p.monthlyPayout || 0).toLocaleString()} kr/mo gross | starts age ${pStart} | ends ${pEnd}${gapYears}`;
+  }).join('\n');
   // Compute all three retirement-expense scenarios so the AI can quote any
   // of them accurately and never has to multiply manually. The active
   // scenario is marked explicitly so the AI knows which lens the
@@ -16364,12 +16380,20 @@ Retirement plan figures — computed under the ACTIVE ${scenLabelMap[activeScen]
 - Age: ${state.currentAge} | Retiring at: ${state.retirementAge} (${Math.max(0,state.retirementAge-state.currentAge)} years away) | Life expectancy: ${state.lifeExp || 90}
 - Active retirement expenses (after-tax, ${scenLabelMap[activeScen]}): ${Math.round(nums.totalExp).toLocaleString()} kr/mo  ← this is figure (B), NOT figure (A)
 - Nest egg at retirement: ${Math.round(realNestEgg).toLocaleString()} kr (today's money) — equivalent to ${Math.round(nominalNestEgg).toLocaleString()} kr nominal/future kr at retirement
-- Sustainable monthly retirement income: ${Math.round(realRetirementIncome).toLocaleString()} kr/mo (today's money) — ${Math.round(nums.sustainableAfterTax).toLocaleString()} kr from portfolio + ${Math.round(nums.pensionAvgMonthly).toLocaleString()} kr from pension (weighted avg across full retirement period), all real
+- Effective portfolio withdrawal tax rate: ${effectiveTaxPct}% (balance-weighted across investment accounts). Pension income is also taxable in Sweden at broadly the same marginal rate — treat pension payouts as gross figures subject to this tax when estimating net spending power.
+- Sustainable monthly retirement income (today's money, real): ${Math.round(realRetirementIncome).toLocaleString()} kr/mo total
+    · Portfolio contribution: ${Math.round(nums.sustainableAfterTax).toLocaleString()} kr/mo — this is AFTER the ${effectiveTaxPct}% withdrawal tax has been deducted
+    · Pension contribution: ${Math.round(nums.pensionAvgMonthly).toLocaleString()} kr/mo — this is a GROSS figure (pre-tax), averaged across the full retirement period including zero-income years before each pension starts. Once each pension is active it pays more than this average; in pre-pension years it contributes zero.
 - Coverage: ${nums.coveragePct.toFixed(0)}% · Verdict: ${nums.verdict}${nums.pensionMaterial ? ` (pension covers ${nums.pensionShareOfNeed.toFixed(0)}% of need)` : ''}
 - Pre-retirement (accumulation) growth rate: ${state.growthRate||7}% nominal / ${Math.max(0,(state.growthRate||7)-state.inflationRate).toFixed(1)}% real — use this for savings growth projections before retirement
 - Post-retirement growth rate: ${state.retirementPostGrowth||4}% nominal / ${realRate.toFixed(1)}% real — use this only for portfolio drawdown after retirement
 - Portfolio depletion age (from shared simulation): ${nums.runoutAge ? 'Age ' + nums.runoutAge : 'never depletes'}
-- External portfolio (current balance, today's kr): ${Math.round(state.externalAssets.filter(a=>(a.assetType||'investment')==='investment').reduce((s,a)=>s+a.balance,0)).toLocaleString()} kr across ${state.externalAssets.length} accounts
+- Investment accounts (${investmentAccounts.length} total, balances in today's kr):
+${investmentAccountLines || '    (none)'}
+  NOTE: accounts with a custom growth rate use their own rate — do NOT apply the global pre-retirement rate to them. The global ${state.growthRate || 7}% is only the default for accounts without a custom rate.
+- Pension plans (${pensionAccounts.length} total, payouts are GROSS/pre-tax in today's kr):
+${pensionAccountLines || '    (none)'}
+  CRITICAL: Pension income is only available from each plan's start age. If retirement age is earlier than a pension's start age, the portfolio must cover 100% of expenses during the gap years with no pension offset. Do not assume any pension income before its listed start age.
 - Planned trips: ${state.trips.map(t=>{const b=(t.expenses||[]).reduce((s,ex)=>s+(Number(ex.amount)||0),0);return t.name+' ('+Math.round(b).toLocaleString()+' kr)';}).join(', ')}
 - Retire Anywhere feasible destinations at current real income: ${scored.filter(l=>l.verdict==='feasible').map(l=>l.name).join(', ')||'none feasible at current income level'}
 
