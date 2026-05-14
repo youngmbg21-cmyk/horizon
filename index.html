@@ -5825,7 +5825,7 @@ function defaultState() {
     currency:'SEK', darkMode:true, lang:'en', activePanel:'dashboard',
     currentAge:44, retirementAge:69, growthRate:7, inflationRate:2,
     retirementPostGrowth:4, lifeExp:90,
-    savingsTaxRate:30, savingsTaxType:'withdrawal',
+    savingsTaxRate:30, savingsAccountType:'standard',
     retirementScenario:'baseline',
     // Global money-display mode. 'real' = every future-dated figure is
     // discounted back to today's purchasing power using inflationRate.
@@ -5875,9 +5875,9 @@ function defaultState() {
     selectedYear:CY+1, cascadeEnabled:true,
 
     externalAssets:[
-      {id:genId(),name:'ITP1',balance:1400000,monthlyContribution:32000,growthRate:4,taxRate:30,assetType:'investment'},
-      {id:genId(),name:'Vanguard',balance:1400000,monthlyContribution:0,growthRate:7,taxRate:30,assetType:'investment'},
-      {id:genId(),name:'Royal London',balance:700000,monthlyContribution:0,growthRate:7,taxRate:20,assetType:'investment'},
+      {id:genId(),name:'ITP1',balance:1400000,monthlyContribution:32000,growthRate:4,accountType:'standard',taxRate:30,assetType:'investment'},
+      {id:genId(),name:'Vanguard',balance:1400000,monthlyContribution:0,growthRate:7,accountType:'standard',taxRate:30,assetType:'investment'},
+      {id:genId(),name:'Royal London',balance:700000,monthlyContribution:0,growthRate:7,accountType:'standard',taxRate:20,assetType:'investment'},
     ],
 
     retirementExpenses:[
@@ -6107,7 +6107,7 @@ window.dr = function(name){ return window.commitRender(name); };
 // ─── PERSISTENCE ────────────────────────────────────────────────────────────
 // State schema version. Bump this and add a branch to migrate() whenever the
 // shape of `state` changes in a backwards-incompatible way.
-const STATE_VERSION = 20;
+const STATE_VERSION = 21;
 function migrate(s) {
   const from = s.version || 1;
   if(from >= STATE_VERSION) { s.version = STATE_VERSION; return s; }
@@ -6292,6 +6292,32 @@ function migrate(s) {
   if(from < 20) {
     if(typeof s.savingsTaxRate !== 'number') s.savingsTaxRate = 30;
     if(!s.savingsTaxType) s.savingsTaxType = 'withdrawal';
+  }
+  // v20 → v21: replace taxType ('withdrawal'/'annual') + taxRate with
+  // accountType ('standard'/'isk'/'notax') + taxRate.
+  // standard = exit tax on gains (default 30%).
+  // isk      = annual schablonbeskattning drag on total value (default 0.88%).
+  // notax    = tax-exempt account (0%).
+  if(from < 21) {
+    (s.externalAssets || []).forEach(a => {
+      if((a.assetType || 'investment') !== 'investment') return;
+      if(!a.accountType) {
+        if(a.taxType === 'annual') {
+          a.accountType = 'isk';
+          a.taxRate = 0.88; // reset to sensible ISK drag — old value was likely wrong
+        } else {
+          a.accountType = 'standard';
+          if(typeof a.taxRate !== 'number') a.taxRate = 30;
+        }
+      }
+      delete a.taxType;
+    });
+    // Migrate savings projection tax type.
+    if(!s.savingsAccountType) {
+      s.savingsAccountType = (s.savingsTaxType === 'annual') ? 'isk' : 'standard';
+      if(s.savingsAccountType === 'isk') s.savingsTaxRate = 0.88;
+    }
+    delete s.savingsTaxType;
   }
   s.version = STATE_VERSION;
   return s;
@@ -6607,7 +6633,13 @@ function getProjection() {
       // .external fields are unchanged.
       const perAccount = {};
       investments.forEach((a,idx) => {
-        const ra=(a.growthRate??state.growthRate)/100/12;
+        const grossRate = a.growthRate ?? state.growthRate;
+        // ISK accounts pay annual schablonbeskattning on total value, modelled
+        // as a drag that reduces the effective compounding rate each year.
+        const effectiveRate = (a.accountType === 'isk')
+          ? Math.max(0, grossRate - (Number.isFinite(a.taxRate) ? a.taxRate : 0.88))
+          : grossRate;
+        const ra = effectiveRate / 100 / 12;
         if(y===0) assetBals[idx]=a.balance*Math.pow(1+ra,months)+a.monthlyContribution*((Math.pow(1+ra,months)-1)/(ra||1));
         else assetBals[idx]=assetBals[idx]*Math.pow(1+ra,12)+a.monthlyContribution*((Math.pow(1+ra,12)-1)/(ra||1));
         ext+=assetBals[idx];
@@ -6636,22 +6668,26 @@ function getEffectiveWithdrawTaxRate() {
   let wSum = 0, bSum = 0;
   inv.forEach(a => {
     const b = Math.max(0, Number(a.balance) || 0);
-    // Annual-tax accounts (e.g. ISK) have no withdrawal tax — their tax
-    // has already been paid year by year during accumulation.
-    const tr = (a.taxType === 'annual') ? 0 : (Number.isFinite(a.taxRate) ? a.taxRate : 30);
+    const at = a.accountType || 'standard';
+    // ISK and no-tax accounts carry 0% exit tax (ISK tax is baked into
+    // growth drag; no-tax accounts are already net).
+    const tr = (at === 'isk' || at === 'notax') ? 0 : (Number.isFinite(a.taxRate) ? a.taxRate : 30);
     wSum += b * tr;
     bSum += b;
   });
   // Include in-app savings projection in the balance-weighted average.
   const savProj = getProjection();
   const savBal = Math.max(0, savProj.length ? (savProj[savProj.length-1].appSavings || 0) : 0);
-  const savTr = (state.savingsTaxType === 'annual') ? 0 : (typeof state.savingsTaxRate === 'number' ? state.savingsTaxRate : 30);
+  const savAt = state.savingsAccountType || 'standard';
+  const savTr = (savAt === 'isk' || savAt === 'notax') ? 0 : (typeof state.savingsTaxRate === 'number' ? state.savingsTaxRate : 30);
   wSum += savBal * savTr;
   bSum += savBal;
   if(bSum <= 0) {
-    // No balances yet — simple mean across all sources.
     const invMean = inv.length
-      ? inv.reduce((s,a) => s + ((a.taxType === 'annual') ? 0 : (Number.isFinite(a.taxRate) ? a.taxRate : 30)), 0) / inv.length
+      ? inv.reduce((s,a) => {
+          const at = a.accountType || 'standard';
+          return s + ((at === 'isk' || at === 'notax') ? 0 : (Number.isFinite(a.taxRate) ? a.taxRate : 30));
+        }, 0) / inv.length
       : savTr;
     return invMean;
   }
@@ -11775,17 +11811,27 @@ function renderRetirement() {
   // upstream". Fields render as static spans instead of inputs since
   // the user cannot edit this row — they edit Monthly Review /
   // Yearly Forecast upstream and the row recomputes.
-  const savTaxRate = typeof state.savingsTaxRate === 'number' ? state.savingsTaxRate : 30;
-  const savTaxType = state.savingsTaxType || 'withdrawal';
+  const savAccType = state.savingsAccountType || 'standard';
+  const savTaxRate = typeof state.savingsTaxRate === 'number' ? state.savingsTaxRate : (savAccType === 'isk' ? 0.88 : 30);
   const ytrSav = Math.max(0, state.retirementAge - state.currentAge);
+  // Post-tax for savings: ISK drag is already baked into getProjection
+  // (appSavings uses the global growth rate, not per-account, so ISK drag
+  // is approximated by reducing the displayed figure at render time).
+  // Standard: tax on gains only. No-tax: no deduction.
   let savPostTax;
-  if (savTaxType === 'annual') {
+  if (savAccType === 'isk') {
     const effectiveRate = Math.max(0, state.growthRate - savTaxRate);
-    const nomPostTax = futureValue(0, savingsMonthlyAvg, effectiveRate, ytrSav);
-    savPostTax = Math.round(FE.display.isNominal() ? nomPostTax : FE.inflation.toTodaysMoney(nomPostTax, ytrSav));
+    const nom = futureValue(0, savingsMonthlyAvg, effectiveRate, ytrSav);
+    savPostTax = Math.round(FE.display.isNominal() ? nom : FE.inflation.toTodaysMoney(nom, ytrSav));
+  } else if (savAccType === 'notax') {
+    savPostTax = savingsFinalReal;
   } else {
-    savPostTax = Math.round(savingsFinalReal * (1 - savTaxRate / 100));
+    const costBasisSav = savingsMonthlyAvg * 12 * ytrSav * r;
+    const gainsSav = Math.max(0, savingsFinalReal - costBasisSav);
+    savPostTax = Math.round(savingsFinalReal - gainsSav * (savTaxRate / 100));
   }
+  const savRateLabel = { standard: 'Exit tax', isk: 'Annual drag', notax: '' };
+  const savPostLabel = savAccType === 'isk' ? 'after annual drag' : savAccType === 'notax' ? '' : 'after exit tax';
   const savingsProjRow = `<div class="ret-asset is-derived" title="${esc2(t('s2.derived.title'))}">
     <div class="ret-asset-top">
       <span class="ret-asset-badge">${t('s2.derived.badge')}</span>
@@ -11801,20 +11847,22 @@ function renderRetirement() {
         <div class="rac-input-wrap"><span class="rac-static">${state.growthRate}</span><span class="rac-suffix">%</span></div>
       </div>
       <div class="ret-asset-cell is-editable">
-        <label>${t('s2.card.field.taxRate')}<select class="rac-taxtype" onchange="state.savingsTaxType=this.value;save();renderRetirement()" title="Tax method">
-          <option value="withdrawal" ${savTaxType==='withdrawal'?'selected':''}>on exit</option>
-          <option value="annual" ${savTaxType==='annual'?'selected':''}>annual</option>
+        <label><select class="rac-taxtype" onchange="(function(el){var v=el.value;state.savingsAccountType=v;state.savingsTaxRate=(v==='isk'?0.88:30);save();renderRetirement();})(this)" title="Account type">
+          <option value="standard" ${savAccType==='standard'?'selected':''}>Standard</option>
+          <option value="isk" ${savAccType==='isk'?'selected':''}>ISK / KF</option>
+          <option value="notax" ${savAccType==='notax'?'selected':''}>No tax</option>
         </select></label>
-        <div class="rac-input-wrap">
+        ${savAccType !== 'notax' ? `<div class="rac-input-wrap">
+          <span class="rac-prefix" style="font-size:8px;color:var(--text3)">${savRateLabel[savAccType]||''}</span>
           <input type="text" inputmode="decimal" data-lang-num="1" value="${savTaxRate}" oninput="state.savingsTaxRate=parseNum(this.value);save()" onchange="commitRender('renderRetirement')">
           <span class="rac-suffix">%</span>
-        </div>
+        </div>` : `<div class="rac-input-wrap" style="opacity:.4"><span style="flex:1;text-align:right;font-family:var(--fm);font-size:12px">—</span></div>`}
       </div>
       <div class="ret-asset-proj">
         <div class="ret-asset-proj-lbl">${esc2(t('s2.card.proj.projected'))}</div>
         <div class="ret-asset-proj-val">${fmt(savingsFinalReal)}</div>
         <div class="ret-asset-proj-sub">${esc2(t('s2.card.proj.atAge', { s, age: state.retirementAge }))}</div>
-        <div class="ret-asset-proj-post">${fmt(savPostTax)} after tax</div>
+        ${savPostLabel ? `<div class="ret-asset-proj-post">${fmt(savPostTax)} ${savPostLabel}</div>` : ''}
       </div>
     </div>
     <div class="ret-asset-note">${t('s2.derived.note')}</div>
@@ -11843,46 +11891,55 @@ function renderRetirement() {
           ${suffix?`<span class="rac-suffix">${suffix}</span>`:''}
         </div>
       </div>`;
-    const tr4 = Number.isFinite(a.taxRate) ? a.taxRate : 30;
-    const taxType = a.taxType || 'withdrawal';
-    // Post-tax projected value: for annual-tax accounts recompute using the
-    // net effective growth rate (growth minus annual tax drag); for
-    // withdrawal-tax accounts apply the rate to the pre-tax lump sum.
-    const ytr = Math.max(0, state.retirementAge - state.currentAge);
+    const accountType = a.accountType || 'standard';
+    const defaultRate = accountType === 'isk' ? 0.88 : 30;
+    const tr4 = Number.isFinite(a.taxRate) ? a.taxRate : defaultRate;
+    // Post-tax projected value.
+    // ISK: projR already reflects annual drag (baked into getProjection) — no exit tax.
+    // Standard: tax applies to gains only (projected − cost basis).
+    // No-tax: projR is the final value with no tax.
+    const ytrCard = Math.max(0, state.retirementAge - state.currentAge);
     let projPostTax;
-    if (taxType === 'annual') {
-      const effectiveRate = Math.max(0, (a.growthRate ?? state.growthRate) - tr4);
-      const nomPostTax = futureValue(a.balance, a.monthlyContribution, effectiveRate, ytr);
-      projPostTax = FE.display.isNominal() ? nomPostTax : FE.inflation.toTodaysMoney(nomPostTax, ytr);
+    if (accountType === 'isk' || accountType === 'notax') {
+      projPostTax = projR; // drag already in projection; no exit tax
     } else {
-      projPostTax = projR * (1 - tr4 / 100);
+      const costBasis = (a.balance + (a.monthlyContribution || 0) * 12 * ytrCard) * r;
+      const gains = Math.max(0, projR - costBasis);
+      projPostTax = Math.round(projR - gains * (tr4 / 100));
     }
-    const taxRateCell = `
+    const acTypeLabel = { standard: 'Standard', isk: 'ISK / KF', notax: 'No tax' };
+    const rateLabel   = { standard: 'Exit tax', isk: 'Annual drag', notax: '' };
+    const taxCell = `
       <div class="ret-asset-cell">
-        <label>${t('s2.card.field.taxRate')}<select class="rac-taxtype" onchange="state.externalAssets[${idx}].taxType=this.value;save();renderRetirement()" title="Tax method">
-          <option value="withdrawal" ${taxType==='withdrawal'?'selected':''}>on exit</option>
-          <option value="annual" ${taxType==='annual'?'selected':''}>annual</option>
+        <label><select class="rac-taxtype" onchange="(function(el){var v=el.value;state.externalAssets[${idx}].accountType=v;state.externalAssets[${idx}].taxRate=(v==='isk'?0.88:30);save();renderRetirement();})(this)" title="Account type">
+          <option value="standard" ${accountType==='standard'?'selected':''}>Standard</option>
+          <option value="isk" ${accountType==='isk'?'selected':''}>ISK / KF</option>
+          <option value="notax" ${accountType==='notax'?'selected':''}>No tax</option>
         </select></label>
-        <div class="rac-input-wrap">
+        ${accountType !== 'notax' ? `<div class="rac-input-wrap">
+          <span class="rac-prefix" style="font-size:8px;color:var(--text3)">${rateLabel[accountType]||''}</span>
           <input type="text" inputmode="decimal" data-lang-num="1" value="${tr4}" oninput="state.externalAssets[${idx}].taxRate=parseNum(this.value);save()" onchange="commitRender('renderRetirement')">
           <span class="rac-suffix">%</span>
-        </div>
+        </div>` : `<div class="rac-input-wrap" style="opacity:.4"><span style="flex:1;text-align:right;font-family:var(--fm);font-size:12px">—</span></div>`}
       </div>`;
     const fields = isInv ? `
       ${numCell(t('s2.card.field.balance'),      Math.round(a.balance*r),             `state.externalAssets[${idx}].balance=parseNum(this.value)/${r};save()`, s)}
       ${numCell(t('s2.card.field.contribution'), Math.round(a.monthlyContribution*r), `state.externalAssets[${idx}].monthlyContribution=parseNum(this.value)/${r};save()`, s, '/mo')}
       ${numCell(t('s2.card.field.growthRate'),   gr,                                  `state.externalAssets[${idx}].growthRate=parseNum(this.value);save()`, '', '%')}
-      ${taxRateCell}
+      ${taxCell}
     ` : `
       ${numCell(t('s2.card.field.payout'),  Math.round((a.monthlyPayout||0)*r), `state.externalAssets[${idx}].monthlyPayout=parseNum(this.value)/${r};save()`, s, '/mo')}
       ${numCell(t('s2.card.field.fromAge'), a.startAge||state.retirementAge,    `state.externalAssets[${idx}].startAge=parseNum(this.value);save()`)}
     `;
+    const projPostLabel = accountType === 'isk'
+      ? 'after annual drag'
+      : accountType === 'notax' ? '' : 'after exit tax';
     const projCell = isInv ? `
       <div class="ret-asset-proj">
         <div class="ret-asset-proj-lbl">${esc2(t('s2.card.proj.projected'))}</div>
         <div class="ret-asset-proj-val">${fmt(projR)}</div>
         <div class="ret-asset-proj-sub">${esc2(t('s2.card.proj.atAge', { s, age: state.retirementAge }))}</div>
-        <div class="ret-asset-proj-post">${fmt(projPostTax)} after tax</div>
+        ${projPostLabel ? `<div class="ret-asset-proj-post">${fmt(projPostTax)} ${projPostLabel}</div>` : ''}
       </div>
     ` : `
       <div class="ret-asset-proj">
@@ -11930,7 +11987,7 @@ function renderRetirement() {
   // that's already localised.
   const newAccountName = t('s2.new.account').replace(/'/g, "\\'");
   const newPensionName = t('s2.new.pension').replace(/'/g, "\\'");
-  const addInvestmentBtn = `<button class="ret-col-add" onclick="state.externalAssets.push({id:genId(),name:'${newAccountName}',balance:0,monthlyContribution:0,growthRate:7,taxRate:30,taxType:'withdrawal',assetType:'investment'});save();renderRetirement()">${esc2(t('s2.col.addInvestment'))}</button>`;
+  const addInvestmentBtn = `<button class="ret-col-add" onclick="state.externalAssets.push({id:genId(),name:'${newAccountName}',balance:0,monthlyContribution:0,growthRate:7,accountType:'standard',taxRate:30,assetType:'investment'});save();renderRetirement()">${esc2(t('s2.col.addInvestment'))}</button>`;
   const addPensionBtn    = `<button class="ret-col-add" onclick="state.externalAssets.push({id:genId(),name:'${newPensionName}',monthlyPayout:0,startAge:state.retirementAge,endAge:null,assetType:'pension'});save();renderRetirement()">${esc2(t('s2.col.addPension'))}</button>`;
   const emptyInv = `<div class="ret-col-empty">${t('s2.col.emptyInv')}</div>`;
   const emptyPen = `<div class="ret-col-empty">${t('s2.col.emptyPen')}</div>`;
@@ -16433,7 +16490,9 @@ function buildAIContext() {
   const investmentAccountLines = investmentAccounts.map(a => {
     const gr = a.growthRate ?? (state.growthRate || 7);
     const usesGlobal = (a.growthRate == null || a.growthRate === (state.growthRate || 7));
-    return `    · ${a.name}: balance ${Math.round(a.balance).toLocaleString()} kr | contrib ${Math.round(a.monthlyContribution || 0).toLocaleString()} kr/mo | growth ${gr}%${usesGlobal ? ' (global default)' : ' (custom)'} | tax on withdrawal ${a.taxRate ?? 30}%`;
+    const at = a.accountType || 'standard';
+    const taxDesc = at === 'isk' ? `ISK/KF annual drag ${a.taxRate ?? 0.88}%` : at === 'notax' ? 'no tax' : `exit tax on gains ${a.taxRate ?? 30}%`;
+    return `    · ${a.name}: balance ${Math.round(a.balance).toLocaleString()} kr | contrib ${Math.round(a.monthlyContribution || 0).toLocaleString()} kr/mo | growth ${gr}%${usesGlobal ? ' (global default)' : ' (custom)'} | ${taxDesc}`;
   }).join('\n');
   // Per-pension detail for AI context (Bug 6)
   const pensionAccounts = (state.externalAssets || []).filter(a => a.assetType === 'pension');
