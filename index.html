@@ -16591,6 +16591,16 @@ Retirement plan figures — computed under the ACTIVE ${scenLabelMap[activeScen]
 ${investmentAccountLines || '    (none)'}
   NOTE: accounts with a custom growth rate use their own rate — do NOT apply the global pre-retirement rate to them. The global ${state.growthRate || 7}% is only the default for accounts without a custom rate.
   The "Total Investment Balance" KPI on the Portfolio card = sum of current account balances + estimated savings for the remainder of the current calendar year (NOT year-to-date). The savings component is: monthly savings rate × months remaining in the current year (${12 - CM} months). It is a near-term forward projection, not a retrospective YTD figure.
+- Savings Projection (derived from Monthly Review / Yearly Forecast savings targets — read-only, not a named account the user edits directly):
+${(()=>{
+  const sp=getProjection();
+  const savAvg=sp.length?Math.round(sp.reduce((s,p)=>s+(p.appYearlyContrib||0),0)/(12*sp.length)):0;
+  const at=state.savingsAccountType||'standard';
+  const tr=typeof state.savingsTaxRate==='number'?state.savingsTaxRate:(at==='isk'?0.88:30);
+  const taxDesc=at==='isk'?`ISK/KF annual drag ${tr}%`:at==='notax'?'no tax':`standard exit tax on gains ${tr}%`;
+  return `    · avg monthly contribution: ${savAvg.toLocaleString()} kr/mo | growth: ${state.growthRate||7}% (global rate) | account type: ${taxDesc}`;
+})()}
+  This is the in-app savings stream that feeds the Nest Egg chart's "Savings Growth" line. If the user tags it as ISK/KF, the annual drag reduces its effective growth rate (same model as ISK investment accounts).
 - Pension plans (${pensionAccounts.length} total, payouts are GROSS/pre-tax in today's kr):
 ${pensionAccountLines || '    (none)'}
   CRITICAL: Pension income is only available from each plan's start age. If retirement age is earlier than a pension's start age, the portfolio must cover 100% of expenses during the gap years with no pension offset. Do not assume any pension income before its listed start age.
