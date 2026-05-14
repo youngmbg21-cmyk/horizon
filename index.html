@@ -5306,6 +5306,11 @@ const STRINGS = {
                               sv:'Inga månadsutgifter att kopiera ännu — lägg till minst en rad i Månadsgenomgång-fliken först.' },
   's3.copy.confirm':        { en:'This will replace your {n} existing retirement expense{s} with a snapshot of your current monthly budget.\n\nThis is a one-shot copy — you can adjust the retirement list afterwards without affecting your Monthly Review. Continue?',
                               sv:'Detta kommer ersätta dina {n} befintliga pensionsutgifter med en ögonblicksbild av din nuvarande månadsbudget.\n\nDet är en engångskopia — du kan justera pensionslistan i efterhand utan att påverka Månadsgenomgång. Fortsätta?' },
+  's3.exp.applyToBaselineBtn':   { en:'↑ Apply to baseline',   sv:'↑ Tillämpa som basutgifter' },
+  's3.exp.applyToBaselineTitle': { en:'Copy these retirement expenses to the baseline expenses in Settings',
+                                   sv:'Kopiera dessa pensionsutgifter till basutgifterna i Inställningar' },
+  's3.exp.applyToBaselineConfirm': { en:'This will replace your {n} existing baseline expense{s} in Settings with the current retirement expense list.\n\nContinue?',
+                                     sv:'Detta kommer ersätta dina {n} befintliga basutgifter i Inställningar med den aktuella pensionsutgiftslistan.\n\nForttsätta?' },
 
   // ── Retirement · s2 Portfolio & Pension ────────────────
   // KPI row above the two-column card grid.
@@ -11429,6 +11434,22 @@ function sectionWrap(n, icon, title, subtitle, content) {
 // If the retirement expense list already has anything in it, we
 // confirm before overwriting so users can't accidentally clobber a
 // retirement plan they've already tuned.
+window.applyRetirementExpensesToBaseline = function(){
+  const retExp = state.retirementExpenses || [];
+  if(!retExp.length){
+    alert('No retirement expenses to apply — add at least one expense first.');
+    return;
+  }
+  const existing = (state.baseExpenses || []).length;
+  if(existing > 0){
+    const proceed = confirm(t('s3.exp.applyToBaselineConfirm', { n: existing, s: existing === 1 ? '' : 's' }));
+    if(!proceed) return;
+  }
+  state.baseExpenses = retExp.map(e => ({ id: genId(), name: e.name, amount: e.amount, type: e.type || 'variable' }));
+  save();
+  renderSettings && renderSettings();
+};
+
 window.copyBaselineToRetirementExpenses = function(){
   const snapshot = FE.months.currentExpensesSnapshot();
   if(!snapshot.length){
@@ -11882,7 +11903,10 @@ function renderRetirement() {
         <div class="card">
           <div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap">
             <span>${esc2(t('s3.exp.title'))} <span style="font-size:9px;color:var(--text2);font-weight:400;text-transform:none">${esc2(t('s3.exp.titleSub'))}</span></span>
-            <button class="btn btn-o btn-xs" onclick="copyBaselineToRetirementExpenses()" title="${esc2(t('s3.exp.copyTitle'))}">${esc2(t('s3.exp.copyBtn'))}</button>
+            <div style="display:flex;gap:6px;flex-wrap:wrap">
+              <button class="btn btn-o btn-xs" onclick="copyBaselineToRetirementExpenses()" title="${esc2(t('s3.exp.copyTitle'))}">${esc2(t('s3.exp.copyBtn'))}</button>
+              <button class="btn btn-o btn-xs" onclick="applyRetirementExpensesToBaseline()" title="${esc2(t('s3.exp.applyToBaselineTitle'))}">${esc2(t('s3.exp.applyToBaselineBtn'))}</button>
+            </div>
           </div>
           ${seededBanner}
           ${expRows}
