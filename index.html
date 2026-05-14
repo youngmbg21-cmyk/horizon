@@ -16823,7 +16823,15 @@ const AI_CHART_RECIPES = {
           borderWidth: 1.5, borderRadius: 3,
         }],
       },
-      options: chartPreset({ indexAxis:'y' }),
+      options: chartPreset({
+        indexAxis: 'y',
+        scales: {
+          // With indexAxis:'y', x = value axis (needs currency format),
+          // y = category axis (destination names — must NOT apply fmtC).
+          x: { ticks:{ color:chartDefaults().textColor, callback:v=>fmtC(v), font:chartDefaults().tickFont, maxTicksLimit:6 }, grid:{display:false} },
+          y: { ticks:{ color:chartDefaults().textColor, font:chartDefaults().tickFont }, grid:{display:false} },
+        },
+      }),
     };
   },
 
