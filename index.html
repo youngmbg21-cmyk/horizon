@@ -16337,7 +16337,8 @@ Retirement plan figures — computed under the ACTIVE ${scenLabelMap[activeScen]
 - Nest egg at retirement: ${Math.round(realNestEgg).toLocaleString()} kr (today's money) — equivalent to ${Math.round(nominalNestEgg).toLocaleString()} kr nominal/future kr at retirement
 - Sustainable monthly retirement income: ${Math.round(realRetirementIncome).toLocaleString()} kr/mo (today's money) — ${Math.round(nums.sustainableAfterTax).toLocaleString()} kr from portfolio + ${Math.round(nums.pensionAvgMonthly).toLocaleString()} kr from pension (weighted avg across full retirement period), all real
 - Coverage: ${nums.coveragePct.toFixed(0)}% · Verdict: ${nums.verdict}${nums.pensionMaterial ? ` (pension covers ${nums.pensionShareOfNeed.toFixed(0)}% of need)` : ''}
-- Real growth rate assumption: ${realRate.toFixed(1)}% (post-retirement growth ${state.retirementPostGrowth||4}% minus ${state.inflationRate}% inflation)
+- Pre-retirement (accumulation) growth rate: ${state.growthRate||7}% nominal / ${Math.max(0,(state.growthRate||7)-state.inflationRate).toFixed(1)}% real — use this for savings growth projections before retirement
+- Post-retirement growth rate: ${state.retirementPostGrowth||4}% nominal / ${realRate.toFixed(1)}% real — use this only for portfolio drawdown after retirement
 - Portfolio depletion age (from shared simulation): ${nums.runoutAge ? 'Age ' + nums.runoutAge : 'never depletes'}
 - External portfolio (current balance, today's kr): ${Math.round(state.externalAssets.filter(a=>(a.assetType||'investment')==='investment').reduce((s,a)=>s+a.balance,0)).toLocaleString()} kr across ${state.externalAssets.length} accounts
 - Planned trips: ${state.trips.map(t=>{const b=(t.expenses||[]).reduce((s,ex)=>s+(Number(ex.amount)||0),0);return t.name+' ('+Math.round(b).toLocaleString()+' kr)';}).join(', ')}
