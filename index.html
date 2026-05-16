@@ -16597,7 +16597,7 @@ ${(()=>{
   const savAvg=sp.length?Math.round(sp.reduce((s,p)=>s+(p.appYearlyContrib||0),0)/(12*sp.length)):0;
   const savFinalNom=sp.length?(sp[sp.length-1].appSavings||0):0;
   const ytr=Math.max(0,state.retirementAge-state.currentAge);
-  const inflFactor=Math.pow(1+(state.inflationRate||2)/100,ytr);
+  const inflFactor=Math.pow(1+(state.inflationRate||0)/100,ytr);
   const savFinalReal=Math.round(savFinalNom/inflFactor);
   const at=state.savingsAccountType||'standard';
   const tr=typeof state.savingsTaxRate==='number'?state.savingsTaxRate:(at==='isk'?0.88:30);
@@ -16670,10 +16670,16 @@ SERIES CATALOG
 Each entry is "series-key — label (unit, x-axis)". The "Per-investment account", "Per-pension plan" and "Per-expense category" sections below are DYNAMIC — they list the user's actual accounts, pensions and expense line items as they exist right now in state. Use only the keys that appear in this list; do not invent account / pension / category names.
 
 Retirement & nest egg (x-axis = age, currentAge → retirementAge):
-- nestEgg.real — Nest egg · today's money (currency, age)
-- nestEgg.nominal — Nest egg · nominal (currency, age)
-- nestEgg.contrib — Annual contributions (currency, age)
-- portfolio.contributions — Portfolio contributions · annual (currency, age)
+- nestEgg.real — Nest egg · today's money (currency, age)  ← total portfolio (savings + all investments combined)
+- nestEgg.nominal — Nest egg · nominal (currency, age)  ← total portfolio, nominal/future kr
+- nestEgg.contrib — Annual contributions (currency, age)  ← total yearly inflow (savings + external monthly contributions)
+- portfolio.contributions — Portfolio contributions · annual (currency, age)  ← same as nestEgg.contrib
+
+Savings Projection account only (x-axis = age, currentAge → retirementAge):
+IMPORTANT: Use these — NOT nestEgg.* — when the user asks about the Savings Projection card or account specifically. These track only the in-app savings stream (appSavings), matching what the chatbot text reports for that account.
+- savings.real — Savings Projection · today's money (currency, age)  ← appSavings deflated to today's money; matches the "projected balance at retirement" figure in the Savings Projection account context above
+- savings.nominal — Savings Projection · nominal (future kr) (currency, age)  ← appSavings in nominal/future kr
+- savings.contrib — Savings Projection · annual contributions (currency, age)  ← in-app yearly savings only (appYearlyContrib)
 
 Runway simulation (x-axis = age, retirementAge → life expectancy):
 - runway.balance — Portfolio balance (currency, age)
@@ -17079,6 +17085,46 @@ function buildSeriesCatalog(){
   addProjSeries('nestEgg.contrib',     'Annual contributions',            p => p.yearlyContrib);
   // Alias: portfolio.contributions → same data, different semantic label.
   addProjSeries('portfolio.contributions', 'Portfolio contributions · annual', p => p.yearlyContrib);
+
+  // Savings Projection account only — the in-app savings stream (appSavings),
+  // separate from external investment accounts. Used when the chatbot discusses
+  // the Savings Projection card, so the chart matches the chatbot text exactly.
+  // The real series deflates by the same inflation factor getProjection() uses
+  // for realTotal, keeping chart and chatbot context consistent.
+  cat['savings.real'] = {
+    label: 'Savings Projection · today’s money', unit:'currency', xAxis:'age',
+    get(){
+      const proj = FE.projection.yearly();
+      const infl = (state.inflationRate || 0) / 100;
+      return {
+        xValues: proj.map(p => p.age),
+        values:  proj.map((p, i) => {
+          const nom = p.appSavings || 0;
+          return infl > 0 ? Math.round(nom / Math.pow(1 + infl, i)) : nom;
+        }),
+      };
+    },
+  };
+  cat['savings.nominal'] = {
+    label: 'Savings Projection · nominal (future kr)', unit:'currency', xAxis:'age',
+    get(){
+      const proj = FE.projection.yearly();
+      return {
+        xValues: proj.map(p => p.age),
+        values:  proj.map(p => p.appSavings || 0),
+      };
+    },
+  };
+  cat['savings.contrib'] = {
+    label: 'Savings Projection · annual contributions', unit:'currency', xAxis:'age',
+    get(){
+      const proj = FE.projection.yearly();
+      return {
+        xValues: proj.map(p => p.age),
+        values:  proj.map(p => p.appYearlyContrib || 0),
+      };
+    },
+  };
 
   // ── RUNWAY SIMULATION (x = age, retirementAge → lifeExp) ──────────────
   const addRunwaySeries = (key, label, unit, pick) => {
