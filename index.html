@@ -17547,7 +17547,7 @@ function _buildCustomChartConfig(validated, catalog, rawSpec){
   if(!unionX.length) throw new Error('no data available for the requested series');
   // 3. For each dataset, build an aligned value array matching unionX
   //    index-for-index. Missing x-values become null (Chart.js gap).
-  const rMult = validated.unit === 'currency' ? r : 1;
+  const rMult = 1; // data stays in native SEK; fmtC on the y-axis tick handles conversion
   const datasets = fetched.map((f, idx) => {
     const color = f.color || PALETTE[idx % PALETTE.length];
     // Map each union-x to its value in this series, or null if absent.
