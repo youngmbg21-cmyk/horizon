@@ -6600,6 +6600,59 @@ function getNext12Forward() {
   return _get13MonthChain().slice(1);
 }
 
+// Returns the previous month (CM-1) as a standalone entry with no carry-forward,
+// used only by the Monthly Review tab to allow reviewing the prior month.
+function getPrevMonthEntry() {
+  return memoSelect('prevMonth', () => {
+    const d = new Date(CY, CM - 1, 1);
+    const year = d.getFullYear(), month = d.getMonth();
+    const key = `${year}-${String(month + 1).padStart(2, '0')}`;
+    const v = getEffective(year, month);
+    const incomeItems  = (v.incomeItems  || []).slice();
+    const expenseItems = (v.expenseItems || []).slice();
+    (state.trips || []).forEach(t => {
+      const icon = t.icon || '✈️';
+      (t.expenses || []).forEach(ex => {
+        const k = (ex.date || '').slice(0, 7);
+        if (k !== key) return;
+        if (!(Number(ex.amount) > 0)) return;
+        expenseItems.push({
+          id: `trip-${t.id}-${ex.id}`,
+          name: `${icon} ${t.name || 'Trip'} · ${ex.name || 'Expense'}`,
+          amount: Number(ex.amount) || 0,
+          type: 'variable',
+          fromTrip: true,
+          tripId: t.id,
+          tripExpenseId: ex.id,
+        });
+      });
+    });
+    const pureIncome   = sumArr(incomeItems,  'amount');
+    const pureExpenses = sumArr(expenseItems, 'amount');
+    const pureFunFund  = pureIncome - pureExpenses - v.savings;
+    const _mn = monthNames();
+    return {
+      key,
+      label: `${_mn[month]} ${year}`,
+      short: `${_mn[month]} '${String(year).slice(2)}`,
+      savings: v.savings,
+      incomeItems, expenseItems,
+      income: pureIncome, expenses: pureExpenses,
+      surplus: pureIncome - pureExpenses,
+      funFund: pureFunFund,
+      pureIncome, pureExpenses, pureFunFund,
+      isCurrent: false,
+      hasOverride: v.hasOverride,
+    };
+  });
+}
+
+// 13-month window for the Monthly Review tab: previous month + current + 11 forward.
+// Only used in renderMonthly(), liveSyncMonthlyReview(), and scopeShift().
+function getMonthlyReviewMonths() {
+  return [getPrevMonthEntry(), ...get12Months()];
+}
+
 function futureValue(P, PMT, r, years) {
   if (years<=0) return P;
   const rn=(r/100)/12, nt=12*years;
@@ -8746,9 +8799,9 @@ function scopeShift(dir){
     state.selectedYear = Math.min(Math.max(CY+1, next), retireYear);
     save(); renderAll();
   } else {
-    // advance selectedMonth; clamp into the 12-month forward window
-    const months = get12Months();
-    const cur = state.selectedMonth || months[0].key;
+    // advance selectedMonth; clamp into the review window (prev month + 12 forward)
+    const months = getMonthlyReviewMonths();
+    const cur = state.selectedMonth || get12Months()[0].key;
     let idx = months.findIndex(m=>m.key===cur);
     if(idx<0) idx=0;
     idx = Math.max(0, Math.min(months.length-1, idx+dir));
@@ -11036,10 +11089,11 @@ window.setReviewScope = function(scope){
 };
 
 function renderMonthly() {
-  const months=get12Months();
-  let selKey=state.selectedMonth||months[0].key;
+  const months=getMonthlyReviewMonths();
+  const currentKey=get12Months()[0].key;
+  let selKey=state.selectedMonth||currentKey;
   if(!months.find(m=>m.key===selKey)) {
-    selKey=months[0].key;
+    selKey=currentKey;
     state.selectedMonth=selKey;
     save();
   }
@@ -11221,8 +11275,8 @@ window.setMonthSavings=function(key,val){
 function liveSyncMonthlyReview(selKey){
   const host = document.getElementById('panel-monthly');
   if(!host) return;
-  const months = get12Months();
-  const key = selKey || state.selectedMonth || months[0]?.key;
+  const months = getMonthlyReviewMonths();
+  const key = selKey || state.selectedMonth || get12Months()[0]?.key;
   const sel = months.find(m => m.key === key);
   if(!sel) return;
   // Summary bar segment widths + headline numbers — every field is
