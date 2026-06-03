@@ -6524,8 +6524,10 @@ function _get13MonthChain() {
     const carryOverrides = state.carryOverrides || {};
     for(let i = 0; i < months.length; i++){
       const m = months[i];
-      if(i > 0){
-        const prev = months[i-1];
+      // For i===0 (current month), carry in from the previous month entry
+      // so a deficit or surplus from last month flows into the forecast chain.
+      if(i === 0 || i > 0){
+        const prev = i === 0 ? getPrevMonthEntry() : months[i-1];
         // Natural carry — what the chain WOULD produce from the
         // previous month's funFund. The user's manual override (if
         // any) supersedes this as the displayed value, but we keep
