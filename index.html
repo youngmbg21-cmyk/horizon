@@ -6834,7 +6834,14 @@ window.syncGenPassphrase = function(){
 };
 window.syncConnect = async function(){
   const s = state.sync;
-  if(!s.url || !s.anonKey || !s.passphrase){ alert('Enter the project URL, anon key, and a passphrase first.'); return; }
+  // Fallback: if the manual fields are empty but a link code was pasted
+  // (and its onchange hasn't fired yet on mobile), apply it first so the
+  // green button still works.
+  if((!s.url || !s.anonKey || !s.passphrase)){
+    const el = document.getElementById('sync-linkcode');
+    if(el && el.value && el.value.trim()) syncPasteLink(el.value);
+  }
+  if(!s.url || !s.anonKey || !s.passphrase){ alert('Enter the project URL, anon key, and a passphrase first — or paste a link code from your other device.'); return; }
   if(!/^https:\/\/.+\.supabase\.co/i.test(s.url.trim()) && !/^https:\/\//i.test(s.url.trim())){
     alert('The project URL should look like https://YOUR-PROJECT.supabase.co'); return;
   }
@@ -6879,14 +6886,31 @@ window.syncCopyLink = function(){
   if(navigator.clipboard && navigator.clipboard.writeText){ navigator.clipboard.writeText(code).then(done, ()=>prompt('Copy this link code:', code)); }
   else prompt('Copy this link code:', code);
 };
+// Parse a link code into the sync credentials. Silent + boolean so
+// callers decide whether to surface an error (onchange applies quietly;
+// the explicit button reports failure). Tolerant of whitespace/newlines
+// and a case-mangled or missing HZS1: prefix (iOS loves to "help").
 window.syncPasteLink = function(raw){
   try {
-    const str = String(raw||'').trim().replace(/^HZS1:/,'');
+    let str = String(raw||'').replace(/\s+/g,'').replace(/^hzs1:/i,'');
+    if(!str) return false;
     const obj = JSON.parse(decodeURIComponent(escape(atob(str))));
     if(!obj.u || !obj.k || !obj.p) throw new Error('incomplete');
     state.sync.url = obj.u; state.sync.anonKey = obj.k; state.sync.passphrase = obj.p;
     save(); _syncRefreshUI();
-  } catch(e){ alert('That link code could not be read. Make sure you pasted the whole thing (it starts with HZS1:).'); }
+    return true;
+  } catch(e){ return false; }
+};
+// One-tap phone onboarding: read the link-code field, apply it, connect.
+window.syncLinkConnect = async function(){
+  const el = document.getElementById('sync-linkcode');
+  const v = el ? el.value : '';
+  if(!v || !v.trim()){ alert('Paste your link code first — copy it from the connected device (Settings → Cloud Sync → Copy link code). It starts with HZS1:.'); return; }
+  if(!syncPasteLink(v)){
+    alert('That link code could not be read. Copy it again from the other device and paste the whole thing (it starts with HZS1:).');
+    return;
+  }
+  await syncConnect();
 };
 
 // ─── CURRENCY / FORMAT ───────────────────────────────────────────────────────
@@ -16514,21 +16538,35 @@ function renderSyncCard(){
       </div>
     </details>`;
 
+  // Credential fields must never be transformed by the browser — iOS
+  // autocapitalize/autocorrect silently corrupts anon keys, passphrases,
+  // and link codes (a lowercased char breaks base64/auth). Kill all of it.
+  const RAW = 'autocapitalize="none" autocorrect="off" autocomplete="off" spellcheck="false"';
   if(!syncConfigured()){
     return `
     <div class="card" id="set-sync-section">
       <div class="card-title">☁️ Cloud Sync <span style="background:var(--bg3);color:var(--text3);border:1px solid var(--border);font-size:9px;padding:2px 7px;border-radius:4px;font-family:var(--fm);font-weight:700;letter-spacing:.06em;margin-left:6px">END-TO-END ENCRYPTED</span></div>
       <p style="font-size:11px;color:var(--text2);margin-bottom:12px;line-height:1.5">Access the same data on your phone and desktop. Your state is encrypted in this browser with your passphrase before it's uploaded, so the server can never read it.</p>
-      <div class="field"><label>Supabase Project URL</label><input value="${esc(s.url||'')}" placeholder="https://YOUR-PROJECT.supabase.co" oninput="syncField('url',this.value)"></div>
-      <div class="field"><label>Supabase anon key <span style="font-size:10px;color:var(--text3)">(public — safe to store)</span></label><input value="${esc(s.anonKey||'')}" placeholder="eyJhbGci…" oninput="syncField('anonKey',this.value)"></div>
-      <div class="field"><label>Sync passphrase <span style="font-size:10px;color:var(--text3)">(your encryption secret — the one thing you must reuse on every device)</span></label>
-        <div style="display:flex;gap:6px"><input type="text" value="${esc(s.passphrase||'')}" placeholder="a long secret only you know" oninput="syncField('passphrase',this.value)" style="flex:1"><button class="btn btn-o btn-sm" onclick="syncGenPassphrase()" title="Generate a strong passphrase">Generate</button></div>
+
+      <!-- Fast path (phone): one paste from the desktop's link code. -->
+      <div style="border:1px solid var(--border);border-radius:9px;padding:12px;background:var(--bg3);margin-bottom:14px">
+        <div style="font-size:12px;font-weight:700;color:var(--text);margin-bottom:4px">📲 Adding another device?</div>
+        <p style="font-size:11px;color:var(--text2);margin:0 0 8px;line-height:1.5">On the device that's already connected: Settings → Cloud Sync → <b>Copy link code</b>. Paste it here.</p>
+        <input id="sync-linkcode" ${RAW} placeholder="HZS1:…" style="width:100%;margin-bottom:8px" onchange="syncPasteLink(this.value)">
+        <button class="btn btn-g" style="width:100%" onclick="syncLinkConnect()">Paste code &amp; connect</button>
       </div>
-      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:4px">
-        <button class="btn btn-g" onclick="syncConnect()">Connect &amp; sync</button>
-      </div>
-      <div class="field" style="margin-top:14px"><label style="color:var(--text3)">Already set up on another device? Paste its link code:</label>
-        <input placeholder="HZS1:…" onchange="if(this.value.trim())syncPasteLink(this.value)"></div>
+
+      <details ${s.url||s.anonKey?'open':''}>
+        <summary style="cursor:pointer;font-size:12px;color:var(--text2);margin-bottom:8px">Or set up manually with your Supabase project</summary>
+        <div class="field"><label>Supabase Project URL</label><input ${RAW} value="${esc(s.url||'')}" placeholder="https://YOUR-PROJECT.supabase.co" oninput="syncField('url',this.value)"></div>
+        <div class="field"><label>Supabase anon key <span style="font-size:10px;color:var(--text3)">(public — safe to store)</span></label><input ${RAW} value="${esc(s.anonKey||'')}" placeholder="eyJhbGci…" oninput="syncField('anonKey',this.value)"></div>
+        <div class="field"><label>Sync passphrase <span style="font-size:10px;color:var(--text3)">(your encryption secret — the one thing you must reuse on every device)</span></label>
+          <div style="display:flex;gap:6px"><input type="text" ${RAW} value="${esc(s.passphrase||'')}" placeholder="a long secret only you know" oninput="syncField('passphrase',this.value)" style="flex:1"><button class="btn btn-o btn-sm" onclick="syncGenPassphrase()" title="Generate a strong passphrase">Generate</button></div>
+        </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:4px">
+          <button class="btn btn-g" onclick="syncConnect()">Connect &amp; sync</button>
+        </div>
+      </details>
       ${setupHelp}
     </div>`;
   }
