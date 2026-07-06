@@ -3571,6 +3571,62 @@ body.light .geo-dropdown { box-shadow:0 10px 30px -10px rgba(60,40,10,0.22); }
 @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.5} }
 .pulse { animation:pulse 2s ease infinite; }
 
+/* ── SPEND INSIGHTS (Bank & Transactions) ─────────────── */
+.si-drop{margin-top:20px;border:1.5px dashed var(--border2);border-radius:var(--rl);background:linear-gradient(180deg,var(--bg2),var(--bg1));padding:40px 28px;text-align:center;cursor:pointer;transition:border-color .15s,background .15s}
+.si-drop:hover,.si-drop.dragover{border-color:var(--green);background:var(--green-dim)}
+.si-drop-ic{font-size:32px}
+.si-drop-t{font-size:17px;font-weight:600;margin-top:8px}
+.si-drop-s{color:var(--text2);font-size:13px;margin-top:6px;max-width:52ch;margin-left:auto;margin-right:auto}
+.si-drop-btn{margin-top:16px;display:inline-flex;align-items:center;gap:8px;background:var(--green);color:#00140d;font-weight:600;font-size:13px;border:none;border-radius:var(--r);padding:10px 18px;cursor:pointer}
+.si-fmt-row{display:flex;gap:8px;flex-wrap:wrap;justify-content:center;margin-top:16px}
+.si-fmt{display:flex;align-items:center;gap:7px;font-size:12px;color:var(--text2);background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:6px 11px}
+.si-fmt b{color:var(--text);font-weight:600}
+.si-fmt-ic{width:20px;height:20px;border-radius:5px;display:grid;place-items:center;font-size:10px;font-weight:700;font-family:var(--fm)}
+.si-paste{margin-top:18px;background:var(--bg2);border:1px solid var(--border);border-radius:var(--r);padding:14px 16px}
+.si-paste-t{font-size:13px;font-weight:600;margin-bottom:10px}
+.si-paste textarea{width:100%;min-height:88px;background:var(--bg0);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:var(--fm);font-size:12px;padding:11px;resize:vertical}
+.si-privacy{margin-top:16px;display:flex;gap:10px;align-items:flex-start;font-size:12px;color:var(--text2);background:var(--blue-dim);border:1px solid #4d9fff2a;border-radius:var(--r);padding:11px 14px}
+.si-privacy b{color:var(--text)}
+.si-verdict{background:linear-gradient(135deg,var(--bg3),var(--bg2));border:1px solid var(--border2);border-radius:var(--rl);padding:20px 22px;position:relative;overflow:hidden;margin-bottom:16px}
+.si-verdict::before{content:"";position:absolute;left:0;top:0;bottom:0;width:3px}
+.si-verdict.t-healthy::before{background:var(--green)}
+.si-verdict.t-watch::before{background:var(--amber)}
+.si-verdict.t-concern::before{background:var(--red)}
+.si-v-top{display:flex;align-items:center;gap:10px;margin-bottom:11px;flex-wrap:wrap}
+.si-v-pill{font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;border-radius:100px;padding:5px 12px}
+.si-verdict.t-healthy .si-v-pill{background:var(--green-dim);color:var(--green);border:1px solid #00e8a035}
+.si-verdict.t-watch .si-v-pill{background:var(--amber-dim);color:var(--amber);border:1px solid #f5a62335}
+.si-verdict.t-concern .si-v-pill{background:var(--red-dim);color:var(--red);border:1px solid #ff4d6d35}
+.si-v-range{margin-left:auto;font-size:12px;color:var(--text3);font-family:var(--fm)}
+.si-v-h{font-size:17px;font-weight:600;line-height:1.45;text-wrap:balance}
+.si-v-src{margin-top:12px;font-size:11px;color:var(--text3)}
+.si-concern{display:flex;gap:12px;padding:12px 0;border-bottom:1px solid var(--border)}
+.si-concern:last-child{border-bottom:none}
+.si-sev{width:3px;border-radius:3px;flex:none}
+.si-sev.hi{background:var(--red)}.si-sev.md{background:var(--amber)}.si-sev.lo{background:var(--blue)}
+.si-c-h{font-size:13px;font-weight:600}
+.si-c-p{font-size:12px;color:var(--text2);margin-top:3px;line-height:1.55}
+.si-c-tag{font-size:10px;color:var(--text3);font-family:var(--fm);margin-top:6px;text-transform:uppercase;letter-spacing:.04em}
+.si-cat{display:grid;grid-template-columns:104px 1fr 46px;align-items:center;gap:10px;padding:6px 0}
+.si-cat-n{font-size:12px;color:var(--text2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.si-cat-track{height:8px;background:var(--bg3);border-radius:100px;overflow:hidden}
+.si-cat-fill{height:100%;border-radius:100px}
+.si-cat-p{font-family:var(--fm);font-size:11px;color:var(--text2);text-align:right}
+.si-insight{display:flex;gap:11px;padding:10px 0;border-bottom:1px solid var(--border);font-size:12.5px;color:var(--text2);line-height:1.55}
+.si-insight:last-child{border-bottom:none}
+.si-insight-ic{width:22px;height:22px;border-radius:6px;flex:none;display:grid;place-items:center;font-size:12px;background:var(--bg3)}
+.si-insight b{color:var(--text);font-weight:600}
+.si-action{display:flex;gap:11px;align-items:flex-start;padding:11px 0;border-bottom:1px solid var(--border);font-size:13px;line-height:1.5}
+.si-action:last-child{border-bottom:none}
+.si-action-n{width:20px;height:20px;border-radius:5px;background:var(--green-dim);color:var(--green);flex:none;display:grid;place-items:center;font-size:11px;font-weight:700;font-family:var(--fm)}
+.si-summary-cta{margin:16px 0;background:var(--bg2);border:1px dashed var(--border2);border-radius:var(--rl);padding:22px;text-align:center}
+.si-summary-cta-t{font-size:15px;font-weight:600}
+.si-summary-cta-s{font-size:12px;color:var(--text2);margin-top:5px;max-width:48ch;margin-left:auto;margin-right:auto}
+.si-summary-cta .si-drop-btn{background:var(--violet);color:#fff;margin-top:14px}
+.si-back{background:none;border:none;color:var(--text2);font-size:13px;cursor:pointer;padding:0;margin-bottom:6px}
+.si-back:hover{color:var(--text)}
+.si-raw{white-space:pre-wrap;font-size:12.5px;color:var(--text2);line-height:1.6;font-family:var(--ff)}
+
 /* ── RESPONSIVE ──────────────────────────────────────── */
 @media(max-width:900px) {
   .two-col,.three-col { grid-template-columns:1fr; }
@@ -5922,6 +5978,9 @@ function defaultState() {
     // Bank connection
     bankConnected:false, bankMode:'demo',
     transactions:[],
+    // Spend Insights — cached AI summary of the uploaded transactions
+    // ({ data, raw, generatedAt, count, range }); null until generated.
+    spendInsights:null,
 
     // Retire Anywhere
     retireLocations:[ /* deprecated — merged into `places` on migrate v3→v4; keep key here for older snapshots */ ],
@@ -10805,209 +10864,446 @@ function renderDashboard() {
 // top bar), which is the single source of truth for every
 // future-dated surface app-wide.
 
-// ══ TRANSACTIONS ═════════════════════════════════════════════════════════════
-function renderTransactions() {
-  const el=document.getElementById('panel-transactions');
-  if(!el) return;
+// ══ SPEND INSIGHTS (Bank & Transactions) ═════════════════════════════════════
+// Upload a bank export (CSV / TSV / pasted rows) → parse locally → compute
+// spend metrics on-device → optional AI summary (top concerns, patterns,
+// actions). Replaces the old demo "bank connect" tab. The uploaded file never
+// leaves the browser; only the aggregated summary text is sent to the user's
+// own configured AI provider when they explicitly request a summary.
 
-  if(!state.bankConnected) {
-    el.innerHTML = `
-      ${ui.ph({tag:t('sb.group.personal'), title:t('tx.page.title'), sub:t('tx.page.sub.empty')})}
-      ${ui.empty({
-        icon:'🏦',
-        title:t('tx.empty.title'),
-        sub:`${t('tx.empty.sub')}
-          <div style="margin-top:14px;display:flex;gap:6px;flex-wrap:wrap;justify-content:center">
-            <span class="bank-badge">🇸🇪 SEB</span><span class="bank-badge">🇸🇪 Swedbank</span><span class="bank-badge">🇸🇪 Handelsbanken</span>
-            <span class="bank-badge">🇸🇪 Nordea</span><span class="bank-badge">🇩🇰 Danske Bank</span><span class="bank-badge">🇪🇺 ${t('tx.empty.allPsd2')}</span>
-          </div>`,
-        cta:`<button class="btn btn-g" onclick="openModal('bank-modal')">${t('tx.empty.cta.connect')}</button>
-             <button class="btn btn-o btn-sm" onclick="connectBankDemo()">${t('tx.empty.cta.demo')}</button>`
-      })}
-    `;
+let _siForceUpload = false; // show the upload view even when data is loaded
+let _siRunning = false;     // AI summary request in flight
+let _siError = null;        // last AI summary error message
+
+// Full HTML-entity escape (incl. quotes) for model/user text rendered into
+// this feature's markup. The app-wide esc() intentionally omits quotes; this
+// local helper is quote-safe so summary/transaction strings are safe inside
+// both attributes and text nodes.
+function _siEsc(s){
+  return String(s==null?'':s)
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+    .replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
+
+// A cell "looks like a date" — used to decide whether a pasted/exported block
+// has a header row (no date in row 0) or is raw data (date already in row 0).
+function _siDatey(v){
+  const s = String(v==null?'':v).trim();
+  return /^\d{4}[-/]\d{1,2}[-/]\d{1,2}/.test(s) || /^\d{1,2}[-/.]\d{1,2}[-/.]\d{2,4}/.test(s);
+}
+
+// Derive spend metrics from state.transactions. Amounts are stored in the
+// app's base currency; fmt() applies the display rate at render time.
+function _siMetrics(){
+  const txs = Array.isArray(state.transactions) ? state.transactions : [];
+  let income=0, spend=0, largest=0, largestName='';
+  const byCat={}, byMonth={};
+  txs.forEach(tx => {
+    const amt = Number(tx.amount)||0;
+    const isCredit = tx.type==='credit' || amt>0;
+    const abs = Math.abs(amt);
+    if(isCredit){ income += abs; }
+    else {
+      spend += abs;
+      const cat = tx.category || 'Other';
+      byCat[cat] = (byCat[cat]||0) + abs;
+      if(abs>largest){ largest=abs; largestName = tx.name || cat; }
+    }
+    const ym = String(tx.date||'').slice(0,7);
+    if(/^\d{4}-\d{2}$/.test(ym)){
+      if(!byMonth[ym]) byMonth[ym] = {income:0, spend:0};
+      if(isCredit) byMonth[ym].income += abs; else byMonth[ym].spend += abs;
+    }
+  });
+  const net = income - spend;
+  const cats = Object.entries(byCat).sort((a,b)=>b[1]-a[1]);
+  const months = Object.keys(byMonth).sort();
+  return { txs, income, spend, net, savingsRate: income>0?net/income:0,
+           cats, byCat, byMonth, months, largest, largestName, count: txs.length };
+}
+
+function _siRangeLabel(m){
+  if(!m.months.length) return '';
+  const _mn = monthNames();
+  const fmtYm = ym => { const [y,mo]=ym.split('-'); return `${_mn[(+mo)-1]} ${y}`; };
+  const a = m.months[0], b = m.months[m.months.length-1];
+  return a===b ? fmtYm(a) : `${fmtYm(a)} – ${fmtYm(b)}`;
+}
+
+// ─── UPLOAD / EMPTY VIEW ─────────────────────────────────────────────────────
+function _siUploadView(hasData){
+  return `
+    ${ui.ph({tag:t('sb.group.personal'), title:'Spend Insights',
+      sub:'Drop your bank’s CSV or Excel export. Horizon reads it in your browser and tells you what it means.'})}
+    ${hasData ? `<button class="si-back" onclick="siBackToInsights()">← Back to insights</button>` : ''}
+    <div class="si-drop" id="si-drop">
+      <div class="si-drop-ic">📤</div>
+      <div class="si-drop-t">Drop your bank export here</div>
+      <div class="si-drop-s">Most banks offer <b>“Export as CSV”</b> under Statements or Transactions. Comma or semicolon, European (1.234,56) or US (1,234.56) number formats — all handled.</div>
+      <button class="si-drop-btn" type="button">＋ Choose a file</button>
+      <input type="file" id="si-file" accept=".csv,.tsv,.txt,text/csv,text/plain" style="display:none">
+      <div class="si-fmt-row">
+        <span class="si-fmt"><span class="si-fmt-ic" style="background:var(--green-dim);color:var(--green)">CSV</span><b>CSV / TSV</b> exports</span>
+        <span class="si-fmt"><span class="si-fmt-ic" style="background:var(--blue-dim);color:var(--blue)">XLS</span><b>Excel</b> — save as CSV</span>
+        <span class="si-fmt"><span class="si-fmt-ic" style="background:var(--violet-dim);color:var(--violet)">TXT</span><b>Pasted</b> rows</span>
+        <span class="si-fmt" style="opacity:.5"><span class="si-fmt-ic" style="background:var(--bg4);color:var(--text3)">PDF</span>PDF / screenshots <b style="color:var(--text3)">· later</b></span>
+      </div>
+    </div>
+    <div class="si-paste">
+      <div class="si-paste-t">⌨︎ …or paste transactions straight in</div>
+      <textarea id="si-paste-box" placeholder="2026-06-14   ICA Maxi        -842,50&#10;2026-06-13   Spotify AB      -119,00&#10;2026-06-12   Salary       +38400,00"></textarea>
+      <div style="margin-top:10px;text-align:right"><button class="btn btn-g btn-sm" onclick="siAnalyzePaste()">Read pasted rows</button></div>
+    </div>
+    <div class="si-privacy">
+      <span>🔒</span>
+      <div><b>Your file never leaves your browser.</b> The export is parsed locally on your device. Only when you ask for a summary is the extracted transaction text sent to <b>your own</b> configured AI provider (Settings → AI Keys) — nothing is stored on any Horizon server.</div>
+    </div>`;
+}
+
+// ─── FILE / PASTE INGEST ─────────────────────────────────────────────────────
+function _siWireDrop(){
+  const drop = document.getElementById('si-drop');
+  const input = document.getElementById('si-file');
+  if(!drop || !input) return;
+  drop.onclick = (e) => { if(e.target.tagName !== 'INPUT') input.click(); };
+  drop.ondragover = (e) => { e.preventDefault(); drop.classList.add('dragover'); };
+  drop.ondragleave = () => drop.classList.remove('dragover');
+  drop.ondrop = (e) => {
+    e.preventDefault(); drop.classList.remove('dragover');
+    const f = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
+    if(f) siHandleFile(f);
+  };
+  input.onchange = () => { if(input.files && input.files[0]) siHandleFile(input.files[0]); };
+}
+function siHandleFile(file){
+  const reader = new FileReader();
+  reader.onload = (e) => { _siIngestText(String(e.target.result || ''), file.name); };
+  reader.onerror = () => alert('Could not read that file.');
+  reader.readAsText(file);
+}
+window.siAnalyzePaste = function(){
+  const box = document.getElementById('si-paste-box');
+  const text = box ? box.value.trim() : '';
+  if(!text){ alert('Paste some transaction rows first.'); return; }
+  _siIngestText(text, 'pasted rows');
+};
+// Parse raw CSV/TSV/pasted text into transactions using the existing hand-rolled
+// CSV parser + column detector, then replace state.transactions.
+function _siIngestText(text, sourceName){
+  let rows;
+  try { rows = _parseCsv(text); } catch(err){ alert('Could not parse that data: ' + (err.message||err)); return; }
+  rows = (rows||[]).filter(r => r.some(v => String(v||'').trim()));
+  if(!rows.length){ alert('No rows found in that file.'); return; }
+  const first = rows[0] || [];
+  const hasHeader = !first.some(_siDatey);
+  const headers = hasHeader ? first : first.map((_,i)=>'col'+(i+1));
+  const data = hasHeader ? rows.slice(1) : rows;
+  if(!data.length){ alert('That file has a header but no transaction rows.'); return; }
+  const map = _detectCsvColumns(headers, data[0]);
+  const txs = _buildCsvTransactions(data.slice(0, 5000), map);
+  if(!txs.length){
+    alert('Couldn’t find a date and amount column in that file. Make sure your export includes at least a date column and an amount column.');
+    return;
+  }
+  state.transactions = txs;
+  state.spendInsights = null;   // stale summary no longer matches the data
+  state.bankConnected = true;
+  state.bankMode = 'imported';
+  _siForceUpload = false;
+  _siError = null;
+  save();
+  renderTransactions();
+}
+window.siShowUpload = function(){ _siForceUpload = true; renderTransactions(); };
+window.siBackToInsights = function(){ _siForceUpload = false; renderTransactions(); };
+
+// ─── AI SUMMARY ──────────────────────────────────────────────────────────────
+function _siBuildPrompt(m){
+  const _mn = monthNames();
+  const money = n => Math.round(n).toLocaleString('en-US');
+  const monthly = m.months.map(ym => {
+    const [y,mo]=ym.split('-');
+    return `  ${_mn[(+mo)-1]} ${y}: in ${money(m.byMonth[ym].income)}, out ${money(m.byMonth[ym].spend)}`;
+  }).join('\n');
+  const catLines = m.cats.map(([c,v]) =>
+    `  ${c}: ${money(v)} (${m.spend>0?Math.round(v/m.spend*100):0}% of spend)`).join('\n');
+  // Largest single debits.
+  const topDebits = m.txs.filter(t => (t.type==='debit'|| (Number(t.amount)||0)<0))
+    .sort((a,b)=>Math.abs(Number(b.amount)||0)-Math.abs(Number(a.amount)||0))
+    .slice(0,8).map(t => `  ${t.date} · ${t.name||'?'} · ${money(Math.abs(Number(t.amount)||0))}`).join('\n');
+  // Recurring merchants (same normalised name appearing 3+ times).
+  const norm = s => String(s||'').toLowerCase().replace(/[0-9]+/g,'').replace(/\s+/g,' ').trim();
+  const groups = {};
+  m.txs.forEach(t => { if(t.type==='debit'||(Number(t.amount)||0)<0){ const k=norm(t.name); if(!k) return; (groups[k]=groups[k]||{n:0,sum:0,label:t.name}).n++; groups[k].sum+=Math.abs(Number(t.amount)||0); }});
+  const recurring = Object.values(groups).filter(g=>g.n>=3).sort((a,b)=>b.n-a.n).slice(0,8)
+    .map(g=>`  ${g.label} · ${g.n}× · ${money(g.sum)} total`).join('\n');
+
+  return `You are a personal-finance analyst. Below is a summary of a user's uploaded bank transactions (${m.count} transactions, ${_siRangeLabel(m)}). All amounts are in the user's base currency. Do NOT invent numbers — only reference the figures given.
+
+TOTALS
+  Money in: ${money(m.income)}
+  Money out: ${money(m.spend)}
+  Net saved: ${money(m.net)} (${Math.round(m.savingsRate*100)}% of income)
+
+MONTHLY
+${monthly || '  (single period)'}
+
+SPENDING BY CATEGORY
+${catLines || '  (uncategorised)'}
+
+LARGEST DEBITS
+${topDebits || '  (none)'}
+
+LIKELY RECURRING CHARGES
+${recurring || '  (none detected)'}
+
+Produce a spend summary. Respond with ONE JSON object ONLY — no prose, no code fences, no markdown — matching exactly this shape:
+{
+  "verdict": { "tone": "healthy" | "watch" | "concern", "headline": "one plain-text sentence, ~20-30 words, naming 1-2 concrete figures" },
+  "concerns": [ { "severity": "hi" | "md" | "lo", "title": "short, may include a figure", "detail": "1-2 sentences", "tag": "2-3 word category e.g. Recurring · Trend" } ],
+  "insights": [ { "icon": "one emoji", "text": "1 sentence pattern worth knowing, referencing a figure" } ],
+  "actions": [ { "text": "one imperative action for this month, starting with a verb" } ]
+}
+Rules: 2-4 concerns, 3-5 insights, 3-4 actions. Plain text only inside strings (no HTML, no markdown, no curly-brace markers). Ground every item in the figures above.`;
+}
+
+function _siParseSummary(raw){
+  try {
+    let s = String(raw||'').trim();
+    s = s.replace(/^```(?:json)?\s*/i,'').replace(/\s*```$/,'').trim();
+    const a = s.indexOf('{'), b = s.lastIndexOf('}');
+    if(a>=0 && b>a) s = s.slice(a, b+1);
+    const o = JSON.parse(s);
+    const str = v => String(v==null?'':v);
+    const arr = v => Array.isArray(v) ? v : [];
+    return {
+      verdict: o.verdict ? { tone: (['healthy','watch','concern'].includes(o.verdict.tone)?o.verdict.tone:'watch'), headline: str(o.verdict.headline) } : null,
+      concerns: arr(o.concerns).slice(0,4).map(c => ({ severity: (['hi','md','lo'].includes(c&&c.severity)?c.severity:'md'), title: str(c&&c.title), detail: str(c&&c.detail), tag: str(c&&c.tag) })),
+      insights: arr(o.insights).slice(0,5).map(i => ({ icon: str((i&&i.icon)||'•').slice(0,4), text: str(i&&i.text) })),
+      actions: arr(o.actions).slice(0,5).map(x => ({ text: str(x&&(x.text!=null?x.text:x)) })),
+    };
+  } catch(_e){
+    return { parseError:true, raw:String(raw||'') };
+  }
+}
+
+window.siGenerateSummary = async function(){
+  if(_siRunning) return;
+  const key = state.aiKeys && state.aiKeys.claude;
+  if(!key){ alert('Add your Claude API key in Settings → AI Keys to generate a summary.'); nav('settings'); return; }
+  _siRunning = true; _siError = null;
+  renderTransactions();
+  try {
+    const m = _siMetrics();
+    const raw = await callClaude(_siBuildPrompt(m), 1400);
+    state.spendInsights = { data: _siParseSummary(raw), raw, generatedAt: Date.now(), count: m.count, range: _siRangeLabel(m) };
+    save();
+  } catch(err){
+    _siError = (err && err.message) ? err.message : String(err);
+  } finally {
+    _siRunning = false;
+    renderTransactions();
+  }
+};
+
+window.siSaveToVault = function(){
+  const si = state.spendInsights;
+  if(!si){ return; }
+  if(!Array.isArray(state.vault)) state.vault = [];
+  state.vault.unshift({
+    id: genId(),
+    type: 'analysis',
+    category: 'spend-insights',
+    title: `Spend Insights · ${si.range || ''}`.trim(),
+    generatedAt: si.generatedAt || Date.now(),
+    snapshot: { count: si.count, range: si.range },
+    markdown: si.raw || '',
+    sections: null,
+  });
+  if(state.vault.length > 100) state.vault = state.vault.slice(0, 100);
+  saveVault(); save();
+  const btn = document.getElementById('si-save-btn');
+  if(btn){ btn.textContent = '✓ Saved to Vault'; btn.disabled = true; }
+};
+
+// ─── SUMMARY REPORT VIEW ─────────────────────────────────────────────────────
+function _siReportView(si){
+  const d = si.data;
+  if(!d || d.parseError){
+    return `<div class="card" data-section="summary">
+      <div class="card-title">AI summary</div>
+      <div style="font-size:12px;color:var(--text3);margin:6px 0 12px">Couldn’t structure this summary — showing the raw output.</div>
+      <div class="si-raw">${_siEsc(d ? d.raw : '')}</div>
+      <div style="margin-top:14px;display:flex;gap:8px">
+        <button class="btn btn-o btn-sm" onclick="siGenerateSummary()">↺ Re-analyse</button>
+      </div>
+    </div>`;
+  }
+  const toneLabel = { healthy:'On track', watch:'Watch', concern:'Needs attention' };
+  const v = d.verdict;
+  const verdict = v ? `
+    <div class="si-verdict t-${v.tone}">
+      <div class="si-v-top">
+        <span class="si-v-pill">${_siEsc(toneLabel[v.tone]||'Summary')}</span>
+        <span class="si-v-range">${_siEsc(si.range||'')} · ${si.count} transactions</span>
+      </div>
+      <div class="si-v-h">${_siEsc(v.headline)}</div>
+      <div class="si-v-src">✦ Written by Claude from your uploaded data · not financial advice</div>
+    </div>` : '';
+
+  const concerns = d.concerns.length ? ui.card({
+    title:`Top concerns <span style="margin-left:auto;font-size:10px;font-weight:600;color:var(--violet);background:var(--violet-dim);border:1px solid #8b5cf630;border-radius:100px;padding:3px 9px">AI-flagged</span>`,
+    section:'concerns',
+    body: d.concerns.map(c => `
+      <div class="si-concern">
+        <div class="si-sev ${c.severity}"></div>
+        <div style="flex:1">
+          <div class="si-c-h">${_siEsc(c.title)}</div>
+          <div class="si-c-p">${_siEsc(c.detail)}</div>
+          ${c.tag?`<div class="si-c-tag">${_siEsc(c.tag)}</div>`:''}
+        </div>
+      </div>`).join('')
+  }) : '';
+
+  const insights = d.insights.length ? ui.card({
+    title:'Patterns worth knowing',
+    section:'insights',
+    body: d.insights.map(i => `
+      <div class="si-insight">
+        <span class="si-insight-ic">${_siEsc(i.icon)}</span>
+        <div>${_siEsc(i.text)}</div>
+      </div>`).join('')
+  }) : '';
+
+  const actions = d.actions.length ? ui.card({
+    title:'Do this month',
+    section:'actions',
+    body: d.actions.map((a,idx) => `
+      <div class="si-action">
+        <span class="si-action-n">${idx+1}</span>
+        <div>${_siEsc(a.text)}</div>
+      </div>`).join('')
+  }) : '';
+
+  const footer = `<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:16px">
+    <button class="btn btn-g btn-sm" id="si-save-btn" onclick="siSaveToVault()">Save summary to Vault</button>
+    <button class="btn btn-o btn-sm" onclick="openAIPanel()">Ask a follow-up in AI chat</button>
+    <button class="btn btn-o btn-sm" onclick="siGenerateSummary()">↺ Re-analyse</button>
+  </div>`;
+
+  return verdict + concerns + insights + actions + footer;
+}
+
+// ══ RENDER ═══════════════════════════════════════════════════════════════════
+function renderTransactions() {
+  const el = document.getElementById('panel-transactions');
+  if(!el) return;
+  const m = _siMetrics();
+
+  // STATE A — no data (or the user asked to upload again) → upload view.
+  if(!m.count || _siForceUpload){
+    el.innerHTML = _siUploadView(m.count > 0);
+    _siWireDrop();
     return;
   }
 
-  // Spending by category (12-month)
-  const totalSpend=Object.values(CAT_SPENDING_12M).reduce((s,v)=>s+v,0);
-  const catRows=Object.entries(CAT_SPENDING_12M).sort((a,b)=>b[1]-a[1]).map(([cat,amt],i)=>{
-    const pct=Math.round(amt/totalSpend*100);
-    const barPct=Math.round(amt/Object.values(CAT_SPENDING_12M)[0]*100);
-    // Translate the category display name via t('tx.cat.<key>'),
-    // falling back to the raw English key for any future categories
-    // that don't yet have a translation entry. CAT_SPENDING_12M
-    // stays the canonical English-keyed source of truth.
+  // Category bars — scaled against the LARGEST category (not insertion order).
+  const catMax = m.cats.length ? m.cats[0][1] : 1;
+  const catRows = m.cats.slice(0, 8).map(([cat, amt], i) => {
+    const pct = m.spend>0 ? Math.round(amt/m.spend*100) : 0;
+    const barPct = catMax>0 ? Math.round(amt/catMax*100) : 0;
     const catLabel = STRINGS['tx.cat.'+cat] ? t('tx.cat.'+cat) : cat;
-    return `<div class="cat-row">
-      <div class="cat-name">${esc2(catLabel)}</div>
-      <div class="cat-bar-wrap"><div class="cat-bar-track"><div class="cat-bar-fill" style="width:${barPct}%;background:${CAT_COLORS[i%CAT_COLORS.length]}"></div></div></div>
-      <div class="cat-pct">${pct}%</div>
-      <div class="cat-amt neg">${fmt(amt)}</div>
+    return `<div class="si-cat">
+      <div class="si-cat-n">${_siEsc(catLabel)}</div>
+      <div class="si-cat-track"><div class="si-cat-fill" style="width:${barPct}%;background:${CAT_COLORS[i%CAT_COLORS.length]}"></div></div>
+      <div class="si-cat-p">${pct}%</div>
     </div>`;
   }).join('');
 
-  // AI patterns — keyed so the labels translate while the
-  // direction arrows stay code-driven.
-  const patterns=[
-    {key:'tx.ai.pattern.groceries', dir:'dn'},
-    {key:'tx.ai.pattern.dining',    dir:'up'},
-    {key:'tx.ai.pattern.transport', dir:'neu'},
-    {key:'tx.ai.pattern.unexpected',dir:'up'},
-  ];
+  // Recent transactions (newest first).
+  const recent = m.txs.slice().sort((a,b)=>String(b.date||'').localeCompare(String(a.date||''))).slice(0,10);
+  const recentRows = recent.map(tx => {
+    const credit = tx.type==='credit' || (Number(tx.amount)||0)>0;
+    return `<div class="tx-item">
+      <div class="tx-icon" style="background:${credit?'var(--green-dim)':'var(--bg3)'}">${_siEsc(tx.icon||(credit?'💰':'💳'))}</div>
+      <div class="tx-info">
+        <div class="tx-name">${_siEsc(tx.name)}</div>
+        <div class="tx-cat">${_siEsc(STRINGS['tx.cat.'+tx.category] ? t('tx.cat.'+tx.category) : (tx.category||''))}</div>
+      </div>
+      <div class="tx-date">${_siEsc(tx.date)}</div>
+      <div class="tx-amount ${credit?'inp':'out'}">${credit?'+':''}${fmt(Math.abs(Number(tx.amount)||0))}</div>
+    </div>`;
+  }).join('');
 
-  el.innerHTML=`
-    <div class="ph">
-      <div class="ph-tag">${t('sb.group.personal')}</div>
-      <div class="ph-title">${esc2(t('tx.page.title'))}</div>
-      <div class="ph-sub">${esc2(t('tx.page.sub.connected'))}</div>
+  // Summary block — running / loaded / error / not-yet-generated.
+  let summaryBlock;
+  if(_siRunning){
+    summaryBlock = ui.loading('Reading your spending and writing the summary…');
+  } else if(state.spendInsights){
+    summaryBlock = _siReportView(state.spendInsights);
+  } else {
+    summaryBlock = `<div class="si-summary-cta">
+      <div class="si-summary-cta-t">Get an AI read on your spending</div>
+      <div class="si-summary-cta-s">Horizon will flag your top concerns, the patterns worth knowing, and what to do this month — grounded in the ${m.count} transactions you uploaded.</div>
+      ${_siError?`<div style="font-size:12px;color:var(--red);margin-top:10px">${_siEsc(_siError)}</div>`:''}
+      <button class="si-drop-btn" onclick="siGenerateSummary()">✦ Generate summary</button>
+    </div>`;
+  }
+
+  el.innerHTML = `
+    <div style="display:flex;align-items:flex-end;gap:14px;flex-wrap:wrap">
+      ${ui.ph({tag:t('sb.group.personal'), title:'Spend Insights', sub:'Your uploaded bank data, read back to you.'})}
+      <div style="margin-left:auto;display:flex;gap:8px;padding-bottom:4px">
+        <button class="btn btn-o btn-sm" onclick="siShowUpload()">＋ New upload</button>
+      </div>
     </div>
     <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px">
-      <span class="conn-badge ${state.bankMode==='demo'?'demo':'live'}">${state.bankMode==='demo'?t('tx.status.demo'):t('tx.status.live')}</span>
-      <span style="font-size:12px;color:var(--text2)">${esc2(t('tx.status.loaded', { n: state.transactions.length }))}</span>
-      <button class="btn btn-o btn-sm" style="margin-left:auto" onclick="openModal('bank-modal')">${esc2(t('tx.status.changeBank'))}</button>
+      <span class="conn-badge ${state.bankMode==='imported'?'live':'demo'}">${state.bankMode==='imported'?'Imported':state.bankMode==='demo'?'Demo':'Live'}</span>
+      <span style="font-size:12px;color:var(--text2)">${m.count} transactions · ${_siEsc(_siRangeLabel(m)||'—')}</span>
     </div>
-    <div class="kpi-row">
-      <div class="kpi"><div class="kpi-lbl">${esc2(t('tx.kpi.totalIncome'))}</div><div class="kpi-val pos">${fmt(state.transactions.filter(t=>t.type==='credit').reduce((s,t)=>s+t.amount,0))}</div></div>
-      <div class="kpi"><div class="kpi-lbl">${esc2(t('tx.kpi.totalSpend'))}</div><div class="kpi-val neg">${fmt(Math.abs(state.transactions.filter(t=>t.type==='debit').reduce((s,t)=>s+t.amount,0)))}</div></div>
-      <div class="kpi"><div class="kpi-lbl">${esc2(t('tx.kpi.transactions'))}</div><div class="kpi-val">${state.transactions.length}</div></div>
-      <div class="kpi"><div class="kpi-lbl">${esc2(t('tx.kpi.largestExpense'))}</div><div class="kpi-val neg">${(()=>{const debits=state.transactions.filter(t=>t.type==='debit').map(t=>t.amount);return debits.length?fmt(Math.abs(Math.min(...debits))):fmt(0);})()}</div><div class="kpi-sub">${esc2(t('tx.kpi.largestExpense.sub'))}</div></div>
-    </div>
+
+    ${ui.kpiRow([
+      {label:'Money in',  value:`<span class="pos">${fmt(m.income)}</span>`, sub:m.months.length?`≈ ${fmt(Math.round(m.income/m.months.length))} / mo`:''},
+      {label:'Money out', value:`<span class="neg">${fmt(m.spend)}</span>`,  sub:m.months.length?`≈ ${fmt(Math.round(m.spend/m.months.length))} / mo`:''},
+      {label:'Net saved', value:fmt(m.net), sub:`${Math.round(m.savingsRate*100)}% of income`},
+      {label:'Biggest expense', value:m.largest?fmt(m.largest):'—', sub:m.largestName?_siEsc(m.largestName.slice(0,22)):''},
+    ])}
+
+    ${summaryBlock}
 
     <div class="two-col">
-      <!-- Recent transactions — compact card with pinned title + scrollable body -->
       <div class="card card-compact">
-        <div class="card-title">${esc2(t('tx.card.recent'))}</div>
-        <div class="card-body">
-          <div class="tx-list">
-            ${state.transactions.slice(0,10).map(tx=>`
-              <div class="tx-item">
-                <div class="tx-icon" style="background:${tx.type==='credit'?'var(--green-dim)':'var(--bg3)'}">${tx.icon||'💳'}</div>
-                <div class="tx-info">
-                  <div class="tx-name">${esc(tx.name)}</div>
-                  <div class="tx-cat">${esc2(STRINGS['tx.cat.'+tx.category] ? t('tx.cat.'+tx.category) : (tx.category||''))}</div>
-                </div>
-                <div class="tx-date">${tx.date}</div>
-                <div class="tx-amount ${tx.type==='credit'?'inp':'out'}">${tx.type==='credit'?'+':''}${fmt(Math.abs(tx.amount))}</div>
-              </div>`).join('')}
-          </div>
-        </div>
+        <div class="card-title">Recent transactions</div>
+        <div class="card-body"><div class="tx-list">${recentRows}</div></div>
       </div>
-
-      <!-- Spending categories — compact card with pinned title + scrollable body -->
       <div class="card card-compact">
-        <div class="card-title">${esc2(t('tx.card.byCategory'))}
-          <div class="ct-actions"><span class="conn-badge demo">${esc2(t('tx.badge.demoData'))}</span></div>
-        </div>
-        <div class="card-body">${catRows}</div>
+        <div class="card-title">Where it went</div>
+        <div class="card-body">${catRows || `<div style="font-size:12px;color:var(--text3);padding:8px 0">No categorised spending yet.</div>`}</div>
       </div>
     </div>
 
-    <!-- Past / Next 12 Months — two side-by-side charts sharing the
-         exact .two-col layout the Dashboard uses for its 12-Month
-         Cash Flow + Nest Egg Growth Curve pair. Left = actual bank
-         history (Income / Expenses bars + Net Flow line). Right =
-         projected forward 12 months from the live Monthly Review
-         state (Income / Expenses bars + Savings + Fun Fund lines). -->
-    <div class="two-col">
-      <div class="card" data-section="past12">
-        <div class="card-title">${esc2(t('tx.chart.past12'))}
-          <div class="ct-actions"><span class="conn-badge demo">${esc2(t('tx.badge.bankData'))}</span></div>
-        </div>
-        <div class="chart-wrap lg"><canvas id="tx-chart-past"></canvas></div>
-      </div>
-      <div class="card" data-section="next12">
-        <div class="card-title">${esc2(t('tx.chart.next12'))}
-          <div class="ct-actions"><span class="conn-badge demo">${esc2(t('tx.badge.projection'))}</span></div>
-        </div>
-        <div class="chart-wrap lg"><canvas id="tx-chart-next"></canvas></div>
-      </div>
-    </div>
-
-    <!-- AI Patterns -->
-    <div class="card">
-      <div class="card-title">${esc2(t('tx.ai.title'))}</div>
-      <div style="font-size:12px;color:var(--text2);margin-bottom:10px">${esc2(t('tx.ai.sub'))}</div>
-      <div>${patterns.map(p=>`<span class="pattern-chip ${p.dir}">${p.dir==='up'?'↑':p.dir==='dn'?'↓':'→'} ${esc2(t(p.key))}</span>`).join('')}</div>
-      <div style="margin-top:14px;padding:12px;background:var(--bg3);border-radius:var(--r);font-size:12px;color:var(--text2);line-height:1.6">
-        💡 <strong style="color:var(--text)">${esc2(t('tx.ai.insightLbl'))}</strong> ${(()=>{const cm=FE.months.current();return t('tx.ai.insightBody', { expenses: fmt(cm.pureExpenses), funFund: fmt(cm.pureFunFund), chase: fmt(55000), boost: fmt(55000) });})()}
-      </div>
+    <div class="card" data-section="trend">
+      <div class="card-title">Monthly spend trend</div>
+      <div class="chart-wrap lg"><canvas id="si-trend"></canvas></div>
     </div>`;
 
-  setTimeout(()=>{
-    destroyChart('tx-past');
-    destroyChart('tx-next');
-    const cd = chartDefaults();
-
-    // ── LEFT · PAST 12 MONTHS ──────────────────────────────────────
-    // Strictly past 12 calendar months — [CM-12 .. CM-1]. Excludes
-    // the current month so the "past" label is honest, and so the
-    // Next-12 chart on the right can own the current month under
-    // the app-wide rolling-12 convention (month 1 = current, month
-    // 12 = current + 11). Together the pair covers 24 distinct
-    // months with no overlap on the current month.
-    // Canonical demo array so the chart always has a full,
-    // realistic shape regardless of how much live transaction data
-    // is loaded. Three series: Income + Expenses bars, Net Flow
-    // line.
-    const pastCtx = document.getElementById('tx-chart-past');
-    if(pastCtx){
-      const pastLabels = [];
-      const _mn = monthNames();
-      for(let i = 12; i >= 1; i--){
-        const d = new Date(CY, CM - i, 1);
-        pastLabels.push(`${_mn[d.getMonth()]} '${String(d.getFullYear()).slice(2)}`);
-      }
-      const pastIncome   = [127000,127000,206000,131800,127000,127000,127000,127000,127000,127000,127000,127000];
-      const pastExpenses = [132500,178264,88545,91500,103500,91500,108636,63945,81636,91500,56590,107090];
-      const pastNet      = pastIncome.map((v,i) => v - pastExpenses[i]);
-      charts['tx-past'] = new Chart(pastCtx.getContext('2d'), {
-        type: 'bar',
-        data: {
-          labels: pastLabels,
-          datasets: [
-            {label:t('tx.series.income'),   data: pastIncome,   backgroundColor:'#00e8a028', borderColor:'#00e8a0', borderWidth:1.75, borderRadius:4, order:2, categoryPercentage:0.7, barPercentage:0.85},
-            {label:t('tx.series.expenses'), data: pastExpenses, backgroundColor:'#ff4d6d22', borderColor:'#ff4d6d', borderWidth:1.75, borderRadius:4, order:2, categoryPercentage:0.7, barPercentage:0.85},
-            {label:t('tx.series.netFlow'),  data: pastNet,      type:'line', borderColor:'#4d9fff', backgroundColor:'transparent', fill:false, tension:.3, pointRadius:2, pointHoverRadius:4, pointBackgroundColor:'#4d9fff', borderWidth:1.75, order:1},
-          ],
-        },
-        options: chartPreset(),
-      });
-    }
-
-    // ── RIGHT · NEXT 12 MONTHS ─────────────────────────────────────
-    // Rolling 12-month forward projection [CM..CM+11] — matches the
-    // app-wide rolling-12 convention every other tab uses, so the
-    // current month appears ONCE across the Past/Next pair (owned by
-    // this chart). Paired with Past 12 [CM-12..CM-1] on the left,
-    // the two halves cover 24 distinct months end-to-end with no
-    // overlap and no gap.
-    const nextCtx = document.getElementById('tx-chart-next');
-    if(nextCtx){
-      const fwd = FE.months.next12();
-      const nextLabels   = fwd.map(m => m.short);
-      const nextIncome   = fwd.map(m => m.pureIncome);
-      const nextExpenses = fwd.map(m => m.pureExpenses);
-      // Savings uses a CUMULATIVE running total so the line grows
-      // steadily across the window — matches the Dashboard 12-Month
-      // Cash Flow chart. Income / Expenses / Fun Fund stay as
-      // monthly values so the bars still read as per-month flow.
-      const nextSavings  = FE.months.runningSavingsForward();
-      const nextFunFund  = fwd.map(m => m.funFund);
-      charts['tx-next'] = new Chart(nextCtx.getContext('2d'), {
-        type: 'bar',
-        data: {
-          labels: nextLabels,
-          datasets: [
-            {label:t('tx.series.income'),   data: nextIncome,   backgroundColor:'#00e8a028', borderColor:'#00e8a0', borderWidth:1.75, borderRadius:4, order:2, categoryPercentage:0.7, barPercentage:0.85},
-            {label:t('tx.series.expenses'), data: nextExpenses, backgroundColor:'#ff4d6d22', borderColor:'#ff4d6d', borderWidth:1.75, borderRadius:4, order:2, categoryPercentage:0.7, barPercentage:0.85},
-            {label:t('tx.series.savings'),  data: nextSavings,  type:'line', borderColor:'#f5a623', backgroundColor:'#f5a62312', fill:true,  tension:.35, pointRadius:2, pointHoverRadius:4, pointBackgroundColor:'#f5a623', borderWidth:1.75, order:1},
-            {label:t('tx.series.funFund'),  data: nextFunFund,  type:'line', borderColor:'#00d4ff', backgroundColor:'transparent', fill:false, tension:.3,  pointRadius:2, pointHoverRadius:4, pointBackgroundColor:'#00d4ff', borderWidth:1.75, borderDash:[4,3], order:1},
-          ],
-        },
-        options: chartPreset(),
-      });
-    }
-  },50);
+  setTimeout(() => {
+    destroyChart('si-trend');
+    const ctx = document.getElementById('si-trend');
+    if(!ctx || !m.months.length) return;
+    const _mn = monthNames();
+    const labels = m.months.map(ym => { const [y,mo]=ym.split('-'); return `${_mn[(+mo)-1]} '${y.slice(2)}`; });
+    const spend  = m.months.map(ym => Math.round(m.byMonth[ym].spend * rate()));
+    const income = m.months.map(ym => Math.round(m.byMonth[ym].income * rate()));
+    charts['si-trend'] = new Chart(ctx.getContext('2d'), {
+      type:'bar',
+      data:{ labels, datasets:[
+        {label:'Spend',  data:spend,  backgroundColor:'#ff4d6d22', borderColor:'#ff4d6d', borderWidth:1.75, borderRadius:4, order:2, categoryPercentage:0.7, barPercentage:0.85},
+        {label:'Income', data:income, type:'line', borderColor:'#00e8a0', backgroundColor:'transparent', fill:false, tension:.3, pointRadius:2, pointHoverRadius:4, pointBackgroundColor:'#00e8a0', borderWidth:1.75, order:1},
+      ]},
+      options: chartPreset(),
+    });
+  }, 50);
 }
 // Legacy no-op kept so any persisted command-palette action or
 // external deep link that previously toggled scope still resolves
