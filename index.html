@@ -190,6 +190,9 @@ input[type="number"] { -moz-appearance:textfield; }
 .nav-item.active { background:var(--bg4); color:var(--green); border-color:var(--border2); }
 .nav-item.dirty::after { content:''; position:absolute; top:10px; right:10px; width:6px; height:6px; border-radius:50%; background:var(--accent-warning); box-shadow:0 0 8px var(--accent-warning); animation:dirtyPulse 2s ease-in-out infinite; }
 @keyframes dirtyPulse { 0%,100%{opacity:.6} 50%{opacity:1} }
+/* Live-FX review pending: green dot on Settings so the user knows fresh
+   market rates are waiting for approval. */
+.nav-item.fx-pending::after { content:''; position:absolute; top:10px; right:10px; width:6px; height:6px; border-radius:50%; background:var(--green,#2ec27e); box-shadow:0 0 8px var(--green,#2ec27e); animation:dirtyPulse 2s ease-in-out infinite; }
 .nav-icon { font-size:14px; width:20px; text-align:center; flex-shrink:0; }
 .sb-sep { height:1px; background:var(--border); margin:6px 10px; }
 .sb-bot { margin-top:auto; padding:10px; }
@@ -4399,6 +4402,25 @@ const STRINGS = {
   'settings.rates.title':   { en:'💱 Exchange Rates (vs SEK)',
                               sv:'💱 Växelkurser (mot SEK)' },
   'settings.rates.oneSekEquals': { en:'1 SEK =',       sv:'1 SEK =' },
+  'settings.rates.fetchBtn':     { en:'↻ Fetch latest market rates', sv:'↻ Hämta senaste marknadskurser' },
+  'settings.rates.fetching':     { en:'Fetching…',     sv:'Hämtar…' },
+  'settings.rates.fetchErr':     { en:'Could not fetch live rates. Your current rates are unchanged.',
+                                   sv:'Kunde inte hämta liveväxelkurser. Dina nuvarande kurser är oförändrade.' },
+  'settings.rates.updatedNever': { en:'Rates set manually — never auto-updated.',
+                                   sv:'Kurser inställda manuellt — aldrig automatiskt uppdaterade.' },
+  'settings.rates.updatedOn':    { en:'Last updated {when} · {source}', sv:'Senast uppdaterad {when} · {source}' },
+  'settings.rates.staleHint':    { en:'These rates may be out of date — fetch the latest to review.',
+                                   sv:'Dessa kurser kan vara inaktuella — hämta de senaste för granskning.' },
+  'settings.rates.reviewTitle':  { en:'📥 New market rates — review & apply', sv:'📥 Nya marknadskurser — granska & tillämpa' },
+  'settings.rates.reviewSub':    { en:'Fetched {when}. Nothing changes until you apply.',
+                                   sv:'Hämtade {when}. Inget ändras förrän du tillämpar.' },
+  'settings.rates.colCurrency':  { en:'Currency',      sv:'Valuta' },
+  'settings.rates.colCurrent':   { en:'Current',       sv:'Nuvarande' },
+  'settings.rates.colNew':       { en:'New',           sv:'Ny' },
+  'settings.rates.colChange':    { en:'Change',        sv:'Ändring' },
+  'settings.rates.applyBtn':     { en:'✓ Approve & apply', sv:'✓ Godkänn & tillämpa' },
+  'settings.rates.dismissBtn':   { en:'Dismiss',       sv:'Avfärda' },
+  'settings.rates.manualHint':   { en:'Or adjust any rate manually below:', sv:'Eller justera valfri kurs manuellt nedan:' },
 
   // ── Settings · AI keys card ────────────────────────────
   'settings.aiKeys.title':  { en:'🤖 AI Keys',         sv:'🤖 AI-nycklar' },
@@ -5917,6 +5939,15 @@ function defaultState() {
     journal:[],
     tickerQuote:'Come rain or shine, I will retire under the sun.',
     exchangeRates:{ SEK:1, USD:0.11, EUR:0.09, KES:14.27 },
+    // Live FX approval flow. exchangeRates above is the ACTIVE set the
+    // whole app converts through; the fields below track where those
+    // numbers came from and hold a freshly-fetched set awaiting the
+    // user's review. Nothing here changes a displayed figure until the
+    // user clicks Approve & Apply in Settings.
+    ratesUpdatedAt:null,   // ISO timestamp of the last APPLIED update (null = never auto-updated)
+    ratesSource:'manual',  // 'manual' | market feed host that last supplied the applied rates
+    pendingRates:null,     // { USD, EUR, KES } fetched from the feed, not yet approved
+    pendingRatesAt:null,   // ISO timestamp the pendingRates snapshot was fetched
 
     baseIncome:[
       {id:genId(),name:'Young',amount:98000,type:'fixed'},
@@ -6180,7 +6211,7 @@ window.dr = function(name){ return window.commitRender(name); };
 // ─── PERSISTENCE ────────────────────────────────────────────────────────────
 // State schema version. Bump this and add a branch to migrate() whenever the
 // shape of `state` changes in a backwards-incompatible way.
-const STATE_VERSION = 21;
+const STATE_VERSION = 22;
 function migrate(s) {
   const from = s.version || 1;
   if(from >= STATE_VERSION) { s.version = STATE_VERSION; return s; }
@@ -6392,6 +6423,17 @@ function migrate(s) {
     }
     delete s.savingsTaxType;
   }
+  // v21 → v22: live FX approval flow. Additive provenance + pending-review
+  // fields only — no existing rate value is touched, so users see no
+  // numeric change on first load. ratesUpdatedAt stays null so the stale
+  // check treats every legacy install as "never auto-updated" and offers
+  // a first refresh.
+  if(from < 22) {
+    if(!('ratesUpdatedAt' in s)) s.ratesUpdatedAt = null;
+    if(!s.ratesSource)           s.ratesSource = 'manual';
+    if(!('pendingRates' in s))   s.pendingRates = null;
+    if(!('pendingRatesAt' in s)) s.pendingRatesAt = null;
+  }
   s.version = STATE_VERSION;
   return s;
 }
@@ -6494,6 +6536,142 @@ function fmtC(v, cur) {
   return `${s}${Math.round(c)}`;
 }
 function inSEK(displayVal) { return +displayVal / rate(); }
+
+// ─── LIVE FX (fetch → review → approve) ──────────────────────────────────────
+// The app is 100% client-side, so there is no server cron. "Automated"
+// here means: on load we quietly fetch the latest market rates into a
+// PENDING slot when the applied set is stale, then surface them in
+// Settings for the user to review and approve. Rates never change on a
+// displayed figure without an explicit Approve & Apply click — the whole
+// app converts through state.exchangeRates, which we only ever mutate on
+// approval or manual edit.
+const FX_CURRENCIES = ['USD','EUR','KES'];       // tracked against SEK (base)
+const FX_BASE = 'SEK';
+const FX_ENDPOINT = `https://open.er-api.com/v6/latest/${FX_BASE}`; // free, no key, CORS-enabled, includes KES
+const RATES_TTL_MS = 7 * 24 * 60 * 60 * 1000;    // consider applied rates stale after 7 days
+let _fxFetchInFlight = false;
+
+// True when the applied rates were never auto-updated, or the last update
+// is older than the TTL. Drives the on-load auto-refresh and the "stale"
+// hint in Settings.
+function ratesAreStale() {
+  if(!state.ratesUpdatedAt) return true;
+  const then = Date.parse(state.ratesUpdatedAt);
+  if(!isFinite(then)) return true;
+  return (Date.now() - then) > RATES_TTL_MS;
+}
+
+// A rate is usable only if it is a finite, strictly-positive number within
+// a broad sanity band. This rejects nulls, NaNs, and obviously-broken feed
+// values while still allowing large-but-legitimate moves (the review panel
+// shows the % change so the user can judge those).
+function fxRateValid(v) { return typeof v === 'number' && isFinite(v) && v > 0 && v < 1e6; }
+
+// Fetch the latest market rates into state.pendingRates WITHOUT applying
+// them. Returns { ok, error }. Never throws — on any network/CORS/parse
+// failure the applied rates are left untouched so the app keeps working
+// offline. `silent` suppresses the alert used by the on-load path.
+async function fetchLatestRates({ silent = false } = {}) {
+  if(_fxFetchInFlight) return { ok:false, error:'A refresh is already in progress.' };
+  _fxFetchInFlight = true;
+  try {
+    const res = await fetch(FX_ENDPOINT, { cache:'no-store' });
+    if(!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json();
+    if(data.result && data.result !== 'success') throw new Error(data['error-type'] || 'feed error');
+    const feed = data.rates || {};
+    const next = {};
+    for(const cur of FX_CURRENCIES) {
+      const v = Number(feed[cur]);
+      if(fxRateValid(v)) next[cur] = v;
+    }
+    if(!Object.keys(next).length) throw new Error('feed returned no usable rates');
+    state.pendingRates = next;
+    state.pendingRatesAt = new Date().toISOString();
+    state.pendingRatesSource = FX_HOST();
+    save();
+    updateRatesBadge();
+    if(state.activePanel === 'settings' && typeof renderSettings === 'function') renderSettings();
+    return { ok:true };
+  } catch(e) {
+    console.warn('fetchLatestRates failed:', e);
+    if(!silent) { try { alert(t('settings.rates.fetchErr') + '\n\n' + (e.message||e)); } catch(_){} }
+    return { ok:false, error: String(e.message||e) };
+  } finally {
+    _fxFetchInFlight = false;
+  }
+}
+function FX_HOST() { try { return new URL(FX_ENDPOINT).host; } catch(_) { return 'open.er-api.com'; } }
+
+// Copy the reviewed pending rates into the ACTIVE set and stamp
+// provenance. This is the only path (besides manual edits) that changes a
+// figure anywhere in the app.
+function applyPendingRates() {
+  if(!state.pendingRates) return;
+  Object.entries(state.pendingRates).forEach(([cur, v]) => {
+    if(fxRateValid(v)) state.exchangeRates[cur] = v;
+  });
+  state.exchangeRates.SEK = 1; // base is always 1 by definition
+  state.ratesUpdatedAt = state.pendingRatesAt || new Date().toISOString();
+  state.ratesSource = state.pendingRatesSource || FX_HOST();
+  state.pendingRates = null;
+  state.pendingRatesAt = null;
+  state.pendingRatesSource = null;
+  save();
+  updateRatesBadge();
+  commitRender('renderAll');
+}
+
+// Discard the fetched rates without applying. The applied set and its
+// timestamp are untouched, so the stale check will offer another refresh
+// on the next qualifying load.
+function dismissPendingRates() {
+  state.pendingRates = null;
+  state.pendingRatesAt = null;
+  state.pendingRatesSource = null;
+  save();
+  updateRatesBadge();
+  if(state.activePanel === 'settings' && typeof renderSettings === 'function') renderSettings();
+}
+
+// On-load hook: if the applied rates are stale and nothing is already
+// waiting for review, quietly fetch a fresh set into the pending slot and
+// light up the Settings badge. Fire-and-forget — never blocks boot.
+function autoRefreshRatesIfStale() {
+  if(state.pendingRates) { updateRatesBadge(); return; } // already have something to review
+  if(!ratesAreStale()) return;
+  if(typeof navigator !== 'undefined' && navigator.onLine === false) return; // offline: skip silently
+  fetchLatestRates({ silent:true });
+}
+
+// Toggle the review dot on the Settings nav item so the user notices
+// pending rates without opening the tab.
+function updateRatesBadge() {
+  try {
+    const el = document.querySelector('.nav-item[data-panel="settings"]');
+    if(el) el.classList.toggle('fx-pending', !!state.pendingRates);
+  } catch(_){}
+}
+
+// Button handler for the manual "Fetch latest" click. Shows a busy state,
+// then re-renders Settings regardless of outcome so the button and any
+// new review panel land correctly.
+function uiFetchRates(btn) {
+  if(btn) { btn.disabled = true; btn.textContent = t('settings.rates.fetching'); }
+  fetchLatestRates().then(() => {
+    if(state.activePanel === 'settings' && typeof renderSettings === 'function') renderSettings();
+  });
+}
+
+// Human-friendly timestamp for the Settings FX card. Returns '' for a
+// missing/invalid value so callers can branch on it.
+function fxWhen(iso) {
+  if(!iso) return '';
+  const d = new Date(iso);
+  if(isNaN(d.getTime())) return '';
+  const loc = state.lang === 'sv' ? 'sv-SE' : 'en-US';
+  return d.toLocaleDateString(loc, { day:'numeric', month:'short', year:'numeric' });
+}
 
 // ─── CORE CALCULATIONS ───────────────────────────────────────────────────────
 function sumArr(arr, key) { return arr.reduce((s,i) => s+(i[key]||0), 0); }
@@ -15976,9 +16154,55 @@ function renderSettings() {
       </div>
       <!-- Exchange rates -->
       <div class="card">
-        <div class="card-title">${esc2(t('settings.rates.title'))}</div>
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap">
+          <div class="card-title" style="margin:0">${esc2(t('settings.rates.title'))}</div>
+          <button class="btn btn-o btn-xs" onclick="uiFetchRates(this)">${esc2(t('settings.rates.fetchBtn'))}</button>
+        </div>
+        <p style="font-size:11px;margin:6px 0 0;color:${ratesAreStale()?'var(--accent-warning)':'var(--text3)'}">
+          ${state.ratesUpdatedAt
+            ? esc2(t('settings.rates.updatedOn', { when: fxWhen(state.ratesUpdatedAt), source: state.ratesSource||'manual' }))
+            : esc2(t('settings.rates.updatedNever'))}${ratesAreStale() && !state.pendingRates ? ' · ' + esc2(t('settings.rates.staleHint')) : ''}
+        </p>
+
+        ${state.pendingRates ? `
+        <!-- Review panel: fetched rates awaiting the user's approval. -->
+        <div style="margin-top:12px;border:1px solid var(--green,#2ec27e);border-radius:8px;padding:12px;background:var(--green-dim,rgba(46,194,126,.08))">
+          <div style="font-weight:700;font-size:13px">${esc2(t('settings.rates.reviewTitle'))}</div>
+          <p style="font-size:11px;color:var(--text2);margin:2px 0 10px">${esc2(t('settings.rates.reviewSub', { when: fxWhen(state.pendingRatesAt) }))}</p>
+          <div style="overflow-x:auto">
+          <table style="width:100%;border-collapse:collapse;font-size:12px;font-family:var(--fm)">
+            <thead><tr style="text-align:right;color:var(--text3)">
+              <th style="text-align:left;font-weight:600;padding:4px 8px 4px 0">${esc2(t('settings.rates.colCurrency'))}</th>
+              <th style="font-weight:600;padding:4px 8px">${esc2(t('settings.rates.colCurrent'))}</th>
+              <th style="font-weight:600;padding:4px 8px">${esc2(t('settings.rates.colNew'))}</th>
+              <th style="font-weight:600;padding:4px 0 4px 8px">${esc2(t('settings.rates.colChange'))}</th>
+            </tr></thead>
+            <tbody>
+            ${['USD','EUR','KES'].filter(cur=>state.pendingRates[cur]!=null).map(cur=>{
+              const cur0 = state.exchangeRates[cur]||DEFAULT_RATES[cur];
+              const cur1 = state.pendingRates[cur];
+              const pct = cur0 ? ((cur1-cur0)/cur0)*100 : 0;
+              const col = Math.abs(pct)<0.005 ? 'var(--text3)' : (pct>0 ? 'var(--green,#2ec27e)' : 'var(--accent-warning,#e5484d)');
+              const arrow = Math.abs(pct)<0.005 ? '' : (pct>0 ? '▲' : '▼');
+              return `<tr style="text-align:right">
+                <td style="text-align:left;padding:4px 8px 4px 0;font-weight:600">${CURRENCY_SYMBOLS[cur]} ${cur}</td>
+                <td style="padding:4px 8px;color:var(--text2)">${cur0}</td>
+                <td style="padding:4px 8px;font-weight:600">${(+cur1).toFixed(4).replace(/\.?0+$/,'')}</td>
+                <td style="padding:4px 0 4px 8px;color:${col}">${arrow} ${Math.abs(pct).toFixed(1)}%</td>
+              </tr>`;
+            }).join('')}
+            </tbody>
+          </table>
+          </div>
+          <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap">
+            <button class="btn btn-g btn-sm" onclick="applyPendingRates()">${esc2(t('settings.rates.applyBtn'))}</button>
+            <button class="btn btn-o btn-sm" onclick="dismissPendingRates()">${esc2(t('settings.rates.dismissBtn'))}</button>
+          </div>
+        </div>` : ''}
+
+        <p style="font-size:11px;color:var(--text3);margin:14px 0 8px">${esc2(t('settings.rates.manualHint'))}</p>
         <div style="display:flex;flex-direction:column;gap:8px;font-size:13px">
-          ${['USD','EUR','KES'].map(cur=>`<div style="display:flex;align-items:center;gap:10px"><span style="font-family:var(--fm);min-width:50px;font-weight:600">${CURRENCY_SYMBOLS[cur]} ${cur}</span><span style="color:var(--text2)">${esc2(t('settings.rates.oneSekEquals'))}</span><div style="display:flex;align-items:center;gap:3px;background:var(--bg3);border:1px solid var(--border);border-radius:6px;padding:0 10px;flex:1;max-width:140px"><input type="text" inputmode="decimal" data-lang-num="1" style="background:transparent;border:none;color:var(--text);font-family:var(--fm);font-size:13px;padding:6px 0;outline:none;width:100%" value="${state.exchangeRates[cur]||DEFAULT_RATES[cur]}" oninput="state.exchangeRates['${cur}']=parseNum(this.value);save()" onchange="commitRender('renderAll')"></div><span style="font-size:11px;color:var(--text3)">≈ ${Math.round(1/(state.exchangeRates[cur]||DEFAULT_RATES[cur]))} SEK/${cur==='KES'?'KSh':cur==='EUR'?'€':'$'}</span></div>`).join('')}
+          ${['USD','EUR','KES'].map(cur=>`<div style="display:flex;align-items:center;gap:10px"><span style="font-family:var(--fm);min-width:50px;font-weight:600">${CURRENCY_SYMBOLS[cur]} ${cur}</span><span style="color:var(--text2)">${esc2(t('settings.rates.oneSekEquals'))}</span><div style="display:flex;align-items:center;gap:3px;background:var(--bg3);border:1px solid var(--border);border-radius:6px;padding:0 10px;flex:1;max-width:140px"><input type="text" inputmode="decimal" data-lang-num="1" style="background:transparent;border:none;color:var(--text);font-family:var(--fm);font-size:13px;padding:6px 0;outline:none;width:100%" value="${state.exchangeRates[cur]||DEFAULT_RATES[cur]}" oninput="state.exchangeRates['${cur}']=parseNum(this.value);state.ratesSource='manual';save()" onchange="commitRender('renderAll')"></div><span style="font-size:11px;color:var(--text3)">≈ ${Math.round(1/(state.exchangeRates[cur]||DEFAULT_RATES[cur]))} SEK/${cur==='KES'?'KSh':cur==='EUR'?'€':'$'}</span></div>`).join('')}
         </div>
       </div>
       <!-- AI Keys -->
@@ -16765,7 +16989,7 @@ const EXPORT_SLICES = [
   { key:'trips',      icon:'✈️', label:'Trips & Fun Fund', sub:'Planned travel and lifestyle budget', fields:['trips'] },
   { key:'overrides',  icon:'📆', label:'Overrides',       sub:'Monthly overrides + yearly bases', fields:['monthlyOverrides','yearlyBases','cascadeEnabled'] },
   { key:'journal',    icon:'📓', label:'Journal',         sub:'Dated events, decisions, and reflections', fields:['journal'] },
-  { key:'settings',   icon:'⚙', label:'Preferences',     sub:'Theme, currency, exchange rates, AI keys, personal profile', fields:['currency','exchangeRates','darkMode','tickerQuote','aiKeys','aiProvider','categoryMap','profile','displayMode'] },
+  { key:'settings',   icon:'⚙', label:'Preferences',     sub:'Theme, currency, exchange rates, AI keys, personal profile', fields:['currency','exchangeRates','ratesUpdatedAt','ratesSource','darkMode','tickerQuote','aiKeys','aiProvider','categoryMap','profile','displayMode'] },
   { key:'all',        icon:'📦', label:'Everything',      sub:'Full state backup (overwrites on import)', fields:null },
 ];
 function downloadJSON(filename, data){
@@ -19012,6 +19236,12 @@ if(!state.welcomeComplete) {
   showOnboardingBlock();
 }
 if(state.activeSection) setTimeout(()=>pulseSection(state.activeSection), 200);
+
+// Live FX: reflect any already-pending review on the Settings badge, then
+// (if the applied rates are stale) quietly fetch fresh market rates into
+// the pending slot for the user to review. Fire-and-forget — never blocks
+// the first paint, and never changes a displayed figure on its own.
+try { updateRatesBadge(); autoRefreshRatesIfStale(); } catch(_){}
 
 // Keep Leaflet tiles correct after layout changes, and re-render active panel
 // so Chart.js updates legibly across viewport width changes.
