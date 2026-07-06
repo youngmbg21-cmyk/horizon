@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>HORIZON FINANCE OS</title>
-<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700&family=JetBrains+Mono:wght@400;500&family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,600;1,9..144,400&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"/>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
@@ -48,8 +48,23 @@
      alias for DM Sans so existing heading call sites don't need to be
      rewritten. */
   --ff:'DM Sans',sans-serif; --fb:'DM Sans',sans-serif; --fm:'JetBrains Mono',monospace;
+  /* Editorial serif — page titles, modal titles, hero figures. Gives the
+     app its "calm instrument" voice; UI text stays in DM Sans and data
+     stays in JetBrains Mono (tabular). */
+  --fs:'Fraunces',Georgia,serif;
   --r:10px; --rl:14px;
   --sidebar-w:220px;
+  /* Tone trios — soft background / border / AA-contrast text, one trio per
+     meaning. Tones carry MEANING (status, severity, category), never
+     decoration: sage=positive, honey=caution, rose=breach, info=neutral
+     context, plum=category, clay=editorial section labels. Derived from
+     the app's own accent hues for each theme. */
+  --sage-bg:#0c241d;  --sage-bd:#12463a;  --sage-tx:#00e8a0;
+  --honey-bg:#241c0d; --honey-bd:#463a12; --honey-tx:#f5a623;
+  --rose-bg:#26121a;  --rose-bd:#4a2130;  --rose-tx:#ff6b83;
+  --info-bg:#101e30;  --info-bd:#22436b;  --info-tx:#4d9fff;
+  --plum-bg:#1c1533;  --plum-bd:#332552;  --plum-tx:#a98bf5;
+  --clay:#d98a5a;     --clay-bg:#2a1a10;  --clay-bd:#4d3220; --clay-tx:#e0a06f;
 }
 body.light {
   --bg0:#F0EBE1; --bg1:#F7F3ED; --bg2:#FDFAF6; --bg3:#EDE8DF; --bg4:#E4DDD2;
@@ -65,6 +80,13 @@ body.light {
   --focus-ring:0 0 0 2px rgba(0,168,112,0.35);
   --card-shadow:0 1px 0 rgba(255,255,255,0.4) inset;
   --card-shadow-hover:0 6px 20px -10px rgba(60,40,10,0.18);
+  /* Tone trios — warm-light values (see :root for the contract). */
+  --sage-bg:#E4EFE7;  --sage-bd:#C6DED0;  --sage-tx:#1c6b4c;
+  --honey-bg:#F6EAD1; --honey-bd:#E7D3A6; --honey-tx:#875607;
+  --rose-bg:#F6E4E1;  --rose-bd:#E8C9C3;  --rose-tx:#9e3227;
+  --info-bg:#E2EAF2;  --info-bd:#C9D8E8;  --info-tx:#265680;
+  --plum-bg:#ECE4F1;  --plum-bd:#D8CAE2;  --plum-tx:#5a3a86;
+  --clay:#a85a2a;     --clay-bg:#F3E4D6;  --clay-bd:#E4CBB4; --clay-tx:#8a481f;
 }
 /* ── LIFE WALL — forced dark scope (dark mode) ───────────
    In dark mode the panel stays dark so neon accents pop.
@@ -111,6 +133,10 @@ body.light #panel-lifewall {
 html,body { height:100%; overflow:hidden; }
 body { font-family:var(--fb); background:var(--bg0); color:var(--text); }
 input,select,button,textarea { font-family:inherit; }
+/* Keyboard focus is always visible: a 2px ring in the brand green, offset
+   so it never melts into the control's own border. Mouse clicks don't
+   trigger it (:focus-visible), so nothing gets noisier for pointer users. */
+:focus-visible { outline:2px solid var(--green); outline-offset:2px; border-radius:4px; }
 /* Number inputs always render in the mono face regardless of what the
    ambient body font is — keeps financial values visually aligned. */
 input[type="number"] { font-family:var(--fm); font-variant-numeric:tabular-nums; }
@@ -287,15 +313,57 @@ input[type="number"] { -moz-appearance:textfield; }
 
 /* ── PAGE HEADER ─────────────────────────────────────── */
 .ph { margin-bottom:16px; }
-.ph-tag { font-size:9px; font-weight:700; letter-spacing:.2em; color:var(--green); margin-bottom:4px; font-family:var(--fm); }
-.ph-title { font-family:var(--ff); font-size:24px; font-weight:800; margin-bottom:4px; letter-spacing:-.01em; line-height:1.15; }
-.ph-sub { color:var(--text2); font-size:12px; max-width:780px; line-height:1.5; }
+/* Panel header — the editorial voice: a clay micro-label naming the section
+   like a field notebook, a Fraunces serif title, and beneath it the ONE
+   plain-language question this screen answers. */
+.ph-tag { font-size:10px; font-weight:500; letter-spacing:.11em; text-transform:uppercase; color:var(--clay-tx); margin-bottom:5px; font-family:var(--fb); }
+.ph-title { font-family:var(--fs); font-size:24px; font-weight:600; margin-bottom:4px; letter-spacing:-.01em; line-height:1.2; text-wrap:balance; }
+.ph-sub { color:var(--text2); font-size:13px; max-width:780px; line-height:1.5; }
 
 /* ── CARDS ───────────────────────────────────────────── */
-.card { background:var(--bg2); border:1px solid var(--border); border-radius:10px; padding:14px 16px; margin-bottom:10px; transition:border-color .2s, box-shadow .2s; }
+.card { background:var(--bg2); border:1px solid var(--border); border-radius:var(--rl); padding:14px 16px; margin-bottom:10px; transition:border-color .2s, box-shadow .2s; }
 .card:hover { border-color:var(--border2); }
 .card-title { font-size:11px; letter-spacing:.05em; font-weight:600; text-transform:uppercase; color:var(--text2); margin-bottom:12px; display:flex; align-items:center; justify-content:space-between; gap:10px; }
 .card-title .ct-actions { display:flex; gap:6px; }
+
+/* ── SHARED TONE COMPONENTS ──────────────────────────────
+   Banner: a persistent notice that SITS IN THE LAYOUT (not a toast).
+   Rose = a rule is breached and the banner leads to the fix; honey =
+   advisory; sage = confirmation; info = neutral context. */
+.tone-banner { display:flex; gap:11px; align-items:flex-start; padding:12px 15px; border-radius:var(--rl); border:1px solid; font-size:13px; line-height:1.45; margin-bottom:10px; }
+.tone-banner .tb-dot { width:8px; height:8px; border-radius:999px; margin-top:5px; flex-shrink:0; }
+.tone-banner b { color:var(--text); font-weight:600; }
+.tone-banner .tb-body { min-width:0; color:var(--text2); }
+.tone-banner a { font-weight:600; text-decoration:underline; text-underline-offset:2px; cursor:pointer; }
+.tone-banner.rose  { background:var(--rose-bg);  border-color:var(--rose-bd); }
+.tone-banner.rose .tb-dot, .tone-banner.rose a  { background:var(--rose-tx); color:var(--rose-tx); }
+.tone-banner.rose a { background:none; }
+.tone-banner.honey { background:var(--honey-bg); border-color:var(--honey-bd); }
+.tone-banner.honey .tb-dot { background:var(--honey-tx); }
+.tone-banner.honey a { color:var(--honey-tx); }
+.tone-banner.sage  { background:var(--sage-bg);  border-color:var(--sage-bd); }
+.tone-banner.sage .tb-dot { background:var(--sage-tx); }
+.tone-banner.sage a { color:var(--sage-tx); }
+.tone-banner.info  { background:var(--info-bg);  border-color:var(--info-bd); }
+.tone-banner.info .tb-dot { background:var(--info-tx); }
+.tone-banner.info a { color:var(--info-tx); }
+
+/* Chip: 22px status/tag pill in a tone trio. Chips never truncate. */
+.tchip { display:inline-flex; align-items:center; height:22px; padding:0 10px; border-radius:999px; font-size:11px; font-weight:500; line-height:1; white-space:nowrap; border:1px solid transparent; }
+.tchip.sage  { background:var(--sage-bg);  border-color:var(--sage-bd);  color:var(--sage-tx); }
+.tchip.honey { background:var(--honey-bg); border-color:var(--honey-bd); color:var(--honey-tx); }
+.tchip.rose  { background:var(--rose-bg);  border-color:var(--rose-bd);  color:var(--rose-tx); }
+.tchip.info  { background:var(--info-bg);  border-color:var(--info-bd);  color:var(--info-tx); }
+.tchip.plum  { background:var(--plum-bg);  border-color:var(--plum-bd);  color:var(--plum-tx); }
+.tchip.clay  { background:var(--clay-bg);  border-color:var(--clay-bd);  color:var(--clay-tx); }
+
+/* Skeleton loading — calm placeholder bars instead of spinners for
+   content-shaped waits. Use 2-4 .skel lines sized like the real content. */
+.skel { display:block; height:12px; border-radius:4px; background:var(--bg3); animation:skelPulse 1.6s ease-in-out infinite; }
+.skel + .skel { margin-top:9px; }
+.skel.w80{width:80%} .skel.w60{width:60%} .skel.w40{width:40%}
+@keyframes skelPulse { 0%,100%{opacity:.55} 50%{opacity:1} }
+@media (prefers-reduced-motion: reduce){ .skel{ animation:none; } }
 .two-col > .card,
 .three-col > .card { margin-bottom:0; }
 
@@ -402,7 +470,7 @@ body.light .card.card-clickable:hover {
 }
 
 /* ── BUTTONS ─────────────────────────────────────────── */
-.btn { display:inline-flex; align-items:center; gap:6px; border-radius:8px; font-size:12px; font-weight:600; cursor:pointer; transition:all .2s; border:none; padding:7px 16px; }
+.btn { display:inline-flex; align-items:center; gap:6px; border-radius:var(--r); font-size:12px; font-weight:600; cursor:pointer; transition:all .2s; border:none; padding:7px 16px; }
 .btn-g { background:var(--green); color:#000; }
 .btn-g:hover { filter:brightness(1.08); transform:translateY(-1px); }
 .btn-o { background:var(--bg4); color:var(--text); border:1px solid var(--border2); }
@@ -884,10 +952,12 @@ body.light .loc-card:hover { box-shadow:0 5px 14px -8px rgba(60,40,10,0.18); }
 .loc-card-del:hover { border-color:var(--red); color:var(--red); background:rgba(255,77,109,.1); }
 .loc-name { font-size:15px; font-weight:700; margin-bottom:1px; }
 .loc-country { font-size:10px; color:var(--text2); margin-bottom:8px; }
-.loc-verdict { display:inline-block; font-size:9px; font-weight:700; letter-spacing:.08em; padding:2px 7px; border-radius:3px; font-family:var(--fm); }
-.loc-verdict.feasible { background:var(--green-dim); color:var(--green); }
-.loc-verdict.conditional { background:var(--amber-dim); color:var(--amber); }
-.loc-verdict.infeasible { background:var(--red-dim); color:var(--red); }
+/* Verdict chips — tone trios (soft bg + border + AA text), fully round by
+   identity. Sage=go, honey=caution, rose=stop: the color IS the meaning. */
+.loc-verdict { display:inline-flex; align-items:center; font-size:10px; font-weight:600; letter-spacing:.06em; padding:3px 10px; border-radius:999px; font-family:var(--fb); border:1px solid transparent; white-space:nowrap; }
+.loc-verdict.feasible { background:var(--sage-bg); border-color:var(--sage-bd); color:var(--sage-tx); }
+.loc-verdict.conditional { background:var(--honey-bg); border-color:var(--honey-bd); color:var(--honey-tx); }
+.loc-verdict.infeasible { background:var(--rose-bg); border-color:var(--rose-bd); color:var(--rose-tx); }
 .loc-stat { display:flex; justify-content:space-between; font-size:10px; padding:3px 0; border-bottom:1px solid var(--bg3); }
 .loc-stat:last-child { border-bottom:none; }
 .loc-stat-lbl { color:var(--text2); }
@@ -2374,7 +2444,7 @@ body.light .md tbody tr:nth-child(even) { background:rgba(0,0,0,0.015); }
 .modal-backdrop { position:fixed; inset:0; background:rgba(0,0,0,.6); z-index:1100; display:flex; align-items:center; justify-content:center; padding:16px; opacity:0; pointer-events:none; transition:opacity .25s; }
 .modal-backdrop.open { opacity:1; pointer-events:all; }
 .modal { background:var(--bg2); border:1px solid var(--border2); border-radius:10px; padding:20px; max-width:440px; width:100%; animation:fadeIn .2s ease; }
-.modal-title { font-size:16px; font-weight:800; margin-bottom:5px; }
+.modal-title { font-family:var(--fs); font-size:17px; font-weight:600; margin-bottom:5px; letter-spacing:-.01em; }
 .modal-sub { font-size:12px; color:var(--text2); margin-bottom:14px; line-height:1.5; }
 .modal-close { float:right; background:none; border:1px solid var(--border); border-radius:5px; color:var(--text2); padding:2px 7px; cursor:pointer; font-size:12px; }
 .modal-close:hover { border-color:var(--red); color:var(--red); }
@@ -3025,7 +3095,7 @@ body.light #panel-lifewall .lw-brick { background:#ffffff; }
   font-size:36px; text-align:center; margin-bottom:8px; line-height:1;
 }
 .welcome-title {
-  font-family:var(--ff); font-size:20px; font-weight:800;
+  font-family:var(--fs); font-size:22px; font-weight:600;
   color:var(--text); text-align:center;
   letter-spacing:-.01em; margin-bottom:8px;
 }
@@ -3171,9 +3241,9 @@ body.light #panel-lifewall .lw-brick { background:#ffffff; }
 /* ── PERSONAL CONTEXT CARD (Settings) ──────────────────────────────── */
 .ctx-card { border-left:4px solid var(--accent-positive); }
 .ctx-card.ctx-incomplete { border-left-color:var(--accent-critical); background:linear-gradient(180deg, var(--accent-critical-dim), var(--bg2)); }
-.ctx-badge { margin-left:8px; font-family:var(--fm); font-size:9px; font-weight:700; letter-spacing:.08em; padding:3px 8px; border-radius:4px; text-transform:uppercase; }
-.ctx-badge.neg { background:var(--accent-critical-dim); color:var(--accent-critical); }
-.ctx-badge.pos { background:var(--accent-positive-dim); color:var(--accent-positive); }
+.ctx-badge { margin-left:8px; font-family:var(--fb); font-size:9px; font-weight:600; letter-spacing:.07em; padding:3px 10px; border-radius:999px; text-transform:uppercase; border:1px solid transparent; }
+.ctx-badge.neg { background:var(--rose-bg); border-color:var(--rose-bd); color:var(--rose-tx); }
+.ctx-badge.pos { background:var(--sage-bg); border-color:var(--sage-bd); color:var(--sage-tx); }
 .ctx-blurb { font-size:12px; color:var(--text2); line-height:1.55; margin-bottom:14px; max-width:680px; }
 .ctx-grid { display:grid; grid-template-columns:1fr 1fr; gap:14px; }
 @media (max-width:720px){ .ctx-grid { grid-template-columns:1fr; } }
@@ -3644,10 +3714,58 @@ body.light .geo-dropdown { box-shadow:0 10px 30px -10px rgba(60,40,10,0.22); }
 .si-raw{white-space:pre-wrap;font-size:12.5px;color:var(--text2);line-height:1.6;font-family:var(--ff)}
 
 /* ── RESPONSIVE ──────────────────────────────────────── */
+/* Hamburger — hidden on desktop, the drawer's only trigger on mobile. */
+.nav-burger { display:none; width:40px; height:40px; flex-shrink:0; margin-right:10px;
+  border:1px solid var(--border); border-radius:var(--r); background:var(--bg3);
+  cursor:pointer; flex-direction:column; align-items:center; justify-content:center; gap:4px;
+  transition:border-color .15s; }
+.nav-burger span { display:block; width:16px; height:1.6px; background:var(--text2); border-radius:2px; }
+.nav-burger:hover { border-color:var(--green); }
+.nav-overlay { display:none; }
+
 @media(max-width:900px) {
   .two-col,.three-col { grid-template-columns:1fr; }
-  .sidebar { display:none; }
   .kpi-row { grid-template-columns:1fr 1fr; }
+  .nav-burger { display:flex; }
+  /* The desktop sidebar becomes a slide-in drawer over a dim overlay.
+     It was previously display:none at this width, which left the app
+     with NO navigation on phones. Drawer stacks above the overlay;
+     both sit above panel content but below modals (which use 1000+). */
+  .nav-overlay { display:block; position:fixed; inset:0; z-index:880;
+    background:rgba(3,6,14,.5); opacity:0; pointer-events:none; transition:opacity .2s ease-out; }
+  body.light .nav-overlay { background:rgba(31,25,10,.4); }
+  .nav-overlay.open { opacity:1; pointer-events:auto; }
+  .sidebar { position:fixed; top:0; left:0; bottom:0; z-index:881;
+    width:min(280px, 82vw); transform:translateX(-105%);
+    transition:transform .2s ease-out; box-shadow:none; border-right:1px solid var(--border); }
+  .sidebar.open { transform:none; box-shadow:0 8px 30px rgba(0,0,0,.35); }
+  /* Comfortable thumbs: 44px rows in the drawer (spec: ≥40px targets). */
+  .sidebar .nav-item { min-height:44px; padding-top:10px; padding-bottom:10px; font-size:14px; }
+  @media (prefers-reduced-motion: reduce) {
+    .sidebar, .nav-overlay { transition:none; }
+  }
+  /* Touch targets ≥40px for every interactive element on phones. Desktop
+     keeps its denser sizing. */
+  .btn, .btn-add { min-height:40px; }
+  .iBtn { width:40px; height:40px; }
+  .field input, .field select, .field textarea { min-height:40px; }
+  select, input[type="date"], input[type="month"] { min-height:40px; }
+  /* Panel headers breathe a little less on small screens. */
+  .ph-title { font-size:22px; }
+  /* The ⌘K hint is a keyboard affordance — meaningless on touch. */
+  .cmdp-hint { display:none; }
+  /* Cards that lay out icon + text + CTA in a row stack on phones so the
+     text gets the full width instead of wrapping one word per line. */
+  .dash-welcome { flex-wrap:wrap; }
+  .dash-welcome-cta { flex-basis:100%; }
+  .dash-welcome-cta .btn { width:100%; justify-content:center; }
+}
+@media(max-width:640px) {
+  /* Phone topbar: hamburger + mark + the working toggles, one row. */
+  .logo-text { display:none; }
+  .topbar { padding:0 12px; gap:6px; }
+  .topbar-right { gap:6px; flex-wrap:nowrap; overflow-x:auto; scrollbar-width:none; }
+  .topbar-right::-webkit-scrollbar { display:none; }
 }
 
 /* ══════════════════════════════════════════════════════
@@ -3862,6 +3980,10 @@ body.light .piq-country-menu { box-shadow:0 12px 28px -10px rgba(60,40,10,0.22);
 
   <!-- Top Bar -->
   <div class="topbar">
+    <!-- Mobile only: opens the nav drawer (the sidebar, re-homed). -->
+    <button class="nav-burger" id="nav-burger" onclick="toggleNavDrawer()" aria-label="Open menu" aria-expanded="false" aria-controls="app-sidebar">
+      <span></span><span></span><span></span>
+    </button>
     <div class="logo">
       <div class="logo-mark">H</div>
       <div class="logo-text">HORIZON <span>FINANCE OS</span></div>
@@ -3883,8 +4005,10 @@ body.light .piq-country-menu { box-shadow:0 12px 28px -10px rgba(60,40,10,0.22);
 
   <!-- Main Row -->
   <div class="main-row">
-    <!-- Sidebar -->
-    <div class="sidebar">
+    <!-- Mobile nav drawer backdrop — sits UNDER the sidebar, over the page. -->
+    <div class="nav-overlay" id="nav-overlay" onclick="closeNavDrawer()"></div>
+    <!-- Sidebar (desktop) = nav drawer (mobile) -->
+    <div class="sidebar" id="app-sidebar">
       <div class="sb-section" data-i18n="sb.group.overview">OVERVIEW</div>
       <div class="nav-item active" data-panel="dashboard" onclick="nav('dashboard')"><span class="nav-icon">◉</span><span class="nav-lbl" data-i18n="panel.dashboard">Dashboard</span></div>
       <div class="nav-item" data-panel="lifewall" onclick="nav('lifewall')"><span class="nav-icon">🧱</span><span class="nav-lbl">Life Wall</span></div>
@@ -4322,8 +4446,8 @@ const STRINGS = {
   // ── Settings · page header ─────────────────────────────
   'settings.page.title':    { en:'Settings & Baseline',
                               sv:'Inställningar & grunddata' },
-  'settings.page.sub':      { en:'Configure your recurring income, expenses, retirement parameters, and AI keys',
-                              sv:'Konfigurera dina återkommande inkomster, utgifter, pensionsparametrar och AI-nycklar' },
+  'settings.page.sub':      { en:'Does Horizon know your real numbers?',
+                              sv:'Känner Horizon till dina verkliga siffror?' },
 
   // ── Settings · Personal Context card ───────────────────
   'settings.ctx.title':     { en:'🪪 Personal Context',
@@ -4362,8 +4486,8 @@ const STRINGS = {
   // ── Journal ──────────────────────────────────────────────
   'journal.page.title':     { en:'Journal',
                               sv:'Dagbok' },
-  'journal.page.sub':       { en:'Log events, decisions, and reflections so advice stays grounded in what\u2019s actually happened.',
-                              sv:'Logga händelser, beslut och reflektioner så att rådgivningen förblir grundad i det som faktiskt hänt.' },
+  'journal.page.sub':       { en:'What happened, and what did you decide?',
+                              sv:'Vad hände, och vad bestämde du?' },
   'journal.compose.title':  { en:'New entry',              sv:'Ny anteckning' },
   'journal.compose.date':   { en:'Date',                   sv:'Datum' },
   'journal.compose.tag':    { en:'Tag',                    sv:'Etikett' },
@@ -4458,8 +4582,8 @@ const STRINGS = {
   'dash.page.tag':          { en:'HORIZON FINANCE OS',    sv:'HORIZON FINANCE OS' },
   'dash.page.title':        { en:'Your Financial Dashboard',
                               sv:'Din ekonomiska översikt' },
-  'dash.page.sub':          { en:'360° view — cash flow, portfolio, retirement health, and lifestyle planning',
-                              sv:'360° vy — kassaflöde, portfölj, pensionshälsa och livsstilsplanering' },
+  'dash.page.sub':          { en:'Are you on track to retire when you plan to?',
+                              sv:'Ligger du i fas för att gå i pension när du planerat?' },
 
   // ── Dashboard · welcome greeting ───────────────────────
   'dash.greet.lateNight':   { en:'Up late',                    sv:'Sent uppe' },
@@ -4677,8 +4801,8 @@ const STRINGS = {
   // ── Retire Anywhere ────────────────────────────────────
   'ra.page.tag':            { en:'RETIRE ANYWHERE',       sv:'PENSIONERA VAR SOM HELST' },
   'ra.page.title':          { en:'Where Can You Retire?', sv:'Var kan du gå i pension?' },
-  'ra.page.sub':            { en:'AI-powered analysis — your <strong>{income}/mo</strong> retirement income (today\u2019s money) vs. global cost of living',
-                              sv:'AI-driven analys — din <strong>{income}/mån</strong> pensionsinkomst (dagens penningvärde) mot global levnadskostnad' },
+  'ra.page.sub':            { en:'Where in the world does your <strong>{income}/mo</strong> live well?',
+                              sv:'Var i världen räcker dina <strong>{income}/mån</strong> till ett gott liv?' },
   'ra.callout':             { en:'<strong>Your Retirement Income: {income}/mo</strong> ({port}/mo from portfolio + {pen}/mo avg pension) — all values in <strong>today\u2019s money</strong>, the inflation-adjusted real purchasing power your nest egg can sustain.<br>Destinations are rated by whether your real income can comfortably cover local cost of living, after accounting for local tax.',
                               sv:'<strong>Din pensionsinkomst: {income}/mån</strong> ({port}/mån från portfölj + {pen}/mån snittpension) — alla värden i <strong>dagens penningvärde</strong>, den inflationsjusterade reella köpkraft som ditt pensionskapital kan upprätthålla.<br>Destinationer rankas efter om din reella inkomst bekvämt kan täcka lokala levnadskostnader, efter att lokal skatt räknats av.' },
   // KPI row
@@ -4765,8 +4889,8 @@ const STRINGS = {
 
   // ── Vault ──────────────────────────────────────────────
   'vault.page.title':       { en:'Vault',                 sv:'Arkiv' },
-  'vault.page.sub':         { en:'Every saved analysis, Deep Dive, and property report lives here. Filter by category, reopen any report for a full read, or tick multiple rows to compare them side by side.',
-                              sv:'Alla sparade analyser, Deep Dives och fastighetsrapporter samlas här. Filtrera efter kategori, öppna en rapport för fullständig läsning eller bocka i flera rader för att jämföra dem sida vid sida.' },
+  'vault.page.sub':         { en:'Which of your saved reports do you want to reread or compare?',
+                              sv:'Vilka av dina sparade rapporter vill du läsa om eller jämföra?' },
   // VAULT_CATEGORIES labels
   'vault.cat.all':           { en:'All',                  sv:'Alla' },
   'vault.cat.monthly-analysis': { en:'Monthly analysis',  sv:'Månadsanalys' },
@@ -4833,8 +4957,8 @@ const STRINGS = {
   'piq.page.tag':           { en:'REAL ESTATE INTELLIGENCE',
                               sv:'FASTIGHETSINTELLIGENS' },
   'piq.page.title':         { en:'Property IQ',           sv:'Fastighets-IQ' },
-  'piq.page.sub':           { en:'AI-powered analysis · Live signals · Mortgage calculator · Legal risk scoring',
-                              sv:'AI-driven analys · Livesignaler · Bolånekalkylator · Juridisk riskbedömning' },
+  'piq.page.sub':           { en:'Is this property worth buying?',
+                              sv:'Är den här fastigheten värd att köpa?' },
   'piq.country.searchPlaceholder':{ en:'Type to search countries…',
                                     sv:'Skriv för att söka länder…' },
   'piq.country.noMatches':  { en:'No matches. Try a different spelling.',
@@ -4975,10 +5099,10 @@ const STRINGS = {
 
   // ── Bank & Transactions ────────────────────────────────
   'tx.page.title':          { en:'Spend Insights',        sv:'Utgiftsinsikter' },
-  'tx.page.sub.empty':      { en:'Connect your bank account to view real transaction data and spending patterns',
-                              sv:'Anslut ditt bankkonto för att se faktisk transaktionsdata och utgiftsmönster' },
-  'tx.page.sub.connected':  { en:'Real transaction data · spending analysis · 12-month patterns',
-                              sv:'Faktisk transaktionsdata · utgiftsanalys · 12-månadersmönster' },
+  'tx.page.sub.empty':      { en:'Where is your money actually going? Connect an account or upload a statement to find out.',
+                              sv:'Vart tar dina pengar egentligen vägen? Anslut ett konto eller ladda upp ett utdrag för att ta reda på det.' },
+  'tx.page.sub.connected':  { en:'Where is your money actually going?',
+                              sv:'Vart tar dina pengar egentligen vägen?' },
   // Empty state
   'tx.empty.title':         { en:'No Bank Connected',     sv:'Ingen bank ansluten' },
   'tx.empty.sub':           { en:'Connect via Open Banking (PSD2) to automatically import transactions from your bank. Supported banks:',
@@ -5121,8 +5245,8 @@ const STRINGS = {
   // ── Fun Fund · header + KPIs + chart ───────────────────
   'ff.page.tag':            { en:'LIFESTYLE PLANNING',    sv:'LIVSSTILSPLANERING' },
   'ff.page.title':          { en:'Fun Fund & Travel',     sv:'Fun Fund & resor' },
-  'ff.page.sub':            { en:'Your discretionary income tracked against travel plans and lifestyle goals',
-                              sv:'Din fritt disponibla inkomst följs mot resplaner och livsstilsmål' },
+  'ff.page.sub':            { en:'How much fun can you afford this year?',
+                              sv:'Hur mycket nöje har du råd med i år?' },
   'ff.kpi.total':           { en:'12-MONTH FUN FUND',     sv:'12-MÅNADERS FUN FUND' },
   'ff.kpi.total.sub':       { en:'{mo}/mo capacity, before trips',
                               sv:'{mo}/mån kapacitet, före resor' },
@@ -5625,8 +5749,8 @@ const STRINGS = {
   // ── Retirement · page header + scenario bar ────────────
   'ret.page.tag':           { en:'RETIREMENT PLANNING',    sv:'PENSIONSPLANERING' },
   'ret.page.title':         { en:'Retirement Plan',        sv:'Pensionsplan' },
-  'ret.page.sub':           { en:'Three interconnected sections — changes anywhere update everything instantly',
-                              sv:'Tre sammanlänkade avsnitt — ändringar någonstans uppdaterar allt direkt' },
+  'ret.page.sub':           { en:'How long will your money last once you stop working?',
+                              sv:'Hur länge räcker dina pengar när du slutar arbeta?' },
   'ret.scen.eyebrow':       { en:'Planning Scenario',      sv:'Planeringsscenario' },
   'ret.scen.titleExpenses': { en:'{scenario} expenses',    sv:'{scenario} utgifter' },
   'ret.scen.hint':          { en:'Scales your retirement expenses by the multiplier shown. All metrics, charts and projections below update instantly.',
@@ -6483,6 +6607,14 @@ function loadState() {
       Object.assign(state, d);
     } else {
       state.version = STATE_VERSION;
+      // Fresh install: follow the device's light/dark preference. A saved
+      // state always wins — this only seeds the very first session, and
+      // the Settings toggle continues to work exactly as before.
+      try {
+        if(window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches){
+          state.darkMode = false;
+        }
+      } catch(_){}
     }
   } catch(e) { console.warn('loadState failed:', e); }
   // Vault lives in its own localStorage key so heavy Deep Dive
@@ -9974,6 +10106,31 @@ function applyTheme() {
   if(btn) btn.textContent=state.darkMode?'☀':'🌙';
 }
 
+// ─── MOBILE NAV DRAWER ──────────────────────────────────────────────────────
+// On ≤900px the sidebar is a slide-in drawer. These helpers are no-ops on
+// desktop (the .open class has no effect there since the sidebar is static).
+function toggleNavDrawer(force){
+  const sb = document.getElementById('app-sidebar');
+  const ov = document.getElementById('nav-overlay');
+  const bg = document.getElementById('nav-burger');
+  if(!sb || !ov) return;
+  const open = (typeof force === 'boolean') ? force : !sb.classList.contains('open');
+  sb.classList.toggle('open', open);
+  ov.classList.toggle('open', open);
+  if(bg) bg.setAttribute('aria-expanded', String(open));
+}
+function closeNavDrawer(){ toggleNavDrawer(false); }
+// Tapping any nav item (or pressing Escape) closes the drawer.
+document.addEventListener('click', (e) => {
+  const sb = document.getElementById('app-sidebar');
+  if(sb && sb.classList.contains('open') && e.target.closest && e.target.closest('#app-sidebar .nav-item')){
+    closeNavDrawer();
+  }
+});
+document.addEventListener('keydown', (e) => {
+  if(e.key === 'Escape') closeNavDrawer();
+});
+
 // ─── MODAL ──────────────────────────────────────────────────────────────────
 function openModal(id) { const el=document.getElementById(id); if(el) el.classList.add('open'); }
 function closeModal(id) { const el=document.getElementById(id); if(el) el.classList.remove('open'); }
@@ -11396,8 +11553,20 @@ function renderDashboard() {
   const hasReport = !!state.dashboardReport;
   const reportRunning = _dashReportRunning;
 
+  // Exception-first: anything that needs the user's action leads the
+  // dashboard, above everything else, as tone banners that link straight
+  // to the fix. No exceptions → no banners → a calm page.
+  const attention = [];
+  if(state.pendingRates){
+    attention.push(`<div class="tone-banner honey"><span class="tb-dot"></span><div class="tb-body"><b>New exchange rates are waiting for your review.</b> Nothing changes until you approve them. <a onclick="nav('settings')">Review rates →</a></div></div>`);
+  }
+  if(state.sync && state.sync.enabled && state.sync.lastError){
+    attention.push(`<div class="tone-banner rose"><span class="tb-dot"></span><div class="tb-body"><b>Cloud sync hit a problem.</b> ${esc(String(state.sync.lastError))} <a onclick="nav('settings')">Open sync settings →</a></div></div>`);
+  }
+
   el.innerHTML=`
     ${ui.ph({tag:t('dash.page.tag'), title:t('dash.page.title'), sub:t('dash.page.sub')})}
+    ${attention.join('')}
 
     <!-- Welcoming AI summary — short, personal snapshot + CTA to run a full analysis. -->
     <div class="dash-welcome ${verdictTone}">
@@ -15232,7 +15401,7 @@ function renderLifeWall() {
     ${ui.ph({
       tag: 'PERSONAL FINANCES · LIFE WALL',
       titleHtml: 'Your life, brick by brick.',
-      sub: `Each brick covers a ${_lwGranularity}-year window of your projected financial life. Green means you're on track. Amber flags a disturbance. Red means the wall can't hold — portfolio shortfall or depletion. Click any brick for the detail panel.`,
+      sub: `Which years of your life hold — and which crack? Each brick is a ${_lwGranularity}-year window: green holds, amber wobbles, red means shortfall. Tap any brick for the detail.`,
     })}
 
     ${granPicker}
@@ -15315,7 +15484,16 @@ document.addEventListener('keydown', e => {
 // ══ RETIRE ANYWHERE ══════════════════════════════════════════════════════════
 let retireMap=null;
 function renderRetireAnywhere() {
-  const scored=retirePlaces().map(scoreLocation);
+  // Exception-first ordering: the destinations with a PROBLEM lead the
+  // grid (infeasible, then conditional — worst surplus first within each),
+  // healthy destinations follow (best surplus first). The user's scarce
+  // attention goes to what's wrong before what's fine.
+  const _vRank = { infeasible:0, conditional:1, feasible:2 };
+  const scored=retirePlaces().map(scoreLocation).sort((a,b)=>{
+    const ra=_vRank[a.verdict]??2, rb=_vRank[b.verdict]??2;
+    if(ra!==rb) return ra-rb;
+    return ra<2 ? (a.surplus-b.surplus) : (b.surplus-a.surplus);
+  });
   const r=rate();
   const nums=getRetirementNumbers();
   const monthlyIncome=nums.grossRetirementIncome;
@@ -16343,7 +16521,8 @@ function renderRetireAIOutput(){
   if(status === 'running'){
     el.style.display='block';
     el.innerHTML = `<div class="card-title" style="margin-bottom:10px">🤖 AI Retirement Destination Analysis</div>
-      <div style="font-family:var(--fm);font-size:12px;color:var(--amber);display:flex;align-items:center;gap:8px"><span class="state-spinner" style="width:16px;height:16px"></span>Analyzing global destinations in the background… You can switch panels and come back.</div>`;
+      <div style="font-size:12px;color:var(--text2);margin-bottom:12px">Analyzing global destinations in the background — you can switch panels and come back.</div>
+      <span class="skel"></span><span class="skel w80"></span><span class="skel w60"></span><span class="skel w80"></span>`;
     return;
   }
   if(err){
