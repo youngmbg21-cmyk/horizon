@@ -5927,6 +5927,22 @@ function defaultState() {
     // decisions are almost always easier to reason about in today's
     // money — the Nominal lens is an escape hatch, not the default.
     displayMode:'real',
+    // Cloud sync (end-to-end encrypted, Supabase REST). This block is
+    // DEVICE-LOCAL and is deliberately EXCLUDED from the synced payload —
+    // it holds credentials + per-device reconciliation stamps. The state
+    // that syncs is everything else. Nothing here leaves the device
+    // except as AES-GCM ciphertext the server cannot read.
+    sync:{
+      enabled:false,      // has the user connected a Supabase project?
+      url:'',             // https://<project>.supabase.co
+      anonKey:'',         // public anon key (safe to embed in clients)
+      passphrase:'',      // the encryption secret — never sent to the server
+      autoSync:true,      // push on change + pull on load automatically
+      remoteStamp:null,   // remote updated_at we last reconciled with
+      lastSyncAt:null,    // ISO of last successful push/pull
+      pendingPush:false,  // local edits not yet pushed
+      lastError:null,     // last sync error message (for the status line)
+    },
     // Personal profile — free-form context the user shares to make
     // AI recommendations personalised. All fields optional; AI prompts
     // will drop any field that's empty so there's no penalty for a
@@ -6216,7 +6232,7 @@ window.dr = function(name){ return window.commitRender(name); };
 // ─── PERSISTENCE ────────────────────────────────────────────────────────────
 // State schema version. Bump this and add a branch to migrate() whenever the
 // shape of `state` changes in a backwards-incompatible way.
-const STATE_VERSION = 22;
+const STATE_VERSION = 23;
 function migrate(s) {
   const from = s.version || 1;
   if(from >= STATE_VERSION) { s.version = STATE_VERSION; return s; }
@@ -6439,6 +6455,14 @@ function migrate(s) {
     if(!('pendingRates' in s))   s.pendingRates = null;
     if(!('pendingRatesAt' in s)) s.pendingRatesAt = null;
   }
+  // v22 → v23: end-to-end-encrypted cloud sync config. Additive,
+  // device-local, never part of the synced payload.
+  if(from < 23) {
+    if(!s.sync || typeof s.sync !== 'object'){
+      s.sync = { enabled:false, url:'', anonKey:'', passphrase:'', autoSync:true,
+                 remoteStamp:null, lastSyncAt:null, pendingPush:false, lastError:null };
+    }
+  }
   s.version = STATE_VERSION;
   return s;
 }
@@ -6499,6 +6523,9 @@ function save() {
   _selGen++;
   // Notify subscribers before the debounced write, so UI reacts instantly.
   if(typeof bus!=='undefined') bus.emit('state:changed', {panel: state.activePanel});
+  // Cloud sync: flag a pending upload + debounce a push (no-op unless the
+  // user has connected a project and auto-sync is on; skipped mid-pull).
+  if(typeof _syncOnLocalChange === 'function') _syncOnLocalChange();
   saveTimer = setTimeout(() => {
     // Strip vault before stringifying the main state blob. The
     // vault has its own storage key (see saveVault + loadState).
@@ -6524,6 +6551,343 @@ function save() {
 // no-op stub is kept so any stale call sites (including the
 // applyCurrency helper and third-party inline handlers) don't throw.
 function showSave() {}
+
+// ─── CLOUD SYNC (end-to-end encrypted, Supabase REST) ────────────────────────
+// The whole app is client-side, so cross-device sync means each device
+// reads/writes the SAME state blob to a shared store. We use Supabase's
+// REST endpoint (no SDK — plain fetch, keeping the no-build ethos) with
+// the public anon key. Privacy is guaranteed by ENCRYPTING the blob in
+// the browser with AES-GCM before it ever leaves: the server only stores
+// ciphertext + a random salt/iv, and only a device holding the user's
+// passphrase can decrypt. Even a full dump of the table (or a leaked
+// anon key) reveals nothing.
+//
+// Reconciliation is timestamp-based with an explicit conflict prompt so
+// financial data is never silently clobbered:
+//   • sync.remoteStamp  — the remote updated_at we last agreed with
+//   • sync.pendingPush  — this device has local edits not yet pushed
+// On load we pull; if the remote changed since remoteStamp AND we have
+// pending local edits, we ASK rather than overwrite.
+const SYNC_TABLE = 'horizon_sync';
+const _enc = new TextEncoder();
+const _dec = new TextDecoder();
+let _syncApplying = false;   // guard: suppress pendingPush while applying a pull
+let _syncPushTimer = null;
+let _syncInFlight = false;
+
+function _b64(bytes){ let s=''; const b=new Uint8Array(bytes); for(let i=0;i<b.length;i++) s+=String.fromCharCode(b[i]); return btoa(s); }
+function _unb64(str){ const s=atob(str); const b=new Uint8Array(s.length); for(let i=0;i<s.length;i++) b[i]=s.charCodeAt(i); return b; }
+
+// Stable record id derived from the PROJECT (anon key), NOT the
+// passphrase. This is deliberate: keying the row to the project means a
+// wrong passphrase fetches the SAME row and fails to DECRYPT — a clear
+// "passphrase doesn't match" error — instead of silently resolving to a
+// different empty row and forking the user's data across two records.
+// The passphrase's only job is encryption. (One synced dataset per
+// project, which is exactly right for a personal sync.)
+async function _syncRecordId(projectKey){
+  const h = await crypto.subtle.digest('SHA-256', _enc.encode('horizon-sync:v1:' + projectKey));
+  return _b64(h).replace(/[^a-zA-Z0-9]/g,'').slice(0, 40);
+}
+// Derive an AES-GCM key from the passphrase + per-record random salt.
+async function _syncDeriveKey(passphrase, salt){
+  const base = await crypto.subtle.importKey('raw', _enc.encode(passphrase), 'PBKDF2', false, ['deriveKey']);
+  return crypto.subtle.deriveKey(
+    { name:'PBKDF2', salt, iterations:210000, hash:'SHA-256' },
+    base, { name:'AES-GCM', length:256 }, false, ['encrypt','decrypt']);
+}
+async function _syncEncrypt(passphrase, plaintext){
+  const salt = crypto.getRandomValues(new Uint8Array(16));
+  const iv   = crypto.getRandomValues(new Uint8Array(12));
+  const key  = await _syncDeriveKey(passphrase, salt);
+  const ct   = await crypto.subtle.encrypt({ name:'AES-GCM', iv }, key, _enc.encode(plaintext));
+  return JSON.stringify({ v:1, salt:_b64(salt), iv:_b64(iv), ct:_b64(ct) });
+}
+async function _syncDecrypt(passphrase, envelopeStr){
+  const env = JSON.parse(envelopeStr);
+  const key = await _syncDeriveKey(passphrase, _unb64(env.salt));
+  const pt  = await crypto.subtle.decrypt({ name:'AES-GCM', iv:_unb64(env.iv) }, key, _unb64(env.ct));
+  return _dec.decode(pt);
+}
+
+// Build the plaintext payload that travels between devices. Deliberately
+// omits state.sync (device-local credentials/stamps). Vault + Property IQ
+// history live in their own localStorage keys, so bundle them explicitly.
+function _syncBuildPayload(){
+  const { sync, vault, ...main } = state;
+  return JSON.stringify({
+    v: 1,
+    main,
+    vault: Array.isArray(state.vault) ? state.vault : [],
+    propiq: (typeof piq_history !== 'undefined' && Array.isArray(piq_history)) ? piq_history : [],
+  });
+}
+// Apply a pulled payload over local state. Runs under the _syncApplying
+// guard so the save() it triggers does not re-flag pendingPush.
+function _syncApplyPayload(payloadStr){
+  const obj = JSON.parse(payloadStr);
+  _syncApplying = true;
+  try {
+    if(obj.main && typeof obj.main === 'object'){
+      const keepSync = state.sync;
+      migrate(obj.main);
+      const { vault, sync, ...rest } = obj.main; // never let a stale sync/vault ride in
+      Object.assign(state, rest);
+      state.sync = keepSync;
+    }
+    if(Array.isArray(obj.vault)){ state.vault = obj.vault; saveVault(); }
+    if(Array.isArray(obj.propiq) && typeof piq_history !== 'undefined'){
+      piq_history = obj.propiq;
+      if(typeof piq_saveHistLS === 'function') piq_saveHistLS();
+    }
+    save();
+  } finally {
+    _syncApplying = false;
+  }
+}
+
+function syncConfigured(){ const s=state.sync; return !!(s && s.enabled && s.url && s.anonKey && s.passphrase); }
+function _syncHeaders(){
+  const k = state.sync.anonKey;
+  return { 'apikey': k, 'Authorization': 'Bearer ' + k, 'Content-Type': 'application/json' };
+}
+function _syncBase(){ return String(state.sync.url||'').replace(/\/+$/,'') + '/rest/v1/' + SYNC_TABLE; }
+
+// Fetch the remote row (or null if none / not yet created).
+async function _syncFetchRemote(){
+  const id = await _syncRecordId(state.sync.anonKey);
+  const url = `${_syncBase()}?sync_id=eq.${encodeURIComponent(id)}&select=payload,updated_at`;
+  const res = await fetch(url, { headers: _syncHeaders(), cache:'no-store' });
+  if(!res.ok) throw new Error(await _syncErr(res));
+  const rows = await res.json();
+  return (Array.isArray(rows) && rows[0]) ? rows[0] : null;
+}
+async function _syncErr(res){
+  let detail = '';
+  try { const j = await res.json(); detail = j.message || j.hint || j.error || ''; } catch(_){}
+  if(res.status === 404 || /relation .* does not exist/i.test(detail))
+    return 'Table not found — run the one-time SQL setup shown in Settings.';
+  if(res.status === 401 || res.status === 403) return 'Auth failed — check the project URL and anon key.';
+  return `Sync error ${res.status}${detail ? ': ' + detail : ''}`;
+}
+
+// Push local state to the cloud (encrypt → upsert). Returns the stored
+// updated_at so the caller can record it as the new remoteStamp.
+async function syncPush(){
+  if(!syncConfigured()) return { ok:false, error:'Cloud sync is not configured.' };
+  if(_syncInFlight) return { ok:false, error:'A sync is already in progress.' };
+  _syncInFlight = true;
+  try {
+    const id = await _syncRecordId(state.sync.anonKey);
+    const envelope = await _syncEncrypt(state.sync.passphrase, _syncBuildPayload());
+    const body = [{ sync_id:id, payload:envelope, updated_at:new Date().toISOString(), device: _syncDeviceLabel() }];
+    const res = await fetch(_syncBase(), {
+      method:'POST',
+      headers:{ ..._syncHeaders(), 'Prefer':'resolution=merge-duplicates,return=representation' },
+      body: JSON.stringify(body),
+    });
+    if(!res.ok) throw new Error(await _syncErr(res));
+    const rows = await res.json().catch(()=>null);
+    const stamp = (Array.isArray(rows) && rows[0] && rows[0].updated_at) ? rows[0].updated_at : body[0].updated_at;
+    state.sync.remoteStamp = stamp;
+    state.sync.lastSyncAt = new Date().toISOString();
+    state.sync.pendingPush = false;
+    state.sync.lastError = null;
+    _syncPersist();
+    _syncRefreshUI();
+    return { ok:true, stamp };
+  } catch(e){
+    state.sync.lastError = String(e.message||e);
+    _syncPersist(); _syncRefreshUI();
+    return { ok:false, error:String(e.message||e) };
+  } finally { _syncInFlight = false; }
+}
+
+// Pull + reconcile. `force` overwrites local unconditionally (used by the
+// explicit "Pull" button and the conflict modal's "Use cloud" choice).
+async function syncPull({ force=false, onLoad=false } = {}){
+  if(!syncConfigured()) return { ok:false, error:'Cloud sync is not configured.' };
+  if(_syncInFlight) return { ok:false, error:'A sync is already in progress.' };
+  _syncInFlight = true;
+  try {
+    const remote = await _syncFetchRemote();
+    if(!remote){
+      // Nothing in the cloud yet — seed it from this device.
+      _syncInFlight = false;
+      if(state.sync.pendingPush || onLoad) return await syncPush();
+      return { ok:true, empty:true };
+    }
+    const remoteChanged = remote.updated_at !== state.sync.remoteStamp;
+    if(!force && !remoteChanged){
+      // Remote is what we last agreed with. Only outbound work may remain.
+      state.sync.lastError = null; _syncPersist(); _syncRefreshUI();
+      _syncInFlight = false;
+      if(state.sync.pendingPush) return await syncPush();
+      return { ok:true, upToDate:true };
+    }
+    if(!force && remoteChanged && state.sync.pendingPush){
+      // True conflict: both sides moved. Never auto-resolve financial data.
+      state.sync.lastError = null; _syncRefreshUI();
+      _syncInFlight = false;
+      _syncShowConflict(remote);
+      return { ok:false, conflict:true };
+    }
+    // Safe to apply remote (either forced, or we had no local edits).
+    const plaintext = await _syncDecrypt(state.sync.passphrase, remote.payload);
+    _syncApplyPayload(plaintext);
+    state.sync.remoteStamp = remote.updated_at;
+    state.sync.lastSyncAt = new Date().toISOString();
+    state.sync.pendingPush = false;
+    state.sync.lastError = null;
+    _syncPersist();
+    if(typeof renderAll === 'function') renderAll();
+    _syncRefreshUI();
+    return { ok:true, applied:true };
+  } catch(e){
+    const msg = /operation-specific reason|OperationError|decrypt/i.test(String(e))
+      ? 'Could not decrypt — the passphrase does not match the data in the cloud.'
+      : String(e.message||e);
+    state.sync.lastError = msg; _syncPersist(); _syncRefreshUI();
+    return { ok:false, error:msg };
+  } finally { _syncInFlight = false; }
+}
+
+// "Sync now" — reconcile in both directions with conflict awareness.
+async function syncNow(){ return syncPull({ onLoad:false }); }
+
+// Persist just the sync block (and the rest of state) without disturbing
+// the _syncApplying guard semantics. save() is debounced; force an
+// immediate write of the credentials/stamps so a reload can't lose them.
+function _syncPersist(){
+  try {
+    const vaultRef = state.vault;
+    state.vault = undefined;
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({ ...state, vault:undefined }));
+    state.vault = vaultRef;
+  } catch(_){ /* fall back to the normal debounced save */ save(); }
+}
+function _syncDeviceLabel(){
+  const ua = navigator.userAgent || '';
+  return /Mobi|Android|iPhone|iPad/i.test(ua) ? 'mobile' : 'desktop';
+}
+
+// Hook invoked from save(): whenever local state changes and auto-sync is
+// on, mark a pending push and debounce an upload. Skipped while applying a
+// pull so echoing a remote change doesn't bounce back.
+function _syncOnLocalChange(){
+  if(_syncApplying || !syncConfigured() || !state.sync.autoSync) return;
+  state.sync.pendingPush = true;
+  clearTimeout(_syncPushTimer);
+  _syncPushTimer = setTimeout(() => { syncPush(); }, 2500);
+}
+// Pull-on-load entry point, called once from boot.
+function syncOnLoad(){
+  if(!syncConfigured() || !state.sync.autoSync) { _syncRefreshUI(); return; }
+  if(typeof navigator !== 'undefined' && navigator.onLine === false){ _syncRefreshUI(); return; }
+  syncPull({ onLoad:true });
+}
+
+// Minimal, dependency-free conflict chooser. Injected on demand so we
+// don't have to thread a static modal through the HTML.
+function _syncShowConflict(remote){
+  if(document.getElementById('sync-conflict-ov')) return;
+  const when = remote && remote.updated_at ? new Date(remote.updated_at).toLocaleString() : '';
+  const ov = document.createElement('div');
+  ov.id = 'sync-conflict-ov';
+  ov.style.cssText = 'position:fixed;inset:0;z-index:9999;background:rgba(3,6,14,.66);display:flex;align-items:center;justify-content:center;padding:20px';
+  ov.innerHTML = `
+    <div style="background:var(--bg2,#0d1526);border:1px solid var(--border,#1a2640);border-radius:14px;max-width:440px;width:100%;padding:22px 24px;box-shadow:0 20px 60px rgba(0,0,0,.5)">
+      <div style="font-size:16px;font-weight:800;color:var(--text,#e4ecf7);margin-bottom:8px">⚠ Sync conflict</div>
+      <p style="font-size:13px;color:var(--text2,#9fb0cc);line-height:1.5;margin:0 0 16px">
+        This device has unsynced changes, and the cloud has newer data from another device${when ? ` (updated ${esc2(when)})` : ''}.
+        Choose which version to keep — the other will be overwritten.
+      </p>
+      <div style="display:flex;flex-direction:column;gap:8px">
+        <button class="btn btn-g" onclick="syncResolveConflict('local')">Keep THIS device &amp; upload it</button>
+        <button class="btn btn-o" onclick="syncResolveConflict('cloud')">Use the CLOUD version &amp; replace this device</button>
+        <button class="btn" style="background:transparent;color:var(--text3,#7a8fb0)" onclick="syncResolveConflict('cancel')">Decide later</button>
+      </div>
+    </div>`;
+  document.body.appendChild(ov);
+}
+window.syncResolveConflict = function(choice){
+  const ov = document.getElementById('sync-conflict-ov'); if(ov) ov.remove();
+  if(choice === 'local') syncPush();
+  else if(choice === 'cloud') syncPull({ force:true });
+  // 'cancel' leaves both sides as-is; pendingPush stays set for later.
+};
+
+// Re-render the Settings sync card if it's on screen (status/last-synced).
+function _syncRefreshUI(){
+  if(state.activePanel === 'settings' && typeof renderSettings === 'function'){
+    try { renderSettings(); } catch(_){}
+  }
+}
+
+// ── Settings · Cloud Sync card interactions ──────────────────────────────────
+function _syncField(k, v){ if(!state.sync) return; state.sync[k] = v; save(); }
+window.syncField = _syncField;
+window.syncGenPassphrase = function(){
+  const bytes = crypto.getRandomValues(new Uint8Array(18));
+  state.sync.passphrase = _b64(bytes).replace(/[^a-zA-Z0-9]/g,'').slice(0,24);
+  save(); _syncRefreshUI();
+};
+window.syncConnect = async function(){
+  const s = state.sync;
+  if(!s.url || !s.anonKey || !s.passphrase){ alert('Enter the project URL, anon key, and a passphrase first.'); return; }
+  if(!/^https:\/\/.+\.supabase\.co/i.test(s.url.trim()) && !/^https:\/\//i.test(s.url.trim())){
+    alert('The project URL should look like https://YOUR-PROJECT.supabase.co'); return;
+  }
+  s.url = s.url.trim(); s.anonKey = s.anonKey.trim();
+  // pendingPush stays FALSE so a second device joining an existing synced
+  // set ADOPTS the cloud data instead of tripping the conflict guard. If
+  // the cloud is empty, syncPull's onLoad path seeds it from this device.
+  s.enabled = true; s.remoteStamp = null; s.pendingPush = false; s.lastError = null;
+  _syncPersist();
+  // Seed-or-pull: if the cloud already has data, adopt it; if not,
+  // upload this device as the first copy.
+  const r = await syncPull({ onLoad:true });
+  if(!r.ok && r.error) alert('Connected, but the first sync failed:\n\n' + r.error);
+  _syncRefreshUI();
+};
+window.syncDisconnect = function(){
+  if(!confirm('Disconnect cloud sync on this device? Your data stays here and in the cloud; this device just stops syncing. Credentials will be cleared from this browser.')) return;
+  state.sync = { enabled:false, url:'', anonKey:'', passphrase:'', autoSync:true,
+                 remoteStamp:null, lastSyncAt:null, pendingPush:false, lastError:null };
+  _syncPersist(); _syncRefreshUI();
+};
+window.syncToggleAuto = function(on){
+  state.sync.autoSync = !!on; _syncPersist();
+  if(on && syncConfigured()) syncPull({ onLoad:true });
+  _syncRefreshUI();
+};
+window.syncNowClick = async function(btn){
+  if(btn){ btn.disabled = true; btn.textContent = 'Syncing…'; }
+  const r = await syncNow();
+  if(!r.ok && r.error) alert(r.error);
+  _syncRefreshUI();
+};
+window.syncPushClick = async function(){ const r = await syncPush(); if(!r.ok && r.error) alert(r.error); };
+window.syncPullClick = async function(){
+  if(!confirm('Replace this device’s data with the cloud version? Local unsynced changes will be lost.')) return;
+  const r = await syncPull({ force:true }); if(!r.ok && r.error) alert(r.error);
+};
+window.syncCopyLink = function(){
+  const s = state.sync;
+  const code = 'HZS1:' + btoa(unescape(encodeURIComponent(JSON.stringify({ u:s.url, k:s.anonKey, p:s.passphrase }))));
+  const done = () => alert('Link code copied. On your other device: open the app → Settings → Cloud Sync → “Paste link code”. Treat this code like a password.');
+  if(navigator.clipboard && navigator.clipboard.writeText){ navigator.clipboard.writeText(code).then(done, ()=>prompt('Copy this link code:', code)); }
+  else prompt('Copy this link code:', code);
+};
+window.syncPasteLink = function(raw){
+  try {
+    const str = String(raw||'').trim().replace(/^HZS1:/,'');
+    const obj = JSON.parse(decodeURIComponent(escape(atob(str))));
+    if(!obj.u || !obj.k || !obj.p) throw new Error('incomplete');
+    state.sync.url = obj.u; state.sync.anonKey = obj.k; state.sync.passphrase = obj.p;
+    save(); _syncRefreshUI();
+  } catch(e){ alert('That link code could not be read. Make sure you pasted the whole thing (it starts with HZS1:).'); }
+};
 
 // ─── CURRENCY / FORMAT ───────────────────────────────────────────────────────
 function rate(cur) { cur=cur||state.currency; return (state.exchangeRates&&state.exchangeRates[cur])||DEFAULT_RATES[cur]||1; }
@@ -16129,6 +16493,75 @@ MEDIAN_INCOME_USD: [median monthly gross personal income in USD for this city]${
 };
 
 // ══ SETTINGS ═════════════════════════════════════════════════════════════════
+// Cloud Sync card — its own builder so renderSettings stays readable and
+// so _syncRefreshUI can re-render the whole panel on status changes.
+function renderSyncCard(){
+  const s = state.sync || {};
+  const sql = `create table if not exists horizon_sync (\n  sync_id text primary key,\n  payload text not null,\n  updated_at timestamptz not null default now(),\n  device text\n);\nalter table horizon_sync enable row level security;\ncreate policy "horizon anon rw" on horizon_sync\n  for all to anon using (true) with check (true);`;
+  const setupHelp = `
+    <details style="margin-top:12px">
+      <summary style="cursor:pointer;font-size:12px;color:var(--text2)">One-time setup — create a free Supabase project</summary>
+      <div style="font-size:12px;color:var(--text2);line-height:1.6;margin-top:8px">
+        <ol style="margin:0 0 8px 18px;padding:0">
+          <li>Create a free project at <b>supabase.com</b>.</li>
+          <li>Open <b>SQL Editor</b> → run this once (creates the encrypted-blob table):</li>
+        </ol>
+        <pre style="background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:10px;overflow:auto;font-family:var(--fm);font-size:11px;white-space:pre;margin:0 0 8px">${esc(sql)}</pre>
+        <ol start="3" style="margin:0 0 0 18px;padding:0">
+          <li>In <b>Project Settings → API</b>, copy the <b>Project URL</b> and the <b>anon public</b> key into the fields above.</li>
+        </ol>
+        <p style="margin:8px 0 0;color:var(--text3)">Your data is encrypted in this browser before upload — Supabase only ever stores unreadable ciphertext.</p>
+      </div>
+    </details>`;
+
+  if(!syncConfigured()){
+    return `
+    <div class="card" id="set-sync-section">
+      <div class="card-title">☁️ Cloud Sync <span style="background:var(--bg3);color:var(--text3);border:1px solid var(--border);font-size:9px;padding:2px 7px;border-radius:4px;font-family:var(--fm);font-weight:700;letter-spacing:.06em;margin-left:6px">END-TO-END ENCRYPTED</span></div>
+      <p style="font-size:11px;color:var(--text2);margin-bottom:12px;line-height:1.5">Access the same data on your phone and desktop. Your state is encrypted in this browser with your passphrase before it's uploaded, so the server can never read it.</p>
+      <div class="field"><label>Supabase Project URL</label><input value="${esc(s.url||'')}" placeholder="https://YOUR-PROJECT.supabase.co" oninput="syncField('url',this.value)"></div>
+      <div class="field"><label>Supabase anon key <span style="font-size:10px;color:var(--text3)">(public — safe to store)</span></label><input value="${esc(s.anonKey||'')}" placeholder="eyJhbGci…" oninput="syncField('anonKey',this.value)"></div>
+      <div class="field"><label>Sync passphrase <span style="font-size:10px;color:var(--text3)">(your encryption secret — the one thing you must reuse on every device)</span></label>
+        <div style="display:flex;gap:6px"><input type="text" value="${esc(s.passphrase||'')}" placeholder="a long secret only you know" oninput="syncField('passphrase',this.value)" style="flex:1"><button class="btn btn-o btn-sm" onclick="syncGenPassphrase()" title="Generate a strong passphrase">Generate</button></div>
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:4px">
+        <button class="btn btn-g" onclick="syncConnect()">Connect &amp; sync</button>
+      </div>
+      <div class="field" style="margin-top:14px"><label style="color:var(--text3)">Already set up on another device? Paste its link code:</label>
+        <input placeholder="HZS1:…" onchange="if(this.value.trim())syncPasteLink(this.value)"></div>
+      ${setupHelp}
+    </div>`;
+  }
+
+  // Connected view
+  let host = ''; try { host = new URL(s.url).host; } catch(_){ host = s.url; }
+  const last = s.lastSyncAt ? new Date(s.lastSyncAt).toLocaleString(state.lang==='sv'?'sv-SE':undefined) : '';
+  const statusLine = s.lastError
+    ? `<span style="color:var(--red)">⚠ ${esc2(s.lastError)}</span>`
+    : s.pendingPush
+      ? `<span style="color:var(--amber)">● Pending upload…</span>`
+      : (last ? `<span style="color:var(--green)">✓ Synced · ${esc2(last)}</span>` : `<span style="color:var(--text3)">Connected</span>`);
+  return `
+    <div class="card" id="set-sync-section">
+      <div class="card-title">☁️ Cloud Sync <span style="background:var(--green-dim,rgba(46,194,126,.12));color:var(--green,#2ec27e);font-size:9px;padding:2px 7px;border-radius:4px;font-family:var(--fm);font-weight:700;letter-spacing:.06em;margin-left:6px">CONNECTED</span></div>
+      <div style="font-size:12px;color:var(--text2);margin-bottom:12px">Project <b style="font-family:var(--fm)">${esc(host)}</b> · this device: ${esc(_syncDeviceLabel())}<br>${statusLine}</div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:12px">
+        <button class="btn btn-g btn-sm" onclick="syncNowClick(this)">↻ Sync now</button>
+        <button class="btn btn-o btn-sm" onclick="syncCopyLink()">Copy link code for phone</button>
+        <label class="toggle-wrap" style="margin-left:auto"><input type="checkbox" ${s.autoSync?'checked':''} onchange="syncToggleAuto(this.checked)"><div class="toggle-slider"></div><span style="font-size:12px;color:var(--text2);margin-left:6px">Auto-sync</span></label>
+      </div>
+      <details style="margin-top:4px">
+        <summary style="cursor:pointer;font-size:12px;color:var(--text3)">Advanced &amp; troubleshooting</summary>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px">
+          <button class="btn btn-o btn-sm" onclick="syncPushClick()" title="Force upload this device's data">↑ Push this device</button>
+          <button class="btn btn-o btn-sm" onclick="syncPullClick()" title="Overwrite this device with the cloud version">↓ Pull from cloud</button>
+          <button class="btn btn-danger btn-sm" onclick="syncDisconnect()" style="margin-left:auto">Disconnect</button>
+        </div>
+        <p style="font-size:11px;color:var(--text3);line-height:1.5;margin-top:10px">To add your phone: tap <b>Copy link code</b>, then on the phone open this app → Settings → Cloud Sync → paste it. Treat the link code like a password — it contains your passphrase.</p>
+        ${setupHelp}
+      </details>
+    </div>`;
+}
 function renderSettings() {
   const r=rate(); const s=sym();
   const ctxIncomplete = !state.citizenship || !state.homeBase;
@@ -16274,6 +16707,8 @@ function renderSettings() {
         <div class="field"><label>${esc2(t('settings.aiKeys.perplexity'))} <span style="font-size:10px;color:var(--text3)">${esc2(t('settings.aiKeys.perplexityHint'))}</span></label><input type="password" value="${esc(state.aiKeys?.perplexity||'')}" placeholder="pplx-…" oninput="if(!state.aiKeys)state.aiKeys={};state.aiKeys.perplexity=this.value;save()"></div>
         <p style="font-size:11px;color:var(--text3);line-height:1.5">${esc2(t('settings.aiKeys.storage'))}</p>
       </div>
+      <!-- Cloud sync -->
+      ${renderSyncCard()}
       <!-- Ticker quote -->
       <div class="card">
         <div class="card-title">${esc2(t('settings.appearance.title'))}</div>
@@ -19389,6 +19824,11 @@ if(state.activeSection) setTimeout(()=>pulseSection(state.activeSection), 200);
 // the pending slot for the user to review. Fire-and-forget — never blocks
 // the first paint, and never changes a displayed figure on its own.
 try { updateRatesBadge(); autoRefreshRatesIfStale(); } catch(_){}
+
+// Cloud sync: on load, pull the latest from the cloud and reconcile
+// (no-op unless the user has connected a project). A conflict prompts
+// rather than overwrites.
+try { if(typeof syncOnLoad === 'function') syncOnLoad(); } catch(_){}
 
 // Keep Leaflet tiles correct after layout changes, and re-render active panel
 // so Chart.js updates legibly across viewport width changes.
