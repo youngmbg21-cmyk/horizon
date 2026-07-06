@@ -3582,6 +3582,10 @@ body.light .geo-dropdown { box-shadow:0 10px 30px -10px rgba(60,40,10,0.22); }
 .si-fmt{display:flex;align-items:center;gap:7px;font-size:12px;color:var(--text2);background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:6px 11px}
 .si-fmt b{color:var(--text);font-weight:600}
 .si-fmt-ic{width:20px;height:20px;border-radius:5px;display:grid;place-items:center;font-size:10px;font-weight:700;font-family:var(--fm)}
+.si-currency-row{margin-top:16px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;background:var(--bg2);border:1px solid var(--border);border-radius:var(--r);padding:12px 16px}
+.si-currency-row label{font-size:13px;font-weight:600;color:var(--text)}
+.si-currency-row select{background:var(--bg0);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:13px;padding:7px 10px;font-family:var(--fm)}
+.si-currency-hint{font-size:11px;color:var(--text3);flex:1;min-width:180px;line-height:1.4}
 .si-paste{margin-top:18px;background:var(--bg2);border:1px solid var(--border);border-radius:var(--r);padding:14px 16px}
 .si-paste-t{font-size:13px;font-weight:600;margin-bottom:10px}
 .si-paste textarea{width:100%;min-height:88px;background:var(--bg0);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:var(--fm);font-size:12px;padding:11px;resize:vertical}
@@ -4468,6 +4472,8 @@ const STRINGS = {
   'dash.kpi.sub.savingsRate':   { en:'{mo}/mo average · {pct}% savings rate',
                                   sv:'{mo}/mån snitt · {pct}% sparkvot' },
   'dash.kpi.sub.avgPerMo':      { en:'{mo}/mo average',       sv:'{mo}/mån snitt' },
+  'dash.kpi.sub.funFundBalance':{ en:'balance in 12 mo · {cap} gross capacity',
+                                  sv:'saldo om 12 mån · {cap} bruttokapacitet' },
 
   // ── Dashboard · KPI row 2 (retirement; lens-aware) ──
   // These keys are resolved based on the active display mode so the
@@ -5981,6 +5987,9 @@ function defaultState() {
     // Spend Insights — cached AI summary of the uploaded transactions
     // ({ data, raw, generatedAt, count, range }); null until generated.
     spendInsights:null,
+    // Metadata about the last Spend Insights upload (e.g. the currency the
+    // file was denominated in, for the "converted from" note).
+    spendMeta:null,
 
     // Retire Anywhere
     retireLocations:[ /* deprecated — merged into `places` on migrate v3→v4; keep key here for older snapshots */ ],
@@ -10695,6 +10704,11 @@ function renderDashboard() {
   const te12         = FE.months.totalExpenses12();
   const savings12    = FE.months.totalSavings12();
   const funFundTotal = FE.months.funFundTwelveMoTotal();
+  // Chained ending balance 12 months out — the SAME number as the first bar
+  // of the Fun Fund "12-month balance outlook" chart. This is what the KPI
+  // headline shows; gross capacity (funFundTotal) moves to the sub-line so
+  // the dashboard tile no longer disagrees with the chart.
+  const funFundBalance = FE.funFund.summary().balance;
   // Current-month helpers still needed for the welcome/greeting copy.
   const ti          = cm.pureIncome;
   const te          = cm.pureExpenses;
@@ -10758,7 +10772,7 @@ function renderDashboard() {
       {icon:'💰', label:t('dash.kpi.income12'),   value:fmt(ti12),      tone:'pos', sub:t('dash.kpi.sub.incomeStreams', { mo: fmt(ti12/12), n: curIncomeStreams }), link:'monthly'},
       {icon:'📤', label:t('dash.kpi.expenses12'), value:fmt(te12),      tone:'neg', sub:t('dash.kpi.sub.pctOfIncome',  { mo: fmt(te12/12), pct: ti12>0?Math.round(te12/ti12*100):0 }), link:'monthly'},
       {icon:'🏦', label:t('dash.kpi.savings12'),  value:`<span class="amb">${fmt(savings12)}</span>`, sub:t('dash.kpi.sub.savingsRate', { mo: fmt(savings12/12), pct: ti12>0?Math.round(savings12/ti12*100):0 }), link:'monthly'},
-      {icon:'✦', label:t('dash.kpi.funFund12'),  value:`<span style="color:var(--cyan)">${fmt(funFundTotal)}</span>`, sub:t('dash.kpi.sub.avgPerMo', { mo: fmt(funFundTotal/12) }), link:'funfund'},
+      {icon:'✦', label:t('dash.kpi.funFund12'),  value:`<span style="color:${funFundBalance>=0?'var(--cyan)':'var(--red)'}">${fmt(funFundBalance)}</span>`, sub:t('dash.kpi.sub.funFundBalance', { cap: fmt(funFundTotal) }), link:'funfund'},
     ])}
 
     <!-- KPI Row 2: Retirement — lens-aware. Both the label and the
@@ -10931,6 +10945,11 @@ let _siRunning = false;     // AI summary request in flight
 let _siError = null;        // last AI summary error message
 let _siGen = 0;             // data generation — bumped on every ingest so an
                             // in-flight AI response for OLD data is discarded
+let _siUploadCurrency = null; // currency the uploaded file is denominated in
+                            // (null → follow auto-detect / base). Amounts are
+                            // converted to base currency at ingest time.
+let _siCurrencyTouched = false; // user picked the currency manually → don't
+                            // let auto-detect override their choice
 
 // Full HTML-entity escape (incl. quotes) for model/user text rendered into
 // this feature's markup. The app-wide esc() intentionally omits quotes; this
@@ -11006,6 +11025,13 @@ function _siUploadView(hasData){
         <span class="si-fmt" style="opacity:.5"><span class="si-fmt-ic" style="background:var(--bg4);color:var(--text3)">PDF</span>PDF / screenshots <b style="color:var(--text3)">· later</b></span>
       </div>
     </div>
+    <div class="si-currency-row">
+      <label for="si-currency">Currency in this file</label>
+      <select id="si-currency" onchange="siSetUploadCurrency(this.value)">
+        ${['SEK','USD','EUR','KES'].map(c=>`<option value="${c}"${(_siUploadCurrency||'SEK')===c?' selected':''}>${c} · ${_siEsc(CURRENCY_SYMBOLS[c]||c)}</option>`).join('')}
+      </select>
+      <span class="si-currency-hint">Auto-detected from the file when possible. Amounts are converted to your base currency using Settings → Exchange Rates.</span>
+    </div>
     <div class="si-paste">
       <div class="si-paste-t">⌨︎ …or paste transactions straight in</div>
       <textarea id="si-paste-box" placeholder="2026-06-14   ICA Maxi        -842,50&#10;2026-06-13   Spotify AB      -119,00&#10;2026-06-12   Salary       +38400,00"></textarea>
@@ -11048,9 +11074,50 @@ window.siAnalyzePaste = function(){
   if(!text){ alert('Paste some transaction rows first.'); return; }
   _siIngestText(text, 'pasted rows');
 };
+// Detect a binary spreadsheet read as text. .xlsx is a ZIP ("PK"), legacy
+// .xls is an OLE2 compound file (starts 0xD0 0xCF → decodes to "ÐÏ"), and any
+// other binary shows up as a high ratio of U+FFFD replacement chars.
+function _siLooksBinary(text){
+  const head = text.slice(0, 8);
+  if(head.startsWith('PK') && /\.(xlsx|xlsm|xltx)$|xl\/|\[Content_Types\]/.test(text.slice(0, 4000))) return 'xlsx';
+  if(head.startsWith('PK')) return 'zip';
+  if(head.charCodeAt(0) === 0xD0 && head.charCodeAt(1) === 0xCF) return 'xls';
+  const sample = text.slice(0, 2000);
+  let bad = 0;
+  for(const ch of sample){ const c = ch.charCodeAt(0); if(c === 0xFFFD || (c < 9) || (c > 13 && c < 32)) bad++; }
+  if(sample.length && bad / sample.length > 0.1) return 'binary';
+  return null;
+}
+// Guess the currency a file is denominated in from symbols/codes in its text.
+function _siDetectCurrency(text){
+  const t = text.toUpperCase();
+  const counts = {
+    SEK: (t.match(/\bSEK\b|\bKR\b|KRONOR/g) || []).length,
+    KES: (t.match(/\bKES\b|KSH|SHILLING/g) || []).length,
+    EUR: (text.match(/€|\bEUR\b/gi) || []).length,
+    USD: (text.match(/\bUSD\b/gi) || []).length + (text.match(/\$/g) || []).length,
+  };
+  let best = null, bestN = 0;
+  for(const [cur, n] of Object.entries(counts)) if(n > bestN){ bestN = n; best = cur; }
+  return bestN > 0 ? best : null;
+}
 // Parse raw CSV/TSV/pasted text into transactions using the existing hand-rolled
 // CSV parser + column detector, then replace state.transactions.
 function _siIngestText(text, sourceName){
+  // Reject binary spreadsheets up front with actionable guidance — reading an
+  // .xlsx as text produced garbled numbers with no explanation.
+  const bin = _siLooksBinary(text);
+  if(bin){
+    alert(bin === 'xlsx' || bin === 'xls' || bin === 'zip'
+      ? 'That looks like an Excel file, which can’t be read directly. In Excel choose File → Save As → CSV (Comma delimited), then upload the .csv.'
+      : 'That file doesn’t look like text/CSV. Export your statement as CSV and upload that.');
+    return;
+  }
+  // Currency: honour a manual pick; otherwise auto-detect from the file and,
+  // if found, update the picker. Amounts are converted to base below.
+  const detected = _siDetectCurrency(text);
+  if(!_siCurrencyTouched && detected) _siUploadCurrency = detected;
+  const uploadCur = _siUploadCurrency || 'SEK';
   // Space-aligned pastes (columns separated by runs of 2+ spaces — exactly
   // what copying rows out of a banking app or the paste-box example gives
   // you) have no ,/;/tab separator, so _parseCsv's separator detection
@@ -11080,7 +11147,15 @@ function _siIngestText(text, sourceName){
     alert('Couldn’t find a date and amount column in that file. Make sure your export includes at least a date column and an amount column.');
     return;
   }
+  // Convert amounts into the app's base currency (SEK). Everything downstream
+  // (metrics, chart, AI prompt) assumes base; fmt() then converts to the
+  // user's display currency at render. rate(cur) is SEK→cur, so base = cur/rate.
+  if(uploadCur !== 'SEK'){
+    const r = rate(uploadCur) || 1;
+    txs.forEach(tx => { tx.amount = Math.round((Number(tx.amount)||0) / r); });
+  }
   state.transactions = txs;
+  state.spendMeta = { uploadCurrency: uploadCur }; // for the "converted from" note
   state.spendInsights = null;   // stale summary no longer matches the data
   state.bankConnected = true;
   state.bankMode = 'imported';
@@ -11092,6 +11167,9 @@ function _siIngestText(text, sourceName){
 }
 window.siShowUpload = function(){ _siForceUpload = true; renderTransactions(); };
 window.siBackToInsights = function(){ _siForceUpload = false; renderTransactions(); };
+window.siSetUploadCurrency = function(cur){
+  _siUploadCurrency = cur; _siCurrencyTouched = true; // manual pick wins over auto-detect
+};
 
 // ─── AI SUMMARY ──────────────────────────────────────────────────────────────
 function _siBuildPrompt(m){
@@ -11373,7 +11451,7 @@ function renderTransactions() {
     </div>
     <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px">
       <span class="conn-badge ${state.bankMode==='imported'?'live':'demo'}">${state.bankMode==='imported'?'Imported':state.bankMode==='demo'?'Demo':'Live'}</span>
-      <span style="font-size:12px;color:var(--text2)">${m.count} transactions · ${_siEsc(_siRangeLabel(m)||'—')}</span>
+      <span style="font-size:12px;color:var(--text2)">${m.count} transactions · ${_siEsc(_siRangeLabel(m)||'—')}${(state.spendMeta&&state.spendMeta.uploadCurrency&&state.spendMeta.uploadCurrency!=='SEK')?` · converted from ${_siEsc(state.spendMeta.uploadCurrency)}`:''}</span>
     </div>
 
     ${ui.kpiRow([
@@ -13624,7 +13702,11 @@ function renderFunFund() {
           ],
         },
         options: chartPreset({
-          plugins:{ legend:{ position:'top', labels:{ color:cd.textColor, font:cd.tickFont } }, tooltip:{ enabled:true } },
+          // Only override the legend — leave tooltip untouched so the shared
+          // chartHtmlTooltip (which formats values through fmt() → display
+          // currency + rounding) applies. A tooltip:{enabled:true} override
+          // replaced it with Chart.js's raw-number default.
+          plugins:{ legend:{ position:'top', labels:{ color:cd.textColor, font:cd.tickFont } } },
           scales:{
             x:{ ticks:{ color:cd.textColor, font:cd.tickFont, maxTicksLimit:12 }, grid:{ display:false } },
             y:{ ticks:{ color:cd.textColor, font:cd.tickFont, callback:v=>fmtC(v) }, grid:{ color:cd.gridColor } },
@@ -13659,7 +13741,8 @@ function renderFunFund() {
           }],
         },
         options: chartPreset({
-          plugins:{ legend:{ display:false }, tooltip:{ enabled:true } },
+          // Leave tooltip to the shared converting renderer (see ff-chart above).
+          plugins:{ legend:{ display:false } },
           scales:{
             x:{ ticks:{ color:cd.textColor, font:cd.tickFont, maxTicksLimit:12 }, grid:{ display:false } },
             y:{ ticks:{ color:cd.textColor, font:cd.tickFont, callback:v=>fmtC(v) }, grid:{ color:cd.gridColor } },
