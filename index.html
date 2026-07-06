@@ -3887,7 +3887,7 @@ body.light .piq-country-menu { box-shadow:0 12px 28px -10px rgba(60,40,10,0.22);
 
       <div class="sb-sep"></div>
       <div class="sb-section" data-i18n="sb.group.personal">PERSONAL FINANCES</div>
-      <div class="nav-item" data-panel="transactions" onclick="nav('transactions')"><span class="nav-icon">🏦</span><span class="nav-lbl" data-i18n="panel.transactions">Bank & Transactions</span></div>
+      <div class="nav-item" data-panel="transactions" onclick="nav('transactions')"><span class="nav-icon">🏦</span><span class="nav-lbl" data-i18n="panel.transactions">Spend Insights</span></div>
       <div class="nav-item" data-panel="review" onclick="nav('review')"><span class="nav-icon">▦</span><span class="nav-lbl" data-i18n="panel.review">Forecast & Review</span></div>
       <div class="nav-item" data-panel="retirement" onclick="nav('retirement')"><span class="nav-icon">🌅</span><span class="nav-lbl" data-i18n="panel.retirement">Retirement Plan</span></div>
 
@@ -4222,7 +4222,7 @@ const STRINGS = {
   // ── Panel labels (used by sidebar, breadcrumb, cmd palette,
   //     related row, dashboard KPI links, …). Mirrors PANEL_META. ──
   'panel.dashboard':        { en:'Dashboard',             sv:'Översikt' },
-  'panel.transactions':     { en:'Bank & Transactions',   sv:'Bank & transaktioner' },
+  'panel.transactions':     { en:'Spend Insights',        sv:'Utgiftsinsikter' },
   'panel.review':           { en:'Forecast & Review',     sv:'Prognos & genomgång' },
   'panel.monthly':          { en:'Monthly Review',        sv:'Månadsgenomgång' },
   'panel.yearly':           { en:'Yearly Forecast',       sv:'Årsprognos' },
@@ -4969,7 +4969,7 @@ const STRINGS = {
   'piq.share.summary.appreciation':{ en:'Appreciation:',  sv:'Värdeökning:' },
 
   // ── Bank & Transactions ────────────────────────────────
-  'tx.page.title':          { en:'Bank & Transactions',   sv:'Bank & transaktioner' },
+  'tx.page.title':          { en:'Spend Insights',        sv:'Utgiftsinsikter' },
   'tx.page.sub.empty':      { en:'Connect your bank account to view real transaction data and spending patterns',
                               sv:'Anslut ditt bankkonto för att se faktisk transaktionsdata och utgiftsmönster' },
   'tx.page.sub.connected':  { en:'Real transaction data · spending analysis · 12-month patterns',
@@ -8379,6 +8379,37 @@ function topIncomePercentile(income, medianIncome) {
   const z = Math.log(income / medianIncome) / 0.8;
   return Math.max(1, Math.min(99, Math.round((1 - _normCDF(z)) * 100)));
 }
+// Country-level median monthly gross personal income (USD, approximate
+// 2024–25 figures). Fallback ONLY: a city-specific value from an AI Deep
+// Dive (loc.medianMonthlyIncome, stored in SEK) always wins, since city
+// medians can differ a lot from the national one (e.g. New York vs rural
+// US). This table exists so every card can show "Income rank · locally"
+// out of the box instead of the line silently disappearing until the
+// user runs a Deep Dive. Keys must match CITY_DB `country` spellings.
+const COUNTRY_MEDIAN_INCOME_USD = {
+  'Portugal':1400, 'Spain':1700, 'Greece':1100, 'Italy':1900, 'France':2400,
+  'Malta':1600, 'Cyprus':1500, 'Slovenia':1700, 'Croatia':1300, 'Hungary':1100,
+  'Czechia':1500, 'Estonia':1500, 'Finland':2900, 'Denmark':3800,
+  'Netherlands':3200, 'Germany':3000, 'Austria':2800, 'Switzerland':5500,
+  'Norway':4000, 'Sweden':3100, 'United Kingdom':2600, 'Ireland':3100,
+  'UAE':3000, 'Indonesia':350, 'Thailand':600, 'Malaysia':800, 'Vietnam':350,
+  'South Africa':450, 'Kenya':200, 'Morocco':350, 'Mexico':500,
+  'Colombia':350, 'Panama':700, 'Uruguay':900, 'Argentina':500, 'Brazil':500,
+  'New Zealand':2900, 'Australia':3400, 'United States':3600, 'Canada':2900,
+  'Japan':2200, 'Singapore':3800, 'Turkey':600, 'South Korea':2200,
+  'Hong Kong':2500, 'Taiwan':1500, 'Philippines':350, 'India':300,
+  'Egypt':200, 'Georgia':500, 'Poland':1400, 'Romania':1100, 'Bulgaria':900,
+};
+// Resolve the median income (in SEK, the app's base currency) for a
+// location: prefer the city-specific AI value, fall back to the national
+// table converted through the live USD rate.
+function locMedianIncomeSEK(loc) {
+  if (loc.medianMonthlyIncome > 0) return loc.medianMonthlyIncome;
+  const usd = COUNTRY_MEDIAN_INCOME_USD[(loc.country || '').trim()];
+  if (!usd) return null;
+  const usdPerSek = rate('USD') || DEFAULT_RATES.USD || 0.11;
+  return Math.round(usd / usdPerSek);
+}
 
 function scoreLocation(loc) {
   // Keyed memo: the retirement numbers are shared across locations, so we
@@ -8396,9 +8427,11 @@ function scoreLocation(loc) {
     if(ratio<=0.7){ verdict='feasible'; label='FEASIBLE'; }
     else if(ratio<=0.9){ verdict='conditional'; label='CONDITIONAL'; }
     const surplus = netIncome - loc.costOfLiving;
-    // Median income is only ever populated by an AI Deep Dive so that any
-    // city in the world works — never fall back to a hardcoded list.
-    const medianIncome = loc.medianMonthlyIncome || null;
+    // Median income: city-specific value from an AI Deep Dive when
+    // available, otherwise the national fallback table — so the
+    // "Income rank · locally" line renders on every card, not just the
+    // ones the user has deep-dived.
+    const medianIncome = locMedianIncomeSEK(loc);
     const incomePercentile = topIncomePercentile(monthlyIncome, medianIncome);
     return { ...loc, verdict, label, ratio, surplus, affordabilityScore, monthlyIncome, netIncome, incomePercentile };
   });
@@ -8863,7 +8896,7 @@ function renderPanel(panel) {
 // ─── PANEL META (labels, breadcrumbs, related cross-links) ──────────────────
 const PANEL_META = {
   dashboard:      {label:'Dashboard',        group:'Overview',          icon:'◉'},
-  transactions:   {label:'Bank & Transactions', group:'Personal Finances', icon:'🏦'},
+  transactions:   {label:'Spend Insights', group:'Personal Finances', icon:'🏦'},
   review:         {label:'Forecast & Review', group:'Personal Finances', icon:'▦'},
   // Legacy aliases — preserved for back-compat with deep-links, the
   // dashboard KPI cards, hash routes, and command palette. nav() resolves
@@ -15117,6 +15150,11 @@ function renderLocAnalysisSlideover(opts){
   }
 
   body.innerHTML = factsHtml + editHtml + analysisHtml;
+  // Rescue any ```horizon-chart``` blocks the model slipped into a cached
+  // Deep Dive despite the no-JSON instruction — mdParse leaves them as raw
+  // <pre> JSON; the rescue pass inside _renderAIChartBlocks turns them
+  // into real charts (empty blocks array = rescue-only sweep).
+  try { _renderAIChartBlocks(body, []); } catch(_){}
 
   // Footer buttons — enabled only when we have a cached report
   const saveBtn = document.getElementById('retire-so-save-btn');
@@ -15231,7 +15269,9 @@ MEDIAN_INCOME_USD: [median monthly gross personal income in USD for this city]${
       const medianMatch = reply.match(/MEDIAN_INCOME_USD:\s*(\d+(?:\.\d+)?)/i);
       if(medianMatch) {
         const medianUSD = parseFloat(medianMatch[1]);
-        const usdToSek = 1 / (DEFAULT_RATES.USD || 0.11);
+        // Convert through the live (user-approved) rate, not the ship-time
+        // default — DEFAULT_RATES drifts as soon as rates are updated.
+        const usdToSek = 1 / (rate('USD') || DEFAULT_RATES.USD || 0.11);
         const locRef = state.places.find(l => l.id === id);
         if(locRef && medianUSD > 0){
         locRef.medianMonthlyIncome = Math.round(medianUSD * usdToSek);
@@ -15897,11 +15937,21 @@ function renderRetireAIOutput(){
     const value = cached.value ?? cached; // support wrapper shape
     const ts = cached.finishedAt ? new Date(cached.finishedAt).toLocaleString() : '';
     el.style.display='block';
+    // Route the reply through the shared in-chat chart pipeline: the
+    // system prompt invites the model to emit fenced ```horizon-chart```
+    // blocks, and rendering with bare mdParse() dumped that JSON as a raw
+    // code block at the bottom of the recommendations. Extract the blocks
+    // first, render the prose, then mount a real Chart.js card in each
+    // placeholder. The fixed 'retire' msg index keeps chart ids stable
+    // across re-renders so destroyChart() reclaims the old instance.
+    const raw = typeof value==='string'?value:(value.reply||'');
+    const { text, blocks } = _extractAIChartBlocks(raw, 'retire');
     el.innerHTML = `<div class="card-title" style="margin-bottom:10px">🤖 AI Retirement Destination Analysis
         <div class="ct-actions"><button class="btn-xs btn-o" onclick="clearSearchCache('${RETIRE_AI_KEY}');aiAnalyzeLocations()" title="Re-run">↻ Refresh</button></div>
       </div>
-      ${mdParse(typeof value==='string'?value:(value.reply||''))}
+      ${_inlineAIChartPlaceholders(mdParse(text), blocks)}
       ${ts?`<div style="font-size:10px;color:var(--text3);margin-top:10px;font-family:var(--fm)">Cached · ${esc2(ts)}</div>`:''}`;
+    _renderAIChartBlocks(el, blocks);
     return;
   }
   // Idle state: hide the container
@@ -16019,7 +16069,7 @@ MEDIAN_INCOME_USD: [median monthly gross personal income in USD for this city]${
       const medianMatch2 = reply.match(/MEDIAN_INCOME_USD:\s*(\d+(?:\.\d+)?)/i);
       if(medianMatch2) {
         const medianUSD2 = parseFloat(medianMatch2[1]);
-        const usdToSek2 = 1 / (DEFAULT_RATES.USD || 0.11);
+        const usdToSek2 = 1 / (rate('USD') || DEFAULT_RATES.USD || 0.11);
         const locRef2 = state.places.find(l => l.id === id);
         if(locRef2 && medianUSD2 > 0) locRef2.medianMonthlyIncome = Math.round(medianUSD2 * usdToSek2);
       }
