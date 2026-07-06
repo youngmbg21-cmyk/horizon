@@ -5395,7 +5395,7 @@ const STRINGS = {
   's3.exp.applyToBaselineTitle': { en:'Copy these retirement expenses to the baseline expenses in Settings',
                                    sv:'Kopiera dessa pensionsutgifter till basutgifterna i Inställningar' },
   's3.exp.applyToBaselineConfirm': { en:'This will replace your {n} existing baseline expense{s} in Settings with the current retirement expense list.\n\nContinue?',
-                                     sv:'Detta kommer ersätta dina {n} befintliga basutgifter i Inställningar med den aktuella pensionsutgiftslistan.\n\nForttsätta?' },
+                                     sv:'Detta kommer ersätta dina {n} befintliga basutgifter i Inställningar med den aktuella pensionsutgiftslistan.\n\nFortsätta?' },
 
   // ── Retirement · s2 Portfolio & Pension ────────────────
   // KPI row above the two-column card grid.
@@ -5501,9 +5501,9 @@ const STRINGS = {
   'ireq.kpi.avgRate':       { en:'Avg withdrawal rate',
                               sv:'Genomsnittlig uttagsgrad' },
   'ireq.kpi.avgRate.above': { en:'Above the 4% safe rate',
-                              sv:'Över den säkra 4%-grensen' },
+                              sv:'Över den säkra 4%-gränsen' },
   'ireq.kpi.avgRate.within':{ en:'Within the 4% safe rate',
-                              sv:'Inom den säkra 4%-grensen' },
+                              sv:'Inom den säkra 4%-gränsen' },
   'ireq.kpi.depletion':     { en:'Fund depletion',
                               sv:'Portföljens tömning' },
   'ireq.kpi.depletion.age': { en:'Age {age}',             sv:'Ålder {age}' },
@@ -6388,8 +6388,14 @@ function loadState() {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (raw) {
       const d = JSON.parse(raw);
+      // Migrate the PARSED BLOB before merging it over the defaults.
+      // Merging first masked every migration keyed on a missing field
+      // (`=== undefined` / `!s.field`): the default value was already in
+      // place, so v11 (skip onboarding for existing users), v13
+      // (dashNestEggMode carry-over), v21 (ISK savings-tax backfill) etc.
+      // silently no-opped for old saves.
+      migrate(d);
       Object.assign(state, d);
-      migrate(state);
     } else {
       state.version = STATE_VERSION;
     }
@@ -6433,19 +6439,24 @@ function save() {
   // Notify subscribers before the debounced write, so UI reacts instantly.
   if(typeof bus!=='undefined') bus.emit('state:changed', {panel: state.activePanel});
   saveTimer = setTimeout(() => {
+    // Strip vault before stringifying the main state blob. The
+    // vault has its own storage key (see saveVault + loadState).
+    // This keeps per-keystroke save payloads small and stops the
+    // main state from bumping into the 5–10 MB localStorage cap
+    // as the user accumulates Deep Dive / Monthly Analysis
+    // reports. The restore MUST run in a finally — a quota-exceeded
+    // throw from setItem previously left state.vault undefined in
+    // memory, and the next saveVault() then wrote [] over the real
+    // vault (permanent report loss).
+    const vaultRef = state.vault;
     try {
-      // Strip vault before stringifying the main state blob. The
-      // vault has its own storage key (see saveVault + loadState).
-      // This keeps per-keystroke save payloads small and stops the
-      // main state from bumping into the 5–10 MB localStorage cap
-      // as the user accumulates Deep Dive / Monthly Analysis
-      // reports. Restore the reference immediately so in-memory
-      // reads via state.vault keep working.
-      const vaultRef = state.vault;
       state.vault = undefined;
       localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    } catch(e) {
+      console.warn('save failed:', e);
+    } finally {
       state.vault = vaultRef;
-    } catch(e) {}
+    }
   }, 400);
 }
 // Save confirmation badge removed — auto-save is now silent. This
@@ -6658,7 +6669,11 @@ function get12Months() {
 // Next 12 paired charts). Distinct concept from the rolling window;
 // do NOT use this helper anywhere that's supposed to be "rolling 12".
 function getNext12Forward() {
-  return _get13MonthChain().slice(1);
+  // Chain entries 1..12 = CM+1 .. CM+12. The chain itself is 23 entries
+  // long (see _get13MonthChain), so the end bound is required — an open
+  // slice(1) returned 22 months and broke the length-12 window contract
+  // (engine invariant I4b).
+  return _get13MonthChain().slice(1, 13);
 }
 
 // Returns the previous month (CM-1) as a standalone entry with no carry-forward,
@@ -6722,6 +6737,12 @@ function futureValue(P, PMT, r, years) {
   return P*cf + PMT*((cf-1)/rn);
 }
 
+// Future-value annuity factor for n periods at per-period rate r.
+// lim r→0 of ((1+r)^n − 1)/r is n — the old inline `(r||1)` guard fixed the
+// divide-by-zero but returned 0 (numerator is 0 too), silently discarding
+// ALL monthly contributions whenever an account's effective rate was 0
+// (e.g. growthRate 0, or an ISK whose tax drag ≥ its gross rate).
+function _annuityFactor(r, n){ return r === 0 ? n : (Math.pow(1 + r, n) - 1) / r; }
 function getProjection() {
   return memoSelect('proj', () => {
     const ytr = Math.max(0, state.retirementAge - state.currentAge);
@@ -6738,7 +6759,7 @@ function getProjection() {
       const ms=months>0?totalSav/months:0;
       const rApp=state.growthRate/100/12;
       if(y===0) appAcc=ms*months;
-      else appAcc=appAcc*Math.pow(1+rApp,12)+ms*((Math.pow(1+rApp,12)-1)/(rApp||1));
+      else appAcc=appAcc*Math.pow(1+rApp,12)+ms*_annuityFactor(rApp,12);
       let ext=0;
       // Per-account balance snapshot for year y, keyed by account id so
       // downstream consumers (series catalog, chart builder) can plot each
@@ -6754,8 +6775,8 @@ function getProjection() {
           ? Math.max(0, grossRate - (Number.isFinite(a.taxRate) ? a.taxRate : 0.88))
           : grossRate;
         const ra = effectiveRate / 100 / 12;
-        if(y===0) assetBals[idx]=a.balance*Math.pow(1+ra,months)+a.monthlyContribution*((Math.pow(1+ra,months)-1)/(ra||1));
-        else assetBals[idx]=assetBals[idx]*Math.pow(1+ra,12)+a.monthlyContribution*((Math.pow(1+ra,12)-1)/(ra||1));
+        if(y===0) assetBals[idx]=a.balance*Math.pow(1+ra,months)+a.monthlyContribution*_annuityFactor(ra,months);
+        else assetBals[idx]=assetBals[idx]*Math.pow(1+ra,12)+a.monthlyContribution*_annuityFactor(ra,12);
         ext+=assetBals[idx];
         perAccount[a.id] = Math.round(assetBals[idx]);
       });
@@ -7058,11 +7079,15 @@ function _lwBuildInsight({ verdict, anyDepleted, anyShortfall, isRetTransition,
     const covPct = totalExp > 0 ? Math.round((pensionAvgMonthly / totalExp) * 100) : 0;
     parts.push(`<strong>Retirement transition.</strong> Your salary ends and portfolio drawdown begins here. Pension income covers ${covPct}% of your retirement expenses — the portfolio tops up the rest. Sequence-of-returns risk peaks in the first 3–5 years of retirement; a market downturn in this window has an outsized long-term impact.`);
   } else if (hasPensionStart) {
-    const pNames = windowEvents.filter(e => e.type === 'pension').map(e => e.title.replace(' begins', '')).join(', ');
+    // esc(): titles derive from user-named pension assets and this string is
+    // rendered via innerHTML in the Life Wall slide-over.
+    const pNames = esc(windowEvents.filter(e => e.type === 'pension').map(e => e.title.replace(' begins', '')).join(', '));
     parts.push(`<strong>Pension activation.</strong> ${pNames} starts in this window, reducing the portfolio withdrawal burden from this point forward.`);
   } else if (tripDisruptive) {
     const tripTotal = windowEvents.filter(e => e.type === 'trip').reduce((s, e) => s + e.amount, 0);
-    const tripNames = [...new Set(windowEvents.filter(e => e.type === 'trip').map(e => e.title))].join(', ');
+    // esc(): titles derive from user-named trips and this string is rendered
+    // via innerHTML in the Life Wall slide-over.
+    const tripNames = esc([...new Set(windowEvents.filter(e => e.type === 'trip').map(e => e.title))].join(', '));
     parts.push(`<strong>High planned spend.</strong> ${tripNames} — totalling ${fmtC(tripTotal)} — represents a significant draw in this window. A cost overrun flows directly into the next window's starting balance.`);
   } else if (inRetirement) {
     parts.push(`Portfolio withdrawals are within the sustainable range. Pension covers a meaningful share of expenses and the balance is holding steady.`);
@@ -7785,30 +7810,35 @@ function getMonthlyActuals() {
 // historical data to plot instead of a single empty bar.
 const DEMO_TRANSACTIONS = (() => {
   const out = [];
+  // Anchor the demo to the LIVE current month (CY/CM) — the dataset was
+  // previously hard-coded to April 2026, so connecting the demo bank on any
+  // later date produced zero current-month transactions and empty
+  // actual-vs-budget surfaces.
+  const _cmKey = `${CY}-${String(CM + 1).padStart(2, '0')}`;
   // Current month — detailed
   out.push(
-    {id:genId(),date:'2026-04-01',name:'Lönebetalning Young',category:'Income',amount:98000,type:'credit',icon:'💼'},
-    {id:genId(),date:'2026-04-01',name:'Lönebetalning Guliz',category:'Income',amount:31000,type:'credit',icon:'💼'},
-    {id:genId(),date:'2026-04-02',name:'ICA Maxi',category:'Groceries',amount:-2400,type:'debit',icon:'🛒'},
-    {id:genId(),date:'2026-04-03',name:'SEB Bolån',category:'Mortgage',amount:-27000,type:'debit',icon:'🏠'},
-    {id:genId(),date:'2026-04-04',name:'Hemstädning',category:'Cleaning',amount:-2000,type:'debit',icon:'🧹'},
-    {id:genId(),date:'2026-04-05',name:'Vattenfall El',category:'Utilities',amount:-1200,type:'debit',icon:'⚡'},
-    {id:genId(),date:'2026-04-06',name:'Systembolaget',category:'Dining & Drinks',amount:-890,type:'debit',icon:'🍷'},
-    {id:genId(),date:'2026-04-07',name:'ICA Maxi',category:'Groceries',amount:-2100,type:'debit',icon:'🛒'},
-    {id:genId(),date:'2026-04-08',name:'Spotify',category:'Subscriptions',amount:-149,type:'debit',icon:'🎵'},
-    {id:genId(),date:'2026-04-09',name:'Tre (Mobile)',category:'Utilities',amount:-349,type:'debit',icon:'📱'},
-    {id:genId(),date:'2026-04-10',name:'Dinner Operakällaren',category:'Dining & Drinks',amount:-2800,type:'debit',icon:'🍽️'},
-    {id:genId(),date:'2026-04-10',name:'ICA Maxi',category:'Groceries',amount:-1800,type:'debit',icon:'🛒'},
-    {id:genId(),date:'2026-04-11',name:'H&M',category:'Shopping',amount:-1240,type:'debit',icon:'👗'},
-    {id:genId(),date:'2026-04-12',name:'Apotek Hjärtat',category:'Healthcare',amount:-380,type:'debit',icon:'💊'},
-    {id:genId(),date:'2026-04-12',name:'SL Månadskort',category:'Transport',amount:-1000,type:'debit',icon:'🚇'},
+    {id:genId(),date:`${_cmKey}-01`,name:'Lönebetalning Young',category:'Income',amount:98000,type:'credit',icon:'💼'},
+    {id:genId(),date:`${_cmKey}-01`,name:'Lönebetalning Guliz',category:'Income',amount:31000,type:'credit',icon:'💼'},
+    {id:genId(),date:`${_cmKey}-02`,name:'ICA Maxi',category:'Groceries',amount:-2400,type:'debit',icon:'🛒'},
+    {id:genId(),date:`${_cmKey}-03`,name:'SEB Bolån',category:'Mortgage',amount:-27000,type:'debit',icon:'🏠'},
+    {id:genId(),date:`${_cmKey}-04`,name:'Hemstädning',category:'Cleaning',amount:-2000,type:'debit',icon:'🧹'},
+    {id:genId(),date:`${_cmKey}-05`,name:'Vattenfall El',category:'Utilities',amount:-1200,type:'debit',icon:'⚡'},
+    {id:genId(),date:`${_cmKey}-06`,name:'Systembolaget',category:'Dining & Drinks',amount:-890,type:'debit',icon:'🍷'},
+    {id:genId(),date:`${_cmKey}-07`,name:'ICA Maxi',category:'Groceries',amount:-2100,type:'debit',icon:'🛒'},
+    {id:genId(),date:`${_cmKey}-08`,name:'Spotify',category:'Subscriptions',amount:-149,type:'debit',icon:'🎵'},
+    {id:genId(),date:`${_cmKey}-09`,name:'Tre (Mobile)',category:'Utilities',amount:-349,type:'debit',icon:'📱'},
+    {id:genId(),date:`${_cmKey}-10`,name:'Dinner Operakällaren',category:'Dining & Drinks',amount:-2800,type:'debit',icon:'🍽️'},
+    {id:genId(),date:`${_cmKey}-10`,name:'ICA Maxi',category:'Groceries',amount:-1800,type:'debit',icon:'🛒'},
+    {id:genId(),date:`${_cmKey}-11`,name:'H&M',category:'Shopping',amount:-1240,type:'debit',icon:'👗'},
+    {id:genId(),date:`${_cmKey}-12`,name:'Apotek Hjärtat',category:'Healthcare',amount:-380,type:'debit',icon:'💊'},
+    {id:genId(),date:`${_cmKey}-12`,name:'SL Månadskort',category:'Transport',amount:-1000,type:'debit',icon:'🚇'},
   );
   // Past 11 months — a compact but realistic rollup: two salary
   // credits, mortgage, groceries, utilities, dining. Variance is
   // sprinkled in so the bars have shape rather than a flat line.
   const wiggle = [0.98, 1.05, 1.12, 0.94, 1.03, 0.91, 1.08, 0.97, 1.15, 1.02, 0.88];
   for(let i = 1; i <= 11; i++){
-    const d = new Date(2026, 3 - i, 1);
+    const d = new Date(CY, CM - i, 1);
     const y = d.getFullYear();
     const mo = String(d.getMonth() + 1).padStart(2, '0');
     const w = wiggle[i - 1] || 1;
@@ -7984,7 +8014,11 @@ function _renderCsvStep(){
   }
   // STEP 2 — mapper + preview
   const { headers, rows, map } = _csvState;
-  const dataRows = rows.slice(0, 1000); // cap for safety
+  // Same cap as _commitCsvImport (5000) so the "Import N transactions"
+  // button reports the number that will actually be imported — the old
+  // 1000-row preview cap under-counted large files and could even show
+  // "Import 0"/disabled when all valid rows sat beyond row 1000.
+  const dataRows = rows.slice(0, 5000);
   const preview = dataRows.slice(0, 8);
   const roleOptions = (sel) => ['ignore','date','description','amount','category']
     .map(r => `<option value="${r}" ${sel===r?'selected':''}>${r === 'ignore' ? '—' : r}</option>`)
@@ -8085,12 +8119,21 @@ function _buildCsvTransactions(rows, map){
       date = `${y}-${String(m).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
     } else if(/^\d{1,2}[\/.-]\d{1,2}[\/.-]\d{2,4}/.test(rawDate)){
       const parts = rawDate.split(/[\/.-]/).map(Number);
-      // Assume DD/MM/YYYY if the first part > 12, else also DD/MM.
-      let d, m, y;
-      if(parts[0] > 12){ d = parts[0]; m = parts[1]; y = parts[2]; }
-      else              { d = parts[0]; m = parts[1]; y = parts[2]; }
+      // Disambiguate DD/MM vs MM/DD: whichever slot exceeds 12 must be the
+      // day. When both are ≤ 12 the format is genuinely ambiguous — default
+      // to DD/MM (this app's primary banks are European). The old code had
+      // two identical branches, so US MM/DD exports produced invalid ISO
+      // dates like 2026-15-04 that silently matched no month bucket.
+      let d, m, y = parts[2];
+      if(parts[0] > 12)      { d = parts[0]; m = parts[1]; } // DD/MM
+      else if(parts[1] > 12) { m = parts[0]; d = parts[1]; } // MM/DD
+      else                   { d = parts[0]; m = parts[1]; } // ambiguous → DD/MM
       if(y < 100) y += 2000;
-      date = `${y}-${String(m).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+      if(m >= 1 && m <= 12 && d >= 1 && d <= 31){
+        date = `${y}-${String(m).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+      }
+      // else: leave date empty → row is skipped rather than importing a
+      // corrupt month key.
     }
     const amount = _parseCsvAmount(rawAmt);
     if(!date || amount === 0) return null;
@@ -8432,8 +8475,7 @@ bus.on('state:changed', (data)=>{
 function _liveSyncCharts(){
   if(typeof get12Months !== 'function') return;
   const months = get12Months();
-  const fwd = months.slice(1);
-  const first12 = months.slice(0, 12);
+  const first12 = months.slice(0, 12); // alias used by the ff-chart handler below
   const patch = (id, map) => {
     const ch = charts && charts[id];
     if(!ch || !ch.data || !Array.isArray(ch.data.datasets)) return;
@@ -8449,34 +8491,28 @@ function _liveSyncCharts(){
   // uses a CUMULATIVE running total so the line grows steadily
   // across the window. Both series read through FinancialEngine so
   // no local running-sum math lives in a renderer anymore.
+  // Dataset keys MUST be the translated labels the charts were built with
+  // (t('dash.series.*') / t('monthly.series.*')) — hard-coded English keys
+  // silently stopped matching (and live-patching) as soon as the app ran
+  // in Swedish.
   patch('dash-cf', {
-    'Income':   () => months.map(m => m.pureIncome),
-    'Expenses': () => months.map(m => m.pureExpenses),
-    'Savings':  () => FE.months.runningSavings(),
-    'Fun Fund': () => FE.months.runningFunFund(),
+    [t('dash.series.income')]:   () => months.map(m => m.pureIncome),
+    [t('dash.series.expenses')]: () => months.map(m => m.pureExpenses),
+    [t('dash.series.savings')]:  () => FE.months.runningSavings(),
+    [t('dash.series.funFund')]:  () => FE.months.runningFunFund(),
   });
   // Monthly Review — Income vs Expenses (left chart)
   patch('mo-ie', {
-    'Income':   () => months.map(m => m.pureIncome),
-    'Expenses': () => months.map(m => m.pureExpenses),
+    [t('monthly.series.income')]:   () => months.map(m => m.pureIncome),
+    [t('monthly.series.expenses')]: () => months.map(m => m.pureExpenses),
   });
   // Monthly Review — Savings & Fun Fund running net flow (right chart)
   patch('mo-nf', {
-    'Savings · running':  () => FE.months.runningSavings(),
-    'Fun Fund · running': () => FE.months.runningFunFund(),
+    [t('monthly.series.savingsRunning')]: () => FE.months.runningSavings(),
+    [t('monthly.series.funFundRunning')]: () => FE.months.runningFunFund(),
   });
-  // Transactions — Next 12 Months forecast chart (right card).
-  // Savings uses the cumulative running total helper so this chart
-  // matches the Dashboard Cash Flow Savings line treatment; every
-  // other series stays per-month. The left Past card reads from a
-  // canonical demo array and does not need a live-sync patch — no
-  // state input feeds it.
-  patch('tx-next', {
-    'Income':   () => fwd.map(m => m.pureIncome),
-    'Expenses': () => fwd.map(m => m.pureExpenses),
-    'Savings':  () => FE.months.runningSavingsForward(),
-    'Fun Fund': () => fwd.map(m => m.funFund),
-  });
+  // (The former tx-next patch was removed with the old Transactions tab —
+  // Spend Insights owns its own chart and re-renders in full.)
   // Monthly allocation & running balance chart (ff-chart) —
   // generic patch() only updates ds.data, but the allocation
   // dataset carries value-dependent backgroundColor/borderColor
@@ -8655,7 +8691,11 @@ const RELATED_MAP = {
   vault:          ['retireanywhere','retirement','propiq'],
   settings:       ['dashboard','retirement','transactions'],
 };
-function esc2(str){const d=document.createElement('div');d.textContent=str;return d.innerHTML;}
+// Full HTML-entity escape. The old textContent→innerHTML trick left double
+// quotes intact, which allowed attribute breakout wherever the result landed
+// inside value="…"/title="…" attributes. Chained replaces cover both text
+// nodes and quoted attributes.
+function esc2(str){return String(str==null?'':str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');}
 
 // Tracks the most recent plain-text value rendered for each KPI label so
 // that ui.kpi() can pulse tiles whose value just changed. Panel re-renders
@@ -9128,7 +9168,7 @@ function renderTicker() {
   ];
   const block = items.map(t=>`<span class="tk"><span class="tks">${t.sym}</span><span class="tkv">${t.val}</span><span class="tkc ${t.up?'up':'dn'}">${t.chg}</span></span>`).join('');
   if(state.tickerQuote) {
-    const q=`<span class="tk" style="border-right:none;color:var(--amber);font-style:italic;padding:0 20px">✦ ${state.tickerQuote}</span>`;
+    const q=`<span class="tk" style="border-right:none;color:var(--amber);font-style:italic;padding:0 20px">✦ ${esc(state.tickerQuote)}</span>`;
     el.innerHTML=(block+q).repeat(2);
   } else {
     el.innerHTML=block.repeat(2);
@@ -9500,7 +9540,9 @@ window.togglePaid = function(monthKey, lineId, checked){
   save();
   renderMonthly();
 };
-function esc(str){const d=document.createElement('div');d.textContent=str;return d.innerHTML;}
+// Quote-safe HTML escape (see esc2 for rationale) — safe in text nodes AND
+// inside double/single-quoted attributes like value="${esc(name)}".
+function esc(str){return String(str==null?'':str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');}
 function updateLineItem(key,id,field,val) {
   const arr=resolveKey(key); if(!arr) return;
   const item=arr.find(i=>i.id===id); if(!item) return;
@@ -9580,7 +9622,12 @@ function resolveKey(key) {
 function mdParse(raw){
   if(raw == null) return '';
   const text = String(raw).replace(/\r\n?/g,'\n');
-  const esc = s => s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  // Quote-safe local escape — output lands in attributes (href, data-lang)
+  // as well as text nodes, so " and ' must be encoded too.
+  const esc = s => s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+  // Only allow benign link schemes; javascript:/data:/vbscript: (or any
+  // unrecognised scheme) from model output must never become a live href.
+  const safeHref = u => /^(https?:|mailto:|#|\/)/i.test(String(u).trim()) ? u : null;
   // Inline rules run on already-escaped text, so bold/italic/code can
   // safely wrap HTML entities.
   function inline(s){
@@ -9595,8 +9642,9 @@ function mdParse(raw){
       .replace(/(^|[^_])_([^_\n]+)_/g, '$1<em>$2</em>')
       // Strikethrough
       .replace(/~~([^~\n]+)~~/g, '<del>$1</del>')
-      // Links [label](url)
-      .replace(/\[([^\]]+)\]\(([^)\s]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>');
+      // Links [label](url) — scheme-checked; unsafe URLs render as plain text.
+      .replace(/\[([^\]]+)\]\(([^)\s]+)\)/g, (_, label, url) =>
+        safeHref(url) ? `<a href="${url}" target="_blank" rel="noopener">${label}</a>` : label);
   }
   const lines = text.split('\n');
   const out = [];
@@ -9817,7 +9865,12 @@ function _capWordsPerSection(md, cap){
       for(const sentence of sentences){
         const sw = wordCount(sentence);
         if(sub + sw > remaining) break;
-        picked[picked.length-1] = (picked[picked.length-1] ? picked[picked.length-1] + ' ' : '') + sentence;
+        // When the block's very FIRST line must be sentence-split, `picked`
+        // is still empty — the old code wrote to picked[-1] (a plain object
+        // property, invisible to .length/.join), silently discarding every
+        // sentence that would have fit under the cap.
+        if(picked.length === 0) picked.push(sentence);
+        else picked[picked.length-1] += ' ' + sentence;
         sub += sw;
       }
       break;
@@ -10046,7 +10099,7 @@ async function _normalizeReportWordCounts(sections){
     const toFix = offenders.map(k => `## ${TITLES[k]}
 (current length: ${counts[k]} words — must be rewritten to land between ${DASH_REPORT_WORD_MIN} and ${DASH_REPORT_WORD_MAX} words)
 
-${sections[k] || '(empty — produce a fresh ${DASH_REPORT_WORD_MIN}-${DASH_REPORT_WORD_MAX} word section grounded in the snapshot in the system prompt.)'}`).join('\n\n');
+${sections[k] || `(empty — produce a fresh ${DASH_REPORT_WORD_MIN}-${DASH_REPORT_WORD_MAX} word section grounded in the snapshot in the system prompt.)`}`).join('\n\n');
     const prompt = `The following dashboard analysis section(s) are outside the 230–250 word target range. Rewrite each one so it lands STRICTLY between ${DASH_REPORT_WORD_MIN} and ${DASH_REPORT_WORD_MAX} words. Hard constraint.
 
 Rules you MUST follow:
@@ -11612,10 +11665,15 @@ function liveSyncMonthlyReview(selKey){
   // now translated and could change between renders. Order is
   // stable: ie chart = [Income, Expenses]; nf chart = [Savings,
   // Fun Fund running].
+  // IMPORTANT: the charts were BUILT from get12Months() (12 points / 12
+  // labels), while `months` above is getMonthlyReviewMonths() (13 entries:
+  // prev month + rolling 12, needed for the review picker). Patching with
+  // the 13-entry array shifted every bar one month left on each keystroke.
+  const chartMonths = get12Months();
   const ieChart = charts['mo-ie'];
   if(ieChart && ieChart.data && Array.isArray(ieChart.data.datasets)){
-    if(ieChart.data.datasets[0]) ieChart.data.datasets[0].data = months.map(m => m.pureIncome);
-    if(ieChart.data.datasets[1]) ieChart.data.datasets[1].data = months.map(m => m.pureExpenses);
+    if(ieChart.data.datasets[0]) ieChart.data.datasets[0].data = chartMonths.map(m => m.pureIncome);
+    if(ieChart.data.datasets[1]) ieChart.data.datasets[1].data = chartMonths.map(m => m.pureExpenses);
     ieChart.update('none');
   }
   const nfChart = charts['mo-nf'];
@@ -12178,7 +12236,11 @@ function renderRetirement() {
   } else if (savAccType === 'notax') {
     savPostTax = savingsFinalReal;
   } else {
-    const costBasisSav = savingsMonthlyAvg * 12 * ytrSav * r;
+    // Cost basis stays in BASE currency — savingsFinalReal is base-currency
+    // and fmt() applies the display rate at render time. The old `* r`
+    // multiplied only one side of the subtraction by the display rate,
+    // overstating tax for rates < 1 and zeroing it for rates > 1.
+    const costBasisSav = savingsMonthlyAvg * 12 * ytrSav;
     const gainsSav = Math.max(0, savingsFinalReal - costBasisSav);
     savPostTax = Math.round(savingsFinalReal - gainsSav * (savTaxRate / 100));
   }
@@ -12255,7 +12317,10 @@ function renderRetirement() {
     if (accountType === 'isk' || accountType === 'notax') {
       projPostTax = projR; // drag already in projection; no exit tax
     } else {
-      const costBasis = (a.balance + (a.monthlyContribution || 0) * 12 * ytrCard) * r;
+      // Base currency on both sides — projR (FE.projection.perAccount*) and
+      // a.balance are base-currency; fmt() converts at render. The old `* r`
+      // mixed units and broke the after-tax figure for any non-SEK display.
+      const costBasis = a.balance + (a.monthlyContribution || 0) * 12 * ytrCard;
       const gains = Math.max(0, projR - costBasis);
       projPostTax = Math.round(projR - gains * (tr4 / 100));
     }
@@ -13023,8 +13088,12 @@ function _attachRunwayHover(host, {cdata, pad, pw, ph, xScale, yBal}){
       ${short > 0 ? `<div class="chart-tt-row"><span class="chart-tt-sw" style="background:#ff4d6d"></span><span style="color:#ff4d6d">${esc2(t('runway.tt.shortfall'))}</span><span class="chart-tt-val" style="color:#ff4d6d">−${fmt(short)}/yr</span></div>` : ''}
       ${short > 0 ? `<div class="chart-tt-row" style="color:var(--text3);font-size:10px"><span></span><span>${esc2(t('runway.tt.need', { amt: fmt(needed) }))}</span><span></span></div>` : ''}
     `;
-    // Position tooltip near cursor, avoiding right/bottom edge clipping
+    // Position tooltip near cursor, avoiding right/bottom edge clipping.
+    // Make it visible BEFORE measuring — while display:none the rect is
+    // 0×0, so on the first hover the edge-flip logic never fired and the
+    // tooltip rendered clipped off-screen.
     const margin = 14;
+    tooltip.style.display = 'block';
     const rect = tooltip.getBoundingClientRect();
     let left = e.clientX + margin;
     let top  = e.clientY + margin;
@@ -13032,7 +13101,6 @@ function _attachRunwayHover(host, {cdata, pad, pw, ph, xScale, yBal}){
     if(top  + rect.height > window.innerHeight - 8) top  = e.clientY - rect.height - margin;
     tooltip.style.left = left + 'px';
     tooltip.style.top  = top + 'px';
-    tooltip.style.display = 'block';
   };
   const onLeave = () => {
     _hideChartTooltip();
@@ -13249,7 +13317,7 @@ function renderFunFund() {
     const cardHtml = `<div class="ff-trip-card${alertCls}${openCls}" role="button" tabindex="0" data-trip-id="${tr.id}" onclick="toggleFunFundTrip('${tr.id}')">
       <div class="ff-trip-card-hd">
         <div class="ff-trip-card-title">
-          <span class="ff-trip-card-icon">${tr.icon || '✈️'}</span>
+          <span class="ff-trip-card-icon">${esc(tr.icon || '✈️')}</span>
           <div style="min-width:0;flex:1">
             <div class="ff-trip-card-name">${esc(tr.name || t('ff.trip.untitled'))}</div>
             ${titleSub ? `<div class="ff-trip-card-meta">${titleSub}</div>` : ''}
@@ -13293,9 +13361,11 @@ function renderFunFund() {
       // references to get12Months() or independent reducers.
       const shortfallAmt = ff.capacity12mo - ff.totalTrips;
       const isShortfall  = shortfallAmt < 0;
+      // (state.trips || []) — an imported backup can legitimately carry
+      // trips:null; every other read in this renderer already guards.
       const tripsSub = ff.tripsOutOfWindow > 0
-        ? esc2(t('ff.kpi.trips.sub.split', { n: state.trips.length, inw: fmt(ff.tripsInWindow), out: fmt(ff.tripsOutOfWindow) }))
-        : esc2(t('ff.kpi.trips.sub', { n: state.trips.length }));
+        ? esc2(t('ff.kpi.trips.sub.split', { n: (state.trips || []).length, inw: fmt(ff.tripsInWindow), out: fmt(ff.tripsOutOfWindow) }))
+        : esc2(t('ff.kpi.trips.sub', { n: (state.trips || []).length }));
       // Tile C flips identity between SHORTFALL (red accent) and
       // HEADROOM (green accent). Value is signed so the "+" / "−"
       // prefix from fmt() carries the direction even without colour.
@@ -13833,9 +13903,15 @@ function _renderFunFundTripDetail(tr, { r, s }) {
 // trip name, without touching state.trips.
 function _tripMonthLabel(key){
   if(!key) return '';
-  const d = new Date(key + '-01');
-  if(isNaN(d.getTime())) return key;
-  return `${monthNames()[d.getMonth()]} '${String(d.getFullYear()).slice(2)}`;
+  // Parse the YYYY-MM key numerically — new Date('YYYY-MM-01') is parsed as
+  // UTC midnight while getMonth()/getFullYear() read LOCAL time, so in any
+  // UTC-negative timezone the label showed the previous month (and for
+  // January, the previous year).
+  const m = /^(\d{4})-(\d{1,2})$/.exec(String(key).trim());
+  if(!m) return key;
+  const y = +m[1], mo = +m[2];
+  if(mo < 1 || mo > 12) return key;
+  return `${monthNames()[mo - 1]} '${String(y).slice(2)}`;
 }
 function _tripMonthRange(tr){
   const ks = (tr.expenses || [])
@@ -14014,7 +14090,7 @@ function lwOpenBrick(idx) {
       <div class="lw-evt-list">
         ${nonRetEvts.map(e => `
           <div class="lw-evt ${esc2(e.type)}">
-            <div class="lw-evt-ic">${e.icon}</div>
+            <div class="lw-evt-ic">${esc(e.icon)}</div>
             <div class="lw-evt-body">
               <div class="lw-evt-title">${esc2(e.title)}</div>
               <div class="lw-evt-sub">${esc2(e.sub)}</div>
@@ -14075,11 +14151,14 @@ function renderLifeWall() {
   const firstAmber = bricks.find(b => b.verdict === 'amber');
   const firstRed   = bricks.find(b => b.verdict === 'red');
   const nowBrick   = bricks.find(b => b.isCurrent);
-  const lifeBrick  = bricks.find(b => b.badge?.cls === 'life');
+  // The final brick may carry a 'now'/'ret' badge instead of 'life' (badge
+  // precedence), so fall back to the literal last brick — and label the
+  // secondary fallback with the LIVE granularity, not a hard-coded "2-yr".
+  const lifeBrick  = bricks.find(b => b.badge?.cls === 'life') || bricks[bricks.length - 1];
 
   const ageRange   = nowBrick && lifeBrick
     ? `Age ${nowBrick.startAge} → ${lifeBrick.endAge}`
-    : `${total} × 2-yr bricks`;
+    : `${total} × ${_lwGranularity}-yr bricks`;
   const yearRange  = nowBrick && lifeBrick
     ? `${nowBrick.startYear} → ${lifeBrick.endYear} · ${total} bricks`
     : `${total} bricks`;
@@ -14130,7 +14209,7 @@ function renderLifeWall() {
         <div class="lw-b-foot">
           <span class="lw-b-savings ${savingsCls}">${esc2(savingsLbl)}</span>
           ${firstEvt
-            ? `<span class="lw-b-event">${firstEvt.icon}${extraEvts > 0 ? `<span>+${extraEvts}</span>` : ''}</span>`
+            ? `<span class="lw-b-event">${esc(firstEvt.icon)}${extraEvts > 0 ? `<span>+${extraEvts}</span>` : ''}</span>`
             : ''}
         </div>
       </button>`;
@@ -14315,7 +14394,7 @@ function renderRetireAnywhere() {
                   : '#ff4d6d';
       return {
         lat: loc.lat, lng: loc.lng, color,
-        popup: `<strong>${loc.flag} ${loc.name}</strong><br><span style="color:${color};font-weight:700">${loc.label}</span><br>Cost: ${fmt(loc.costOfLiving)}/mo<br>Surplus: ${fmt(loc.surplus)}/mo`
+        popup: `<strong>${loc.flag} ${esc(loc.name)}</strong><br><span style="color:${color};font-weight:700">${esc(loc.label)}</span><br>Cost: ${fmt(loc.costOfLiving)}/mo<br>Surplus: ${fmt(loc.surplus)}/mo`
       };
     });
     retireMap = createWorldMap('retire-map', points, {center:[20,20], zoom:2});
@@ -14451,8 +14530,21 @@ function renderLocAnalysisSlideover(opts){
 
   // Analysis section — three possible states: empty (show CTA), running
   // (show spinner), or complete (show full report from vault cache).
+  // The running branch matters: any re-render mid-analysis (editing the
+  // cost/tax fields triggers commitRender) used to replace the spinner
+  // with the idle CTA, whose button then silently no-ops because
+  // runLocAnalysis ignores duplicate clicks for an in-flight id.
   let analysisHtml;
-  if(cached && !(opts && opts.rerunIfCached)){
+  if(_runningAnalysis.has(loc.id)){
+    analysisHtml = `
+      <div class="retire-so-section">
+        <div class="retire-so-section-hd">${esc2(t('ra.so.analysis.title'))}</div>
+        <div class="retire-so-loading" id="retire-so-analysis-cta" data-loc-id="${esc2(loc.id)}">
+          <span class="state-spinner" style="width:18px;height:18px;border-width:2px"></span>
+          <span>${t('ra.so.analysis.loading', { name: esc(loc.name) })}</span>
+        </div>
+      </div>`;
+  } else if(cached && !(opts && opts.rerunIfCached)){
     analysisHtml = `
       <div class="retire-so-section">
         <div class="retire-so-section-hd">${esc2(t('ra.so.analysis.title'))}</div>
@@ -14464,7 +14556,7 @@ function renderLocAnalysisSlideover(opts){
     analysisHtml = `
       <div class="retire-so-section">
         <div class="retire-so-section-hd">${esc2(t('ra.so.analysis.title'))}</div>
-        <div class="retire-so-empty-cta" id="retire-so-analysis-cta">
+        <div class="retire-so-empty-cta" id="retire-so-analysis-cta" data-loc-id="${esc2(loc.id)}">
           <div class="retire-so-empty-icon">🔬</div>
           <div class="retire-so-empty-t">${esc2(t('ra.so.analysis.empty.title'))}</div>
           <div class="retire-so-empty-s">${t('ra.so.analysis.empty.sub')}</div>
@@ -14517,11 +14609,14 @@ window.runLocAnalysis = function(id, opts){
   // Mark as in-flight and immediately update the card button
   _runningAnalysis.add(id);
   if(state.activePanel === 'retireanywhere') renderRetireAnywhere();
-  // Show the loading state in the analysis section of the slide-over
+  // Show the loading state in the analysis section of the slide-over.
+  // Scoped by data-loc-id: the slide-over may since have been switched to a
+  // DIFFERENT location whose section shares the same element id — writing
+  // into it unconditionally showed location A's progress inside B's panel.
   const body = document.getElementById('retire-so-body');
   const cta = document.getElementById('retire-so-analysis-cta');
-  if(cta) cta.outerHTML = `
-    <div class="retire-so-loading" id="retire-so-analysis-cta">
+  if(cta && cta.getAttribute('data-loc-id') === id) cta.outerHTML = `
+    <div class="retire-so-loading" id="retire-so-analysis-cta" data-loc-id="${esc2(id)}">
       <span class="state-spinner" style="width:18px;height:18px;border-width:2px"></span>
       <span>${t('ra.so.analysis.loading', { name: esc(loc.name) })}</span>
     </div>`;
@@ -14626,9 +14721,11 @@ MEDIAN_INCOME_USD: [median monthly gross personal income in USD for this city]${
     } catch(e) {
       _runningAnalysis.delete(id);
       if(state.activePanel === 'retireanywhere') renderRetireAnywhere();
+      // Scoped by data-loc-id — never inject location A's error (and its
+      // retry-A button) into location B's open slide-over.
       const cta2 = document.getElementById('retire-so-analysis-cta');
-      if(cta2) cta2.outerHTML = `
-        <div class="state state-error" id="retire-so-analysis-cta">
+      if(cta2 && cta2.getAttribute('data-loc-id') === id) cta2.outerHTML = `
+        <div class="state state-error" id="retire-so-analysis-cta" data-loc-id="${esc2(id)}">
           <div class="state-icon">⚠</div>
           <div class="state-title">${esc2(t('ra.so.analysis.failTitle'))}</div>
           <div class="state-sub">${esc(e.message||String(e))}</div>
@@ -14837,8 +14934,15 @@ function createCountryDropdown({host, currentCode, placeholder, onPick}){
     const c = list.find(x => x.code === code);
     pick(c);
   });
-  // Close on outside click
-  const outsideClick = (e) => { if(!picker.contains(e.target)) close(); };
+  // Close on outside click. Self-cleaning: renderers re-create dropdowns on
+  // every render without calling destroy(), which used to accumulate one
+  // document-level listener (plus its retained detached DOM) per render for
+  // the app's lifetime. If our picker is no longer in the document, drop the
+  // listener instead of handling the click.
+  const outsideClick = (e) => {
+    if(!document.contains(picker)){ document.removeEventListener('click', outsideClick); return; }
+    if(!picker.contains(e.target)) close();
+  };
   document.addEventListener('click', outsideClick);
   // Return an API the caller can use to destroy the listener later
   return {
@@ -14977,6 +15081,10 @@ function attachGeocodeAutocomplete(input, { onPick, onEnterNoPick, placement } =
     dd.style.display = 'none';
     items = [];
     activeIdx = -1;
+    // Invalidate any in-flight fetch — without this, a response arriving
+    // after Escape/blur/clearing the field passed the token check and
+    // re-opened the dropdown with stale results.
+    currentToken++;
   }
   function pick(i){
     const s = items[i];
@@ -15503,9 +15611,9 @@ function renderSettings() {
       <!-- AI Keys -->
       <div class="card" id="set-ai-keys-section">
         <div class="card-title">${esc2(t('settings.aiKeys.title'))}</div>
-        <div class="field"><label>${esc2(t('settings.aiKeys.claude'))}</label><input type="password" value="${state.aiKeys?.claude||''}" placeholder="sk-ant-…" oninput="if(!state.aiKeys)state.aiKeys={};state.aiKeys.claude=this.value;save()"></div>
-        <div class="field"><label>${esc2(t('settings.aiKeys.openai'))}</label><input type="password" value="${state.aiKeys?.openai||''}" placeholder="sk-…" oninput="if(!state.aiKeys)state.aiKeys={};state.aiKeys.openai=this.value;save()"></div>
-        <div class="field"><label>${esc2(t('settings.aiKeys.perplexity'))} <span style="font-size:10px;color:var(--text3)">${esc2(t('settings.aiKeys.perplexityHint'))}</span></label><input type="password" value="${state.aiKeys?.perplexity||''}" placeholder="pplx-…" oninput="if(!state.aiKeys)state.aiKeys={};state.aiKeys.perplexity=this.value;save()"></div>
+        <div class="field"><label>${esc2(t('settings.aiKeys.claude'))}</label><input type="password" value="${esc(state.aiKeys?.claude||'')}" placeholder="sk-ant-…" oninput="if(!state.aiKeys)state.aiKeys={};state.aiKeys.claude=this.value;save()"></div>
+        <div class="field"><label>${esc2(t('settings.aiKeys.openai'))}</label><input type="password" value="${esc(state.aiKeys?.openai||'')}" placeholder="sk-…" oninput="if(!state.aiKeys)state.aiKeys={};state.aiKeys.openai=this.value;save()"></div>
+        <div class="field"><label>${esc2(t('settings.aiKeys.perplexity'))} <span style="font-size:10px;color:var(--text3)">${esc2(t('settings.aiKeys.perplexityHint'))}</span></label><input type="password" value="${esc(state.aiKeys?.perplexity||'')}" placeholder="pplx-…" oninput="if(!state.aiKeys)state.aiKeys={};state.aiKeys.perplexity=this.value;save()"></div>
         <p style="font-size:11px;color:var(--text3);line-height:1.5">${esc2(t('settings.aiKeys.storage'))}</p>
       </div>
       <!-- Ticker quote -->
@@ -16314,9 +16422,15 @@ window.importSlice=function(input, sliceKey){
     try{
       const d=JSON.parse(e.target.result);
       if(slice.fields === null) {
-        // Full import — replace wholesale, then migrate.
+        // Full import — migrate the blob first (see loadState for why the
+        // order matters), then replace wholesale.
+        migrate(d);
         Object.assign(state, d);
-        migrate(state);
+        // The vault has its own storage key and save() deliberately strips
+        // it from the main blob — without an explicit saveVault() here the
+        // imported reports evaporated on the next reload (loadState pulled
+        // the OLD vault back from VAULT_STORAGE_KEY).
+        if(Array.isArray(state.vault)) saveVault();
       } else {
         // Slice import: merge only the fields this slice owns.
         // Refuse if the file was exported as a different slice (unless it's "all").
@@ -16687,11 +16801,15 @@ function renderAIPChips(){
   const chips = aipChipsFor(panel);
   const recent = getAIHistoryFor(panel).slice(0, 4); // up to 4 recent queries
   // Suggestions group + (optional) recent group, separated visually.
-  let html = chips.map(c=>`<button class="aip-chip" onclick="aipChip('${c.replace(/'/g,"\\'")}')">${c}</button>`).join('');
+  // The query is carried in a data attribute and read back via
+  // this.dataset.q instead of being spliced into an inline JS string —
+  // inline splicing was breakable with backslashes/quotes (stored XSS
+  // from persisted chat history). esc2 is quote-safe, so data-q is inert.
+  let html = chips.map(c=>`<button class="aip-chip" data-q="${esc2(c)}" onclick="aipChip(this.dataset.q)">${esc2(c)}</button>`).join('');
   if(recent.length){
     html += `<div class="aip-chip-divider"></div>
       <div class="aip-chip-group-lbl">Recent on ${esc2((PANEL_META[panel]&&PANEL_META[panel].label)||panel)}</div>
-      ${recent.map(q=>`<button class="aip-chip aip-chip-recent" onclick="aipChip('${q.replace(/'/g,"\\'").replace(/"/g,'&quot;')}')" title="${esc2(q)}">↺ ${esc2(q.length>42?q.slice(0,40)+'…':q)}</button>`).join('')}`;
+      ${recent.map(q=>`<button class="aip-chip aip-chip-recent" data-q="${esc2(q)}" onclick="aipChip(this.dataset.q)" title="${esc2(q)}">↺ ${esc2(q.length>42?q.slice(0,40)+'…':q)}</button>`).join('')}`;
   }
   el.innerHTML = html;
 }
@@ -18194,6 +18312,12 @@ async function sendToAI(thread, msg){
       // `horizon-chart` block without squeezing the narrative response.
       body:JSON.stringify({model:'claude-opus-4-6',max_tokens:900,system:buildAIContext(),messages:thread.messages.slice(-8).map(m=>({role:m.role,content:m.content}))})
     });
+    // Status check BEFORE parsing — an unchecked 401/429/400 used to be
+    // swallowed into a literal "No response" that was persisted as a real
+    // assistant turn and re-sent as context on every later message.
+    if(res.status===401) throw new Error('Invalid API key — check Settings → AI Keys.');
+    if(res.status===429) throw new Error('Rate limited by the API — wait a moment and try again.');
+    if(!res.ok) throw new Error('API error '+res.status);
     const d=await res.json();
     const reply=d.content?.map(c=>c.text||'').join('')||'No response';
     thread.messages.push({ role:'assistant', content:reply, at: Date.now() });
@@ -18211,7 +18335,7 @@ async function sendToAI(thread, msg){
     if(blocks.length) rendered = _inlineAIChartPlaceholders(rendered, blocks);
     bubble.innerHTML = rendered;
     _renderAIChartBlocks(bubble, blocks);
-  } catch(e){ typWrap.querySelector('.ai-msg').innerHTML=`<span style="color:var(--red);font-size:12px">Error: ${e.message}</span>`; }
+  } catch(e){ typWrap.querySelector('.ai-msg').innerHTML=`<span style="color:var(--red);font-size:12px">Error: ${esc(e.message)}</span>`; }
   aipTyping=false;
   // Land the user at the TOP of the new response so long replies can
   // be read naturally from the first line. Defer to the next frame so
@@ -18541,6 +18665,7 @@ let piq_market = 'KE';
 let piq_history = [];
 let piq_currentResult = null;
 let piq_lastQuery = '';
+let piq_activeHistId = null; // id of the history entry currently displayed
 let piq_progressTimer = null;
 
 // PIQ uses the shared COUNTRY_CODES + COUNTRY_CURRENCY + countryList()
@@ -18700,9 +18825,10 @@ function renderPropIQ(){
         const dateLocale = state.lang === 'sv' ? 'sv-SE' : 'en-GB';
         const time=new Date(h.timestamp).toLocaleDateString(dateLocale,{day:'numeric',month:'short'});
         const hCfg = piq_getConfig(h.market || h.country || 'KE');
-        return `<div class="piq-hist-item${i===0&&piq_currentResult?' active':''}" onclick="piq_loadHistory(${i})">
-          <div class="piq-hi-q">${h.query}</div>
-          <div class="piq-hi-m"><span>${hCfg.flag}</span><span>${time}</span>${h.verdict?`<span class="piq-hi-verdict ${vCls}">${h.verdict}</span>`:''}</div>
+        const activeCls = (piq_activeHistId != null ? h.id === piq_activeHistId : (i===0 && piq_currentResult)) ? ' active' : '';
+        return `<div class="piq-hist-item${activeCls}" onclick="piq_loadHistory(${i})">
+          <div class="piq-hi-q">${esc(h.query)}</div>
+          <div class="piq-hi-m"><span>${hCfg.flag}</span><span>${time}</span>${h.verdict?`<span class="piq-hi-verdict ${vCls}">${esc2(h.verdict)}</span>`:''}</div>
         </div>`;
       }).join('');
 
@@ -18817,6 +18943,7 @@ function piq_setCountry(code){
   if(piq_country === code) { piq_closeCountryMenu(); return; }
   piq_country = code;
   piq_market = code; // back-compat alias
+  _piqEnsureBusListener(piq_bgKey()); // bgtask events for the new market
   state.piqCountry = code;
   if(typeof save === 'function') save();
   const cfg = piq_getConfig(code);
@@ -18947,6 +19074,7 @@ function piq_loadHistory(i){
   const code = (h.market || h.country || 'KE').toUpperCase();
   piq_currentResult = h.result;
   piq_lastQuery = h.query;
+  piq_activeHistId = h.id; // so the sidebar highlights THIS entry, not index 0
   piq_setCountry(code);
   const input = document.getElementById('piq-search-input');
   if(input) input.value = h.query;
@@ -19013,9 +19141,14 @@ async function piq_runSearch(){
   piq_lastQuery=q;
   const cfg=PIQ_MC[piq_market];
   const bgKey = piq_bgKey();
+  _piqEnsureBusListener(bgKey);
+  // In-flight guard: runBgTask returns the SAME promise for a running key,
+  // so a second click used to attach a second .then and save the result to
+  // history twice. (The button never disabled either — see the bus-listener
+  // fix above — so double clicks were easy to produce.)
+  if(bgTaskStatus(bgKey) === 'running'){ piq_renderBgSearchUI(); return; }
   // A fresh search invalidates any previously cached result for this market.
   if(typeof clearSearchCache==='function') clearSearchCache(bgKey);
-  piq_renderBgSearchUI(); // show spinner
   runBgTask(bgKey, async () => {
     const signals = await piq_fetchSignals(q, cfg);
     const analysis = await piq_fetchAnalysis(q, signals, cfg);
@@ -19073,10 +19206,17 @@ function piq_renderBgSearchUI(){
     }
   }
 }
-if(typeof bus!=='undefined') {
-  // Re-render whenever the piq task for either market fires an event.
-  ['piq:ke','piq:se'].forEach(k => bus.on('bgtask:'+k, () => piq_renderBgSearchUI()));
+// Subscribe lazily per market key. The old hard-coded LOWERCASE list
+// ['piq:ke','piq:se'] never matched piq_bgKey()'s uppercase ISO2 output
+// ('piq:KE'), so no bgtask event ever reached this panel — no spinner, no
+// completion re-render — and it excluded every non-KE/SE market besides.
+const _piqBusKeys = new Set();
+function _piqEnsureBusListener(key){
+  if(typeof bus==='undefined' || _piqBusKeys.has(key)) return;
+  _piqBusKeys.add(key);
+  bus.on('bgtask:'+key, () => piq_renderBgSearchUI());
 }
+_piqEnsureBusListener(piq_bgKey());
 
 async function piq_fetchSignals(query,cfg){
   const prompt=cfg.contextPrompt.replace('{q}',query);
@@ -19135,10 +19275,15 @@ function piq_getMortgageScenario(a, cfg){
   // Derive a default price from the analysis if the calculator is empty.
   let price = inpPrice;
   if(!price){
-    const raw = (a.kpis?.avgPrice || a.priceRange || '').replace(/[^0-9.MkK]/g,'');
-    const m = raw.match(/([0-9.]+)([Mk]?)/);
+    // Strip everything up to the first digit FIRST — currency codes like
+    // "KES" used to survive the character filter (K is a magnitude letter),
+    // and the suffix regex matched only [Mk], so "KES 950K" parsed as 950
+    // and the mortgage table ran on a 950-shilling property.
+    const src = String(a.kpis?.avgPrice || a.priceRange || '').replace(/^[^0-9]*/,'');
+    const m = src.replace(/[\s,]/g,'').match(/([0-9]+(?:\.[0-9]+)?)\s*([MmKk])?/);
     if(m){
-      const n = parseFloat(m[1]) * (m[2]==='M' ? 1e6 : (m[2].toLowerCase()==='k' ? 1e3 : 1));
+      const suffix = (m[2]||'').toUpperCase();
+      const n = parseFloat(m[1]) * (suffix==='M' ? 1e6 : suffix==='K' ? 1e3 : 1);
       price = Math.round(n);
     }
   }
@@ -19465,7 +19610,10 @@ window.piq_exportReportPdf = function(){
 };
 
 // ── FX CONVERTER ──────────────────────────────────────────────────────────────
-const PIQ_FX={KESKES:1,SEKSEK:1,KESUSD:0.0077,USDKES:129.5,SEKUSD:0.093,USDSEK:10.75,KESSEK:0.12,SEKKES:8.33,KESEUR:0.0071,SEKEUR:0.086,EURKES:140.5,EURSEK:11.6,USDEUR:0.925,EURUSD:1.081};
+// KES↔SEK derived from the table's own USD legs (KESUSD × USDSEK ≈ 0.083 →
+// SEKKES ≈ 12.05). The old hand-typed 0.12 / 8.33 pair contradicted every
+// other leg by ~45% and materially misstated SEK↔KES conversions.
+const PIQ_FX={KESKES:1,SEKSEK:1,KESUSD:0.0077,USDKES:129.5,SEKUSD:0.093,USDSEK:10.75,KESSEK:0.083,SEKKES:12.05,KESEUR:0.0071,SEKEUR:0.086,EURKES:140.5,EURSEK:11.6,USDEUR:0.925,EURUSD:1.081};
 function piq_convertFX(){
   const amt=parseNum(document.getElementById('piq-fx-amount')?.value||0);
   const from=document.getElementById('piq-fx-from')?.value;
@@ -19514,9 +19662,11 @@ function piq_compareSearches(){
 function piq_sbClass(s){ const m={'planning':'piq-b-plan','approved':'piq-b-appr','under construction':'piq-b-cons','complete':'piq-b-done','bygglov ansökt':'piq-b-plan','bygglov beviljat':'piq-b-appr','byggnation pågår':'piq-b-cons','klart':'piq-b-done'}; return m[s.toLowerCase()]||'piq-b-plan'; }
 
 function piq_renderResults(query,a,cfg){
-  const pipeRows=(a.pipeline||[]).map(p=>`<tr><td style="font-weight:600;color:var(--text)">${p.name}</td><td style="color:var(--text2)">${p.developer}</td><td style="color:var(--text2)">${p.units}</td><td><span class="piq-badge ${piq_sbClass(p.status)}">${p.status}</span></td><td style="color:var(--text2);font-family:var(--fm);font-size:10px">${p.completion}</td><td style="color:var(--green);font-family:var(--fm);font-size:10px">${p.priceFrom}</td></tr>`).join('');
-  const flagsHtml=(a.titleRisks||[]).map(f=>`<div class="piq-flag ${f.level}"><div class="piq-flag-dot"></div><div><div class="piq-flag-t">${f.title}</div><div class="piq-flag-txt">${f.detail}</div></div></div>`).join('');
-  const signalsHtml=(a.signals||[]).map(s=>`<div class="piq-signal"><div class="piq-signal-dot" style="background:${s.sentiment==='positive'?'var(--green)':s.sentiment==='negative'?'var(--red)':'var(--amber)'}"></div><div><div class="piq-signal-txt">${s.text}</div><div class="piq-signal-src">${s.source||t('piq.sig.defaultSource')}</div></div></div>`).join('');
+  // esc()/esc2() everywhere: every p.*/f.*/s.* field is LLM output grounded on
+  // untrusted web-search content and is rendered via innerHTML below.
+  const pipeRows=(a.pipeline||[]).map(p=>`<tr><td style="font-weight:600;color:var(--text)">${esc2(p.name)}</td><td style="color:var(--text2)">${esc2(p.developer)}</td><td style="color:var(--text2)">${esc2(p.units)}</td><td><span class="piq-badge ${piq_sbClass(p.status)}">${esc2(p.status)}</span></td><td style="color:var(--text2);font-family:var(--fm);font-size:10px">${esc2(p.completion)}</td><td style="color:var(--green);font-family:var(--fm);font-size:10px">${esc2(p.priceFrom)}</td></tr>`).join('');
+  const flagsHtml=(a.titleRisks||[]).map(f=>`<div class="piq-flag ${esc2(f.level)}"><div class="piq-flag-dot"></div><div><div class="piq-flag-t">${esc2(f.title)}</div><div class="piq-flag-txt">${esc2(f.detail)}</div></div></div>`).join('');
+  const signalsHtml=(a.signals||[]).map(s=>`<div class="piq-signal"><div class="piq-signal-dot" style="background:${s.sentiment==='positive'?'var(--green)':s.sentiment==='negative'?'var(--red)':'var(--amber)'}"></div><div><div class="piq-signal-txt">${esc2(s.text)}</div><div class="piq-signal-src">${esc2(s.source||t('piq.sig.defaultSource'))}</div></div></div>`).join('');
   const vCls=a.verdict==='BUY'?'piq-v-buy':a.verdict==='AVOID'?'piq-v-avoid':'piq-v-hold';
   const vIcon=a.verdict==='BUY'?'▲':a.verdict==='AVOID'?'▼':'►';
   const rateOpts=cfg.mortgageRates.map(r=>`<option value="${r.v}">${r.l}</option>`).join('');
@@ -19528,7 +19678,7 @@ function piq_renderResults(query,a,cfg){
 
   document.getElementById('piq-results').innerHTML=`
     <div class="piq-compare-bar">
-      <span>${cfg.flag} ${query} · ${new Date().toLocaleDateString(dateLocale,{day:'numeric',month:'short',year:'numeric'})}</span>
+      <span>${cfg.flag} ${esc2(query)} · ${new Date().toLocaleDateString(dateLocale,{day:'numeric',month:'short',year:'numeric'})}</span>
       ${compareBtn}
     </div>
 
@@ -19558,8 +19708,8 @@ function piq_renderResults(query,a,cfg){
           <div class="piq-ai-box"><div class="piq-ai-lbl">${esc2(t('piq.inv.summaryLbl'))}</div><div class="piq-ai-text">${mdParse(a.summary||'')}</div></div>
           <div class="piq-ai-box"><div class="piq-ai-lbl">${esc2(t('piq.inv.thesisLbl'))}</div><div class="piq-ai-text">${mdParse(a.investmentThesis||'')}</div></div>
           <div class="piq-verdict-row">
-            <div class="piq-verdict-card"><div class="piq-verdict-lbl">${esc2(t('piq.inv.priceRange'))}</div><div class="piq-verdict-val" style="color:var(--text);font-size:11px">${a.priceRange}</div></div>
-            <div class="piq-verdict-card"><div class="piq-verdict-lbl">${esc2(t('piq.inv.verdict'))}</div><div class="piq-verdict-val ${vCls}" style="font-size:20px">${vIcon} ${a.verdict}</div></div>
+            <div class="piq-verdict-card"><div class="piq-verdict-lbl">${esc2(t('piq.inv.priceRange'))}</div><div class="piq-verdict-val" style="color:var(--text);font-size:11px">${esc2(a.priceRange)}</div></div>
+            <div class="piq-verdict-card"><div class="piq-verdict-lbl">${esc2(t('piq.inv.verdict'))}</div><div class="piq-verdict-val ${vCls}" style="font-size:20px">${vIcon} ${esc2(a.verdict)}</div></div>
             <div class="piq-verdict-card"><div class="piq-verdict-lbl">${esc2(t('piq.inv.rationale'))}</div><div class="piq-verdict-val" style="font-weight:400">${mdParse(a.verdictReason||'')}</div></div>
           </div>
         </div>
@@ -19583,7 +19733,7 @@ function piq_renderResults(query,a,cfg){
 
     <div id="piq-pane-pipe" class="piq-pane">
       <div class="piq-card">
-        <div class="piq-card-hd"><div class="piq-card-icon" style="background:var(--blue-dim)">🏗</div><div><div class="piq-card-title">${esc2(t('piq.pipe.title'))}</div><div class="piq-card-sub">${esc2(cfg.currency==='SEK'?t('piq.pipe.sub.sek'):t('piq.pipe.sub.default'))} · ${query}</div></div></div>
+        <div class="piq-card-hd"><div class="piq-card-icon" style="background:var(--blue-dim)">🏗</div><div><div class="piq-card-title">${esc2(t('piq.pipe.title'))}</div><div class="piq-card-sub">${esc2(cfg.currency==='SEK'?t('piq.pipe.sub.sek'):t('piq.pipe.sub.default'))} · ${esc2(query)}</div></div></div>
         <div class="piq-card-body" style="padding:0">${pipeRows?`<div style="overflow-x:auto"><table class="piq-table"><thead><tr><th>${esc2(t('piq.pipe.col.project'))}</th><th>${esc2(t('piq.pipe.col.developer'))}</th><th>${esc2(t('piq.pipe.col.units'))}</th><th>${esc2(t('piq.pipe.col.status'))}</th><th>${esc2(t('piq.pipe.col.completion'))}</th><th>${esc2(t('piq.pipe.col.priceFrom'))}</th></tr></thead><tbody>${pipeRows}</tbody></table></div>`:`<div class="piq-empty" style="padding:20px"><div class="piq-empty-s">${esc2(t('piq.pipe.empty'))}</div></div>`}</div>
       </div>
     </div>
@@ -19597,7 +19747,7 @@ function piq_renderResults(query,a,cfg){
 
     <div id="piq-pane-title" class="piq-pane">
       <div class="piq-card">
-        <div class="piq-card-hd"><div class="piq-card-icon" style="background:var(--red-dim)">⚖</div><div><div class="piq-card-title">${esc2(cfg.currency==='SEK'?t('piq.legal.title.sek'):t('piq.legal.title.default'))}</div><div class="piq-card-sub">${cfg.flag} ${cfg.name} · ${query}</div></div></div>
+        <div class="piq-card-hd"><div class="piq-card-icon" style="background:var(--red-dim)">⚖</div><div><div class="piq-card-title">${esc2(cfg.currency==='SEK'?t('piq.legal.title.sek'):t('piq.legal.title.default'))}</div><div class="piq-card-sub">${cfg.flag} ${cfg.name} · ${esc2(query)}</div></div></div>
         <div class="piq-card-body"><div class="piq-flags">${flagsHtml}</div><div class="piq-legal">${cfg.legalNote}</div></div>
       </div>
     </div>
@@ -19634,9 +19784,9 @@ function piq_renderResults(query,a,cfg){
           </div>
           <div class="piq-toast" id="piq-toast"></div>
           <div style="background:var(--bg3);border-radius:6px;padding:10px 12px;font-size:11px;color:var(--text2);line-height:1.6;margin-top:4px">
-            ${cfg.flag} <strong>${query}</strong> · ${esc2(t('piq.share.summary'))} <strong class="${vCls}">${a.verdict}</strong><br>
-            ${esc2(t('piq.share.summary.price'))} ${a.priceRange} · ${esc2(t('piq.share.summary.yield'))} ${a.rentalYield} · ${esc2(t('piq.share.summary.appreciation'))} ${a.capitalAppreciation}<br>
-            <span style="color:var(--text3);font-size:10px">${a.summary}</span>
+            ${cfg.flag} <strong>${esc2(query)}</strong> · ${esc2(t('piq.share.summary'))} <strong class="${vCls}">${esc2(a.verdict)}</strong><br>
+            ${esc2(t('piq.share.summary.price'))} ${esc2(a.priceRange)} · ${esc2(t('piq.share.summary.yield'))} ${esc2(a.rentalYield)} · ${esc2(t('piq.share.summary.appreciation'))} ${esc2(a.capitalAppreciation)}<br>
+            <span style="color:var(--text3);font-size:10px">${esc2(a.summary)}</span>
           </div>
         </div>
       </div>
@@ -19649,9 +19799,10 @@ function piq_renderResults(query,a,cfg){
     histEl.innerHTML=piq_history.map((h,i)=>{
       const vCls2=h.verdict==='BUY'?'piq-hv-buy':h.verdict==='AVOID'?'piq-hv-avoid':'piq-hv-hold';
       const time=new Date(h.timestamp).toLocaleDateString(histLocale,{day:'numeric',month:'short'});
-      return `<div class="piq-hist-item${i===0?' active':''}" onclick="piq_loadHistory(${i})">
-        <div class="piq-hi-q">${h.query}</div>
-        <div class="piq-hi-m"><span>${PIQ_MC[h.market]?.flag||''}</span><span>${time}</span>${h.verdict?`<span class="piq-hi-verdict ${vCls2}">${h.verdict}</span>`:''}</div>
+      const activeCls2 = (piq_activeHistId != null ? h.id === piq_activeHistId : i===0) ? ' active' : '';
+      return `<div class="piq-hist-item${activeCls2}" onclick="piq_loadHistory(${i})">
+        <div class="piq-hi-q">${esc(h.query)}</div>
+        <div class="piq-hi-m"><span>${PIQ_MC[h.market]?.flag||''}</span><span>${time}</span>${h.verdict?`<span class="piq-hi-verdict ${vCls2}">${esc2(h.verdict)}</span>`:''}</div>
       </div>`;
     }).join('');
   }

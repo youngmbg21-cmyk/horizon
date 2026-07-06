@@ -388,6 +388,11 @@ body{font-family:var(--sans);background:var(--bg);color:var(--text);min-height:1
 let ANTHROPIC_KEY = '', PERPLEXITY_KEY = '', MARKET = 'ke';
 let history = [], currentResult = null, lastQuery = '';
 
+// Quote-safe HTML escape. Every LLM-returned field and the user query below
+// are rendered via innerHTML; the analysis is grounded on untrusted
+// web-search content, so its fields can carry markup.
+function escHtml(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');}
+
 const MC = {
   ke:{name:'Kenya',flag:'🇰🇪',currency:'KES',locale:'en-KE',
     banner:'🇰🇪 &nbsp; Kenya market · Prices in KES · Nairobi focus',
@@ -513,8 +518,17 @@ window.addEventListener('DOMContentLoaded',()=>{
 
 // ── HISTORY ──
 function loadHistory(){
-  const saved=localStorage.getItem('propiq_history');
-  history=saved?JSON.parse(saved):[];
+  // try/catch: a corrupt/truncated propiq_history value used to throw here
+  // (this runs from the DOMContentLoaded auto-login path), which left the
+  // setup screen up and bricked the app with no way to recover.
+  try {
+    const saved=localStorage.getItem('propiq_history');
+    history=saved?JSON.parse(saved):[];
+    if(!Array.isArray(history)) history=[];
+  } catch(e){
+    console.warn('Corrupt propiq_history — resetting.', e);
+    history=[];
+  }
   renderHistory();
 }
 
@@ -536,24 +550,33 @@ function renderHistory(){
     const flag=MC[h.market]?.flag||'';
     const time=new Date(h.timestamp).toLocaleDateString('en-GB',{day:'numeric',month:'short'});
     return `<div class="history-item ${i===0&&currentResult?'active':''}" onclick="loadHistoryItem(${i})">
-      <div class="hi-query">${h.query}</div>
-      <div class="hi-meta"><span class="hi-flag">${flag}</span><span>${time}</span>${h.verdict?`<span class="hi-verdict ${vClass}">${h.verdict}</span>`:''}</div>
+      <div class="hi-query">${escHtml(h.query)}</div>
+      <div class="hi-meta"><span class="hi-flag">${flag}</span><span>${time}</span>${h.verdict?`<span class="hi-verdict ${vClass}">${escHtml(h.verdict)}</span>`:''}</div>
     </div>`;
   }).join('');
 }
 
 function loadHistoryItem(i){
   const item=history[i];
+  if(!item) return;
   MARKET=item.market;
+  const cfg=MC[item.market];
   document.getElementById('tog-ke').classList.toggle('on',item.market==='ke');
   document.getElementById('tog-se').classList.toggle('on',item.market==='se');
   const banner=document.getElementById('market-banner');
   banner.className='market-banner '+item.market;
-  banner.innerHTML=MC[item.market].banner;
-  document.getElementById('search-input').value=item.query;
+  banner.innerHTML=cfg.banner;
+  // Also sync the search label, placeholder and quick tags to the loaded
+  // market — otherwise the UI kept advertising the previous market (e.g.
+  // Kenya quick tags while running a Sweden analysis).
+  document.getElementById('search-label').textContent=cfg.searchLabel;
+  const input=document.getElementById('search-input');
+  input.value=item.query;
+  input.placeholder=cfg.placeholder;
+  renderQuickTags();
   currentResult=item.result;
   lastQuery=item.query;
-  renderResults(item.query,item.result,MC[item.market]);
+  renderResults(item.query,item.result,cfg);
   document.querySelectorAll('.history-item').forEach((el,idx)=>el.classList.toggle('active',idx===i));
 }
 
@@ -566,8 +589,13 @@ function clearHistory(){
 // ── PROGRESS ──
 const STEPS=['Fetching live signals','Analysing market data','Generating investment thesis','Scoring legal risks'];
 let progressTimer=null;
+let searchInFlight=false;
 
 function startProgress(){
+  // Clear any previous interval before starting a new one — a second call
+  // used to orphan the first setInterval, leaving it mutating the progress
+  // bar forever.
+  if(progressTimer) clearInterval(progressTimer);
   const wrap=document.getElementById('progress-wrap');
   const fill=document.getElementById('progress-fill');
   const label=document.getElementById('progress-label');
@@ -607,6 +635,12 @@ function quickSearch(q){document.getElementById('search-input').value=q;runSearc
 async function runSearch(){
   const q=document.getElementById('search-input').value.trim();
   if(!q) return;
+  // In-flight guard: the Enter key and quick tags call runSearch() directly
+  // (bypassing the disabled button), so two searches could race and whichever
+  // finished last silently overwrote the other's results — and both were
+  // pushed to history.
+  if(searchInFlight) return;
+  searchInFlight=true;
   lastQuery=q;
   const btn=document.getElementById('search-btn');
   btn.disabled=true;btn.textContent='Analysing...';
@@ -625,11 +659,13 @@ async function runSearch(){
     document.getElementById('results-area').innerHTML=`
       <div class="error-box">
         <div class="error-title">Analysis failed</div>
-        <div class="error-msg">${e.message}<br><br>Common fixes: check your API key is valid · if using Perplexity from a local file, host on Netlify · ensure you have API credits remaining</div>
+        <div class="error-msg">${escHtml(e.message)}<br><br>Common fixes: check your API key is valid · if using Perplexity from a local file, host on Netlify · ensure you have API credits remaining</div>
         <button class="retry-btn" onclick="runSearch()">Retry</button>
       </div>`;
+  }finally{
+    searchInFlight=false;
+    btn.disabled=false;btn.textContent='Analyse';
   }
-  btn.disabled=false;btn.textContent='Analyse';
 }
 
 async function fetchSignals(query,cfg){
@@ -679,7 +715,10 @@ function calcMortgage(){
 }
 
 // ── CURRENCY CONVERTER ──
-const FX_RATES={KESKES:1,SEKSEK:1,KESUSD:0.0077,USDKES:129.5,SEKSEK:1,SEKUSD:0.093,USDSEK:10.75,KESSEK:0.12,SEKKES:8.33,KESEUR:0.0071,SEKEUR:0.086,EURKES:140.5,EURSEK:11.6};
+// USDEUR/EURUSD added (USD↔EUR previously fell back to rate 1); KES↔SEK
+// derived from the USD legs (0.0077×10.75≈0.083 → SEKKES≈12.05) instead of
+// the inconsistent hand-typed 0.12/8.33; duplicate SEKSEK removed.
+const FX_RATES={KESKES:1,SEKSEK:1,USDUSD:1,EUREUR:1,KESUSD:0.0077,USDKES:129.5,SEKUSD:0.093,USDSEK:10.75,KESSEK:0.083,SEKKES:12.05,KESEUR:0.0071,SEKEUR:0.086,EURKES:140.5,EURSEK:11.6,USDEUR:0.925,EURUSD:1.081};
 function getFX(from,to){return FX_RATES[from+to]||FX_RATES[to+from]?1/(FX_RATES[to+from]||1):1}
 function convertFX(){
   const amt=parseFloat(document.getElementById('fx-amount').value)||0;
@@ -730,13 +769,13 @@ function compareSearches(){
     const vColor=h.verdict==='BUY'?'var(--green-text)':h.verdict==='AVOID'?'var(--red-text)':'var(--amber-text)';
     const r=h.result;
     html+=`<div class="compare-card">
-      <div class="cc-header">${h.query}</div>
-      <div class="cc-row"><span class="cc-label">Price range</span><span class="cc-val">${r.priceRange||'—'}</span></div>
-      <div class="cc-row"><span class="cc-label">Per sqm</span><span class="cc-val">${r.pricePerSqm||'—'}</span></div>
-      <div class="cc-row"><span class="cc-label">Rental yield</span><span class="cc-val">${r.rentalYield||'—'}</span></div>
-      <div class="cc-row"><span class="cc-label">Appreciation</span><span class="cc-val">${r.capitalAppreciation||'—'}</span></div>
-      <div class="cc-row"><span class="cc-label">Liquidity</span><span class="cc-val">${r.kpis?.liquidity||'—'}</span></div>
-      <div style="margin-top:8px"><span class="cc-verdict ${vClass}" style="color:${vColor}">${h.verdict}</span></div>
+      <div class="cc-header">${escHtml(h.query)}</div>
+      <div class="cc-row"><span class="cc-label">Price range</span><span class="cc-val">${escHtml(r.priceRange||'—')}</span></div>
+      <div class="cc-row"><span class="cc-label">Per sqm</span><span class="cc-val">${escHtml(r.pricePerSqm||'—')}</span></div>
+      <div class="cc-row"><span class="cc-label">Rental yield</span><span class="cc-val">${escHtml(r.rentalYield||'—')}</span></div>
+      <div class="cc-row"><span class="cc-label">Appreciation</span><span class="cc-val">${escHtml(r.capitalAppreciation||'—')}</span></div>
+      <div class="cc-row"><span class="cc-label">Liquidity</span><span class="cc-val">${escHtml(r.kpis?.liquidity||'—')}</span></div>
+      <div style="margin-top:8px"><span class="cc-verdict ${vClass}" style="color:${vColor}">${escHtml(h.verdict)}</span></div>
     </div>`;
   });
   html+='</div></div></div>';
@@ -747,9 +786,9 @@ function compareSearches(){
 function sbClass(s){const m={'planning':'sb-plan','approved':'sb-appr','under construction':'sb-cons','complete':'sb-done','bygglov ansökt':'sb-plan','bygglov beviljat':'sb-appr','byggnation pågår':'sb-cons','klart':'sb-done'};return m[s.toLowerCase()]||'sb-plan'}
 
 function renderResults(query,a,cfg){
-  const pipeRows=(a.pipeline||[]).map(p=>`<tr><td style="font-weight:500;color:var(--text)">${p.name}</td><td style="color:var(--text2)">${p.developer}</td><td style="color:var(--text2)">${p.units}</td><td><span class="sbadge ${sbClass(p.status)}">${p.status}</span></td><td style="color:var(--text2);font-family:var(--mono);font-size:11px">${p.completion}</td><td style="color:var(--green-text);font-family:var(--mono);font-size:11px">${p.priceFrom}</td></tr>`).join('');
-  const flagsHtml=(a.titleRisks||[]).map(f=>`<div class="flag ${f.level}"><div class="flag-dot"></div><div><div class="flag-title">${f.title}</div><div class="flag-text">${f.detail}</div></div></div>`).join('');
-  const signalsHtml=(a.signals||[]).map(s=>`<div class="signal-item"><div class="signal-dot" style="background:${s.sentiment==='positive'?'var(--green)':s.sentiment==='negative'?'var(--red)':'var(--amber)'}"></div><div><div class="signal-text">${s.text}</div><div class="signal-meta">${s.source||'Market data'}</div></div></div>`).join('');
+  const pipeRows=(a.pipeline||[]).map(p=>`<tr><td style="font-weight:500;color:var(--text)">${escHtml(p.name)}</td><td style="color:var(--text2)">${escHtml(p.developer)}</td><td style="color:var(--text2)">${escHtml(p.units)}</td><td><span class="sbadge ${sbClass(p.status)}">${escHtml(p.status)}</span></td><td style="color:var(--text2);font-family:var(--mono);font-size:11px">${escHtml(p.completion)}</td><td style="color:var(--green-text);font-family:var(--mono);font-size:11px">${escHtml(p.priceFrom)}</td></tr>`).join('');
+  const flagsHtml=(a.titleRisks||[]).map(f=>`<div class="flag ${escHtml(f.level)}"><div class="flag-dot"></div><div><div class="flag-title">${escHtml(f.title)}</div><div class="flag-text">${escHtml(f.detail)}</div></div></div>`).join('');
+  const signalsHtml=(a.signals||[]).map(s=>`<div class="signal-item"><div class="signal-dot" style="background:${s.sentiment==='positive'?'var(--green)':s.sentiment==='negative'?'var(--red)':'var(--amber)'}"></div><div><div class="signal-text">${escHtml(s.text)}</div><div class="signal-meta">${escHtml(s.source||'Market data')}</div></div></div>`).join('');
   const vClass=a.verdict==='BUY'?'v-buy':a.verdict==='AVOID'?'v-avoid':'v-hold';
   const vIcon=a.verdict==='BUY'?'▲':a.verdict==='AVOID'?'▼':'►';
   const rateOpts=cfg.mortgageRates.map(r=>`<option value="${r.val}">${r.label}</option>`).join('');
@@ -758,16 +797,16 @@ function renderResults(query,a,cfg){
 
   document.getElementById('results-area').innerHTML=`
     <div class="compare-bar">
-      <span>${cfg.flag} ${query} · ${new Date().toLocaleDateString(cfg.locale,{day:'numeric',month:'short',year:'numeric'})}</span>
+      <span>${cfg.flag} ${escHtml(query)} · ${new Date().toLocaleDateString(cfg.locale,{day:'numeric',month:'short',year:'numeric'})}</span>
       ${compareBtn}
     </div>
 
     <div class="kpi-row" style="margin-top:14px">
-      <div class="kpi"><div class="kpi-label">Avg price</div><div class="kpi-value" style="font-size:14px;color:var(--text)">${a.kpis?.avgPrice||a.priceRange||'—'}</div><div class="kpi-sub">${query}</div></div>
-      <div class="kpi"><div class="kpi-label">Price / m²</div><div class="kpi-value" style="font-size:13px;color:var(--text2)">${a.pricePerSqm||'—'}</div><div class="kpi-sub">${cfg.currency}/sqm</div></div>
-      <div class="kpi"><div class="kpi-label">Rental yield</div><div class="kpi-value" style="color:var(--green)">${a.kpis?.yield||a.rentalYield||'—'}</div><div class="kpi-sub">Gross annual</div></div>
-      <div class="kpi"><div class="kpi-label">Appreciation</div><div class="kpi-value" style="color:var(--blue);font-size:15px">${a.kpis?.appreciation||'—'}</div><div class="kpi-sub">Annual est.</div></div>
-      <div class="kpi"><div class="kpi-label">Liquidity</div><div class="kpi-value" style="font-size:14px;color:var(--text)">${a.kpis?.liquidity||'—'}</div><div class="kpi-sub">Market depth</div></div>
+      <div class="kpi"><div class="kpi-label">Avg price</div><div class="kpi-value" style="font-size:14px;color:var(--text)">${escHtml(a.kpis?.avgPrice||a.priceRange||'—')}</div><div class="kpi-sub">${escHtml(query)}</div></div>
+      <div class="kpi"><div class="kpi-label">Price / m²</div><div class="kpi-value" style="font-size:13px;color:var(--text2)">${escHtml(a.pricePerSqm||'—')}</div><div class="kpi-sub">${cfg.currency}/sqm</div></div>
+      <div class="kpi"><div class="kpi-label">Rental yield</div><div class="kpi-value" style="color:var(--green)">${escHtml(a.kpis?.yield||a.rentalYield||'—')}</div><div class="kpi-sub">Gross annual</div></div>
+      <div class="kpi"><div class="kpi-label">Appreciation</div><div class="kpi-value" style="color:var(--blue);font-size:15px">${escHtml(a.kpis?.appreciation||'—')}</div><div class="kpi-sub">Annual est.</div></div>
+      <div class="kpi"><div class="kpi-label">Liquidity</div><div class="kpi-value" style="font-size:14px;color:var(--text)">${escHtml(a.kpis?.liquidity||'—')}</div><div class="kpi-sub">Market depth</div></div>
     </div>
 
     <div class="tabs">
@@ -784,12 +823,12 @@ function renderResults(query,a,cfg){
       <div class="panel">
         <div class="panel-header"><div class="panel-icon" style="background:var(--green-pale)"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="var(--green)" stroke-width="2"><polyline points="2,12 6,7 9,10 14,4"/></svg></div><div><div class="panel-title">AI Investment Analysis</div><div class="panel-sub">Claude · Live signals · ${cfg.flag} ${cfg.name}</div></div></div>
         <div class="panel-body">
-          <div class="ai-box"><div class="ai-box-label">Executive Summary</div><div class="ai-box-content">${a.summary}</div></div>
-          <div class="ai-box"><div class="ai-box-label">Investment Thesis</div><div class="ai-box-content">${a.investmentThesis}</div></div>
+          <div class="ai-box"><div class="ai-box-label">Executive Summary</div><div class="ai-box-content">${escHtml(a.summary)}</div></div>
+          <div class="ai-box"><div class="ai-box-label">Investment Thesis</div><div class="ai-box-content">${escHtml(a.investmentThesis)}</div></div>
           <div class="verdict-row">
-            <div class="verdict-card"><div class="verdict-label">Price Range</div><div class="verdict-value" style="color:var(--text);font-size:12px">${a.priceRange}</div></div>
-            <div class="verdict-card"><div class="verdict-label">Verdict</div><div class="verdict-value ${vClass}" style="font-size:22px">${vIcon} ${a.verdict}</div></div>
-            <div class="verdict-card"><div class="verdict-label">Rationale</div><div class="verdict-value" style="color:var(--text2);font-size:11px;font-weight:400;line-height:1.4">${a.verdictReason}</div></div>
+            <div class="verdict-card"><div class="verdict-label">Price Range</div><div class="verdict-value" style="color:var(--text);font-size:12px">${escHtml(a.priceRange)}</div></div>
+            <div class="verdict-card"><div class="verdict-label">Verdict</div><div class="verdict-value ${vClass}" style="font-size:22px">${vIcon} ${escHtml(a.verdict)}</div></div>
+            <div class="verdict-card"><div class="verdict-label">Rationale</div><div class="verdict-value" style="color:var(--text2);font-size:11px;font-weight:400;line-height:1.4">${escHtml(a.verdictReason)}</div></div>
           </div>
         </div>
       </div>
@@ -812,7 +851,7 @@ function renderResults(query,a,cfg){
 
     <div id="pane-pipe" class="pane">
       <div class="panel">
-        <div class="panel-header"><div class="panel-icon" style="background:var(--blue-pale)"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="var(--blue)" stroke-width="2"><rect x="1" y="3" width="14" height="10" rx="1"/><line x1="5" y1="3" x2="5" y2="13"/><line x1="11" y1="3" x2="11" y2="13"/></svg></div><div><div class="panel-title">Development Pipeline</div><div class="panel-sub">${cfg.currency==='SEK'?'Nyproduktion and byggprojekt':'Active and planned developments'} · ${query}</div></div></div>
+        <div class="panel-header"><div class="panel-icon" style="background:var(--blue-pale)"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="var(--blue)" stroke-width="2"><rect x="1" y="3" width="14" height="10" rx="1"/><line x1="5" y1="3" x2="5" y2="13"/><line x1="11" y1="3" x2="11" y2="13"/></svg></div><div><div class="panel-title">Development Pipeline</div><div class="panel-sub">${cfg.currency==='SEK'?'Nyproduktion and byggprojekt':'Active and planned developments'} · ${escHtml(query)}</div></div></div>
         <div class="panel-body" style="padding:0">${pipeRows?`<div style="overflow-x:auto"><table class="dt"><thead><tr><th>Project</th><th>Developer</th><th>Units</th><th>Status</th><th>Completion</th><th>Price from</th></tr></thead><tbody>${pipeRows}</tbody></table></div>`:'<div class="empty" style="padding:24px"><div class="empty-sub">No pipeline data for this query</div></div>'}</div>
       </div>
     </div>
@@ -826,7 +865,7 @@ function renderResults(query,a,cfg){
 
     <div id="pane-title" class="pane">
       <div class="panel">
-        <div class="panel-header"><div class="panel-icon" style="background:var(--red-pale)"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="var(--red)" stroke-width="2"><path d="M8 2L2 6v8h4v-4h4v4h4V6L8 2z"/><line x1="8" y1="7" x2="8" y2="9"/><circle cx="8" cy="11" r=".5" fill="var(--red)"/></svg></div><div><div class="panel-title">${cfg.currency==='SEK'?'Legal & Title Risk':'Title Risk Assessment'}</div><div class="panel-sub">${cfg.flag} ${cfg.name} · ${query}</div></div></div>
+        <div class="panel-header"><div class="panel-icon" style="background:var(--red-pale)"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="var(--red)" stroke-width="2"><path d="M8 2L2 6v8h4v-4h4v4h4V6L8 2z"/><line x1="8" y1="7" x2="8" y2="9"/><circle cx="8" cy="11" r=".5" fill="var(--red)"/></svg></div><div><div class="panel-title">${cfg.currency==='SEK'?'Legal & Title Risk':'Title Risk Assessment'}</div><div class="panel-sub">${cfg.flag} ${cfg.name} · ${escHtml(query)}</div></div></div>
         <div class="panel-body"><div class="flags">${flagsHtml}</div><div class="legal-note">${cfg.legalNote}</div></div>
       </div>
     </div>
@@ -874,9 +913,9 @@ function renderResults(query,a,cfg){
           <div class="copy-toast" id="copy-toast"></div>
           <div style="background:var(--bg3);border-radius:var(--rs);padding:12px;font-size:12px;color:var(--text2);line-height:1.6;margin-top:4px">
             <strong style="color:var(--text)">Analysis summary</strong><br>
-            ${cfg.flag} <strong>${query}</strong> · Verdict: <strong class="${vClass}">${a.verdict}</strong><br>
-            Price: ${a.priceRange} · Yield: ${a.rentalYield} · Appreciation: ${a.capitalAppreciation}<br>
-            <span style="color:var(--text3);font-size:11px">${a.summary}</span>
+            ${cfg.flag} <strong>${escHtml(query)}</strong> · Verdict: <strong class="${vClass}">${escHtml(a.verdict)}</strong><br>
+            Price: ${escHtml(a.priceRange)} · Yield: ${escHtml(a.rentalYield)} · Appreciation: ${escHtml(a.capitalAppreciation)}<br>
+            <span style="color:var(--text3);font-size:11px">${escHtml(a.summary)}</span>
           </div>
           <div class="feedback-row">
             <span class="feedback-label">Was this analysis accurate?</span>

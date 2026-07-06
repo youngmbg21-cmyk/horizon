@@ -542,7 +542,7 @@ body.light .leaflet-container{background:#e8f0ff}
         <div class="kpi-row" id="nwKpis"></div>
         <div class="two-col">
           <div class="card">
-            <div class="card-title">◆ Assets <div class="card-actions"><button class="btn btn-o btn-xs" onclick="openModal('netWorthModal')">Edit Property/Debt</button></div></div>
+            <div class="card-title">◆ Assets <div class="card-actions"><button class="btn btn-o btn-xs" onclick="openNWModal()">Edit Property/Debt</button></div></div>
             <div id="nwAssets"></div>
           </div>
           <div class="card">
@@ -818,6 +818,11 @@ body.light .leaflet-container{background:#e8f0ff}
 const STORAGE_KEY='horizon-os-v2';
 const MN=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 const CSYM={SEK:'kr',USD:'$',EUR:'€',KES:'KSh'};
+// Add n months to a date, anchored to day 1 so month arithmetic never
+// overflows. `d.setMonth(getMonth()+n)` kept the current day-of-month, so on
+// the 29th–31st it rolled into the following month (Jan 31 + 1 → "Feb 31" →
+// Mar 3), skipping/duplicating months in the 12-month strips and tables.
+function addMonths(base,n){return new Date(base.getFullYear(),base.getMonth()+n,1);}
 const PULSE_DESTS=[
   {dest:'Nairobi + Safari',flag:'🇰🇪',why:'East Africa peak season',cost:'SEK 25–45K',lat:-1.29,lng:36.82,vibe:'Safari & Wildlife',col:'#00e8a0'},
   {dest:'Cape Town',flag:'🇿🇦',why:'World-class and affordable',cost:'SEK 20–40K',lat:-33.93,lng:18.42,vibe:'City & Culture',col:'#4d8fff'},
@@ -960,7 +965,11 @@ function connectFirebase(){
     fbRef=fbDb.ref('users/'+(user||'default')+'/state');
     fbRef.once('value',snap=>{
       if(snap.val()){Object.assign(state,snap.val());renderAll()}
-      fbRef.on('value',s=>{if(s.val())Object.assign(state,s.val())});
+      // Re-render (and refresh the sync badge) when a remote change lands —
+      // the listener previously mutated state silently, so other devices' edits
+      // never appeared until some unrelated interaction forced a render, and a
+      // stale-view edit could then overwrite the newer remote data.
+      fbRef.on('value',s=>{if(s.val()){Object.assign(state,s.val());renderAll();setSyncBadge('synced','☁ SYNCED');}});
       document.getElementById('fbStatus').innerHTML='<span style="color:var(--green)">✓ Connected</span>';
       setSyncBadge('synced','☁ SYNCED');
       fbReady=true;
@@ -1113,7 +1122,7 @@ function renderDashboard(){
     <div class="kpi"><div class="kpi-icon">📤</div><div class="kpi-lbl">TOTAL EXPENSES</div><div class="kpi-val neg">${fmt(md.totExp)}</div><div class="kpi-sub">Monthly committed</div></div>
     <div class="kpi"><div class="kpi-icon">🏦</div><div class="kpi-lbl">PLANNED SAVINGS</div><div class="kpi-val bv">${fmt(md.savings)}</div><div class="kpi-sub">${md.totInc?((md.savings/md.totInc)*100).toFixed(1)+'% of income':'-'}</div></div>
     <div class="kpi"><div class="kpi-icon">✦</div><div class="kpi-lbl">FUN FUND</div><div class="kpi-val neu">${fmt(md.funFund)}</div><div class="kpi-sub">Free after savings</div></div>
-    <div class="kpi"><div class="kpi-icon">◈</div><div class="kpi-lbl">NEST EGG</div><div class="kpi-val vv">${fmtC(ne)}</div><div class="kpi-sub">${state.nestEggReal?'Real (inflation-adj)':'Nominal'} · age ${state.retirementAge}</div></div>
+    <div class="kpi"><div class="kpi-icon">◈</div><div class="kpi-lbl">NEST EGG</div><div class="kpi-val vv">${fmtC(state.nestEggReal?realVal(ne,ytr):ne)}</div><div class="kpi-sub">${state.nestEggReal?'Real (inflation-adj)':'Nominal'} · age ${state.retirementAge}</div></div>
     <div class="kpi"><div class="kpi-icon">💵</div><div class="kpi-lbl">RETIREMENT DRAW</div><div class="kpi-val pos">${fmtC(draw)}</div><div class="kpi-sub">After tax · inc. pension</div></div>
   `;
 
@@ -1133,7 +1142,7 @@ function renderDashboard(){
     let rows='<div style="overflow-x:auto"><table style="width:100%;font-size:11px;font-family:var(--fm);border-collapse:collapse">';
     rows+='<tr style="color:var(--text3)"><th style="text-align:left;padding:4px 6px">Month</th><th style="padding:4px 6px">Income</th><th style="padding:4px 6px">Expenses</th><th style="padding:4px 6px">Savings</th><th style="padding:4px 6px">Fun Fund</th></tr>';
     for(let i=0;i<12;i++){
-      const d=new Date(now); d.setMonth(now.getMonth()+i);
+      const d=addMonths(now,i);
       const k=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
       const m=getMonthData(k);
       const isCur=i===0;
@@ -1151,7 +1160,7 @@ function renderDashboard(){
   // Savings chart
   const labs=[],sdata=[],fdata=[];
   for(let i=0;i<12;i++){
-    const d=new Date(now);d.setMonth(now.getMonth()+i);
+    const d=addMonths(now,i);
     const k=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
     const m=getMonthData(k);
     labs.push(MN[d.getMonth()]+" '"+(d.getFullYear()%100));
@@ -1187,7 +1196,7 @@ function renderCashflow(){
   // Month strip
   let pills='';
   for(let i=0;i<12;i++){
-    const d=new Date(now);d.setMonth(now.getMonth()+i);
+    const d=addMonths(now,i);
     const k=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
     const isCur=i===0,isSel=k===state.selectedMonth;
     const hasOv=!!state.monthlyOverrides[k];
@@ -1235,15 +1244,23 @@ function lineHTML(type,item){
 
 function render12MoTable(){
   const now=new Date();
-  const expNames=[...new Set([...state.expenses.map(e=>e.name)])];
+  // Union of baseline names AND every name that appears in any of the 12
+  // months' effective (override-including) expenses — otherwise an expense
+  // added via a month override had no row, yet its amount was still counted
+  // in the TOTAL row, so the column totals didn't match the rows above them.
+  const monthKeys=[];
+  for(let i=0;i<12;i++){const d=addMonths(now,i);monthKeys.push(`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`);}
+  const nameSet=new Set(state.expenses.map(e=>e.name));
+  monthKeys.forEach(k=>getMonthData(k).expenses.forEach(e=>nameSet.add(e.name)));
+  const expNames=[...nameSet];
   let html=`<tr style="color:var(--text3)"><th style="text-align:left;padding:5px 8px;min-width:120px;white-space:nowrap">Expense</th>`;
-  for(let i=0;i<12;i++){const d=new Date(now);d.setMonth(now.getMonth()+i);html+=`<th style="padding:5px 8px;text-align:right;white-space:nowrap">${MN[d.getMonth()]}</th>`}
+  for(let i=0;i<12;i++){const d=addMonths(now,i);html+=`<th style="padding:5px 8px;text-align:right;white-space:nowrap">${MN[d.getMonth()]}</th>`}
   html+='<th style="padding:5px 8px;text-align:right">Total</th></tr>';
   expNames.forEach(name=>{
-    html+=`<tr style="border-top:1px solid var(--border)"><td style="padding:5px 8px;color:var(--text2)">${name}</td>`;
+    html+=`<tr style="border-top:1px solid var(--border)"><td style="padding:5px 8px;color:var(--text2)">${mdEsc(name)}</td>`;
     let rowTotal=0;
     for(let i=0;i<12;i++){
-      const d=new Date(now);d.setMonth(now.getMonth()+i);
+      const d=addMonths(now,i);
       const k=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
       const md=getMonthData(k);
       const exp=md.expenses.find(e=>e.name===name);
@@ -1257,7 +1274,7 @@ function render12MoTable(){
   html+=`<tr style="border-top:2px solid var(--border2);font-weight:700"><td style="padding:5px 8px;color:var(--text)">TOTAL</td>`;
   let grandTotal=0;
   for(let i=0;i<12;i++){
-    const d=new Date(now);d.setMonth(now.getMonth()+i);
+    const d=addMonths(now,i);
     const k=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
     const md=getMonthData(k);
     grandTotal+=md.totExp;
@@ -1414,7 +1431,7 @@ function renderAssets(){
   document.getElementById('assetKpis').innerHTML=`
     <div class="kpi"><div class="kpi-icon">◆</div><div class="kpi-lbl">CURRENT ASSETS</div><div class="kpi-val">${fmtC(totalNow)}</div></div>
     <div class="kpi"><div class="kpi-icon">📥</div><div class="kpi-lbl">MONTHLY CONTRIBUTIONS</div><div class="kpi-val bv">${fmt(totalMo)}</div></div>
-    <div class="kpi"><div class="kpi-icon">◈</div><div class="kpi-lbl">PROJECTED NEST EGG</div><div class="kpi-val vv">${fmtC(ne)}</div><div class="kpi-sub">${state.nestEggReal?'Real values':'Nominal'}</div></div>
+    <div class="kpi"><div class="kpi-icon">◈</div><div class="kpi-lbl">PROJECTED NEST EGG</div><div class="kpi-val vv">${fmtC(state.nestEggReal?realVal(ne,ytr):ne)}</div><div class="kpi-sub">${state.nestEggReal?'Real values':'Nominal'}</div></div>
     <div class="kpi"><div class="kpi-icon">📅</div><div class="kpi-lbl">YEARS TO GO</div><div class="kpi-val neu">${ytr}Y</div><div class="kpi-sub">Retire at ${state.retirementAge}</div></div>
   `;
   const colors=['#00e8a0','#4d8fff','#f5a623','#8b5cf6','#00d4ff','#ec4899'];
@@ -1504,7 +1521,7 @@ function updateAffordCalc(){
   if(!target||ff<=0){document.getElementById('affordCalc').innerHTML='<div style="color:var(--text3);font-size:12px">Enter a target budget above.</div>';return}
   const months=Math.ceil(target/ff);
   const now=new Date();
-  const ready=new Date(now);ready.setMonth(now.getMonth()+months);
+  const ready=addMonths(now,months);
   const alreadyCanAfford=ff*1>=target;
   document.getElementById('affordCalc').innerHTML=`
     <div style="font-family:var(--fm);font-size:12px;line-height:2">
@@ -1513,8 +1530,8 @@ function updateAffordCalc(){
       <div>Months to save: <strong style="color:var(--cyan)">${months} months</strong></div>
       <div>Ready by: <strong style="color:var(--green)">${alreadyCanAfford?'NOW ✓':MN[ready.getMonth()]+' '+ready.getFullYear()}</strong></div>
       <div style="margin-top:8px">
-        <div class="pbar"><div class="pbar-fill" style="width:${Math.min(ff/target*100*months,100)}%;background:var(--green)"></div></div>
-        <div style="font-size:10px;color:var(--text3);margin-top:2px">${Math.min(100,Math.round(ff/target*100))}% funded today</div>
+        <div class="pbar"><div class="pbar-fill" style="width:${target>0?Math.min(ff/target*100,100):0}%;background:var(--green)"></div></div>
+        <div style="font-size:10px;color:var(--text3);margin-top:2px">${target>0?Math.min(100,Math.round(ff/target*100)):0}% funded today</div>
       </div>
     </div>`;
 }
@@ -1525,7 +1542,7 @@ function renderFundTimeline(){
   const now=new Date();
   for(let i=0;i<12;i++){
     cum+=ff;
-    const d=new Date(now);d.setMonth(now.getMonth()+i);
+    const d=addMonths(now,i);
     const hl=i===5||i===11;
     html+=`<div class="fund-mo ${hl?'hl':''}">
       <div class="fund-mo-name">${MN[d.getMonth()]}</div>
@@ -1542,7 +1559,12 @@ function renderPulseGrid(){
   let dests=[...PULSE_DESTS];
   if(vibe!=='Any Vibe')dests.sort((a,b)=>a.vibe===vibe?-1:b.vibe===vibe?1:0);
   document.getElementById('pulseGrid').innerHTML=dests.slice(0,6).map(d=>{
-    const affordable=parseInt(d.cost.replace(/[^0-9]/g,''))*1000<=ff;
+    // cost is a range like "SEK 25–45K": take the UPPER bound × 1000.
+    // The old code stripped all non-digits, concatenating "25" and "45"
+    // into "2545" → a 2.5M threshold that marked nearly everything unaffordable.
+    const _nums=(d.cost.match(/\d+/g)||[]).map(Number);
+    const _upper=_nums.length?Math.max(..._nums):0;
+    const affordable=_upper*1000<=ff;
     return`<div class="pulse-card" onclick="vacMapFocus(${d.lat},${d.lng})">
       <div class="pulse-flag">${d.flag}</div>
       <div class="pulse-dest">${d.dest}</div>
@@ -1577,7 +1599,7 @@ function updateTripCalc(){
   if(!budget||ff<=0)return;
   const months=Math.ceil(budget/ff);
   const now=new Date();
-  const ready=new Date(now);ready.setMonth(now.getMonth()+months);
+  const ready=addMonths(now,months);
   document.getElementById('tb-calc').innerHTML=`
     Budget: <strong style="color:var(--amber)">${fmtC(budget)}</strong> &nbsp;·&nbsp;
     Fun Fund: <strong style="color:var(--green)">${fmtC(ff)}/mo</strong> &nbsp;·&nbsp;
@@ -1892,20 +1914,22 @@ Return ONLY valid JSON:
     const clean=res.replace(/```json|```/g,'').trim();
     const parsed=JSON.parse(clean);
 
+    // mdEsc() every model-returned field — this JSON comes straight from the
+    // API and is injected via innerHTML.
     document.getElementById('apexMods').innerHTML=parsed.modules.map(m=>`
       <div class="apex-mod">
-        <div class="apex-mod-name">${m.name}</div>
-        <div class="apex-mod-val ${m.status}">${m.score}/100</div>
-        <div style="font-size:9px;color:var(--text3);margin-top:3px;font-family:var(--fm);line-height:1.4">${m.detail}</div>
-        <div class="pbar" style="margin-top:5px"><div class="pbar-fill" style="width:${m.score}%;background:${m.status==='pass'?'var(--green)':m.status==='warn'?'var(--amber)':'var(--red)'}"></div></div>
+        <div class="apex-mod-name">${mdEsc(m.name)}</div>
+        <div class="apex-mod-val ${mdEsc(m.status)}">${mdEsc(m.score)}/100</div>
+        <div style="font-size:9px;color:var(--text3);margin-top:3px;font-family:var(--fm);line-height:1.4">${mdEsc(m.detail)}</div>
+        <div class="pbar" style="margin-top:5px"><div class="pbar-fill" style="width:${Number(m.score)||0}%;background:${m.status==='pass'?'var(--green)':m.status==='warn'?'var(--amber)':'var(--red)'}"></div></div>
       </div>`).join('');
 
     const vc=parsed.verdict==='FEASIBLE'?'FEASIBLE':parsed.verdict==='CONDITIONAL'?'CONDITIONAL':'NOT_FEASIBLE';
     document.getElementById('apexVerdict').innerHTML=`
-      <div class="apex-verdict ${vc}">${parsed.verdict} — ${dest}</div>
-      <div style="text-align:center;color:var(--text2);font-size:11px;margin-top:5px;font-family:var(--fm)">${parsed.verdict_sub||''}</div>`;
+      <div class="apex-verdict ${vc}">${mdEsc(parsed.verdict)} — ${mdEsc(dest)}</div>
+      <div style="text-align:center;color:var(--text2);font-size:11px;margin-top:5px;font-family:var(--fm)">${mdEsc(parsed.verdict_sub||'')}</div>`;
 
-    document.getElementById('apexOut').innerHTML=`<div style="color:var(--text);font-size:12px;line-height:1.85;margin-bottom:12px">${(parsed.analysis||'').replace(/\*\*(.*?)\*\*/g,'<strong style="color:var(--amber)">$1</strong>').replace(/\n/g,'<br>')}</div>`;
+    document.getElementById('apexOut').innerHTML=`<div style="color:var(--text);font-size:12px;line-height:1.85;margin-bottom:12px">${mdEsc(parsed.analysis||'').replace(/\*\*(.*?)\*\*/g,'<strong style="color:var(--amber)">$1</strong>').replace(/\n/g,'<br>')}</div>`;
 
     // Migration Timeline
     if(parsed.action_steps?.length){
@@ -1916,9 +1940,9 @@ Return ONLY valid JSON:
           return`<div class="mig-step">
             <div class="mig-dot ${dotCls}">${i+1}</div>
             <div class="mig-body">
-              <div class="mig-year">${s.year||'Phase '+(i+1)}</div>
-              <div class="mig-title">${s.title}</div>
-              <div class="mig-desc">${s.desc}</div>
+              <div class="mig-year">${mdEsc(s.year||'Phase '+(i+1))}</div>
+              <div class="mig-title">${mdEsc(s.title)}</div>
+              <div class="mig-desc">${mdEsc(s.desc)}</div>
             </div>
           </div>`}).join('')+'</div></div>';
       document.getElementById('migTimeline').innerHTML=tl;
@@ -1929,7 +1953,7 @@ Return ONLY valid JSON:
   }catch(e){
     document.getElementById('apexStatus').textContent='ERROR';
     document.getElementById('apexStatus').className='apex-status fail';
-    document.getElementById('apexOut').innerHTML=`<span style="color:var(--red)">${e.message}</span>`;
+    document.getElementById('apexOut').innerHTML=`<span style="color:var(--red)">${mdEsc(e.message)}</span>`;
   }
 }
 
@@ -1972,12 +1996,26 @@ User financial context: Income: SEK ${Math.round(totalIncome()).toLocaleString()
   document.getElementById('aiMsgs').appendChild(thinkingEl);
   document.getElementById('aiMsgs').scrollTop=99999;
   try{
-    const res=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'Content-Type':'application/json','x-api-key':apiKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:500,system,messages:chatHistory.slice(-6)})});
+    // Trim to whole user→assistant turns AND guarantee the first message is
+    // a user turn. A raw slice(-6) began with an assistant turn from the 4th
+    // message on, which the Anthropic API rejects (400) — and res.ok was
+    // never checked, so the chat silently died with "No response" after
+    // three exchanges.
+    let convo=chatHistory.slice(-6);
+    while(convo.length && convo[0].role!=='user') convo=convo.slice(1);
+    const res=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'Content-Type':'application/json','x-api-key':apiKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:500,system,messages:convo})});
+    if(res.status===401) throw new Error('Invalid API key.');
+    if(!res.ok) throw new Error('API error '+res.status);
     const data=await res.json();
     const reply=data.content?.map(c=>c.text||'').join('')||'No response';
     chatHistory.push({role:'assistant',content:reply});
     thinkingEl.innerHTML=mdParse(reply);
-  }catch(e){thinkingEl.innerHTML=`<span style="color:var(--red)">${e.message}</span>`}
+  }catch(e){
+    // Remove the user turn we optimistically pushed so a failed send doesn't
+    // poison the next request's history.
+    if(chatHistory.length && chatHistory[chatHistory.length-1].role==='user') chatHistory.pop();
+    thinkingEl.innerHTML=`<span style="color:var(--red)">${mdEsc(e.message)}</span>`;
+  }
   document.getElementById('aiMsgs').scrollTop=99999;
 }
 function addChatMsg(role,text){
@@ -2002,8 +2040,13 @@ async function callClaude(prompt,maxTokens=1000){
 // ═══════════════════════════════════════════════════════════════════
 // MARKDOWN PARSER
 // ═══════════════════════════════════════════════════════════════════
+// Escape HTML entities (incl. quotes) — mdParse output is injected via
+// innerHTML, so raw markup in a model reply must not become live nodes.
+function mdEsc(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');}
 function mdParse(t){
-  return t
+  // Escape FIRST, then apply the markdown rules to the escaped text so the
+  // generated tags survive but any HTML in the source does not.
+  return mdEsc(t)
     .replace(/^## (.+)$/gm,'<h3>$1</h3>')
     .replace(/^### (.+)$/gm,'<h4>$1</h4>')
     .replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>')
