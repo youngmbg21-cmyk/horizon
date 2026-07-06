@@ -3586,6 +3586,11 @@ body.light .geo-dropdown { box-shadow:0 10px 30px -10px rgba(60,40,10,0.22); }
 .si-currency-row label{font-size:13px;font-weight:600;color:var(--text)}
 .si-currency-row select{background:var(--bg0);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:13px;padding:7px 10px;font-family:var(--fm)}
 .si-currency-hint{font-size:11px;color:var(--text3);flex:1;min-width:180px;line-height:1.4}
+.si-acct-chip{background:var(--bg3);border:1px solid var(--border);border-radius:100px;color:var(--text2);font-size:11px;padding:4px 10px;cursor:pointer}
+.si-tx-badge{display:inline-block;font-size:9px;font-weight:700;letter-spacing:.05em;border-radius:4px;padding:1px 6px;vertical-align:1px}
+.si-tx-badge.pay{background:var(--blue-dim);color:var(--blue);border:1px solid #4d9fff30}
+.si-tx-badge.ref{background:var(--green-dim);color:var(--green);border:1px solid #00e8a030}
+.si-tx-badge.fee{background:var(--red-dim);color:var(--red);border:1px solid #ff4d6d30}
 .si-paste{margin-top:18px;background:var(--bg2);border:1px solid var(--border);border-radius:var(--r);padding:14px 16px}
 .si-paste-t{font-size:13px;font-weight:600;margin-bottom:10px}
 .si-paste textarea{width:100%;min-height:88px;background:var(--bg0);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:var(--fm);font-size:12px;padding:11px;resize:vertical}
@@ -8111,8 +8116,13 @@ function _handleCsvFile(file){
   };
   reader.readAsText(file);
 }
-function _buildCsvTransactions(rows, map){
+// opts.typeCol (optional): index of a source "Type" column (Sale / Payment /
+// Return / Fee — credit-card exports). When provided, its raw value is
+// attached as tx.srcType so account-aware consumers (Spend Insights) can
+// classify rows without re-parsing the file.
+function _buildCsvTransactions(rows, map, opts){
   if(map.date < 0 || map.amount < 0) return [];
+  const typeCol = opts && typeof opts.typeCol === 'number' ? opts.typeCol : -1;
   return rows.map((row, i) => {
     const rawDate = String(row[map.date] || '').trim();
     const rawAmt  = row[map.amount];
@@ -8147,7 +8157,7 @@ function _buildCsvTransactions(rows, map){
     }
     const amount = _parseCsvAmount(rawAmt);
     if(!date || amount === 0) return null;
-    return {
+    const tx = {
       id: genId(),
       date,
       name: rawDesc || 'Transaction',
@@ -8156,6 +8166,11 @@ function _buildCsvTransactions(rows, map){
       type: amount >= 0 ? 'credit' : 'debit',
       icon: amount >= 0 ? '💰' : '💳',
     };
+    if(typeCol >= 0){
+      const st = String(row[typeCol] || '').trim();
+      if(st) tx.srcType = st;
+    }
+    return tx;
   }).filter(Boolean);
 }
 window._commitCsvImport = function(){
@@ -10950,6 +10965,9 @@ let _siUploadCurrency = null; // currency the uploaded file is denominated in
                             // converted to base currency at ingest time.
 let _siCurrencyTouched = false; // user picked the currency manually → don't
                             // let auto-detect override their choice
+let _siAccountType = null;    // 'bank' | 'credit' — what kind of statement the
+                            // upload is; null → auto-detect at ingest
+let _siAccountTouched = false; // user picked the account type manually
 
 // Full HTML-entity escape (incl. quotes) for model/user text rendered into
 // this feature's markup. The app-wide esc() intentionally omits quotes; this
@@ -10970,14 +10988,52 @@ function _siDatey(v){
 
 // Derive spend metrics from state.transactions. Amounts are stored in the
 // app's base currency; fmt() applies the display rate at render time.
+//
+// Account-aware: in 'credit' mode a positive amount is a card PAYMENT (the
+// user's own transfer) or a REFUND — never income. Purchases are the
+// negatives; refunds net against their category; fees are tracked
+// separately. In 'bank' mode the original income/expense semantics apply.
 function _siMetrics(){
   const txs = Array.isArray(state.transactions) ? state.transactions : [];
+  const accountType = (state.spendMeta && state.spendMeta.accountType) || 'bank';
   let income=0, spend=0, largest=0, largestName='';
+  let payments=0, refunds=0, fees=0;
   const byCat={}, byMonth={};
+  const monthSlot = ym => {
+    if(!byMonth[ym]) byMonth[ym] = {income:0, spend:0, payments:0};
+    return byMonth[ym];
+  };
   txs.forEach(tx => {
     const amt = Number(tx.amount)||0;
-    const isCredit = tx.type==='credit' || amt>0;
     const abs = Math.abs(amt);
+    const ym = String(tx.date||'').slice(0,7);
+    const hasYm = /^\d{4}-\d{2}$/.test(ym);
+    if(accountType === 'credit'){
+      const cls = _siClassify(tx);
+      if(cls === 'payment'){
+        payments += abs;
+        if(hasYm) monthSlot(ym).payments += abs;
+        return;
+      }
+      if(cls === 'refund'){
+        refunds += abs;
+        // Refunds reduce their category's spend and the monthly spend bar.
+        const cat = tx.category || 'Other';
+        byCat[cat] = (byCat[cat]||0) - abs;
+        if(hasYm) monthSlot(ym).spend -= abs;
+        return;
+      }
+      // purchase or fee — both are spending; fees also totalled separately.
+      if(cls === 'fee') fees += abs;
+      spend += abs;
+      const cat = tx.category || 'Other';
+      byCat[cat] = (byCat[cat]||0) + abs;
+      if(abs>largest){ largest=abs; largestName = tx.name || cat; }
+      if(hasYm) monthSlot(ym).spend += abs;
+      return;
+    }
+    // ── bank-account semantics (original) ──
+    const isCredit = tx.type==='credit' || amt>0;
     if(isCredit){ income += abs; }
     else {
       spend += abs;
@@ -10985,16 +11041,17 @@ function _siMetrics(){
       byCat[cat] = (byCat[cat]||0) + abs;
       if(abs>largest){ largest=abs; largestName = tx.name || cat; }
     }
-    const ym = String(tx.date||'').slice(0,7);
-    if(/^\d{4}-\d{2}$/.test(ym)){
-      if(!byMonth[ym]) byMonth[ym] = {income:0, spend:0};
-      if(isCredit) byMonth[ym].income += abs; else byMonth[ym].spend += abs;
+    if(hasYm){
+      const slot = monthSlot(ym);
+      if(isCredit) slot.income += abs; else slot.spend += abs;
     }
   });
+  if(accountType === 'credit') spend = spend - refunds; // net spend
   const net = income - spend;
-  const cats = Object.entries(byCat).sort((a,b)=>b[1]-a[1]);
+  const cats = Object.entries(byCat).filter(([,v])=>v>0).sort((a,b)=>b[1]-a[1]);
   const months = Object.keys(byMonth).sort();
-  return { txs, income, spend, net, savingsRate: income>0?net/income:0,
+  return { txs, accountType, income, spend, net, savingsRate: income>0?net/income:0,
+           payments, refunds, fees,
            cats, byCat, byMonth, months, largest, largestName, count: txs.length };
 }
 
@@ -11030,7 +11087,12 @@ function _siUploadView(hasData){
       <select id="si-currency" onchange="siSetUploadCurrency(this.value)">
         ${['SEK','USD','EUR','KES'].map(c=>`<option value="${c}"${(_siUploadCurrency||'SEK')===c?' selected':''}>${c} · ${_siEsc(CURRENCY_SYMBOLS[c]||c)}</option>`).join('')}
       </select>
-      <span class="si-currency-hint">Auto-detected from the file when possible. Amounts are converted to your base currency using Settings → Exchange Rates.</span>
+      <label for="si-acct" style="margin-left:8px">Account type</label>
+      <select id="si-acct" onchange="siSetAccountType(this.value)">
+        <option value="bank"${(_siAccountType||'bank')==='bank'?' selected':''}>Bank account</option>
+        <option value="credit"${_siAccountType==='credit'?' selected':''}>Credit card</option>
+      </select>
+      <span class="si-currency-hint">Both are auto-detected from the file when possible. On a credit card, payments to the card are transfers — not income — and are reported separately.</span>
     </div>
     <div class="si-paste">
       <div class="si-paste-t">⌨︎ …or paste transactions straight in</div>
@@ -11088,6 +11150,46 @@ function _siLooksBinary(text){
   if(sample.length && bad / sample.length > 0.1) return 'binary';
   return null;
 }
+// Classify a transaction row for credit-card semantics. Prefers the source
+// Type column (Chase-style Sale/Payment/Return/Fee/Adjustment) and falls back
+// to description patterns + amount sign. On a card statement a positive
+// amount is a payment TO the card or a refund — never income.
+function _siClassify(tx){
+  const st = String(tx.srcType || '').toLowerCase();
+  const amt = Number(tx.amount) || 0;
+  if(st){
+    if(/payment/.test(st)) return 'payment';
+    if(/return|refund/.test(st)) return 'refund';
+    if(/fee|interest/.test(st)) return 'fee';
+    if(/adjustment/.test(st)) return amt >= 0 ? 'refund' : 'fee';
+    if(/sale|purchase/.test(st)) return amt >= 0 ? 'refund' : 'purchase';
+  }
+  const name = String(tx.name || '').toLowerCase();
+  if(amt > 0 && /payment thank you|autopay|automatic payment|online payment|payment received|betalning mottagen|direct debit/.test(name)) return 'payment';
+  if(/fee|interest charge|ränta|avgift/.test(name) && amt < 0) return 'fee';
+  return amt >= 0 ? 'refund' : 'purchase';
+}
+// Guess whether an upload is a CREDIT CARD statement or a bank account.
+// Signals: a Sale/Payment-style Type column, "payment thank you" rows,
+// Transaction+Post date header pair, and an overwhelmingly-negative amount
+// profile whose few positives are card payments.
+function _siDetectAccountType(headers, txs){
+  const h = headers.map(x => String(x||'').toLowerCase());
+  let score = 0;
+  if(h.some(x => /post(ing)? date/.test(x)) && h.some(x => /transaction date/.test(x))) score += 2;
+  const stVals = new Set(txs.map(t => String(t.srcType||'').toLowerCase()).filter(Boolean));
+  if(stVals.has('sale') && (stVals.has('payment') || stVals.has('return'))) score += 3;
+  if(txs.some(t => /payment thank you|autopay/i.test(t.name||''))) score += 2;
+  const neg = txs.filter(t => (Number(t.amount)||0) < 0).length;
+  if(txs.length >= 10 && neg / txs.length >= 0.8) score += 1;
+  return score >= 3 ? 'credit' : 'bank';
+}
+// Bank exports often HTML-encode merchant names ("BULL &amp; BEAR INN").
+// Decode the common entities so names read naturally; everything is
+// re-escaped through _siEsc at render time, so this cannot introduce markup.
+function _siDecodeEntities(s){
+  return String(s||'').replace(/&amp;/g,'&').replace(/&quot;/g,'"').replace(/&#39;|&apos;/g,"'").replace(/&lt;/g,'<').replace(/&gt;/g,'>').replace(/&nbsp;/g,' ');
+}
 // Guess the currency a file is denominated in from symbols/codes in its text.
 function _siDetectCurrency(text){
   const t = text.toUpperCase();
@@ -11142,11 +11244,19 @@ function _siIngestText(text, sourceName){
   const data = hasHeader ? rows.slice(1) : rows;
   if(!data.length){ alert('That file has a header but no transaction rows.'); return; }
   const map = _detectCsvColumns(headers, data[0]);
-  const txs = _buildCsvTransactions(data.slice(0, 5000), map);
+  // Source "Type" column (Sale / Payment / Return / Fee on card exports) —
+  // only if it isn't already claimed as the category column.
+  const typeCol = headers.findIndex((h, i) => i !== map.category && /^type$|transaction ?type/i.test(String(h||'').trim()));
+  const txs = _buildCsvTransactions(data.slice(0, 5000), map, { typeCol });
   if(!txs.length){
     alert('Couldn’t find a date and amount column in that file. Make sure your export includes at least a date column and an amount column.');
     return;
   }
+  // Decode HTML entities bank exports embed in merchant names.
+  txs.forEach(tx => { tx.name = _siDecodeEntities(tx.name); tx.category = _siDecodeEntities(tx.category); });
+  // Account type: manual pick wins; otherwise detect from the file's shape.
+  if(!_siAccountTouched) _siAccountType = _siDetectAccountType(headers, txs);
+  const accountType = _siAccountType || 'bank';
   // Convert amounts into the app's base currency (SEK). Everything downstream
   // (metrics, chart, AI prompt) assumes base; fmt() then converts to the
   // user's display currency at render. rate(cur) is SEK→cur, so base = cur/rate.
@@ -11155,7 +11265,7 @@ function _siIngestText(text, sourceName){
     txs.forEach(tx => { tx.amount = Math.round((Number(tx.amount)||0) / r); });
   }
   state.transactions = txs;
-  state.spendMeta = { uploadCurrency: uploadCur }; // for the "converted from" note
+  state.spendMeta = { uploadCurrency: uploadCur, accountType }; // drives labels + AI framing
   state.spendInsights = null;   // stale summary no longer matches the data
   state.bankConnected = true;
   state.bankMode = 'imported';
@@ -11170,34 +11280,121 @@ window.siBackToInsights = function(){ _siForceUpload = false; renderTransactions
 window.siSetUploadCurrency = function(cur){
   _siUploadCurrency = cur; _siCurrencyTouched = true; // manual pick wins over auto-detect
 };
+window.siSetAccountType = function(type, reingest){
+  _siAccountType = type === 'credit' ? 'credit' : 'bank';
+  _siAccountTouched = true;
+  if(reingest){
+    // Changing the interpretation of ALREADY-LOADED data: update the meta,
+    // drop the cached AI summary (its framing no longer matches), re-render.
+    if(state.spendMeta) state.spendMeta.accountType = _siAccountType;
+    else state.spendMeta = { uploadCurrency:'SEK', accountType:_siAccountType };
+    state.spendInsights = null;
+    _siError = null;
+    _siGen++;
+    save();
+    renderTransactions();
+  }
+};
 
 // ─── AI SUMMARY ──────────────────────────────────────────────────────────────
+// Every figure in the prompt is pre-formatted in the user's DISPLAY currency
+// (fmt applies the rate + symbol) so the AI's numbers always match the KPI
+// cards on screen — the old prompt sent unlabeled base-currency values, and
+// the verdict showed "167,039" while the cards showed "$18,374".
 function _siBuildPrompt(m){
   const _mn = monthNames();
-  const money = n => Math.round(n).toLocaleString('en-US');
+  const money = n => fmt(n).replace(/ | /g, ' '); // display currency + symbol
+  const isCard = m.accountType === 'credit';
+  const norm = s => String(s||'').toLowerCase().replace(/[0-9]+|[*#]/g,'').replace(/\s+/g,' ').trim();
+  const isSpendTx = t => isCard ? _siClassify(t) === 'purchase' || _siClassify(t) === 'fee'
+                                : (t.type==='debit' || (Number(t.amount)||0) < 0);
+
   const monthly = m.months.map(ym => {
     const [y,mo]=ym.split('-');
-    return `  ${_mn[(+mo)-1]} ${y}: in ${money(m.byMonth[ym].income)}, out ${money(m.byMonth[ym].spend)}`;
+    const slot = m.byMonth[ym];
+    return isCard
+      ? `  ${_mn[(+mo)-1]} ${y}: spend ${money(slot.spend)}, card payments ${money(slot.payments||0)}`
+      : `  ${_mn[(+mo)-1]} ${y}: in ${money(slot.income)}, out ${money(slot.spend)}`;
   }).join('\n');
+
   const catLines = m.cats.map(([c,v]) =>
     `  ${c}: ${money(v)} (${m.spend>0?Math.round(v/m.spend*100):0}% of spend)`).join('\n');
-  // Largest single debits.
-  const topDebits = m.txs.filter(t => (t.type==='debit'|| (Number(t.amount)||0)<0))
+
+  // Largest single purchases.
+  const topDebits = m.txs.filter(isSpendTx)
     .sort((a,b)=>Math.abs(Number(b.amount)||0)-Math.abs(Number(a.amount)||0))
     .slice(0,8).map(t => `  ${t.date} · ${t.name||'?'} · ${money(Math.abs(Number(t.amount)||0))}`).join('\n');
-  // Recurring merchants (same normalised name appearing 3+ times).
-  const norm = s => String(s||'').toLowerCase().replace(/[0-9]+/g,'').replace(/\s+/g,' ').trim();
+
+  // Merchant aggregation — top merchants by total AND by visit count, so the
+  // model can talk about behaviour ("42 Wolt orders") not just categories.
   const groups = {};
-  m.txs.forEach(t => { if(t.type==='debit'||(Number(t.amount)||0)<0){ const k=norm(t.name); if(!k) return; (groups[k]=groups[k]||{n:0,sum:0,label:t.name}).n++; groups[k].sum+=Math.abs(Number(t.amount)||0); }});
-  const recurring = Object.values(groups).filter(g=>g.n>=3).sort((a,b)=>b.n-a.n).slice(0,8)
+  m.txs.forEach(t => {
+    if(!isSpendTx(t)) return;
+    const k = norm(t.name); if(!k) return;
+    const g = (groups[k] = groups[k] || {n:0, sum:0, label:t.name, months:new Set(), amts:[]});
+    const abs = Math.abs(Number(t.amount)||0);
+    g.n++; g.sum += abs; g.amts.push(abs);
+    const ym = String(t.date||'').slice(0,7); if(ym) g.months.add(ym);
+  });
+  const gl = Object.values(groups);
+  const topBySum   = gl.slice().sort((a,b)=>b.sum-a.sum).slice(0,8)
+    .map(g=>`  ${g.label} · ${g.n}× · ${money(g.sum)} total · avg ${money(g.sum/g.n)}`).join('\n');
+  const topByCount = gl.slice().sort((a,b)=>b.n-a.n).slice(0,8)
     .map(g=>`  ${g.label} · ${g.n}× · ${money(g.sum)} total`).join('\n');
 
-  return `You are a personal-finance analyst. Below is a summary of a user's uploaded bank transactions (${m.count} transactions, ${_siRangeLabel(m)}). All amounts are in the user's base currency. Do NOT invent numbers — only reference the figures given.
+  // Subscription candidates: same merchant, ≥3 charges, similar amounts,
+  // spread over ≥2 distinct months — the "forgotten recurring charge" shape.
+  const subs = gl.filter(g => {
+    if(g.n < 3 || g.months.size < 2) return false;
+    const sorted = g.amts.slice().sort((a,b)=>a-b);
+    const median = sorted[Math.floor(sorted.length/2)] || 0;
+    if(!median) return false;
+    return g.amts.filter(a => Math.abs(a-median)/median <= 0.2).length >= g.amts.length*0.7;
+  }).sort((a,b)=>b.sum-a.sum).slice(0,6)
+    .map(g=>`  ${g.label} · ${g.n}× over ${g.months.size} months · ~${money(g.sum/g.n)} each`).join('\n');
+
+  // Month-over-month category movers: last month vs the average of the
+  // months before it.
+  const movers = (() => {
+    if(m.months.length < 2) return '';
+    const last = m.months[m.months.length-1];
+    const perCatMonth = {};
+    m.txs.forEach(t => {
+      if(!isSpendTx(t)) return;
+      const ym = String(t.date||'').slice(0,7); if(!ym) return;
+      const cat = t.category || 'Other';
+      (perCatMonth[cat] = perCatMonth[cat] || {})[ym] = (perCatMonth[cat][ym]||0) + Math.abs(Number(t.amount)||0);
+    });
+    return Object.entries(perCatMonth).map(([cat, byYm]) => {
+      const lastV = byYm[last] || 0;
+      const priorMonths = m.months.slice(0,-1);
+      const priorAvg = priorMonths.reduce((s,ym)=>s+(byYm[ym]||0),0) / priorMonths.length;
+      if(priorAvg < 1) return null;
+      const deltaPct = Math.round((lastV - priorAvg) / priorAvg * 100);
+      return { cat, lastV, priorAvg, deltaPct };
+    }).filter(Boolean).sort((a,b)=>Math.abs(b.deltaPct)-Math.abs(a.deltaPct)).slice(0,4)
+      .map(x=>`  ${x.cat}: ${money(x.lastV)} last month vs ${money(x.priorAvg)} prior-month average (${x.deltaPct>0?'+':''}${x.deltaPct}%)`).join('\n');
+  })();
+
+  const header = isCard
+    ? `You are a precise personal-finance analyst. Below is a summary of a user's uploaded CREDIT CARD statement (${m.count} transactions, ${_siRangeLabel(m)}, ${m.months.length} months).
+CRITICAL: this is a credit card. "Card payments" are the user's own transfers to pay the card — they are NOT income. Refunds are NOT income. NEVER mention income, salary, or savings rate. Frame everything around spending composition, payment coverage vs spending, fees, and behaviour.
+
+TOTALS
+  Total spend (refunds netted): ${money(m.spend)}
+  Card payments made: ${money(m.payments)}${m.payments > m.spend ? '  (payments exceed this period’s spend — the user is also paying down an earlier balance)' : ''}
+  Refunds received: ${money(m.refunds)}
+  Fees & interest: ${money(m.fees)}`
+    : `You are a precise personal-finance analyst. Below is a summary of a user's uploaded bank transactions (${m.count} transactions, ${_siRangeLabel(m)}, ${m.months.length} months).
 
 TOTALS
   Money in: ${money(m.income)}
   Money out: ${money(m.spend)}
-  Net saved: ${money(m.net)} (${Math.round(m.savingsRate*100)}% of income)
+  Net saved: ${money(m.net)} (${Math.round(m.savingsRate*100)}% of income)`;
+
+  return `${header}
+
+Every figure below is already in the user's display currency — quote figures EXACTLY as written, including the currency symbol. Do NOT invent numbers.
 
 MONTHLY
 ${monthly || '  (single period)'}
@@ -11205,20 +11402,29 @@ ${monthly || '  (single period)'}
 SPENDING BY CATEGORY
 ${catLines || '  (uncategorised)'}
 
-LARGEST DEBITS
+LARGEST SINGLE PURCHASES
 ${topDebits || '  (none)'}
 
-LIKELY RECURRING CHARGES
-${recurring || '  (none detected)'}
+TOP MERCHANTS BY TOTAL SPEND
+${topBySum || '  (none)'}
 
-Produce a spend summary. Respond with ONE JSON object ONLY — no prose, no code fences, no markdown — matching exactly this shape:
+MOST FREQUENT MERCHANTS
+${topByCount || '  (none)'}
+
+LIKELY SUBSCRIPTIONS / RECURRING CHARGES
+${subs || '  (none detected)'}
+
+BIGGEST CATEGORY SHIFTS (last month vs prior average)
+${movers || '  (not enough months to compare)'}
+
+Produce a spend summary. Be specific and consequential: prefer "so-what" statements with quantified impact (e.g. "halving your 42 Wolt orders frees about X/mo") over restating percentages. Respond with ONE JSON object ONLY — no prose, no code fences, no markdown — matching exactly this shape:
 {
-  "verdict": { "tone": "healthy" | "watch" | "concern", "headline": "one plain-text sentence, ~20-30 words, naming 1-2 concrete figures" },
-  "concerns": [ { "severity": "hi" | "md" | "lo", "title": "short, may include a figure", "detail": "1-2 sentences", "tag": "2-3 word category e.g. Recurring · Trend" } ],
+  "verdict": { "tone": "healthy" | "watch" | "concern", "headline": "one plain-text sentence, ~20-30 words, naming 1-2 concrete figures with their currency symbol" },
+  "concerns": [ { "severity": "hi" | "md" | "lo", "title": "short, may include a figure", "detail": "1-2 sentences with a quantified so-what", "tag": "2-3 word category e.g. Recurring · Trend" } ],
   "insights": [ { "icon": "one emoji", "text": "1 sentence pattern worth knowing, referencing a figure" } ],
-  "actions": [ { "text": "one imperative action for this month, starting with a verb" } ]
+  "actions": [ { "text": "one imperative, quantified action for this month, starting with a verb" } ]
 }
-Rules: 2-4 concerns, 3-5 insights, 3-4 actions. Plain text only inside strings (no HTML, no markdown, no curly-brace markers). Ground every item in the figures above.`;
+Rules: 2-4 concerns, 3-5 insights, 3-4 actions. Plain text only inside strings (no HTML, no markdown, no curly-brace markers). Ground every item in the figures above and keep every figure's currency symbol.`;
 }
 
 // Extract the FIRST balanced top-level JSON object from a string. Tracks
@@ -11275,7 +11481,7 @@ window.siGenerateSummary = async function(){
     // demands markdown/tone-markers/chart blocks, which corrupt the
     // JSON-only contract of _siBuildPrompt (and leaks unrelated personal
     // context into a request that doesn't need it).
-    const raw = await callClaude(_siBuildPrompt(m), 1400, null,
+    const raw = await callClaude(_siBuildPrompt(m), 1600, null,
       'You are a precise personal-finance analyst. Follow the output-format instructions in the user message exactly. Output raw JSON only — no markdown, no code fences, no commentary.');
     if(gen !== _siGen) return; // data changed mid-flight — drop stale summary
     state.spendInsights = { data: _siParseSummary(raw), raw, generatedAt: Date.now(), count: m.count, range: _siRangeLabel(m) };
@@ -11412,14 +11618,20 @@ function renderTransactions() {
     </div>`;
   }).join('');
 
-  // Recent transactions (newest first).
+  // Recent transactions (newest first). In card mode, payments and refunds
+  // get an explicit badge so they visibly aren't income.
+  const isCard = m.accountType === 'credit';
   const recent = m.txs.slice().sort((a,b)=>String(b.date||'').localeCompare(String(a.date||''))).slice(0,10);
   const recentRows = recent.map(tx => {
     const credit = tx.type==='credit' || (Number(tx.amount)||0)>0;
+    const cls = isCard ? _siClassify(tx) : null;
+    const badge = cls==='payment' ? `<span class="si-tx-badge pay">PAYMENT</span>`
+                : cls==='refund'  ? `<span class="si-tx-badge ref">REFUND</span>`
+                : cls==='fee'     ? `<span class="si-tx-badge fee">FEE</span>` : '';
     return `<div class="tx-item">
       <div class="tx-icon" style="background:${credit?'var(--green-dim)':'var(--bg3)'}">${_siEsc(tx.icon||(credit?'💰':'💳'))}</div>
       <div class="tx-info">
-        <div class="tx-name">${_siEsc(tx.name)}</div>
+        <div class="tx-name">${_siEsc(tx.name)} ${badge}</div>
         <div class="tx-cat">${_siEsc(STRINGS['tx.cat.'+tx.category] ? t('tx.cat.'+tx.category) : (tx.category||''))}</div>
       </div>
       <div class="tx-date">${_siEsc(tx.date)}</div>
@@ -11449,12 +11661,21 @@ function renderTransactions() {
         <button class="btn btn-o btn-sm" onclick="siShowUpload()">＋ New upload</button>
       </div>
     </div>
-    <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px">
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;flex-wrap:wrap">
       <span class="conn-badge ${state.bankMode==='imported'?'live':'demo'}">${state.bankMode==='imported'?'Imported':state.bankMode==='demo'?'Demo':'Live'}</span>
-      <span style="font-size:12px;color:var(--text2)">${m.count} transactions · ${_siEsc(_siRangeLabel(m)||'—')}${(state.spendMeta&&state.spendMeta.uploadCurrency&&state.spendMeta.uploadCurrency!=='SEK')?` · converted from ${_siEsc(state.spendMeta.uploadCurrency)}`:''}</span>
+      <select class="si-acct-chip" onchange="siSetAccountType(this.value, true)" title="How the amounts in this upload are interpreted">
+        <option value="bank"${!isCard?' selected':''}>Bank account</option>
+        <option value="credit"${isCard?' selected':''}>Credit card</option>
+      </select>
+      <span style="font-size:12px;color:var(--text2)">${m.count} transactions · ${_siEsc(_siRangeLabel(m)||'—')} · ${m.months.length} month${m.months.length===1?'':'s'}${(state.spendMeta&&state.spendMeta.uploadCurrency&&state.spendMeta.uploadCurrency!=='SEK')?` · converted from ${_siEsc(state.spendMeta.uploadCurrency)}`:''}</span>
     </div>
 
-    ${ui.kpiRow([
+    ${isCard ? ui.kpiRow([
+      {label:'Total spend',     value:`<span class="neg">${fmt(m.spend)}</span>`, sub:m.months.length?`≈ ${fmt(Math.round(m.spend/m.months.length))} / mo · refunds netted`:''},
+      {label:'Card payments',   value:fmt(m.payments), sub:'transfers to this card — not income'},
+      {label:'Fees & interest', value:m.fees?`<span class="neg">${fmt(m.fees)}</span>`:fmt(0), sub:m.fees?'included in total spend':'none in this period'},
+      {label:'Biggest purchase',value:m.largest?fmt(m.largest):'—', sub:m.largestName?_siEsc(m.largestName.slice(0,22)):''},
+    ]) : ui.kpiRow([
       {label:'Money in',  value:`<span class="pos">${fmt(m.income)}</span>`, sub:m.months.length?`≈ ${fmt(Math.round(m.income/m.months.length))} / mo`:''},
       {label:'Money out', value:`<span class="neg">${fmt(m.spend)}</span>`,  sub:m.months.length?`≈ ${fmt(Math.round(m.spend/m.months.length))} / mo`:''},
       {label:'Net saved', value:fmt(m.net), sub:`${Math.round(m.savingsRate*100)}% of income`},
@@ -11475,7 +11696,7 @@ function renderTransactions() {
     </div>
 
     <div class="card" data-section="trend">
-      <div class="card-title">Monthly spend trend</div>
+      <div class="card-title">${isCard ? 'Monthly spend vs card payments' : 'Monthly spend trend'}</div>
       <div class="chart-wrap lg"><canvas id="si-trend"></canvas></div>
     </div>`;
 
@@ -11490,12 +11711,16 @@ function renderTransactions() {
     // by rate() at render time, so pre-converting here double-converted the
     // axis and tooltip for any non-SEK display currency.
     const spend  = m.months.map(ym => Math.round(m.byMonth[ym].spend));
-    const income = m.months.map(ym => Math.round(m.byMonth[ym].income));
+    // Card mode answers "am I paying off what I spend?" — the line is your
+    // payments to the card. Bank mode keeps the income line.
+    const lineData  = m.months.map(ym => Math.round(isCard ? (m.byMonth[ym].payments||0) : m.byMonth[ym].income));
+    const lineLabel = isCard ? 'Card payments' : 'Income';
+    const lineColor = isCard ? '#4d9fff' : '#00e8a0';
     charts['si-trend'] = new Chart(ctx.getContext('2d'), {
       type:'bar',
       data:{ labels, datasets:[
-        {label:'Spend',  data:spend,  backgroundColor:'#ff4d6d22', borderColor:'#ff4d6d', borderWidth:1.75, borderRadius:4, order:2, categoryPercentage:0.7, barPercentage:0.85},
-        {label:'Income', data:income, type:'line', borderColor:'#00e8a0', backgroundColor:'transparent', fill:false, tension:.3, pointRadius:2, pointHoverRadius:4, pointBackgroundColor:'#00e8a0', borderWidth:1.75, order:1},
+        {label:'Spend',    data:spend,    backgroundColor:'#ff4d6d22', borderColor:'#ff4d6d', borderWidth:1.75, borderRadius:4, order:2, categoryPercentage:0.7, barPercentage:0.85},
+        {label:lineLabel,  data:lineData, type:'line', borderColor:lineColor, backgroundColor:'transparent', fill:false, tension:.3, pointRadius:2, pointHoverRadius:4, pointBackgroundColor:lineColor, borderWidth:1.75, order:1},
       ]},
       options: chartPreset(),
     });
