@@ -1,0 +1,24 @@
+# Netlify configuration for the Horizon app (https://horizonos.netlify.app).
+# The app is a single static index.html at the repo root — no build step.
+[build]
+  publish = "."
+  command = ""
+
+# The app is one large HTML file that updates frequently. Tell browsers to
+# revalidate it on every load (cheap 304 when unchanged) so a new deploy
+# reaches desktop AND phone immediately instead of being masked by a stale
+# cached copy — otherwise cross-device sync looks broken when it isn't.
+[[headers]]
+  for = "/"
+  [headers.values]
+    Cache-Control = "public, max-age=0, must-revalidate"
+
+[[headers]]
+  for = "/index.html"
+  [headers.values]
+    Cache-Control = "public, max-age=0, must-revalidate"
+
+[[headers]]
+  for = "/*.html"
+  [headers.values]
+    Cache-Control = "public, max-age=0, must-revalidate"
