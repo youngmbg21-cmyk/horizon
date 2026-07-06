@@ -7866,6 +7866,7 @@ const CAT_SPENDING_12M = {
 function connectBankDemo() {
   state.bankConnected=true; state.bankMode='demo';
   state.transactions=[...DEMO_TRANSACTIONS];
+  state.spendInsights=null; // cached AI summary described the previous dataset
   save(); closeModal('bank-modal');
   nav('transactions');
   renderAll();
@@ -8157,6 +8158,7 @@ window._commitCsvImport = function(){
   state.transactions = mode === 'append' ? existing.concat(txs) : txs;
   state.bankConnected = true;
   state.bankMode = 'imported';
+  state.spendInsights = null; // cached AI summary no longer matches the data
   save();
   closeModal('csv-import-modal');
   nav('transactions');
@@ -10927,6 +10929,8 @@ function renderDashboard() {
 let _siForceUpload = false; // show the upload view even when data is loaded
 let _siRunning = false;     // AI summary request in flight
 let _siError = null;        // last AI summary error message
+let _siGen = 0;             // data generation — bumped on every ingest so an
+                            // in-flight AI response for OLD data is discarded
 
 // Full HTML-entity escape (incl. quotes) for model/user text rendered into
 // this feature's markup. The app-wide esc() intentionally omits quotes; this
@@ -11033,6 +11037,10 @@ function siHandleFile(file){
   reader.onload = (e) => { _siIngestText(String(e.target.result || ''), file.name); };
   reader.onerror = () => alert('Could not read that file.');
   reader.readAsText(file);
+  // Reset so picking the SAME file again re-fires onchange (e.g. after the
+  // user fixes an export that failed to parse and re-selects it).
+  const input = document.getElementById('si-file');
+  if(input) input.value = '';
 }
 window.siAnalyzePaste = function(){
   const box = document.getElementById('si-paste-box');
@@ -11043,6 +11051,20 @@ window.siAnalyzePaste = function(){
 // Parse raw CSV/TSV/pasted text into transactions using the existing hand-rolled
 // CSV parser + column detector, then replace state.transactions.
 function _siIngestText(text, sourceName){
+  // Space-aligned pastes (columns separated by runs of 2+ spaces — exactly
+  // what copying rows out of a banking app or the paste-box example gives
+  // you) have no ,/;/tab separator, so _parseCsv's separator detection
+  // latched onto the DECIMAL comma and split every amount in half. When the
+  // text has no tab or semicolon and most lines contain 2+-space runs,
+  // convert those runs to tabs first. True comma-CSVs have no such runs and
+  // pass through untouched.
+  if(!/[\t;]/.test(text)){
+    const lines = text.split('\n').filter(l => l.trim());
+    const spaced = lines.filter(l => /\S {2,}\S/.test(l)).length;
+    if(lines.length && spaced >= lines.length / 2){
+      text = text.split('\n').map(l => l.replace(/ {2,}/g, '\t')).join('\n');
+    }
+  }
   let rows;
   try { rows = _parseCsv(text); } catch(err){ alert('Could not parse that data: ' + (err.message||err)); return; }
   rows = (rows||[]).filter(r => r.some(v => String(v||'').trim()));
@@ -11064,6 +11086,7 @@ function _siIngestText(text, sourceName){
   state.bankMode = 'imported';
   _siForceUpload = false;
   _siError = null;
+  _siGen++; // invalidate any in-flight AI summary for the previous dataset
   save();
   renderTransactions();
 }
@@ -11120,12 +11143,30 @@ Produce a spend summary. Respond with ONE JSON object ONLY — no prose, no code
 Rules: 2-4 concerns, 3-5 insights, 3-4 actions. Plain text only inside strings (no HTML, no markdown, no curly-brace markers). Ground every item in the figures above.`;
 }
 
+// Extract the FIRST balanced top-level JSON object from a string. Tracks
+// string/escape state so braces inside string values don't confuse the scan.
+// (The old first-`{`-to-last-`}` slice broke whenever the model appended
+// anything containing a `}` after the JSON — e.g. a stray code fence.)
+function _siFirstJsonObject(s){
+  const start = s.indexOf('{');
+  if(start < 0) return null;
+  let depth = 0, inStr = false, escp = false;
+  for(let i = start; i < s.length; i++){
+    const c = s[i];
+    if(escp){ escp = false; continue; }
+    if(c === '\\'){ if(inStr) escp = true; continue; }
+    if(c === '"'){ inStr = !inStr; continue; }
+    if(inStr) continue;
+    if(c === '{') depth++;
+    else if(c === '}'){ depth--; if(depth === 0) return s.slice(start, i+1); }
+  }
+  return null;
+}
 function _siParseSummary(raw){
   try {
     let s = String(raw||'').trim();
     s = s.replace(/^```(?:json)?\s*/i,'').replace(/\s*```$/,'').trim();
-    const a = s.indexOf('{'), b = s.lastIndexOf('}');
-    if(a>=0 && b>a) s = s.slice(a, b+1);
+    s = _siFirstJsonObject(s) || s;
     const o = JSON.parse(s);
     const str = v => String(v==null?'':v);
     const arr = v => Array.isArray(v) ? v : [];
@@ -11146,9 +11187,19 @@ window.siGenerateSummary = async function(){
   if(!key){ alert('Add your Claude API key in Settings → AI Keys to generate a summary.'); nav('settings'); return; }
   _siRunning = true; _siError = null;
   renderTransactions();
+  // Generation token: if a new upload replaces the data while this request
+  // is in flight (_siIngestText bumps _siGen), the stale response must be
+  // discarded instead of being attached to transactions it doesn't describe.
+  const gen = _siGen;
   try {
     const m = _siMetrics();
-    const raw = await callClaude(_siBuildPrompt(m), 1400);
+    // Minimal system prompt — the default buildAIContext() chat persona
+    // demands markdown/tone-markers/chart blocks, which corrupt the
+    // JSON-only contract of _siBuildPrompt (and leaks unrelated personal
+    // context into a request that doesn't need it).
+    const raw = await callClaude(_siBuildPrompt(m), 1400, null,
+      'You are a precise personal-finance analyst. Follow the output-format instructions in the user message exactly. Output raw JSON only — no markdown, no code fences, no commentary.');
+    if(gen !== _siGen) return; // data changed mid-flight — drop stale summary
     state.spendInsights = { data: _siParseSummary(raw), raw, generatedAt: Date.now(), count: m.count, range: _siRangeLabel(m) };
     save();
   } catch(err){
@@ -11163,6 +11214,13 @@ window.siSaveToVault = function(){
   const si = state.spendInsights;
   if(!si){ return; }
   if(!Array.isArray(state.vault)) state.vault = [];
+  // Dedupe on generatedAt: the button's disabled state doesn't survive a
+  // re-render, so repeated clicks used to file the same summary repeatedly.
+  if(state.vault.some(v => v.category === 'spend-insights' && v.generatedAt === si.generatedAt)){
+    const b = document.getElementById('si-save-btn');
+    if(b){ b.textContent = '✓ Saved to Vault'; b.disabled = true; }
+    return;
+  }
   state.vault.unshift({
     id: genId(),
     type: 'analysis',
@@ -11238,7 +11296,10 @@ function _siReportView(si){
       </div>`).join('')
   }) : '';
 
-  const footer = `<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:16px">
+  // A failed re-analyse keeps the previous report on screen — surface the
+  // error next to the actions instead of failing silently.
+  const errLine = _siError ? `<div style="font-size:12px;color:var(--red);margin-top:12px">Re-analyse failed: ${_siEsc(_siError)} — showing the previous summary.</div>` : '';
+  const footer = `${errLine}<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:16px">
     <button class="btn btn-g btn-sm" id="si-save-btn" onclick="siSaveToVault()">Save summary to Vault</button>
     <button class="btn btn-o btn-sm" onclick="openAIPanel()">Ask a follow-up in AI chat</button>
     <button class="btn btn-o btn-sm" onclick="siGenerateSummary()">↺ Re-analyse</button>
@@ -11346,8 +11407,12 @@ function renderTransactions() {
     if(!ctx || !m.months.length) return;
     const _mn = monthNames();
     const labels = m.months.map(ym => { const [y,mo]=ym.split('-'); return `${_mn[(+mo)-1]} '${y.slice(2)}`; });
-    const spend  = m.months.map(ym => Math.round(m.byMonth[ym].spend * rate()));
-    const income = m.months.map(ym => Math.round(m.byMonth[ym].income * rate()));
+    // BASE-currency values, like every other chart in the app — chartPreset's
+    // y-axis tick callback (fmtC) and the shared tooltip (fmt) both multiply
+    // by rate() at render time, so pre-converting here double-converted the
+    // axis and tooltip for any non-SEK display currency.
+    const spend  = m.months.map(ym => Math.round(m.byMonth[ym].spend));
+    const income = m.months.map(ym => Math.round(m.byMonth[ym].income));
     charts['si-trend'] = new Chart(ctx.getContext('2d'), {
       type:'bar',
       data:{ labels, datasets:[
@@ -17277,13 +17342,18 @@ function toggleAIExpand(){
   save();
 }
 
-async function callClaude(prompt, maxTokens, key) {
+// `system` overrides the default financial-advisor context. Callers with a
+// strict output contract (e.g. Spend Insights' JSON-only summary) must pass
+// their own minimal system prompt — buildAIContext() instructs the model to
+// use markdown, tone markers, and optional horizon-chart blocks, all of
+// which corrupt a JSON-only response.
+async function callClaude(prompt, maxTokens, key, system) {
   const apiKey=key||(state.aiKeys?.claude);
   if(!apiKey) throw new Error('No Claude API key. Add one in Settings → AI Keys.');
   const res=await fetch('https://api.anthropic.com/v1/messages',{
     method:'POST',
     headers:{'Content-Type':'application/json','x-api-key':apiKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
-    body:JSON.stringify({model:'claude-opus-4-6',max_tokens:maxTokens||600,system:buildAIContext(),messages:[{role:'user',content:prompt}]})
+    body:JSON.stringify({model:'claude-opus-4-6',max_tokens:maxTokens||600,system:system||buildAIContext(),messages:[{role:'user',content:prompt}]})
   });
   if(res.status===401) throw new Error('Invalid API key');
   if(!res.ok) throw new Error('API error '+res.status);
