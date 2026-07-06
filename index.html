@@ -6596,18 +6596,39 @@ async function _syncDeriveKey(passphrase, salt){
     { name:'PBKDF2', salt, iterations:210000, hash:'SHA-256' },
     base, { name:'AES-GCM', length:256 }, false, ['encrypt','decrypt']);
 }
+// gzip helpers (native CompressionStream, ~iOS 16.4+/modern Chrome). A
+// full bank statement + Vault reports is highly repetitive JSON that
+// compresses ~8-12x, which keeps the encrypted row comfortably under
+// Supabase's request-size limit — the reason large Spend Insights data
+// previously failed to push. Falls back to no compression where the API
+// is unavailable, flagged per-envelope so decrypt always knows.
+async function _gzip(bytes){
+  if(typeof CompressionStream === 'undefined') return null;
+  const cs = new CompressionStream('gzip');
+  const stream = new Response(new Blob([bytes]).stream().pipeThrough(cs));
+  return new Uint8Array(await stream.arrayBuffer());
+}
+async function _gunzip(bytes){
+  const ds = new DecompressionStream('gzip');
+  const stream = new Response(new Blob([bytes]).stream().pipeThrough(ds));
+  return new Uint8Array(await stream.arrayBuffer());
+}
 async function _syncEncrypt(passphrase, plaintext){
   const salt = crypto.getRandomValues(new Uint8Array(16));
   const iv   = crypto.getRandomValues(new Uint8Array(12));
   const key  = await _syncDeriveKey(passphrase, salt);
-  const ct   = await crypto.subtle.encrypt({ name:'AES-GCM', iv }, key, _enc.encode(plaintext));
-  return JSON.stringify({ v:1, salt:_b64(salt), iv:_b64(iv), ct:_b64(ct) });
+  let data = _enc.encode(plaintext), comp = false;
+  const gz = await _gzip(data);
+  if(gz && gz.length < data.length){ data = gz; comp = true; }
+  const ct = await crypto.subtle.encrypt({ name:'AES-GCM', iv }, key, data);
+  return JSON.stringify({ v:1, salt:_b64(salt), iv:_b64(iv), ct:_b64(ct), c: comp ? 'gz' : undefined });
 }
 async function _syncDecrypt(passphrase, envelopeStr){
   const env = JSON.parse(envelopeStr);
   const key = await _syncDeriveKey(passphrase, _unb64(env.salt));
   const pt  = await crypto.subtle.decrypt({ name:'AES-GCM', iv:_unb64(env.iv) }, key, _unb64(env.ct));
-  return _dec.decode(pt);
+  const bytes = new Uint8Array(pt);
+  return _dec.decode(env.c === 'gz' ? await _gunzip(bytes) : bytes);
 }
 
 // Build the plaintext payload that travels between devices. Deliberately
@@ -6668,6 +6689,7 @@ async function _syncErr(res){
   if(res.status === 404 || /relation .* does not exist/i.test(detail))
     return 'Table not found — run the one-time SQL setup shown in Settings.';
   if(res.status === 401 || res.status === 403) return 'Auth failed — check the project URL and anon key.';
+  if(res.status === 413) return 'Your data is too large for the sync request. Try clearing old Vault reports, then Sync now.';
   return `Sync error ${res.status}${detail ? ': ' + detail : ''}`;
 }
 
@@ -19867,6 +19889,20 @@ try { updateRatesBadge(); autoRefreshRatesIfStale(); } catch(_){}
 // (no-op unless the user has connected a project). A conflict prompts
 // rather than overwrites.
 try { if(typeof syncOnLoad === 'function') syncOnLoad(); } catch(_){}
+
+// There's no live socket, so a device left open would otherwise miss the
+// other device's changes until a full reload. Re-reconcile whenever the
+// tab regains focus (switching back to the app, unlocking the phone),
+// debounced so rapid focus flaps don't spam the API. syncNow() pushes
+// pending local edits, pulls remote changes, or prompts on a true
+// conflict — never a silent overwrite.
+let _syncFocusTimer = null;
+document.addEventListener('visibilitychange', () => {
+  if(document.hidden) return;
+  if(typeof syncConfigured !== 'function' || !syncConfigured() || !state.sync.autoSync) return;
+  clearTimeout(_syncFocusTimer);
+  _syncFocusTimer = setTimeout(() => { try { syncNow(); } catch(_){} }, 400);
+});
 
 // Keep Leaflet tiles correct after layout changes, and re-render active panel
 // so Chart.js updates legibly across viewport width changes.
