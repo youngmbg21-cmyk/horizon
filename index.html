@@ -4374,8 +4374,13 @@ body.light .piq-country-menu { box-shadow:0 12px 28px -10px rgba(60,40,10,0.22);
      stays visible above the keys instead of being buried under them. */
   #ai-panel {
     width:100vw !important; border-left:none !important; z-index:600;
-    top:auto !important; bottom:0;
-    height:var(--hz-vvh, 100dvh); max-height:100dvh;
+    /* Anchor to the TOP of the VISIBLE viewport (offset + height from the
+       visualViewport API), NOT bottom:0 — on iOS the layout viewport does
+       not shrink for the keyboard, so a bottom anchor buries the input row
+       under the keys. Top-anchoring keeps the whole panel inside the visible
+       area, so the input sits just above the keyboard. */
+    top:var(--hz-vv-top, 0px) !important; bottom:auto !important;
+    height:var(--hz-vvh, 100dvh) !important; max-height:none !important;
   }
   #ai-panel.expanded { width:100vw !important; }
   #ai-backdrop { z-index:595; }
@@ -22794,7 +22799,12 @@ class HZMobile {
   // window", not "keyboard space".
   if(window.visualViewport){
     const vv=window.visualViewport;
-    const setVVH=()=>{ if(vv.scale&&vv.scale>1.05) return; document.documentElement.style.setProperty('--hz-vvh', Math.round(vv.height)+'px'); };
+    const setVVH=()=>{
+      if(vv.scale&&vv.scale>1.05) return; // pinch-zoomed — vv.height isn't keyboard space
+      const rs=document.documentElement.style;
+      rs.setProperty('--hz-vvh', Math.round(vv.height)+'px');
+      rs.setProperty('--hz-vv-top', Math.max(0,Math.round(vv.offsetTop))+'px');
+    };
     vv.addEventListener('resize',setVVH);
     vv.addEventListener('scroll',setVVH);
     setVVH();
