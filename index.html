@@ -22660,23 +22660,80 @@ class HZMobile {
   afford(){const ff=this.fun();const t=+this.data.targetBudget||0;if(!t||ff<=0)return `<div style="color:var(--text3);font-size:12px">Enter a target budget above.</div>`;const m=Math.ceil(t/ff);const r=this.addMonths(new Date(),m);return `<div style="font-family:var(--fm);font-size:12px;line-height:1.9"><div>Target: <strong style="color:var(--amber)">${this.fmt(t)}</strong></div><div>Monthly fund: <strong style="color:var(--green)">${this.fmt(ff)}</strong></div><div>Save for: <strong style="color:var(--cyan)">${m} months</strong></div><div>Ready by: <strong style="color:var(--green)">${this.MN[r.getMonth()]} ${r.getFullYear()}</strong></div></div>${this.bar(Math.min(100,ff/t*100),'var(--green)',6)}<div style="font-size:10px;color:var(--text3);font-family:var(--fm)">${Math.min(100,Math.round(ff/t*100))}% funded today</div>`;}
 
   // ══════ RETIRE ANYWHERE ══════
-  dests(){return (this.data.places&&this.data.places.length)?this.data.places:this.RET;}
+  // ══════ RETIRE ANYWHERE (desktop-parity) ══════
+  // Drive the tab off the SAME engine the desktop uses: retirePlaces() is the
+  // shared state.places store and scoreLocation() computes each destination's
+  // verdict from net income after its LOCAL tax vs cost of living. Sorted
+  // exception-first (infeasible → conditional → feasible) like desktop.
+  raScored(){try{if(typeof retirePlaces==='function'&&typeof scoreLocation==='function'){const rank={infeasible:0,conditional:1,feasible:2};return retirePlaces().map(scoreLocation).sort((a,b)=>{const ra=rank[a.verdict]??2,rb=rank[b.verdict]??2;if(ra!==rb)return ra-rb;return ra<2?(this.n(a.surplus,0)-this.n(b.surplus,0)):(this.n(b.surplus,0)-this.n(a.surplus,0));});}}catch(_){}return [];}
+  raNums(){try{if(typeof getRetirementNumbers==='function')return getRetirementNumbers();}catch(_){}return null;}
+  raRow(l,v,c){return `<div style="display:flex;justify-content:space-between;gap:10px"><span style="color:var(--text3)">${l}</span><span style="color:${c};font-weight:600">${v}</span></div>`;}
+  raCard(loc){
+    const vc={feasible:'var(--green)',conditional:'var(--amber)',infeasible:'var(--red)'}[loc.verdict]||'var(--text3)';
+    const vchip={feasible:['sage','FEASIBLE'],conditional:['honey','CONDITIONAL'],infeasible:['rose','INFEASIBLE']}[loc.verdict]||['info',String(loc.verdict||'').toUpperCase()];
+    const aff=Math.max(0,Math.min(100,Math.round(this.n(loc.affordabilityScore,0)*100)));
+    const rank=(loc.incomePercentile!=null)?`<div style="font-size:9.5px;color:var(--text3);font-family:var(--fm);margin-top:6px">Income rank · locally: <span style="color:var(--text2)">Top ${loc.incomePercentile}% earner</span></div>`:'';
+    return `<div data-act="editdest" data-id="${loc.id}" style="padding:12px 0;border-bottom:1px solid var(--border);cursor:pointer">
+      <div style="display:flex;align-items:flex-start;gap:10px">
+        <div style="font-size:22px">${loc.flag||'📍'}</div>
+        <div style="flex:1;min-width:0"><div style="font-size:14px;font-weight:600">${this.esc(loc.name)}</div><div style="font-size:10.5px;color:var(--text3)">${this.esc(loc.country||'')}${loc.climate?' · '+this.esc(loc.climate):''}</div></div>
+        ${this.chip(vchip[0],vchip[1])}
+      </div>
+      <div style="margin-top:9px">${this.bar(aff,vc,5)}</div>
+      <div style="font-size:9.5px;color:var(--text3);font-family:var(--fm);margin-top:3px">${aff}% affordable on your income</div>
+      <div style="margin-top:9px;display:flex;flex-direction:column;gap:5px;font-family:var(--fm);font-size:11.5px">
+        ${this.raRow('Cost of living',this.fmt(this.n(loc.costOfLiving,0))+'/mo','var(--text)')}
+        ${this.raRow('Net income · after '+this.n(loc.taxRate,0)+'% local tax',this.fmt(this.n(loc.netIncome,0))+'/mo','var(--green)')}
+        ${this.raRow('Monthly surplus',this.fmt(this.n(loc.surplus,0))+'/mo',this.n(loc.surplus,0)>=0?'var(--green)':'var(--red)')}
+      </div>${rank}
+    </div>`;
+  }
   vAnywhere(){
-    const dr=this.retIncome();const ytr=this.data.retirementAge-this.data.currentAge;
-    const DEST=this.dests();const mine=DEST!==this.RET;
-    const inBudget=DEST.filter(d=>d.costK*1000<=dr).length;
-    let h=this.ph('PLANNING','Where in the world?','Your dream retirement, wherever that may be.');
-    h+=this.grid2([this.kpi('✦','Monthly Income',this.fmtC(dr),'var(--green)','Draw + pension'),this.kpi('🌍','Cities in Budget',inBudget+'/'+DEST.length,'var(--cyan)',mine?'Your destinations':'Starter list'),this.kpi('🏛','Pension',this.fmtC(this.pension()),'var(--blue)','/mo'),this.kpi('📅','Years to Go',ytr+'Y','var(--amber)','Age '+this.data.retirementAge)]);
-    h+=this.card(this.ct('💭 Your Dream Retirement')+`<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px">${this.DREAMS.map(d=>{const on=this.data.dreams.includes(d.id);return `<div data-act="dream" data-id="${d.id}" style="background:${on?'var(--plum-bg)':'var(--bg3)'};border:1px solid ${on?'var(--violet)':'var(--border)'};border-radius:9px;padding:10px;text-align:center;cursor:pointer"><div style="font-size:19px;margin-bottom:3px">${d.icon}</div><div style="font-size:11px;font-weight:600;color:${on?'var(--plum-tx)':'var(--text2)'}">${d.name}</div></div>`;}).join('')}</div>`);
-    const lvl=this.data.retCostLevel;const m=this.EXP[lvl];const need=this.expTotal(lvl);const surplus=dr-need;
-    h+=this.card(this.ct('🧮 Retirement Cost Model')+`<select data-model="costlevel" style="width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:6px;padding:9px 11px;color:var(--text);font-size:13px;margin-bottom:12px">${[['low','Low Cost · 12K/mo'],['mid','Mid Range · 20K/mo'],['high','High Standard · 35K/mo'],['luxury','Luxury · 55K/mo']].map(o=>`<option value="${o[0]}" ${lvl===o[0]?'selected':''}>${o[1]}</option>`).join('')}</select><div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px">${Object.entries(m).map(([k,v])=>`<div style="background:var(--bg3);border-radius:8px;padding:9px 10px"><div style="font-size:10px;color:var(--text3)">${k}</div><div style="font-family:var(--fm);font-size:12px;font-weight:600">${this.fmtC(v)}</div>${this.bar(v/need*100,'var(--violet)',4)}</div>`).join('')}</div><div style="display:flex;gap:12px;flex-wrap:wrap;background:var(--bg3);border-radius:8px;padding:11px;font-family:var(--fm);font-size:11.5px"><span>Need <strong style="color:var(--amber)">${this.fmtC(need)}</strong></span><span>Draw <strong style="color:var(--green)">${this.fmtC(dr)}</strong></span><span style="margin-left:auto">${surplus>=0?this.chip('sage','SUSTAINABLE ✓'):this.chip('rose','SHORTFALL')}</span></div>`);
-    h+=this.card(this.ct('📍 Destinations'+(mine?'':' · starter list'),this.btn('+ Add','adddest','','o'))+`<div style="display:grid;grid-template-columns:1fr 1fr;gap:9px">${DEST.map(d=>{const aff=d.costK*1000<=dr;return `<div style="background:var(--bg3);border:1px solid var(--border);border-radius:11px;padding:12px"><div style="font-size:24px">${d.flag}</div><div style="font-weight:700;font-size:13px;margin-top:4px">${this.esc(d.name)}</div><div style="font-size:10px;color:var(--text3)">${this.esc(d.country)}</div><div style="font-family:var(--fm);font-size:13px;color:var(--green);margin-top:5px">${d.costK}K SEK<span style="font-size:9px;color:var(--text3)">/mo</span></div><div style="display:flex;flex-wrap:wrap;gap:3px;margin-top:6px">${d.tl.slice(0,3).map(x=>`<span style="font-size:8px;padding:2px 5px;border-radius:3px;background:var(--info-bg);color:var(--info-tx)">${this.esc(x)}</span>`).join('')}</div><div style="margin-top:6px">${aff?this.chip('sage','WITHIN BUDGET'):this.chip('honey','STRETCH')}</div></div>`;}).join('')}</div>`);
-    h+=this.card(this.ct('⚡ APEX Feasibility',this.btn('Run Check','apex','','g'))+`<div id="hzApex">${this.data.apex?this.apexHTML():`<div style="color:var(--text3);font-size:12px">Run an APEX feasibility scan against your top destination to see financial, legal, healthcare and lifestyle scores.</div>`}</div>`);
-    h+=this.card(this.ct('🗺 Retirement World Map')+`<div id="hzRetMap" style="height:200px;border-radius:11px;overflow:hidden;border:1px solid var(--border)"></div>`);
+    const nums=this.raNums();
+    const income=nums?this.n(nums.grossRetirementIncome,0):this.retIncome();
+    const scored=this.raScored();
+    const feas=scored.filter(l=>l.verdict==='feasible').length;
+    const cond=scored.filter(l=>l.verdict==='conditional').length;
+    const ytr=this.data.retirementAge-this.data.currentAge;
+    let h=this.ph('PLANNING','Retire anywhere',`Every destination scored against your ${this.fmtC(income)}/mo retirement income — net of each country's local tax.`);
+    if(nums)h+=this.banner('info',`Projected retirement income <b>${this.fmt(income)}/mo</b> — <b>${this.fmt(this.n(nums.sustainableMonthly,0))}</b> portfolio draw + <b>${this.fmt(this.n(nums.pensionAvgMonthly,0))}</b> pension. Each destination applies its own local tax before comparing to cost of living.`);
+    h+=this.grid2([this.kpi('✅','Feasible',feas,'var(--green)','Comfortably affordable','pos'),this.kpi('🎯','Conditional',cond,'var(--amber)','Tight but possible','warn'),this.kpi('💰','Income',this.fmtC(income),'var(--blue)','At age '+this.data.retirementAge),this.kpi('📅','Years to Go',ytr+'Y','var(--text)','Until retirement')]);
+    h+=this.card(this.ct('🗺 Retirement World Map')+`<div id="hzRetMap" style="height:210px;border-radius:11px;overflow:hidden;border:1px solid var(--border)"></div>`);
+    h+=this.card(this.ct('📍 Destinations',this.btn('+ Add','adddest','','o'))+(scored.length?scored.map(l=>this.raCard(l)).join(''):`<div style="color:var(--text3);font-size:12px">No destinations yet — tap “+ Add” to score a city against your retirement income. Your picks sync with desktop.</div>`));
     return h;
   }
-  runApex(){const dr=this.retIncome();const need=this.expTotal(this.data.retCostLevel);const surplus=dr-need;const ratio=need?dr/need:1;const s=(base)=>Math.max(35,Math.min(98,Math.round(base)));const mods=[['FINANCIAL READINESS',s(ratio*70)],['LEGAL PATHWAY',82],['HEALTHCARE ACCESS',88],['COST FIT',s(ratio*68)],['TAX EFFICIENCY',76],['LIFESTYLE MATCH',this.data.dreams.length?90:70],['EXPAT COMMUNITY',84],['RUNWAY (YRS)',s(ratio*60)]];const avg=mods.reduce((a,m)=>a+m[1],0)/mods.length;const verdict=avg>=80?'FEASIBLE':avg>=62?'CONDITIONAL':'NOT FEASIBLE';const d0=this.dests()[0];this.data.apex={mods,verdict,dest:d0.name+(d0.country?', '+d0.country:''),surplus};}
-  apexHTML(){const ap=this.data.apex;const vc={FEASIBLE:'var(--green)',CONDITIONAL:'var(--amber)','NOT FEASIBLE':'var(--red)'}[ap.verdict];const vt={FEASIBLE:'sage',CONDITIONAL:'honey','NOT FEASIBLE':'rose'}[ap.verdict];return `<div style="display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-bottom:11px">${ap.mods.map(m=>{const c=m[1]>=80?'var(--green)':m[1]>=62?'var(--amber)':'var(--red)';return `<div style="background:var(--bg3);border-radius:8px;padding:9px"><div style="font-size:8px;letter-spacing:.06em;color:var(--text3);font-weight:700">${m[0]}</div><div style="font-family:var(--fm);font-size:13px;font-weight:700;color:${c};margin-top:3px">${m[1]}/100</div>${this.bar(m[1],c,4)}</div>`;}).join('')}</div><div style="border:1px solid ${vc};background:var(--${vt}-bg);border-radius:10px;padding:13px;text-align:center"><div style="font-family:var(--fs);font-size:17px;font-weight:600;color:${vc};letter-spacing:.04em">${ap.verdict} — ${this.esc(ap.dest)}</div><div style="font-size:11px;color:var(--text2);margin-top:4px;font-family:var(--fm)">Projected ${ap.surplus>=0?'surplus':'shortfall'} of ${this.fmtC(Math.abs(ap.surplus))}/mo at this cost level</div></div>`;}
+  // Add a destination from the shared CITY_DB (same curated data desktop seeds
+  // from). Writes straight into state.places so it scores instantly and syncs.
+  openAddDest(){
+    const db=(typeof CITY_DB!=='undefined')?CITY_DB:[];
+    const have=new Set((typeof retirePlaces==='function'?retirePlaces():[]).map(p=>(p.name||'').toLowerCase()+'|'+(p.country||'').toLowerCase()));
+    const tiles=db.map((c,i)=>{const added=have.has((c.name||'').toLowerCase()+'|'+(c.country||'').toLowerCase());return `<div ${added?'':`data-act="pickdest" data-i="${i}"`} style="display:flex;align-items:center;gap:11px;padding:10px 0;border-bottom:1px solid var(--border);cursor:${added?'default':'pointer'};opacity:${added?'.45':'1'}"><div style="font-size:20px">${c.flag||'🌍'}</div><div style="flex:1;min-width:0"><div style="font-size:13px;font-weight:600">${this.esc(c.name)}</div><div style="font-size:10px;color:var(--text3)">${this.esc(c.country)} · ${this.esc(c.climate||'')}</div></div><div style="text-align:right"><div style="font-family:var(--fm);font-size:11px;color:var(--text2)">${this.fmtC(c.costOfLiving)}/mo</div><div style="font-size:9px;color:var(--text3)">Tax ${c.taxRate}%</div></div>${added?this.chip('sage','ADDED'):`<span style="color:var(--green);font-size:20px;font-weight:700;width:20px;text-align:center">+</span>`}</div>`;}).join('');
+    this.sheet('Add Destination',`<div style="max-height:62vh;overflow-y:auto;margin:0 -2px;padding:0 2px">${tiles||'<div style="color:var(--text3);font-size:12px">City list unavailable.</div>'}</div>`,'Pick a city to score it against your retirement income. It syncs with desktop.');
+  }
+  // Edit a destination's cost of living / local tax / climate / notes. Mutates
+  // state.places directly (same fields desktop edits) so both sides re-score.
+  openEditDest(id){
+    const loc=(typeof retirePlaces==='function'?retirePlaces():[]).find(l=>l.id===id);if(!loc)return;
+    const inp='width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:9px 11px;color:var(--text);font-size:13px;font-family:var(--fm)';
+    const lbl='display:block;font-size:11px;color:var(--text2);margin-bottom:4px';
+    const body=`<input type="hidden" id="edId" value="${id}"><div style="display:flex;flex-direction:column;gap:11px">`
+      +`<div><label style="${lbl}">Monthly cost of living (SEK)</label><input id="edCost" type="number" value="${this.n(loc.costOfLiving,0)}" style="${inp}"></div>`
+      +`<div style="display:flex;gap:8px"><div style="flex:1"><label style="${lbl}">Local tax rate (%)</label><input id="edTax" type="number" value="${this.n(loc.taxRate,0)}" style="${inp}"></div><div style="flex:1"><label style="${lbl}">Climate</label><input id="edClimate" value="${this.esc(loc.climate||'')}" style="${inp}"></div></div>`
+      +`<div><label style="${lbl}">Notes</label><input id="edNotes" value="${this.esc(loc.notes||'')}" placeholder="Visa, healthcare, anything to remember" style="${inp}"></div>`
+      +`</div><div style="margin-top:14px">`+this.btn('Save','savedest','','g')
+      +`<button data-act="rmdest" data-id="${id}" style="width:100%;margin-top:8px;background:var(--rose-bg);color:var(--rose-tx);border:1px solid var(--rose-bd);border-radius:8px;padding:10px;font-size:12px;font-weight:600;cursor:pointer">Remove destination</button></div>`;
+    this.sheet(`${loc.flag||'📍'} ${this.esc(loc.name)}`,body,'Edits sync with desktop and re-score instantly.');
+  }
+  saveDest(){
+    const id=(document.getElementById('edId')||{}).value;if(!id||typeof state==='undefined')return;
+    const loc=(state.places||[]).find(l=>l.id===id);if(!loc)return;
+    loc.costOfLiving=this.n((document.getElementById('edCost')||{}).value,loc.costOfLiving);
+    loc.taxRate=this.n((document.getElementById('edTax')||{}).value,loc.taxRate);
+    loc.climate=((document.getElementById('edClimate')||{}).value||'').trim()||loc.climate;
+    loc.notes=(document.getElementById('edNotes')||{}).value||'';
+    if(typeof save==='function')save();
+    this.closeOverlay();this.paint();this.toast('Destination updated ✓');
+  }
 
   // ══════ LIFE WALL ══════
   vLifeWall(){
@@ -22821,7 +22878,7 @@ class HZMobile {
   // display currency, exactly like the app's other charts.
   chartFFBal(){this.whenLib(()=>window.Chart,()=>{const s=this.ffSummary();if(!s)return;const bars=(s.balanceBars||[]).map(v=>Math.round(this.n(v,0)));const wm=s.windowMonths||[];const labs=wm.length?wm.map(m=>this.MN[(+String(m.key).slice(5,7))-1]||''):bars.map((_,i)=>this.MN[(new Date().getMonth()+i)%12]);const c=this.cc();const ctx=document.getElementById('hzFFBalChart');if(!ctx)return;if(this.charts.ffbal)this.charts.ffbal.destroy();this.charts.ffbal=new Chart(ctx,{type:'bar',data:{labels:labs,datasets:[{data:bars,backgroundColor:bars.map(v=>v>=0?'#00e8a055':'#ff4d6d55'),borderColor:bars.map(v=>v>=0?'#00e8a0':'#ff4d6d'),borderWidth:1.5,borderRadius:3}]},options:this.chOpts({plugins:{legend:{display:false},tooltip:{callbacks:{label:ctx=>this.fmtC(ctx.parsed.y)}}},scales:{x:{ticks:{color:c.t3,font:{size:9},maxTicksLimit:12},grid:{display:false}},y:{ticks:{color:c.t3,font:{size:9},callback:v=>this.fmtC(v)},grid:{color:c.grid}}}})});});}
   initVacMap(){this.whenLib(()=>window.L&&document.getElementById('hzVacMap'),()=>{if(this.vacMap){this.vacMap.remove();this.vacMap=null;}const el=document.getElementById('hzVacMap');if(!el)return;this.vacMap=L.map(el,{zoomControl:false,attributionControl:false}).setView([20,20],1);L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(this.vacMap);this.PULSE.forEach(d=>{const m=L.circleMarker([d.lat,d.lng],{radius:8,fillColor:d.col,color:d.col,fillOpacity:.8,weight:2});m.bindPopup(`<strong>${d.flag} ${d.dest}</strong><br>${d.cost}`);m.addTo(this.vacMap);});setTimeout(()=>this.vacMap&&this.vacMap.invalidateSize(),140);});}
-  initRetMap(){this.whenLib(()=>window.L&&document.getElementById('hzRetMap'),()=>{if(this.retMap){this.retMap.remove();this.retMap=null;}const el=document.getElementById('hzRetMap');if(!el)return;this.retMap=L.map(el,{zoomControl:false,attributionControl:false}).setView([25,10],1);L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(this.retMap);const dr=this.retIncome();this.dests().forEach(d=>{if(!d.lat&&!d.lng)return;const col=d.costK*1000<=dr?'#00e8a0':'#f5a623';const m=L.circleMarker([d.lat,d.lng],{radius:9,fillColor:col,color:col,fillOpacity:.8,weight:2});m.bindPopup(`<strong>${d.flag} ${this.esc(d.name)}</strong><br>${d.costK}K SEK/mo`);m.addTo(this.retMap);});setTimeout(()=>this.retMap&&this.retMap.invalidateSize(),140);});}
+  initRetMap(){this.whenLib(()=>window.L&&document.getElementById('hzRetMap'),()=>{if(this.retMap){this.retMap.remove();this.retMap=null;}const el=document.getElementById('hzRetMap');if(!el)return;this.retMap=L.map(el,{zoomControl:false,attributionControl:false}).setView([25,10],1);L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(this.retMap);this.raScored().forEach(l=>{if(!l.lat&&!l.lng)return;const col={feasible:'#00e8a0',conditional:'#f5a623',infeasible:'#ff4d6d'}[l.verdict]||'#7a8fb0';const m=L.circleMarker([l.lat,l.lng],{radius:9,fillColor:col,color:col,fillOpacity:.8,weight:2});m.bindPopup(`<strong>${l.flag||''} ${this.esc(l.name)}</strong><br>${this.fmtC(this.n(l.costOfLiving,0))}/mo · surplus ${this.fmtC(this.n(l.surplus,0))}`);m.addTo(this.retMap);});setTimeout(()=>this.retMap&&this.retMap.invalidateSize(),140);});}
 
   // ══════ EVENTS ══════
   onClick(e){const el=e.target.closest('[data-act]');if(!el)return;const a=el.dataset.act;const d=el.dataset;
@@ -22838,7 +22895,10 @@ class HZMobile {
     if(a==='lens'){this.data.retLens=d.l;this.persist();return this.paint();}
     if(a==='dream'){const i=this.data.dreams.indexOf(d.id);if(i>-1)this.data.dreams.splice(i,1);else this.data.dreams.push(d.id);this.persist();return this.paint();}
     if(a==='pulse'&&this.vacMap){this.vacMap.setView([+d.lat,+d.lng],4);return;}
-    if(a==='apex'){this.runApex();this.persist();this.paint();return this.toast('APEX scan complete');}
+    if(a==='pickdest'){const db=(typeof CITY_DB!=='undefined')?CITY_DB:[];const c=db[+d.i];if(c&&typeof state!=='undefined'){if(!Array.isArray(state.places))state.places=[];const key=(c.name||'').toLowerCase()+'|'+(c.country||'').toLowerCase();if(!state.places.some(p=>(p.kind||'retirement')==='retirement'&&((p.name||'').toLowerCase()+'|'+(p.country||'').toLowerCase())===key)){state.places.push({id:this.newId(),kind:'retirement',name:c.name,country:c.country||'',flag:c.flag||'🌍',costOfLiving:this.n(c.costOfLiving,40000),taxRate:this.n(c.taxRate,15),climate:c.climate||'Temperate',healthcare:c.healthcare||'Good',infrastructure:c.infrastructure||'Good',medianMonthlyIncome:c.medianMonthlyIncome||null,notes:'',lat:this.n(c.lat,0),lng:this.n(c.lng,0)});if(typeof save==='function')save();}}this.closeOverlay();this.paint();return this.toast('Destination added ✓');}
+    if(a==='editdest')return this.openEditDest(d.id);
+    if(a==='savedest')return this.saveDest();
+    if(a==='rmdest'){if(typeof state!=='undefined'&&Array.isArray(state.places)){state.places=state.places.filter(l=>l.id!==d.id);if(typeof save==='function')save();}this.closeOverlay();this.paint();return this.toast('Destination removed');}
     if(a==='theme')return this.toggleTheme();
     if(a==='seg'){this.data[d.model]=d.v;this.persist();return this.paint();}
     if(a==='rmtrip'){if(typeof state!=='undefined'&&Array.isArray(state.trips)){state.trips=state.trips.filter(t=>t.id!==d.id);if(typeof save==='function')save();}this.data.savedTrips=this.seedTrips((typeof state!=='undefined'&&state.trips)||[]);this.closeOverlay();this.persist();return this.paint();}
@@ -22939,7 +22999,6 @@ class HZMobile {
     if(this.data.tab!=='funfund')this.go('funfund');else this.paint();
     this.toast(id?'Trip updated ✓':'Trip saved ✓');
   }
-  openAddDest(){this.sheet('Add Destination','<input placeholder="🔍 Search city or country…" style="width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:9px;padding:11px 13px;color:var(--text);font-size:14px;margin-bottom:12px"><div style="font-size:11.5px;color:var(--text3);line-height:1.6">Pick a match to pre-fill cost of living, tax, climate and coordinates. Add and manage full destinations from Retire Anywhere on desktop.</div>','Search by city or country to add a retirement destination.');}
   openChat(){this.closeOverlay();if(typeof toggleAIPanel==='function'){try{toggleAIPanel();return;}catch(_){}}this.sheet('Horizon AI Advisor','<div style="background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:13px;font-size:12.5px;line-height:1.6;color:var(--text);margin-bottom:12px">Ask me anything about your finances, retirement timeline, where to retire, or travel budget. I have full context of your data.</div>','Aware of your financial context');}
 }
 
