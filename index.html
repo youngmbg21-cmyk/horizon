@@ -7436,6 +7436,11 @@ function _syncRefreshUI(){
   if(state.activePanel === 'settings' && typeof renderSettings === 'function'){
     try { renderSettings(); } catch(_){}
   }
+  // Mirror the refresh into the mobile shell's Settings so the Cloud Sync card
+  // reflects connect / sign-in / sign-out / error transitions live on phones.
+  if(typeof window!=='undefined' && window.HZ && window.HZ.data && window.HZ.data.tab==='settings'){
+    try { window.HZ.paint(true); } catch(_){}
+  }
 }
 
 // ── Settings · Cloud Sync card interactions ──────────────────────────────────
@@ -22305,6 +22310,7 @@ class HZMobile {
   // ══════ SETTINGS ══════
   vSettings(){
     let h=this.ph('SYSTEM','Settings','Profile, assumptions and appearance. Powers every AI analysis.');
+    h+=this.syncCard();
     h+=this.card(this.ct('🪪 Profile & Context')+this.srow('Citizenship',`<input value="${this.esc(this.data.citizenship)}" data-model="s:citizenship" style="${this.inpS(150)}">`)+this.srow('Home Base',`<input value="${this.esc(this.data.homeBase)}" data-model="s:homeBase" style="${this.inpS(150)}">`)+this.srow('Current Age',`<input type="number" value="${this.data.currentAge}" data-model="n:currentAge" style="${this.inpS(70)}">`)+this.srow('Retirement Age',`<input type="number" value="${this.data.retirementAge}" data-model="n:retirementAge" style="${this.inpS(70)}">`)+this.srow('Life Expectancy',`<input type="number" value="${this.data.lifeExp}" data-model="n:lifeExp" style="${this.inpS(70)}">`,true));
     h+=this.card(this.ct('📊 Assumptions')+this.srow('Portfolio Growth %',`<input type="number" step=".5" value="${this.data.growthRate}" data-model="n:growthRate" style="${this.inpS(70)}">`)+this.srow('Inflation %',`<input type="number" step=".5" value="${this.data.inflationRate}" data-model="n:inflationRate" style="${this.inpS(70)}">`)+this.srow('Post-Retire Growth %',`<input type="number" step=".5" value="${this.data.postRetGrowth}" data-model="n:postRetGrowth" style="${this.inpS(70)}">`)+this.srow('Withdrawal Tax %',`<input type="number" value="${this.data.withdrawTaxRate}" data-model="n:withdrawTaxRate" style="${this.inpS(70)}">`,true));
     h+=this.card(this.ct('🎨 Appearance')+this.srow('Currency',this.seg('currency',[['SEK','kr'],['USD','$'],['EUR','€'],['KES','KSh']]))+this.srow('Language',this.seg('lang',[['EN','EN'],['SV','SV']]))+this.srow('Theme',`<button data-act="theme" style="background:var(--bg4);border:1px solid var(--border2);color:var(--text);border-radius:7px;padding:6px 12px;font-size:11px;cursor:pointer">${this.data.theme==='dark'?'☀ Switch to Light':'☾ Switch to Dark'}</button>`,true));
@@ -22313,6 +22319,42 @@ class HZMobile {
     h+=this.card(this.ct('💾 Data')+`<div style="display:flex;gap:8px;flex-wrap:wrap">${this.btn('⬇ Export JSON','export','','o')}${this.btn('⬆ Import','import','','o')}<button data-act="reset" style="background:var(--rose-bg);color:var(--rose-tx);border:1px solid var(--rose-bd);border-radius:8px;font-size:11px;font-weight:600;padding:6px 11px;cursor:pointer">⚠ Reset</button></div>`);
     h+=`<div style="text-align:center;color:var(--text3);font-size:10px;font-family:var(--fm);margin-top:6px">HORIZON FINANCE OS · mobile</div>`;
     return h;
+  }
+  // Cloud Sync card — reuses the app's real sync engine (Supabase Auth + RLS).
+  // Credential entry (email + password) happens through the shared sign-in gate
+  // overlay so the mobile card only needs project config + account actions; that
+  // also keeps its element ids unique (hz-sync-*), never colliding with the
+  // hidden desktop Settings card or the gate.
+  syncCard(){
+    const s=(typeof state!=='undefined'&&state.sync)||{};
+    const configured=(typeof syncConfigured==='function')?syncConfigured():!!(s.enabled&&s.url&&s.anonKey);
+    const user=(typeof _syncUser!=='undefined')?_syncUser:null;
+    const inp='width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:10px 11px;color:var(--text);font-size:13px;margin-bottom:10px;font-family:var(--fm)';
+    const RAW='autocapitalize="none" autocorrect="off" autocomplete="off" spellcheck="false"';
+    const gBtn='background:var(--green);color:var(--bg0);border:none;border-radius:8px;font-size:12px;font-weight:700;padding:10px 14px;cursor:pointer;width:100%';
+    if(!configured){
+      return this.card(this.ct('☁️ Cloud Sync')+
+        `<div style="font-size:11.5px;color:var(--text2);line-height:1.55;margin-bottom:12px">Use the same data on your phone and desktop. Paste your Supabase project details, then sign in with your email on each device.</div>`+
+        `<label style="display:block;font-size:11px;color:var(--text2);margin-bottom:4px">Supabase Project URL</label><input ${RAW} id="hz-sync-url" value="${this.esc(s.url||'')}" placeholder="https://YOUR-PROJECT.supabase.co" oninput="syncField('url',this.value)" style="${inp}">`+
+        `<label style="display:block;font-size:11px;color:var(--text2);margin-bottom:4px">Supabase anon key <span style="color:var(--text3);font-size:10px">(public)</span></label><input ${RAW} id="hz-sync-key" value="${this.esc(s.anonKey||'')}" placeholder="eyJhbGci…" oninput="syncField('anonKey',this.value)" style="${inp}">`+
+        `<button onclick="syncConnect()" style="${gBtn}">Connect</button>`+
+        `<div style="font-size:10.5px;color:var(--text3);line-height:1.5;margin-top:10px">New to this? Open <b>Settings → Cloud Sync</b> on desktop for the one-time Supabase setup guide.</div>`);
+    }
+    let host=''; try{host=new URL(s.url).host;}catch(_){host=s.url||'';}
+    if(!user){
+      return this.card(this.ct('☁️ Cloud Sync&nbsp;'+this.chip('info','SIGN IN'))+
+        `<div style="font-size:12px;color:var(--text2);margin-bottom:12px">Project <b style="font-family:var(--fm)">${this.esc(host)}</b></div>`+
+        (s.lastError?`<div style="font-size:11px;color:var(--red);margin-bottom:10px;line-height:1.5">⚠ ${this.esc(s.lastError)}</div>`:'')+
+        `<button onclick="_syncShowGate()" style="${gBtn};margin-bottom:8px">Sign in / Create account</button>`+
+        `<button onclick="syncDisconnect()" style="background:transparent;color:var(--text3);border:1px solid var(--border);border-radius:8px;font-size:11px;font-weight:600;padding:9px 12px;cursor:pointer;width:100%">Use this device offline (disconnect)</button>`);
+    }
+    const last=s.lastSyncAt?new Date(s.lastSyncAt).toLocaleString(state.lang==='sv'?'sv-SE':undefined):'';
+    const status=s.lastError?`<span style="color:var(--red)">⚠ ${this.esc(s.lastError)}</span>`:s.pendingPush?`<span style="color:var(--amber)">● Pending upload…</span>`:(last?`<span style="color:var(--green)">✓ Synced · ${this.esc(last)}</span>`:`<span style="color:var(--text3)">Connected</span>`);
+    const email=(user&&user.email)||s.email||'';
+    return this.card(this.ct('☁️ Cloud Sync&nbsp;'+this.chip('sage','SIGNED IN'))+
+      `<div style="font-size:12px;color:var(--text2);line-height:1.55;margin-bottom:12px">Signed in as <b style="color:var(--text)">${this.esc(email)}</b> · <b style="font-family:var(--fm)">${this.esc(host)}</b><br>${status}</div>`+
+      `<div style="display:flex;gap:10px;align-items:center;margin-bottom:11px"><button onclick="syncNowClick(this)" style="background:var(--green);color:var(--bg0);border:none;border-radius:8px;font-size:11px;font-weight:700;padding:9px 13px;cursor:pointer">↻ Sync now</button><label style="margin-left:auto;display:inline-flex;align-items:center;gap:7px;font-size:11.5px;color:var(--text2)"><input type="checkbox" class="hz-chk" ${s.autoSync?'checked':''} onchange="syncToggleAuto(this.checked)">Auto-sync</label></div>`+
+      `<div style="display:flex;gap:8px"><button onclick="syncSignOut()" style="background:var(--bg4);color:var(--text);border:1px solid var(--border2);border-radius:8px;font-size:11px;font-weight:600;padding:8px 13px;cursor:pointer">Sign out</button><button onclick="syncDisconnect()" style="background:var(--rose-bg);color:var(--rose-tx);border:1px solid var(--rose-bd);border-radius:8px;font-size:11px;font-weight:600;padding:8px 13px;cursor:pointer;margin-left:auto">Disconnect</button></div>`);
   }
 
   // ══════ CHARTS ══════
