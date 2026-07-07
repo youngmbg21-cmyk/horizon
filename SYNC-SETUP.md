@@ -2,7 +2,8 @@
 
 Horizon syncs your data across devices by storing it in **your own** Supabase
 project, keyed to your signed-in account and fenced off by Row Level Security.
-You sign in with your email (magic link) — no codes to copy between devices.
+You sign in with an **email and password** — the same account on every device,
+no codes to copy.
 
 These are the one-time steps **you** do in the Supabase dashboard. Everything
 else happens in the app.
@@ -15,24 +16,19 @@ else happens in the app.
 2. Pick a name and a strong database password (you won't need the password for
    the app). Wait ~1 minute for it to provision.
 
-## 2. Enable email sign-in
+## 2. Enable email + password sign-in
 
 1. In the dashboard: **Authentication → Providers → Email**.
-2. Make sure **Email** is enabled. Magic-link sign-in is on by default — you
-   don't need to enable passwords.
+2. Make sure **Email** is enabled.
+3. Turn **OFF “Confirm email.”** This is the important one: with it off, you can
+   create an account and sign in with just an email + password — **no
+   confirmation email is ever sent**. (Leaving it on would email you a
+   confirmation link on signup, which is the delivery step we're avoiding.)
 
-## 3. Set the redirect URL
+> There's no redirect-URL step anymore. Password sign-in doesn't round-trip
+> through your inbox, so nothing has to match a hosted URL.
 
-The magic-link email needs to know where to send you back.
-
-1. **Authentication → URL Configuration**.
-2. Set **Site URL** to where the app is hosted, e.g. `https://horizonos.netlify.app`.
-   (For local testing you can also add `http://localhost:...`.)
-3. Add the same URL under **Redirect URLs**.
-
-> If you skip this, the sign-in link will fail or bounce you to the wrong page.
-
-## 4. Create the table + policy
+## 3. Create the table + policy
 
 **SQL Editor → New query**, paste this, and click **Run**:
 
@@ -56,7 +52,7 @@ account can only ever read or write its own row.
 > bucket to configure**. If file storage is added later, this doc will grow a
 > Storage section.
 
-## 5. Copy your keys into the app
+## 4. Copy your keys into the app
 
 1. In the dashboard: **Project Settings → API**.
 2. Copy the **Project URL** (e.g. `https://abcd1234.supabase.co`) and the
@@ -64,20 +60,20 @@ account can only ever read or write its own row.
    client; the `service_role` key is **not** — never paste that anywhere).
 3. In Horizon: **Settings → Cloud Sync**, paste both, click **Connect**.
 
-## 6. Sign in
+## 5. Create your account
 
-1. After Connect, the app shows a **sign-in screen**. Enter your email →
-   **Send magic link**.
-2. Open the email **on that same device** and tap the link. It brings you back
-   to the app, now signed in. Your current data is uploaded automatically as
-   the starting point.
+1. After Connect, the app shows a **sign-in screen**. The first time, tap
+   **“New here? Create an account.”**
+2. Enter your email and a password → **Create account**. With *Confirm email*
+   off (step 2), you're signed in instantly — no email to check. Your current
+   data is uploaded automatically as the starting point.
 
-## 7. Add your phone (or any other device)
+## 6. Add your phone (or any other device)
 
 1. Open the app on the other device → **Settings → Cloud Sync**.
 2. Paste the **same** Project URL + anon key → **Connect**.
-3. Sign in with the **same email**. The data from your first device appears
-   automatically.
+3. **Sign in** with the **same email + password**. The data from your first
+   device appears automatically.
 
 That's it. After this, edits sync automatically: they upload a couple of
 seconds after you change something, and each device pulls the latest on load
@@ -103,9 +99,10 @@ keep — financial data is never silently overwritten.
 
 | Status in Settings | Meaning | Fix |
 |---|---|---|
-| "Table not found — run the one-time SQL setup" | The `app_state` table doesn't exist | Run the SQL in step 4 |
+| "Table not found — run the one-time SQL setup" | The `app_state` table doesn't exist | Run the SQL in step 3 |
 | "Not authorized — sign in again / re-check the SQL policy" | RLS policy missing or session expired | Re-run the policy SQL; sign out and back in |
-| Magic link doesn't sign you in | Redirect URL not set | Do step 3, then request a new link |
+| "Wrong email or password" | Typo, or no account yet | Re-check both; if you're new, tap **Create an account** |
+| "Email not confirmed yet" | *Confirm email* is still ON in Supabase | Turn it OFF (step 2), or click the confirmation link in your inbox |
 | "Network error" | Offline | It retries automatically when you're back online; local data keeps working |
 
 ## Security notes
