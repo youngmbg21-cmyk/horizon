@@ -22667,9 +22667,14 @@ class HZMobile {
     const aff=Math.max(0,Math.min(100,Math.round(this.n(loc.affordabilityScore,0)*100)));
     const rank=(loc.incomePercentile!=null)?`<div style="font-size:9.5px;color:var(--text3);font-family:var(--fm);margin-top:6px">Income rank · locally: <span style="color:var(--text2)">Top ${loc.incomePercentile}% earner</span></div>`:'';
     const cached=this.locDeepDive(loc.id);
-    const ai=`<div style="margin-top:10px;display:flex;gap:8px">${cached
-      ? `<button data-act="ddview" data-id="${loc.id}" style="flex:1;background:var(--sage-bg);border:1px solid var(--sage-bd);color:var(--sage-tx);border-radius:7px;font-size:11px;font-weight:600;padding:7px;cursor:pointer">📄 View AI report</button><button data-act="ddrun" data-id="${loc.id}" title="Re-run" style="background:var(--bg4);border:1px solid var(--border2);color:var(--text2);border-radius:7px;font-size:11px;padding:7px 10px;cursor:pointer">↻</button>`
-      : `<button data-act="ddrun" data-id="${loc.id}" style="flex:1;background:var(--bg4);border:1px solid var(--border2);color:var(--text);border-radius:7px;font-size:11px;font-weight:600;padding:7px;cursor:pointer">🔬 AI Deep Dive</button>`}</div>`;
+    const running=!!(this._ddRunning&&this._ddRunning.has(loc.id));
+    const spinner=`<span style="width:13px;height:13px;border:2px solid currentColor;border-top-color:transparent;border-radius:50%;display:inline-block;animation:hzspin .8s linear infinite"></span>`;
+    const ai=`<div style="margin-top:10px;display:flex;gap:8px">${
+      running
+        ? `<div style="flex:1;display:flex;align-items:center;justify-content:center;gap:8px;background:var(--honey-bg);border:1px solid var(--honey-bd);color:var(--honey-tx);border-radius:7px;font-size:11px;font-weight:600;padding:7px">${spinner}Analyzing… 20–40s</div>`
+        : cached
+          ? `<button data-act="ddview" data-id="${loc.id}" style="flex:1;background:var(--sage-bg);border:1px solid var(--sage-bd);color:var(--sage-tx);border-radius:7px;font-size:11px;font-weight:600;padding:7px;cursor:pointer">📄 View AI report</button><button data-act="ddrun" data-id="${loc.id}" title="Re-run" style="background:var(--bg4);border:1px solid var(--border2);color:var(--text2);border-radius:7px;font-size:11px;padding:7px 10px;cursor:pointer">↻</button>`
+          : `<button data-act="ddrun" data-id="${loc.id}" style="flex:1;background:var(--bg4);border:1px solid var(--border2);color:var(--text);border-radius:7px;font-size:11px;font-weight:600;padding:7px;cursor:pointer">🔬 AI Deep Dive</button>`}</div>`;
     return `<div data-act="editdest" data-id="${loc.id}" style="padding:12px 0;border-bottom:1px solid var(--border);cursor:pointer">
       <div style="display:flex;align-items:flex-start;gap:10px">
         <div style="font-size:22px">${loc.flag||'📍'}</div>
@@ -22703,7 +22708,12 @@ class HZMobile {
     if(typeof state==='undefined'||!state.citizenship||!state.homeBase){this.toast('Set Citizenship & Home Base in Settings first');this.go('settings');return;}
     const loc=(typeof retirePlaces==='function'?retirePlaces():[]).find(l=>l.id===id);if(!loc){return;}
     const key=state.aiKeys.claude;
-    this.sheet(`${loc.flag||'📍'} ${this.esc(loc.name)} · Deep Dive`,`<div style="display:flex;align-items:center;gap:10px;color:var(--text2);font-size:13px;padding:10px 0"><span style="font-size:18px">🤖</span><span>Generating your Deep Dive report… this takes 20–40 seconds. You can keep using the app.</span></div>`,'Tailored to your citizenship, home base and retirement income.');
+    // Mark this destination as analysing so its card button shows a live spinner
+    // — the signal persists even if the user closes the sheet and keeps browsing.
+    if(!this._ddRunning)this._ddRunning=new Set();
+    this._ddRunning.add(id);
+    if(this.data.tab==='retireanywhere')this.paint(true);
+    this.sheet(`${loc.flag||'📍'} ${this.esc(loc.name)} · Deep Dive`,`<div style="display:flex;align-items:center;gap:10px;color:var(--text2);font-size:13px;padding:10px 0"><span style="width:16px;height:16px;border:2px solid var(--border2);border-top-color:var(--green);border-radius:50%;display:inline-block;animation:hzspin .8s linear infinite;flex-shrink:0"></span><span>Generating your Deep Dive report… this takes 20–40 seconds. You can close this and keep using the app — the card shows progress.</span></div>`,'Tailored to your citizenship, home base and retirement income.');
     try{
       const nums=(typeof getRetirementNumbers==='function')?getRetirementNumbers():null;
       const income=nums?this.n(nums.grossRetirementIncome,0):this.retIncome();
@@ -22719,8 +22729,9 @@ class HZMobile {
       const entry={id:'dd-'+Date.now(),type:'deepdive',locationId:id,location:loc.name,country:loc.country,flag:loc.flag||'🌍',date:new Date().toISOString(),lang:state.lang,citizenship:state.citizenship,homeBase:state.homeBase,markdown:clean};
       if(!Array.isArray(state.vault))state.vault=[];state.vault.unshift(entry);if(state.vault.length>50)state.vault=state.vault.slice(0,50);
       if(typeof saveVault==='function')saveVault();if(typeof save==='function')save();
-      this.hydrate();this.openLocReport(id);this.toast('Deep Dive saved to Vault ✓');
-    }catch(e){this.sheet('Deep Dive',`<div style="color:var(--red);font-size:13px;padding:8px 0">Analysis failed: ${this.esc((e&&e.message)||'error')}</div><div style="margin-top:12px">`+this.btn('Try again','ddrun',' data-id="'+id+'"','o')+`</div>`);}
+      if(this._ddRunning)this._ddRunning.delete(id);
+      this.hydrate();if(this.data.tab==='retireanywhere')this.paint(true);this.openLocReport(id);this.toast('Deep Dive saved to Vault ✓');
+    }catch(e){if(this._ddRunning)this._ddRunning.delete(id);if(this.data.tab==='retireanywhere')this.paint(true);this.sheet('Deep Dive',`<div style="color:var(--red);font-size:13px;padding:8px 0">Analysis failed: ${this.esc((e&&e.message)||'error')}</div><div style="margin-top:12px">`+this.btn('Try again','ddrun',' data-id="'+id+'"','o')+`</div>`);}
   }
   vAnywhere(){
     const nums=this.raNums();
