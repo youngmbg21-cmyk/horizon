@@ -4388,6 +4388,14 @@ body.light .piq-country-menu { box-shadow:0 12px 28px -10px rgba(60,40,10,0.22);
   /* Message list scrolls within whatever height the keyboard leaves. */
   #ai-panel .aip-msgs { overscroll-behavior:contain; min-height:0; }
 }
+@keyframes hzspin { to{transform:rotate(360deg)} }
+/* AI analysis markdown inside the phone shell — inherits the app's .md
+   tone-marker spans; these just size it for mobile cards. */
+#hzApp .hz-md p { margin:0 0 8px; }
+#hzApp .hz-md ul { margin:6px 0 8px 16px; padding:0; }
+#hzApp .hz-md li { margin:0 0 5px; }
+#hzApp .hz-md strong { color:var(--text); font-weight:700; }
+#hzApp .hz-md h2, #hzApp .hz-md h3 { font-size:12px; margin:8px 0 5px; color:var(--text); }
 @keyframes hzticker { 0%{transform:translateX(0)} 100%{transform:translateX(-50%)} }
 @keyframes hzfade { from{opacity:0;transform:translateY(7px)} to{opacity:1;transform:none} }
 @keyframes hzsheet { from{transform:translateY(102%)} to{transform:translateY(0)} }
@@ -22155,7 +22163,22 @@ class HZMobile {
   // Monthly retirement income — desktop's headline (sustainable draw after
   // tax + pension after tax, from the drawdown simulation), NOT a 4% rule.
   retIncome(){const nu=this.nums();if(nu)return this.n(nu.totalRetirementIncome,0);return this.draw(this.nestEgg())+this.pension();}
+  // Gross (before withdrawal + pension tax) vs net (after tax) monthly income.
+  grossRet(){const nu=this.nums();if(nu)return this.n(nu.grossRetirementIncome,0);return this.retIncome();}
   portfolioDraw(){const nu=this.nums();if(nu)return this.n(nu.sustainableAfterTax,0);return this.draw(this.nestEgg());}
+  penAvgMonthly(){const nu=this.nums();return nu?this.n(nu.pensionAvgMonthly,0):this.pension();}
+  // 12-month aggregates + fun-fund capacity/balance — the SAME engine
+  // getters that power the desktop Dashboard's KPI row.
+  inc12(){try{return this.n(this.fe().months.totalIncome12(),0);}catch(_){return this.ti()*12;}}
+  exp12(){try{return this.n(this.fe().months.totalExpenses12(),0);}catch(_){return this.te()*12;}}
+  sav12(){try{return this.n(this.fe().months.totalSavings12(),0);}catch(_){return this.n(this.data.baseSavings,0)*12;}}
+  ffCapacity(){try{return this.n(this.fe().months.funFundTwelveMoTotal(),0);}catch(_){return this.fun()*12;}}
+  ffBalance(){try{return this.n(this.fe().funFund.summary().balance,0);}catch(_){return this.ffCapacity();}}
+  // Projected value of the in-app monthly savings stream (lens-aware) —
+  // the desktop "Savings Projection" row; part of the nest egg but not an
+  // externalAsset, so the mobile asset list was under-counting without it.
+  savProjValue(){try{const f=this.fe();return this.n(this.data.retLens==='today'?f.projection.savingsReal():f.projection.savingsNominal(),0);}catch(_){return this.fv(0,this.data.baseSavings,this.data.growthRate,this.data.retirementAge-this.data.currentAge);}}
+  savMonthlyAvg(){try{const proj=this.fe().projection.yearly();if(proj&&proj.length)return Math.round(proj.reduce((s,p)=>s+this.n(p.appYearlyContrib,0),0)/(12*proj.length));}catch(_){} return this.n(this.data.baseSavings,0);}
   draw(ne){return (this.n(ne,0)*0.04/12)*(1-this.n(this.data.withdrawTaxRate,0)/100);}
   // Net worth — desktop's Dashboard definition: Σ external asset balances.
   // (Property equity remains a Property IQ-tab concept, not part of the
@@ -22239,15 +22262,63 @@ class HZMobile {
     const homeBase=this.data.homeBase||'—';
     let h=this.ph('OVERVIEW','Where you stand today',`Live position · <span style="color:var(--amber)">${this.MN[new Date().getMonth()]} ${new Date().getFullYear()}</span> · ${this.esc(homeBase)}`);
     h+=`<div style="position:relative;background:linear-gradient(140deg,var(--bg2),var(--bg1));border:1px solid var(--border2);border-radius:16px;padding:16px;margin-bottom:10px;overflow:hidden"><div style="position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,var(--green),var(--cyan),var(--blue))"></div><div style="font-size:9px;color:var(--text3);letter-spacing:.1em;font-weight:700;text-transform:uppercase;margin-bottom:6px">NET WORTH</div><div style="font-family:var(--fm);font-size:30px;font-weight:700;color:${nw>=0?'var(--green)':'var(--red)'};line-height:1">${this.fmtC(nw)}</div><div style="display:flex;gap:8px;margin-top:13px"><div style="flex:1;background:var(--bg3);border-radius:10px;padding:8px 10px"><div style="font-size:9px;color:var(--text3);font-weight:600">MONTHLY SURPLUS</div><div style="font-family:var(--fm);font-size:13px;color:${disp>=0?'var(--green)':'var(--red)'}">${this.fmt(disp)}</div></div><div style="flex:1;background:var(--bg3);border-radius:10px;padding:8px 10px"><div style="font-size:9px;color:var(--text3);font-weight:600">FUN FUND</div><div style="font-family:var(--fm);font-size:13px;color:var(--amber)">${this.fmt(fun)}</div></div></div></div>`;
-    h+=this.grid2([this.kpi('💰','Income',this.fmt(ti),'var(--green)','This month'),this.kpi('📤','Expenses',this.fmt(te),'var(--red)','This month'),this.kpi('◈','Nest Egg',this.fmtC(ne),'var(--violet)',(this.data.retLens==='today'?"Today's money · age ":'Nominal · age ')+this.data.retirementAge),this.kpi('💵','Retire Income',this.fmtC(dr),'var(--green)','Sustainable + pension')]);
+    // KPI grid — the SAME eight tiles as desktop (12-month cash-flow
+    // aggregates + retirement headline), from the same engine getters.
+    const inc12=this.inc12(),exp12=this.exp12(),sav12=this.sav12();
+    const ffCap=this.ffCapacity(),ffBal=this.ffBalance();
+    const streams=(this.data.income||[]).length;
+    const isNom=this.data.retLens==='nominal';
+    const nestPrimary=isNom?this.neNominal():this.neReal();const nestOther=isNom?this.neReal():this.neNominal();
+    const retInc=this.retIncome();const subPort=this.portfolioDraw();const subPen=this.penAvgMonthly();
+    const nu2=this.nums();const covPct=nu2?Math.round(this.n(nu2.coveragePct,0)):Math.min(100,Math.round((retInc/(nu2?this.n(nu2.totalExp,1):1))*100));
+    const vClass=nu2?nu2.verdictClass:'ontarget';const vCol=vClass==='overfunded'?'var(--green)':vClass==='underfunded'?'var(--red)':'var(--amber)';
+    h+=this.grid2([
+      this.kpi('💰','Income · 12mo',this.fmt(inc12),'var(--green)',`${this.fmt(inc12/12)}/mo · ${streams} streams`),
+      this.kpi('📤','Expenses · 12mo',this.fmt(exp12),'var(--red)',`${this.fmt(exp12/12)}/mo · ${inc12>0?Math.round(exp12/inc12*100):0}% of income`),
+      this.kpi('🏦','Savings · 12mo',this.fmt(sav12),'var(--amber)',`${this.fmt(sav12/12)}/mo · ${inc12>0?Math.round(sav12/inc12*100):0}% rate`),
+      this.kpi('✦','Fun Fund · 12mo',this.fmt(ffBal),ffBal>=0?'var(--cyan)':'var(--red)',`balance · ${this.fmt(ffCap)} capacity`),
+      this.kpi('◈',isNom?'Nest Egg · Nominal':"Nest Egg · Today's",this.fmtC(nestPrimary),'var(--violet)',`Age ${this.data.retirementAge} · ${isNom?'real':'nominal'} ${this.fmtC(nestOther)}`),
+      this.kpi('💵',isNom?'Retire Income · Nom':"Retire Income · Today's",this.fmtC(retInc),'var(--green)',`Draw ${this.fmtC(subPort)} + pension ${this.fmtC(subPen)}`),
+      this.kpi('⏱','Years to Retire',ytr+'Y','var(--amber)',`Age ${this.data.currentAge} → ${this.data.retirementAge}`),
+      this.kpi('✅','Retire Status',`<span style="color:${vCol}">${nu2?nu2.verdict:'On Target'}</span>`,vCol,`${covPct}% funded · ${this.fmtC(subPort)}/mo`)
+    ]);
     const pe=ti?te/ti*100:0,ps=ti?sav/ti*100:0,pf=ti?fun/ti*100:0;
     h+=this.card(this.ct('⇄ Cash Flow This Month')+`<div style="height:8px;background:var(--bg3);border-radius:4px;display:flex;overflow:hidden"><div style="width:${pe}%;background:var(--red);opacity:.75"></div><div style="width:${ps}%;background:var(--amber);opacity:.85"></div><div style="width:${pf}%;background:var(--green)"></div></div><div style="display:flex;gap:14px;margin-top:7px;font-size:10px;color:var(--text3);font-family:var(--fm)"><span style="color:var(--red)">■ Expenses ${pe.toFixed(0)}%</span><span style="color:var(--amber)">■ Savings ${ps.toFixed(0)}%</span><span style="color:var(--green)">■ Fun ${pf.toFixed(0)}%</span></div>`);
     h+=this.card(this.ct('📊 Net Cash Flow · 12-Month')+`<div style="height:158px"><canvas id="hzDashChart"></canvas></div>`);
-    const bigExp=this.data.expenses.slice().sort((a,b)=>b.amount-a.amount)[0];
-    const insight=bigExp?`Your <strong>${this.esc(bigExp.name)}</strong> line at <strong>${this.fmtC(bigExp.amount)}</strong> is your largest monthly outflow — trimming it lifts your surplus and compounds into a bigger nest egg over ${ytr} years.`:`With a monthly surplus of <strong style="color:${disp>=0?'var(--green)':'var(--red)'}">${this.fmt(disp)}</strong>, staying consistent compounds into <strong style="color:var(--green)">${this.fmtC(this.neNominal())}</strong> by age ${this.data.retirementAge}.`;
-    h+=`<div style="background:linear-gradient(135deg,var(--bg2),var(--info-bg));border:1px solid var(--border2);border-radius:14px;padding:14px;margin-bottom:10px;position:relative;overflow:hidden"><div style="position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,var(--green),var(--cyan))"></div><div style="display:flex;align-items:center;gap:7px;font-size:9px;font-weight:700;letter-spacing:.1em;color:var(--cyan);margin-bottom:8px"><span style="width:6px;height:6px;border-radius:50%;background:var(--green);animation:hzpulse 1.5s infinite"></span>HORIZON AI</div><div style="font-size:12.5px;line-height:1.6;color:var(--text)">${insight}</div><div style="margin-top:10px">${this.btn('Ask about this →','aichat','','o')}</div></div>`;
+    // Full AI analysis — runs the SAME desktop report generator; result is
+    // cached in state.dashboardReport and syncs across devices.
+    h+=this.aiReportCard();
     h+=`<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:14px;padding-top:12px;border-top:1px dashed var(--border)"><span style="font-family:var(--fm);font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--text3);width:100%">Jump to</span>${[['spend','🏦','Spend'],['forecast','▦','Budget'],['retirement','🌅','Retirement']].map(r=>`<button data-act="nav" data-t="${r[0]}" style="display:inline-flex;align-items:center;gap:7px;background:var(--bg2);border:1px solid var(--border);border-radius:9px;padding:8px 11px;color:var(--text2);font-size:12px;cursor:pointer"><span>${r[1]}</span>${r[2]}<span style="color:var(--text3);margin-left:2px">↗</span></button>`).join('')}</div>`;
     return h;
+  }
+  // Dashboard AI analysis card — mirrors desktop's "Run full analysis".
+  aiReportCard(){
+    const r=(typeof state!=='undefined')?state.dashboardReport:null;
+    const running=(typeof _dashReportRunning!=='undefined')&&_dashReportRunning;
+    const err=(typeof state!=='undefined')?state.dashboardReportError:null;
+    let inner=`<div style="display:flex;align-items:center;gap:7px;font-size:9px;font-weight:700;letter-spacing:.1em;color:var(--cyan);margin-bottom:10px"><span style="width:6px;height:6px;border-radius:50%;background:var(--green);${running?'animation:hzpulse 1.5s infinite':''}"></span>HORIZON AI · FULL ANALYSIS${r&&r.generatedAt?`<span style="margin-left:auto;font-weight:500;letter-spacing:0;color:var(--text3);text-transform:none">${this.esc(this.fmtWhenShort(r.generatedAt))}</span>`:''}</div>`;
+    if(running){inner+=`<div style="display:flex;align-items:center;gap:9px;color:var(--text2);font-size:12.5px;padding:6px 0"><span class="hz-spin" style="width:15px;height:15px;border:2px solid var(--border2);border-top-color:var(--green);border-radius:50%;display:inline-block;animation:hzspin .8s linear infinite"></span>Analysing your finances…</div>`;}
+    else if(r&&r.sections){
+      inner+=this.reportSections(r.sections);
+      inner+=`<div style="display:flex;gap:8px;margin-top:12px">${this.btn('↻ Re-run analysis','dashrun','','o')}${this.btn('🗄 Save to Vault','dashvault','','o')}</div>`;
+    } else {
+      inner+=`<div style="font-size:12.5px;line-height:1.6;color:var(--text2);margin-bottom:12px">Generate a full executive brief of your finances — position, what's working, concerns, and concrete actions for this month.</div>`;
+      if(err)inner+=`<div style="font-size:11.5px;color:var(--red);margin-bottom:10px;line-height:1.5">⚠ ${this.esc(err)}</div>`;
+      inner+=this.btn('✦ Run full analysis','dashrun','','g');
+    }
+    return `<div style="background:linear-gradient(135deg,var(--bg2),var(--info-bg));border:1px solid var(--border2);border-radius:14px;padding:14px;margin-bottom:10px;position:relative;overflow:hidden"><div style="position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,var(--green),var(--cyan))"></div>${inner}</div>`;
+  }
+  reportSections(sections){
+    const SEC=[['position','📍','Current position'],['good','✅','What is going well'],['concern','⚠️','Areas of concern'],['recs','🧭','Recommendations']];
+    return SEC.map(s=>{const body=(sections&&sections[s[0]])||'';if(!body)return '';let md='';try{md=(typeof _renderAISectionBody==='function')?_renderAISectionBody(body):this.esc(body);}catch(_){md=this.esc(body);}return `<div style="background:var(--bg2);border:1px solid var(--border);border-radius:10px;padding:12px;margin-bottom:8px"><div style="font-size:11px;font-weight:700;color:var(--text);margin-bottom:8px">${s[1]} ${s[2]}</div><div class="md hz-md" style="font-size:12.5px;line-height:1.6;color:var(--text2)">${md}</div></div>`;}).join('');
+  }
+  fmtWhenShort(ts){try{const d=new Date(ts);return d.toLocaleDateString(undefined,{month:'short',day:'numeric'})+' '+d.toLocaleTimeString(undefined,{hour:'2-digit',minute:'2-digit'});}catch(_){return '';}}
+  hasAIKey(){return !!(typeof state!=='undefined'&&state.aiKeys&&state.aiKeys.claude);}
+  async runReport(fn,toastMsg){
+    if(!this.hasAIKey()){this.toast('Add your Claude API key in Settings');this.go('settings');setTimeout(()=>{const el=document.getElementById('hz-ai-key');if(el)el.focus();},400);return;}
+    if(typeof window[fn]!=='function'){this.toast('Analysis unavailable here');return;}
+    try{const p=window[fn]();this.paint();await p;this.hydrate();this.paint();if(toastMsg)this.toast(toastMsg);}
+    catch(e){this.hydrate();this.paint();this.toast('Analysis failed');}
   }
 
   // ══════ SPEND INSIGHTS ══════
@@ -22288,6 +22359,26 @@ class HZMobile {
     const recent=M.txs.slice().sort((a,b)=>String(b.date||'').localeCompare(String(a.date||''))).slice(0,14);
     h+=this.card(this.ct('🧾 Recent Transactions')+recent.map(t=>{const amt=this.n(t.amount,0);const neg=amt<0;const cat=t.category||'Other';return `<div style="display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--border)"><div style="width:34px;height:34px;border-radius:9px;background:var(--bg3);display:flex;align-items:center;justify-content:center;font-size:15px;flex-shrink:0">${this.catIcon(cat)}</div><div style="flex:1;min-width:0"><div style="font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${this.esc(t.name||cat)}</div><div style="font-size:10.5px;color:var(--text3);font-family:var(--fm)">${this.txDate(t.date)} · ${this.esc(cat)}</div></div><div style="font-family:var(--fm);font-size:13px;font-weight:600;color:${neg?'var(--text)':'var(--green)'}">${neg?'−':'+'}${this.fmt(Math.abs(amt))}</div></div>`;}).join('')+`<div style="font-size:10.5px;color:var(--text3);text-align:center;margin-top:10px">Showing ${recent.length} of ${M.count} · upload more in Spend Insights on desktop</div>`);
     h+=this.card(this.ct('🍩 Category Split')+`<div style="height:180px"><canvas id="hzSpendChart"></canvas></div>`);
+    h+=this.spendReportCard();
+    return h;
+  }
+  // Spend AI summary — runs the SAME desktop siGenerateSummary; the parsed
+  // verdict/concerns/insights/actions cache in state.spendInsights and sync.
+  spendReportCard(){
+    const si=(typeof state!=='undefined')?state.spendInsights:null;
+    const running=(typeof _siRunning!=='undefined')&&_siRunning;
+    const err=(typeof _siError!=='undefined')?_siError:null;
+    let inner=`<div style="display:flex;align-items:center;gap:7px;font-size:9px;font-weight:700;letter-spacing:.1em;color:var(--cyan);margin-bottom:10px"><span style="width:6px;height:6px;border-radius:50%;background:var(--green);${running?'animation:hzpulse 1.5s infinite':''}"></span>HORIZON AI · SPEND ANALYSIS${si&&si.generatedAt?`<span style="margin-left:auto;font-weight:500;letter-spacing:0;color:var(--text3);text-transform:none">${this.esc(this.fmtWhenShort(si.generatedAt))}</span>`:''}</div>`;
+    if(running){inner+=`<div style="display:flex;align-items:center;gap:9px;color:var(--text2);font-size:12.5px;padding:6px 0"><span class="hz-spin" style="width:15px;height:15px;border:2px solid var(--border2);border-top-color:var(--green);border-radius:50%;display:inline-block;animation:hzspin .8s linear infinite"></span>Reading your transactions…</div>`;}
+    else if(si&&si.data&&!si.data.parseError){inner+=this.spendInsightBody(si);inner+=`<div style="display:flex;gap:8px;margin-top:12px">${this.btn('↻ Re-analyse','spendrun','','o')}${this.btn('🗄 Save to Vault','spendvault','','o')}</div>`;}
+    else {inner+=`<div style="font-size:12.5px;line-height:1.6;color:var(--text2);margin-bottom:12px">Let Horizon AI read your transactions — a verdict, the top concerns, patterns worth knowing, and what to do this month.</div>`;if(err)inner+=`<div style="font-size:11.5px;color:var(--red);margin-bottom:10px;line-height:1.5">⚠ ${this.esc(err)}</div>`;inner+=this.btn('✦ Generate summary','spendrun','','g');}
+    return `<div style="background:linear-gradient(135deg,var(--bg2),var(--info-bg));border:1px solid var(--border2);border-radius:14px;padding:14px;margin-bottom:10px;position:relative;overflow:hidden"><div style="position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,var(--green),var(--cyan))"></div>${inner}</div>`;
+  }
+  spendInsightBody(si){
+    const d=si.data;const tone={healthy:'sage',watch:'honey',concern:'rose'};let h='';
+    if(d.verdict)h+=`<div style="margin-bottom:10px">${this.chip(tone[d.verdict.tone]||'info',({healthy:'On track',watch:'Watch',concern:'Needs attention'})[d.verdict.tone]||'Summary')}<div style="font-size:13px;color:var(--text);line-height:1.5;margin-top:8px">${this.esc(d.verdict.headline)}</div></div>`;
+    if(d.concerns&&d.concerns.length){h+=`<div style="font-size:10.5px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;margin:12px 0 6px">Top concerns</div>`+d.concerns.slice(0,4).map(c=>`<div style="display:flex;gap:8px;padding:7px 0;border-bottom:1px solid var(--border)"><span style="width:6px;height:6px;border-radius:50%;margin-top:5px;flex-shrink:0;background:${c.severity==='high'?'var(--red)':c.severity==='med'?'var(--amber)':'var(--text3)'}"></span><div style="min-width:0"><div style="font-size:12.5px;font-weight:600;color:var(--text)">${this.esc(c.title)}</div><div style="font-size:11.5px;color:var(--text2);line-height:1.5">${this.esc(c.detail)}</div></div></div>`).join('');}
+    if(d.actions&&d.actions.length){h+=`<div style="font-size:10.5px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;margin:12px 0 6px">Do this month</div>`+d.actions.slice(0,5).map((a,i)=>`<div style="display:flex;gap:9px;padding:6px 0"><span style="width:18px;height:18px;border-radius:50%;background:var(--green);color:var(--bg0);font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0">${i+1}</span><div style="font-size:12.5px;color:var(--text);line-height:1.5">${this.esc(a.text)}</div></div>`).join('');}
     return h;
   }
   txDate(d){const s=String(d||'');const m=s.match(/^(\d{4})-(\d{2})-(\d{2})/);return m?`${this.MN[(+m[2])-1]} ${m[3]}`:s;}
@@ -22344,7 +22435,7 @@ class HZMobile {
     const covPct=nu?Math.round(this.n(nu.coveragePct,0)):Math.min(100,Math.round(need?dr/need*100:100));
     let h=this.ph('PERSONAL FINANCES','Are you on track?',`Projected to age ${this.data.retirementAge}, sustained to ${this.data.lifeExp}.`);
     h+=`<div style="display:inline-flex;gap:2px;background:var(--bg0);border:1px solid var(--border);border-radius:7px;padding:3px;margin-bottom:12px">${[['today','Today'],['nominal','Nominal']].map(m=>`<button data-act="lens" data-l="${m[0]}" style="border:none;border-radius:5px;padding:5px 11px;font-family:var(--fm);font-size:10px;font-weight:600;cursor:pointer;background:${this.data.retLens===m[0]?'var(--green)':'transparent'};color:${this.data.retLens===m[0]?'var(--bg0)':'var(--text2)'}">${m[1]}</button>`).join('')}</div>`;
-    h+=`<div style="background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:15px;margin-bottom:10px"><div style="display:flex;align-items:center;gap:10px;margin-bottom:10px"><span style="font-size:26px">${vIcon}</span><div><div style="font-family:var(--fs);font-size:19px;font-weight:600;color:${vColor}">${vText}</div><div style="font-size:11px;color:var(--text2)">${runout&&runout<this.data.lifeExp?`Portfolio lasts to age ${runout} (plan: ${this.data.lifeExp})`:`Income vs ${this.fmtC(need)}/mo need · ${covPct}% of years funded`}</div></div></div><div style="margin-top:4px">${this.bar(covPct,vColor,8)}</div><div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px">${[['Nest egg',this.fmtC(this.lensNe())],['Monthly income',this.fmtC(dr)],['Monthly need',this.fmtC(need)],[gap>=0?'Headroom':'Shortfall',(gap>=0?'+':'')+this.fmtC(gap)]].map((n,i)=>`<div style="background:var(--bg3);border-radius:8px;padding:9px;text-align:center"><div style="font-size:9px;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:3px">${n[0]}</div><div style="font-family:var(--fm);font-size:14px;font-weight:700;color:${i===3?vColor:'var(--text)'}">${n[1]}</div></div>`).join('')}</div></div>`;
+    h+=`<div style="background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:15px;margin-bottom:10px"><div style="display:flex;align-items:center;gap:10px;margin-bottom:10px"><span style="font-size:26px">${vIcon}</span><div><div style="font-family:var(--fs);font-size:19px;font-weight:600;color:${vColor}">${vText}</div><div style="font-size:11px;color:var(--text2)">${runout&&runout<this.data.lifeExp?`Portfolio lasts to age ${runout} (plan: ${this.data.lifeExp})`:`Income vs ${this.fmtC(need)}/mo need · ${covPct}% of years funded`}</div></div></div><div style="margin-top:4px">${this.bar(covPct,vColor,8)}</div><div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px">${[['Nest egg',this.fmtC(this.lensNe())],['Net income',this.fmtC(dr)],['Monthly need',this.fmtC(need)],[gap>=0?'Headroom':'Shortfall',(gap>=0?'+':'')+this.fmtC(gap)]].map((n,i)=>`<div style="background:var(--bg3);border-radius:8px;padding:9px;text-align:center"><div style="font-size:9px;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:3px">${n[0]}</div><div style="font-family:var(--fm);font-size:14px;font-weight:700;color:${i===3?vColor:'var(--text)'}">${n[1]}</div></div>`).join('')}</div><div style="display:flex;align-items:center;gap:8px;margin-top:10px;padding:9px 11px;background:var(--bg3);border-radius:8px;font-family:var(--fm);font-size:11.5px"><span style="color:var(--text2)">Gross <strong style="color:var(--text)">${this.fmtC(this.grossRet())}</strong>/mo</span><span style="color:var(--text3)">→</span><span style="color:var(--text2)">Net <strong style="color:var(--green)">${this.fmtC(dr)}</strong>/mo</span><span style="margin-left:auto;color:var(--text3);font-size:10px">after ${Math.round(this.n(this.data.withdrawTaxRate,0))}% tax</span></div></div>`;
     const penMo=nu?this.n(nu.pensionAvgMonthly,0):this.pension();
     h+=this.grid2([this.kpi('🏛','Pension',this.fmtC(penMo),'var(--blue)','Avg /mo in retirement'),this.kpi('💵','Portfolio Draw',this.fmtC(this.portfolioDraw()),'var(--green)','Sustainable, after tax'),this.kpi('📅','Years to Retire',ytr+'Y','var(--amber)','Age '+this.data.currentAge+' → '+this.data.retirementAge),this.kpi('⏳','Runway',runout?('Age '+runout):(this.data.lifeExp+'+'),runout&&runout<this.data.lifeExp?'var(--amber)':'var(--violet)',runout&&runout<this.data.lifeExp?'Portfolio runs out':'Lasts past age '+this.data.lifeExp)]);
     h+=this.card(this.ct('📈 Nest Egg Growth',`<label style="display:flex;align-items:center;gap:5px;font-size:10px;color:var(--text3)">${this.data.retLens==='today'?'Real':'Nominal'}</label>`)+`<div style="height:190px"><canvas id="hzNestChart"></canvas></div>`);
@@ -22362,7 +22453,11 @@ class HZMobile {
     // "at retirement" figures equal desktop's to the krona.
     const colors=['#00e8a0','#4d9fff','#f5a623','#8b5cf6'];
     const f=this.fe();
-    h+=this.card(this.ct('◆ Investment Assets',this.btn('+ Add','assetadd','','o'))+this.invAssets().map((a,i)=>{let rp=0;try{rp=this.data.retLens==='today'?f.projection.perAccountReal(a.id):f.projection.perAccountNominal(a.id);}catch(_){ }if(!rp){const proj=this.fv(a.balance,a.monthlyContribution,(a.growthRate!=null&&a.growthRate!=='')?a.growthRate:this.data.growthRate,ytr);rp=this.data.retLens==='today'?this.realVal(proj,ytr):proj;}return `<div style="display:flex;align-items:flex-start;gap:9px;padding:11px 0;border-bottom:1px solid var(--border)"><div style="width:9px;height:9px;border-radius:50%;background:${colors[i%4]};margin-top:5px;flex-shrink:0"></div><div style="flex:1;min-width:0"><input value="${this.esc(a.name)}" data-model="aname:${a.id}" style="width:100%;background:transparent;border:none;border-bottom:1px solid var(--border);color:var(--text);font-size:12.5px;font-weight:600;padding:2px 0;margin-bottom:6px"><div style="display:flex;flex-wrap:wrap;gap:8px;font-size:10px;color:var(--text3)"><span>Bal <input type="number" value="${this.n(a.balance,0)}" data-model="abal:${a.id}" style="width:78px;background:transparent;border:none;border-bottom:1px solid var(--border);color:var(--text2);font-family:var(--fm);font-size:10px"></span><span>+<input type="number" value="${this.n(a.monthlyContribution,0)}" data-model="acon:${a.id}" style="width:58px;background:transparent;border:none;border-bottom:1px solid var(--border);color:var(--text2);font-family:var(--fm);font-size:10px">/mo</span><span><input type="number" value="${this.n(a.growthRate,this.data.growthRate)}" data-model="agro:${a.id}" style="width:32px;background:transparent;border:none;border-bottom:1px solid var(--border);color:var(--text2);font-family:var(--fm);font-size:10px">%</span></div></div><div style="text-align:right;flex-shrink:0"><div style="font-family:var(--fm);font-weight:700;font-size:12px;color:${colors[i%4]}">${this.fmtC(rp)}</div><div style="font-size:9px;color:var(--text3)">at retirement</div></div><button data-act="assetrm" data-id="${a.id}" style="background:none;border:none;color:var(--red);font-size:16px;cursor:pointer;opacity:.5">×</button></div>`;}).join(''));
+    // Read-only in-app savings projection — the desktop "Savings Projection"
+    // row. It is part of the nest egg but isn't an externalAsset, so listing
+    // it makes the asset cards add up to the headline figure.
+    const savRow=`<div style="display:flex;align-items:flex-start;gap:9px;padding:11px 0;border-bottom:1px solid var(--border)"><div style="width:9px;height:9px;border-radius:50%;background:var(--green);margin-top:5px;flex-shrink:0"></div><div style="flex:1;min-width:0"><div style="font-size:12.5px;font-weight:600;color:var(--text);margin-bottom:6px">In-app savings <span title="Computed from your monthly savings — edit in Budget" style="opacity:.6">🔒</span></div><div style="display:flex;flex-wrap:wrap;gap:8px;font-size:10px;color:var(--text3);font-family:var(--fm)"><span>+${this.fmt(this.savMonthlyAvg())}/mo avg</span><span>${this.n(this.data.growthRate,0)}%</span></div></div><div style="text-align:right;flex-shrink:0"><div style="font-family:var(--fm);font-weight:700;font-size:12px;color:var(--green)">${this.fmtC(this.savProjValue())}</div><div style="font-size:9px;color:var(--text3)">at retirement</div></div></div>`;
+    h+=this.card(this.ct('◆ Investment Assets',this.btn('+ Add','assetadd','','o'))+savRow+this.invAssets().map((a,i)=>{let rp=0;try{rp=this.data.retLens==='today'?f.projection.perAccountReal(a.id):f.projection.perAccountNominal(a.id);}catch(_){ }if(!rp){const proj=this.fv(a.balance,a.monthlyContribution,(a.growthRate!=null&&a.growthRate!=='')?a.growthRate:this.data.growthRate,ytr);rp=this.data.retLens==='today'?this.realVal(proj,ytr):proj;}return `<div style="display:flex;align-items:flex-start;gap:9px;padding:11px 0;border-bottom:1px solid var(--border)"><div style="width:9px;height:9px;border-radius:50%;background:${colors[i%4]};margin-top:5px;flex-shrink:0"></div><div style="flex:1;min-width:0"><input value="${this.esc(a.name)}" data-model="aname:${a.id}" style="width:100%;background:transparent;border:none;border-bottom:1px solid var(--border);color:var(--text);font-size:12.5px;font-weight:600;padding:2px 0;margin-bottom:6px"><div style="display:flex;flex-wrap:wrap;gap:8px;font-size:10px;color:var(--text3)"><span>Bal <input type="number" value="${this.n(a.balance,0)}" data-model="abal:${a.id}" style="width:78px;background:transparent;border:none;border-bottom:1px solid var(--border);color:var(--text2);font-family:var(--fm);font-size:10px"></span><span>+<input type="number" value="${this.n(a.monthlyContribution,0)}" data-model="acon:${a.id}" style="width:58px;background:transparent;border:none;border-bottom:1px solid var(--border);color:var(--text2);font-family:var(--fm);font-size:10px">/mo</span><span><input type="number" value="${this.n(a.growthRate,this.data.growthRate)}" data-model="agro:${a.id}" style="width:32px;background:transparent;border:none;border-bottom:1px solid var(--border);color:var(--text2);font-family:var(--fm);font-size:10px">%</span></div></div><div style="text-align:right;flex-shrink:0"><div style="font-family:var(--fm);font-weight:700;font-size:12px;color:${colors[i%4]}">${this.fmtC(rp)}</div><div style="font-size:9px;color:var(--text3)">at retirement</div></div><button data-act="assetrm" data-id="${a.id}" style="background:none;border:none;color:var(--red);font-size:16px;cursor:pointer;opacity:.5">×</button></div>`;}).join(''));
     return h;
   }
 
@@ -22485,6 +22580,8 @@ class HZMobile {
     h+=this.syncCard();
     h+=this.card(this.ct('🪪 Profile & Context')+this.srow('Citizenship',`<input value="${this.esc(this.data.citizenship)}" data-model="s:citizenship" style="${this.inpS(150)}">`)+this.srow('Home Base',`<input value="${this.esc(this.data.homeBase)}" data-model="s:homeBase" style="${this.inpS(150)}">`)+this.srow('Current Age',`<input type="number" value="${this.data.currentAge}" data-model="n:currentAge" style="${this.inpS(70)}">`)+this.srow('Retirement Age',`<input type="number" value="${this.data.retirementAge}" data-model="n:retirementAge" style="${this.inpS(70)}">`)+this.srow('Life Expectancy',`<input type="number" value="${this.data.lifeExp}" data-model="n:lifeExp" style="${this.inpS(70)}">`,true));
     h+=this.card(this.ct('📊 Assumptions')+this.srow('Portfolio Growth %',`<input type="number" step=".5" value="${this.data.growthRate}" data-model="n:growthRate" style="${this.inpS(70)}">`)+this.srow('Inflation %',`<input type="number" step=".5" value="${this.data.inflationRate}" data-model="n:inflationRate" style="${this.inpS(70)}">`)+this.srow('Post-Retire Growth %',`<input type="number" step=".5" value="${this.data.postRetGrowth}" data-model="n:postRetGrowth" style="${this.inpS(70)}">`)+this.srow('Savings Tax %',`<input type="number" value="${this.data.withdrawTaxRate}" data-model="n:withdrawTaxRate" style="${this.inpS(70)}">`,true));
+    const aiKey=(typeof state!=='undefined'&&state.aiKeys&&state.aiKeys.claude)||'';
+    h+=this.card(this.ct('✦ AI Key')+`<div style="font-size:11.5px;color:var(--text2);line-height:1.55;margin-bottom:10px">Paste your Claude API key to power the AI advisor and the full-analysis reports on this device. Stored locally, never synced.</div><input id="hz-ai-key" type="password" autocapitalize="none" autocorrect="off" spellcheck="false" value="${this.esc(aiKey)}" placeholder="sk-ant-…" oninput="(function(v){if(typeof state!=='undefined'){if(!state.aiKeys)state.aiKeys={};state.aiKeys.claude=v.trim();if(typeof save==='function')save();}})(this.value)" style="width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:10px 11px;color:var(--text);font-family:var(--fm);font-size:13px">${aiKey?`<div style="font-size:10.5px;color:var(--green);margin-top:8px">✓ Key set — AI analysis enabled</div>`:''}`);
     h+=this.card(this.ct('🎨 Appearance')+this.srow('Currency',this.seg('currency',[['SEK','kr'],['USD','$'],['EUR','€'],['KES','KSh']]))+this.srow('Language',this.seg('lang',[['EN','EN'],['SV','SV']]))+this.srow('Theme',`<button data-act="theme" style="background:var(--bg4);border:1px solid var(--border2);color:var(--text);border-radius:7px;padding:6px 12px;font-size:11px;cursor:pointer">${this.data.theme==='dark'?'☀ Switch to Light':'☾ Switch to Dark'}</button>`,true));
     h+=this.card(this.ct('💱 Exchange Rates',this.chip('sage','● Live FX pending'))+['USD','EUR','KES'].map((k,i)=>this.srow(k+' per SEK',`<input type="number" step=".001" value="${this.data.exchangeRates[k]}" data-model="fx:${k}" style="${this.inpS(90)}">`,i===2)).join(''));
     h+=this.card(this.ct('🏦 Connections')+`<div style="display:flex;gap:8px;flex-wrap:wrap">${this.btn('🏦 Connect Bank (PSD2)','bank','','o')}${this.btn('📥 Import CSV','csv','','o')}${this.btn('📊 Load Demo Data','demo','','o')}</div>`);
@@ -22561,6 +22658,10 @@ class HZMobile {
     if(a==='theme')return this.toggleTheme();
     if(a==='seg'){this.data[d.model]=d.v;this.persist();return this.paint();}
     if(a==='rmtrip'){const trip=this.data.savedTrips.find(t=>t.id===d.id);if(trip&&!trip._m&&typeof state!=='undefined'&&Array.isArray(state.trips)){state.trips=state.trips.filter(t=>t.id!==d.id);}this.data.savedTrips=this.data.savedTrips.filter(t=>t.id!==d.id);if(typeof state!=='undefined')state.mobileTrips=this.data.savedTrips;this.persist();return this.paint();}
+    if(a==='dashrun')return this.runReport('runDashboardAIReport');
+    if(a==='dashvault'){if(typeof saveDashboardReportToVault==='function'){try{saveDashboardReportToVault();}catch(_){}this.toast('Saved to Vault ✓');}return;}
+    if(a==='spendrun')return this.runReport('siGenerateSummary');
+    if(a==='spendvault'){if(typeof siSaveToVault==='function'){try{siSaveToVault();}catch(_){}this.toast('Saved to Vault ✓');}return;}
     if(a==='trip')return this.openTrip();
     if(a==='adddest')return this.openAddDest();
     if(a==='bank')return this.openBank();
