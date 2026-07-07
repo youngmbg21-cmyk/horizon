@@ -22025,7 +22025,7 @@ class HZMobile {
     ];
     this.DREAMS=[{id:'coastal',icon:'🏖',name:'Coastal'},{id:'city',icon:'🏙',name:'City Life'},{id:'nature',icon:'🌿',name:'Nature'},{id:'warm',icon:'☀️',name:'Warm'},{id:'culture',icon:'🎭',name:'Culture'},{id:'family',icon:'👨‍👩‍👧',name:'Family'},{id:'luxury',icon:'🥂',name:'Luxury'},{id:'adventure',icon:'🧗',name:'Adventure'},{id:'peaceful',icon:'🕊',name:'Peaceful'}];
     this.EXP={low:{Housing:5000,Food:2500,Health:1500,Transport:800,Leisure:1200,Misc:1000},mid:{Housing:9000,Food:4000,Health:2500,Transport:1500,Leisure:2500,Misc:1500},high:{Housing:16000,Food:6000,Health:4000,Transport:2500,Leisure:5000,Misc:2500},luxury:{Housing:25000,Food:9000,Health:6000,Transport:4000,Leisure:10000,Misc:5000}};
-    this.MORE=[['dashboard','◉','Dashboard','Overview'],['lifewall','🧱','Life Wall','Overview'],['spend','🏦','Spend Insights','Personal Finances'],['forecast','▦','Forecast & Review','Personal Finances'],['retirement','🌅','Retirement Plan','Personal Finances'],['funfund','✦','Fun Fund','Planning'],['retireanywhere','🌍','Retire Anywhere','Planning'],['property','🏠','Property IQ','Planning'],['journal','📓','Journal','Library'],['vault','🗄','Vault','Library'],['settings','⚙','Settings','System']];
+    this.MORE=[['dashboard','◉','Dashboard','Overview'],['lifewall','🧱','Life Wall','Overview'],['spend','🏦','Spend Insights','Personal Finances'],['forecast','▦','Forecast & Review','Personal Finances'],['retirement','🌅','Retirement Plan','Personal Finances'],['funfund','✦','Fun Fund','Planning'],['retireanywhere','🌍','Retire Anywhere','Planning'],['journal','📓','Journal','Library'],['vault','🗄','Vault','Library'],['settings','⚙','Settings','System']];
   }
 
   // ── mount / lifecycle ──
@@ -22053,8 +22053,8 @@ class HZMobile {
     this.syncThemeBtn();
     this.paint();
   }
-  tabFromPanel(p){return ({transactions:'spend',review:'forecast',monthly:'forecast',yearly:'forecast',propiq:'property'})[p]||p;}
-  panelFromTab(t){return ({spend:'transactions',forecast:'review',property:'propiq'})[t]||t;}
+  tabFromPanel(p){return ({transactions:'spend',review:'forecast',monthly:'forecast',yearly:'forecast',propiq:'dashboard'})[p]||p;}
+  panelFromTab(t){return ({spend:'transactions',forecast:'review'})[t]||t;}
   // Robust numeric coercion. Real synced data can carry numbers as strings
   // ("1 400 000", "27,000") or omit fields entirely (an asset added but never
   // given a balance) — raw `+x` arithmetic on those yields NaN, which then
@@ -22375,6 +22375,9 @@ class HZMobile {
   setFab(){const fab=document.getElementById('hzFab');if(fab)fab.classList.toggle('hz-hidden',this.data.tab==='settings');}
 
   paint(silent){
+    // Property IQ tab was removed on mobile — normalise any stale/desktop
+    // pointer to it (state.activePanel can be 'propiq' from desktop) to Dashboard.
+    if(this.data.tab==='property'||this.data.tab==='propiq')this.data.tab='dashboard';
     const t=this.data.tab;
     const prevScroll=silent?this.body.scrollTop:0;
     this.nav.querySelectorAll('[data-nav]').forEach(b=>{const map={dashboard:'dashboard',spend:'spend',forecast:'forecast',retirement:'retirement'};const on=(b.dataset.nav===map[t])||(b.dataset.nav==='__more'&&!map[t]);b.classList.toggle('active',on);});
@@ -22387,10 +22390,10 @@ class HZMobile {
     else if(t==='funfund')h=this.vFun();
     else if(t==='retireanywhere')h=this.vAnywhere();
     else if(t==='lifewall')h=this.vLifeWall();
-    else if(t==='property')h=this.vProperty();
     else if(t==='journal')h=this.vJournal();
     else if(t==='vault')h=this.vVault();
     else if(t==='settings')h=this.vSettings();
+    else h=this.vDash();
     this.body.innerHTML=`<div class="hz-body-inner${silent?' no-anim':''}">${h}</div>`;
     if(silent)this.body.scrollTop=prevScroll;
     this.setFab();
@@ -22400,7 +22403,6 @@ class HZMobile {
     if(t==='retirement')this.chartNest();
     if(t==='funfund'){this.chartFFBal();this.initVacMap();}
     if(t==='retireanywhere')this.initRetMap();
-    if(t==='property')this.chartAmort();
   }
 
   renderTicker(){
@@ -22771,19 +22773,6 @@ class HZMobile {
   }
 
   // ══════ PROPERTY IQ ══════
-  vProperty(){
-    const p=this.data.property;const eq=p.value-p.mortgage;const ltv=p.value?p.mortgage/p.value*100:0;
-    const tone=ltv<70?'sage':ltv<85?'honey':'rose';const bc=ltv<70?'var(--green)':ltv<85?'var(--amber)':'var(--red)';
-    let h=this.ph('PLANNING','Property IQ','Your home as a financial asset — equity, leverage and payoff.');
-    if(!p.value)h+=this.banner('info',`<b>No property added yet.</b> Enter your home's market value and mortgage below to model equity, leverage and payoff — it feeds your Net Worth.`);
-    h+=this.grid2([this.kpi('🏠','Value',this.fmtC(p.value),'var(--text)','Market est.'),this.kpi('💎','Equity',this.fmtC(eq),'var(--green)',(100-ltv).toFixed(0)+'% owned','pos'),this.kpi('🏦','Mortgage',this.fmtC(p.mortgage),'var(--red)',(p.rate||0)+'% · SEB'),this.kpi('📉','LTV',ltv.toFixed(0)+'%',bc,ltv<70?'Healthy':ltv<85?'Moderate':'High',tone==='sage'?'pos':tone==='honey'?'warn':'alert')]);
-    h+=this.card(this.ct('💎 Equity Position')+this.row('Market value',this.fmtC(p.value),'var(--text)')+this.row('Mortgage outstanding','−'+this.fmtC(p.mortgage),'var(--red)')+this.row('Your equity',this.fmtC(eq),'var(--green)',true)+`<div style="margin-top:10px"><div style="display:flex;justify-content:space-between;font-size:10px;color:var(--text3);font-family:var(--fm);margin-bottom:3px"><span>Loan-to-value</span><span style="color:${bc}">${ltv.toFixed(0)}%</span></div>${this.bar(ltv,bc,8)}</div>`);
-    h+=this.card(this.ct('✎ Details')+['value','mortgage','rate','monthly'].map((k,i)=>this.srow(['Market value','Mortgage','Interest rate %','Monthly payment'][i],`<div style="display:flex;align-items:center;background:var(--bg3);border:1px solid var(--border);border-radius:6px;padding:0 9px"><input type="number" value="${p[k]||0}" data-model="prop:${k}" style="width:${k==='rate'?'56':'96'}px;background:transparent;border:none;color:var(--text);font-family:var(--fm);font-size:12px;padding:7px 0;text-align:right"><span style="color:var(--text3);font-size:9px;font-family:var(--fm)">${k==='rate'?'%':'kr'}</span></div>`,i===3)).join(''));
-    h+=this.card(this.ct('📉 Mortgage Payoff')+`<div style="height:180px"><canvas id="hzAmortChart"></canvas></div>`);
-    h+=this.banner(tone,`At <b>${ltv.toFixed(0)}% LTV</b> you hold <b>${this.fmtC(eq)}</b> of equity. ${ltv<70?'Comfortable leverage — this equity backs your net worth and could part-fund a retirement move.':'Consider extra amortisation to lift your equity buffer.'} <a data-act="nav" data-t="retirement">See in Retirement →</a>`);
-    return h;
-  }
-
   // ══════ JOURNAL ══════
   vJournal(){
     let h=this.ph('LIBRARY','Journal','Decisions and notes, timestamped alongside your numbers.');
@@ -22870,7 +22859,6 @@ class HZMobile {
   chartNest(){this.whenLib(()=>window.Chart,()=>{let labs=[],data=[];try{const f=this.fe();const proj=f?f.projection.yearly():null;if(proj&&proj.length){proj.forEach(p=>{labs.push(p.age!=null?p.age:p.year);data.push(Math.round(this.n(this.data.retLens==='today'?p.realTotal:p.total,0)));});}}catch(_){}
     if(!labs.length){const ytr=this.data.retirementAge-this.data.currentAge;const step=Math.max(1,Math.floor(ytr/18));for(let y=0;y<=ytr;y+=step){let t=this.nestEgg(y);if(this.data.retLens==='today')t=this.realVal(t,y);data.push(Math.round(t));labs.push(this.data.currentAge+y);}}
     const c=this.cc();const ctx=document.getElementById('hzNestChart');if(!ctx)return;if(this.charts.nest)this.charts.nest.destroy();this.charts.nest=new Chart(ctx,{type:'line',data:{labels:labs,datasets:[{data,borderColor:'#8b5cf6',backgroundColor:'#8b5cf618',fill:true,tension:.4,pointRadius:0}]},options:this.chOpts({plugins:{legend:{display:false},tooltip:{callbacks:{label:ctx=>this.fmtC(ctx.parsed.y)}}},scales:{x:{ticks:{color:c.t3,font:{size:9}},grid:{display:false}},y:{ticks:{color:c.t3,font:{size:9},maxTicksLimit:6,callback:v=>this.fmtC(v)},grid:{color:c.grid}}}})});});}
-  chartAmort(){this.whenLib(()=>window.Chart,()=>{const p=this.data.property;const ctx=document.getElementById('hzAmortChart');if(!ctx)return;if(this.charts.amort)this.charts.amort.destroy();if(!p.mortgage||!p.monthly){this.charts.amort=null;return;}let bal=p.mortgage;const r=(p.rate||0)/100/12;const labs=[],data=[];let baseYr=new Date().getFullYear();for(let mth=0;mth<=480&&bal>0.5;mth++){if(mth%12===0){labs.push(baseYr+mth/12);data.push(Math.round(bal));}const interest=bal*r;bal=bal-(p.monthly-interest);if(bal<0)bal=0;if(p.monthly-interest<=0)break;}const c=this.cc();this.charts.amort=new Chart(ctx,{type:'line',data:{labels:labs,datasets:[{data,borderColor:'#4d9fff',backgroundColor:'#4d9fff18',fill:true,tension:.35,pointRadius:0}]},options:this.chOpts({plugins:{legend:{display:false},tooltip:{callbacks:{label:ctx=>this.fmtC(ctx.parsed.y)}}},scales:{x:{ticks:{color:c.t3,font:{size:9},maxTicksLimit:7},grid:{display:false}},y:{ticks:{color:c.t3,font:{size:9},maxTicksLimit:6,callback:v=>this.fmtC(v)},grid:{color:c.grid}}}})});});}
   // Fun fund · 12-month balance outlook — mirror of the desktop chart. Each
   // bar is the carry-forward ending balance 12 months ahead of that month
   // (engine balanceBars). Green = surplus, red = a planned trip pushes the
