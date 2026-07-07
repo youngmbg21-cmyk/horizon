@@ -3891,6 +3891,30 @@ body.light .geo-dropdown { box-shadow:0 10px 30px -10px rgba(60,40,10,0.22); }
   .dhp-val.pos { color:var(--green); } .dhp-val.neg { color:var(--red); } .dhp-val.cyan { color:var(--cyan); }
 }
 
+/* ── Dashboard cash-flow segmented bar (mobile-only) — spec §6.1 ────────────
+   "Where this month's income goes": one stacked bar split into expenses
+   (red) / savings (amber) / fun (green), with a % -of-income legend. */
+.dash-cashflow-bar { display:none; }
+@media (max-width:640px){
+  .dash-cashflow-bar { display:block; }
+  .cfbar { display:flex; height:11px; border-radius:999px; overflow:hidden;
+    background:var(--bg0); border:1px solid var(--border); margin:4px 0 13px; }
+  .cfbar-seg { height:100%; transition:width .4s cubic-bezier(.2,.7,.2,1); }
+  .cfbar-seg + .cfbar-seg { border-left:1.5px solid var(--bg1); }
+  .cfbar-exp { background:var(--red); }
+  .cfbar-sav { background:var(--amber); }
+  .cfbar-fun { background:var(--green); }
+  .cfbar-legend { display:flex; flex-wrap:wrap; gap:8px 16px; font-size:12px;
+    color:var(--text2); font-family:var(--fm); }
+  .cfl { display:inline-flex; align-items:center; gap:6px; }
+  .cfl b { color:var(--text); font-weight:700; }
+  .cfl-dot { width:8px; height:8px; border-radius:2px; display:inline-block; flex:none; }
+  .cfl-dot.exp { background:var(--red); }
+  .cfl-dot.sav { background:var(--amber); }
+  .cfl-dot.fun { background:var(--green); }
+  @media (prefers-reduced-motion: reduce) { .cfbar-seg { transition:none; } }
+}
+
 /* ══════════════════════════════════════════════════════
    PROPERTY IQ — scoped under .piq
 ══════════════════════════════════════════════════════ */
@@ -4784,6 +4808,10 @@ const STRINGS = {
   'dash.hero.sub':          { en:'Tracked assets today',     sv:'Spårade tillgångar idag' },
   'dash.hero.surplus':      { en:'Monthly Surplus',          sv:'Månadsöverskott' },
   'dash.hero.funFund':      { en:'Fun Fund',                 sv:'Fun Fund' },
+  'dash.cashbar.title':     { en:'CASH FLOW THIS MONTH',     sv:'KASSAFLÖDE DENNA MÅNAD' },
+  'dash.cashbar.expenses':  { en:'Expenses',                 sv:'Utgifter' },
+  'dash.cashbar.savings':   { en:'Savings',                  sv:'Sparande' },
+  'dash.cashbar.fun':       { en:'Fun',                      sv:'Fun' },
   'dash.kpi.income12':      { en:'INCOME · NEXT 12 MONTHS',   sv:'INKOMST · NÄSTA 12 MÅNADER' },
   'dash.kpi.expenses12':    { en:'EXPENSES · NEXT 12 MONTHS', sv:'UTGIFTER · NÄSTA 12 MÅNADER' },
   'dash.kpi.savings12':     { en:'SAVINGS · NEXT 12 MONTHS',  sv:'SPARANDE · NÄSTA 12 MÅNADER' },
@@ -11864,6 +11892,15 @@ function renderDashboard() {
               : t('dash.greet.midnight');
   const funFlow = cm.pureFunFund;
   const savePct = ti > 0 ? Math.round(curSavings / ti * 100) : 0;
+  // Cash-flow bar (mobile): split this month's income into expenses / savings /
+  // fun. Legend shows true % of income (can exceed 100% in a deficit month);
+  // the bar widths are normalised to the segment sum so it always fills.
+  const cfFun   = Math.max(0, funFlow);
+  const cfTotal = te + curSavings + cfFun;
+  const cfW = (v) => cfTotal > 0 ? (v / cfTotal * 100) : 0;
+  const cfWExp = cfW(te), cfWSav = cfW(curSavings), cfWFun = cfW(cfFun);
+  const cfP = (v) => ti > 0 ? Math.round(v / ti * 100) : 0;
+  const cfPExp = cfP(te), cfPSav = cfP(curSavings), cfPFun = cfP(cfFun);
   let verdictTone = 'pos';
   let verdictBits = [];
   if(funFlow >= 0) verdictBits.push(t('dash.verdict.cashGreen', { amount: fmt(funFlow) }));
@@ -11966,6 +12003,21 @@ function renderDashboard() {
         {icon:retNums.verdictIcon, label:t('dash.kpi.retireStatus'), value:`<span class="${retNums.verdictClass==='overfunded'?'pos':retNums.verdictClass==='ontarget'?'amb':'neg'}">${retNums.verdict}</span>`, sub:t('dash.kpi.statusSub', { pct: covPct, amt: fmt(retNums.sustainableAfterTax) }), link:'retirement', section:'runway'},
       ]);
     })()}
+
+    <!-- Cash-flow segmented bar (phone-only via CSS) — spec §6.1 -->
+    <div class="card dash-cashflow-bar" data-section="cashflow-bar">
+      <div class="card-title">⇄ ${t('dash.cashbar.title')}</div>
+      <div class="cfbar" role="img" aria-label="${esc2(t('dash.cashbar.expenses'))} ${cfPExp}%, ${esc2(t('dash.cashbar.savings'))} ${cfPSav}%, ${esc2(t('dash.cashbar.fun'))} ${cfPFun}%">
+        <div class="cfbar-seg cfbar-exp" style="width:${cfWExp}%"></div>
+        <div class="cfbar-seg cfbar-sav" style="width:${cfWSav}%"></div>
+        <div class="cfbar-seg cfbar-fun" style="width:${cfWFun}%"></div>
+      </div>
+      <div class="cfbar-legend">
+        <span class="cfl"><span class="cfl-dot exp"></span>${t('dash.cashbar.expenses')} <b>${cfPExp}%</b></span>
+        <span class="cfl"><span class="cfl-dot sav"></span>${t('dash.cashbar.savings')} <b>${cfPSav}%</b></span>
+        <span class="cfl"><span class="cfl-dot fun"></span>${t('dash.cashbar.fun')} <b>${cfPFun}%</b></span>
+      </div>
+    </div>
 
     <!-- Bank status -->
     <div class="callout ${state.bankConnected?'':'callout-warn'}">
