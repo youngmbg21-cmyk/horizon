@@ -6997,7 +6997,13 @@ function loadState() {
       // silently no-opped for old saves.
       migrate(d);
       Object.assign(state, d);
-    } else {
+    }
+    // Restore the device-local Supabase connection from its dedicated,
+    // migration-proof store. Runs whether or not a main-state blob existed,
+    // so a code update / migration reset can never drop the URL + anon key
+    // and force the user to reconnect.
+    _syncRestoreConfig();
+    if (!raw) {
       state.version = STATE_VERSION;
       // Fresh install: follow the device's light/dark preference. A saved
       // state always wins — this only seeds the very first session, and
@@ -7358,6 +7364,9 @@ function _syncOnLocalChange(){
 // then either pulls (signed in) or shows the sign-in gate (signed out).
 async function syncBootstrap(){
   if(!syncConfigured()){ _syncRefreshUI(); return; }
+  // Mirror the live connection into the resilient store on every boot where
+  // we're configured, so it's always the freshest copy for future restores.
+  _syncSaveConfig();
   try {
     await HZCloud.onAuth((event, sess) => {
       _syncUser = sess ? sess.user : null;
@@ -7475,7 +7484,46 @@ function _syncRefreshUI(){
 }
 
 // ── Settings · Cloud Sync card interactions ──────────────────────────────────
-function _syncField(k, v){ if(!state.sync) return; state.sync[k] = v; save(); }
+// ── Resilient, migration-proof Supabase connection store ────────────────────
+// The project URL + anon key + enabled flag are DEVICE-LOCAL. They live in the
+// main state blob, but a migration reset or any state reshape on a code deploy
+// could drop them — which would force the user to paste the URL/key again after
+// every update. To make that impossible we ALSO mirror the connection into a
+// dedicated localStorage key that migrations never touch, and restore from it
+// on boot (see loadState) whenever the main state has lost it.
+const SYNC_CONFIG_KEY = STORAGE_KEY + ':synccfg';
+function _syncSaveConfig(){
+  try {
+    const s = state.sync || {};
+    if(s.url && s.anonKey){
+      localStorage.setItem(SYNC_CONFIG_KEY, JSON.stringify({
+        enabled: !!s.enabled, url: s.url, anonKey: s.anonKey,
+        email: s.email || '', autoSync: s.autoSync !== false,
+      }));
+    }
+  } catch(_){}
+}
+function _syncRestoreConfig(){
+  try {
+    const raw = localStorage.getItem(SYNC_CONFIG_KEY);
+    if(!raw) return;
+    const cfg = JSON.parse(raw);
+    if(!cfg || !cfg.url || !cfg.anonKey) return;
+    if(!state.sync || typeof state.sync !== 'object'){
+      state.sync = { enabled:false, url:'', anonKey:'', email:'', autoSync:true,
+                     remoteStamp:null, lastSyncAt:null, pendingPush:false, lastError:null };
+    }
+    const sy = state.sync;
+    // Only fill fields the main state is missing — never clobber a fresher
+    // in-memory value. Re-enable when the saved config was a live connection,
+    // so a migration that flipped `enabled` off can't sign the user out.
+    if(!sy.url)     sy.url = cfg.url;
+    if(!sy.anonKey) sy.anonKey = cfg.anonKey;
+    if(!sy.email && cfg.email) sy.email = cfg.email;
+    if(!sy.enabled && cfg.enabled && sy.url && sy.anonKey) sy.enabled = true;
+  } catch(_){}
+}
+function _syncField(k, v){ if(!state.sync) return; state.sync[k] = v; save(); _syncSaveConfig(); }
 window.syncField = _syncField;
 
 // Save the pasted project URL + anon key, flip into cloud mode, and bootstrap
@@ -7487,7 +7535,7 @@ window.syncConnect = async function(){
   if(!s.url || !s.anonKey){ alert('Paste your Supabase Project URL and anon key first.'); return; }
   if(!/^https:\/\//i.test(s.url)){ alert('The project URL should look like https://YOUR-PROJECT.supabase.co'); return; }
   s.enabled = true; s.remoteStamp = null; s.pendingPush = false; s.lastError = null;
-  _syncPersist(); _syncRefreshUI();
+  _syncPersist(); _syncSaveConfig(); _syncRefreshUI();
   await syncBootstrap();
   _syncRefreshUI();
 };
@@ -7507,7 +7555,7 @@ window.syncAuthSubmit = async function(emailId, passId, mode){
   const fail = (msg) => { if(note) note.innerHTML = '<span style="color:var(--red,#e5484d)">⚠ ' + esc2(msg) + '</span>'; else alert(msg); };
   if(!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)){ fail('Enter a valid email address.'); return; }
   if(password.length < 6){ fail('Password must be at least 6 characters.'); return; }
-  state.sync.email = email; _syncPersist();
+  state.sync.email = email; _syncPersist(); _syncSaveConfig();
   const btn = document.getElementById('sync-auth-send');
   const orig = btn ? btn.textContent : '';
   if(btn){ btn.disabled = true; btn.textContent = (m === 'signup') ? 'Creating…' : 'Signing in…'; }
@@ -7547,6 +7595,9 @@ window.syncDisconnect = async function(){
   _syncUser = null; _syncHideGate();
   state.sync = { enabled:false, url:'', anonKey:'', email:'', autoSync:true,
                  remoteStamp:null, lastSyncAt:null, pendingPush:false, lastError:null };
+  // Disconnect is the ONE explicit "forget this device" action — clear the
+  // resilient store too so boot-time restore doesn't re-add the connection.
+  try { localStorage.removeItem(SYNC_CONFIG_KEY); } catch(_){}
   _syncPersist(); _syncRefreshUI();
 };
 
@@ -22261,7 +22312,6 @@ class HZMobile {
     const ne=this.lensNe();const dr=this.retIncome();const nw=this.nwTotal();
     const homeBase=this.data.homeBase||'—';
     let h=this.ph('OVERVIEW','Where you stand today',`Live position · <span style="color:var(--amber)">${this.MN[new Date().getMonth()]} ${new Date().getFullYear()}</span> · ${this.esc(homeBase)}`);
-    h+=`<div style="position:relative;background:linear-gradient(140deg,var(--bg2),var(--bg1));border:1px solid var(--border2);border-radius:16px;padding:16px;margin-bottom:10px;overflow:hidden"><div style="position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,var(--green),var(--cyan),var(--blue))"></div><div style="font-size:9px;color:var(--text3);letter-spacing:.1em;font-weight:700;text-transform:uppercase;margin-bottom:6px">NET WORTH</div><div style="font-family:var(--fm);font-size:30px;font-weight:700;color:${nw>=0?'var(--green)':'var(--red)'};line-height:1">${this.fmtC(nw)}</div><div style="display:flex;gap:8px;margin-top:13px"><div style="flex:1;background:var(--bg3);border-radius:10px;padding:8px 10px"><div style="font-size:9px;color:var(--text3);font-weight:600">MONTHLY SURPLUS</div><div style="font-family:var(--fm);font-size:13px;color:${disp>=0?'var(--green)':'var(--red)'}">${this.fmt(disp)}</div></div><div style="flex:1;background:var(--bg3);border-radius:10px;padding:8px 10px"><div style="font-size:9px;color:var(--text3);font-weight:600">FUN FUND</div><div style="font-family:var(--fm);font-size:13px;color:var(--amber)">${this.fmt(fun)}</div></div></div></div>`;
     // KPI grid — the SAME eight tiles as desktop (12-month cash-flow
     // aggregates + retirement headline), from the same engine getters.
     const inc12=this.inc12(),exp12=this.exp12(),sav12=this.sav12();
