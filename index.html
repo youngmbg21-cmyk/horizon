@@ -3864,6 +3864,33 @@ body.light .geo-dropdown { box-shadow:0 10px 30px -10px rgba(60,40,10,0.22); }
   }
 }
 
+/* ── Dashboard net-worth hero (mobile-only) — spec §4/§6.1 ──────────────────
+   A signature card that leads the mobile Dashboard: gradient field, a
+   green→cyan→blue hairline on top, the net-worth figure in mono, and two
+   mini-stat pills. Hidden on desktop so that layout is untouched. */
+.dash-hero { display:none; }
+@media (max-width:640px){
+  .dash-hero {
+    display:block; position:relative; overflow:hidden;
+    background:linear-gradient(160deg, var(--bg2), var(--bg1));
+    border:1px solid var(--border); border-radius:var(--rl);
+    padding:18px 16px 16px; margin:0 0 12px;
+  }
+  .dash-hero-top { position:absolute; top:0; left:0; right:0; height:2px;
+    background:linear-gradient(90deg, var(--green), var(--cyan), var(--blue)); }
+  .dash-hero-label { font-size:10px; font-weight:700; letter-spacing:.13em;
+    color:var(--text3); text-transform:uppercase; margin-bottom:7px; }
+  .dash-hero-val { font-family:var(--fm); font-size:33px; font-weight:700; line-height:1;
+    color:var(--green); letter-spacing:-.01em; font-variant-numeric:tabular-nums; }
+  .dash-hero-sub { font-size:11px; color:var(--text2); margin-top:6px; }
+  .dash-hero-pills { display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-top:15px; }
+  .dash-hero-pill { background:var(--bg0); border:1px solid var(--border); border-radius:10px; padding:9px 11px; }
+  .dhp-label { font-size:8.5px; font-weight:700; letter-spacing:.1em; color:var(--text3);
+    text-transform:uppercase; margin-bottom:4px; }
+  .dhp-val { font-family:var(--fm); font-size:15px; font-weight:700; font-variant-numeric:tabular-nums; color:var(--text); }
+  .dhp-val.pos { color:var(--green); } .dhp-val.neg { color:var(--red); } .dhp-val.cyan { color:var(--cyan); }
+}
+
 /* ══════════════════════════════════════════════════════
    PROPERTY IQ — scoped under .piq
 ══════════════════════════════════════════════════════ */
@@ -4753,6 +4780,10 @@ const STRINGS = {
                               sv:'🤖 Kör fullständig ekonomisk analys' },
 
   // ── Dashboard · KPI row 1 (cash flow, 12-month) ────────
+  'dash.hero.netWorth':     { en:'Net Worth',                sv:'Nettoförmögenhet' },
+  'dash.hero.sub':          { en:'Tracked assets today',     sv:'Spårade tillgångar idag' },
+  'dash.hero.surplus':      { en:'Monthly Surplus',          sv:'Månadsöverskott' },
+  'dash.hero.funFund':      { en:'Fun Fund',                 sv:'Fun Fund' },
   'dash.kpi.income12':      { en:'INCOME · NEXT 12 MONTHS',   sv:'INKOMST · NÄSTA 12 MÅNADER' },
   'dash.kpi.expenses12':    { en:'EXPENSES · NEXT 12 MONTHS', sv:'UTGIFTER · NÄSTA 12 MÅNADER' },
   'dash.kpi.savings12':     { en:'SAVINGS · NEXT 12 MONTHS',  sv:'SPARANDE · NÄSTA 12 MÅNADER' },
@@ -11810,6 +11841,12 @@ function renderDashboard() {
   const curSavings  = cm.savings;
   const curIncomeStreams = (cm.incomeItems || []).filter(it => !it.carryForward).length;
   const extBal=state.externalAssets.filter(a=>(a.assetType||'investment')==='investment').reduce((s,a)=>s+a.balance,0);
+  // Mobile hero: current net worth = the sum of every tracked asset the user
+  // has entered today (investment + pension balances). This is the SAME figure
+  // the Life Wall shows for the current year, so the two never disagree. The
+  // hero is rendered for all viewports but only shown on phones (CSS).
+  const netWorthNow = (state.externalAssets || []).reduce((s,a)=>s+(a.balance||0),0);
+  const surplusNow  = ti - te; // income − expenses (matches the ticker SURPLUS sign)
 
   const el=document.getElementById('panel-dashboard');
   if(!el) return;
@@ -11858,6 +11895,24 @@ function renderDashboard() {
 
   el.innerHTML=`
     ${ui.ph({tag:t('dash.page.tag'), title:t('dash.page.title'), sub:t('dash.page.sub')})}
+
+    <!-- Mobile net-worth hero (phone-only via CSS) — spec §6.1 -->
+    <div class="dash-hero">
+      <div class="dash-hero-top"></div>
+      <div class="dash-hero-label">${esc2(t('dash.hero.netWorth'))}</div>
+      <div class="dash-hero-val">${fmtC(netWorthNow)}</div>
+      <div class="dash-hero-sub">${esc2(t('dash.hero.sub'))}</div>
+      <div class="dash-hero-pills">
+        <div class="dash-hero-pill">
+          <div class="dhp-label">${esc2(t('dash.hero.surplus'))}</div>
+          <div class="dhp-val ${surplusNow>=0?'pos':'neg'}">${fmtC(surplusNow)}</div>
+        </div>
+        <div class="dash-hero-pill">
+          <div class="dhp-label">${esc2(t('dash.hero.funFund'))}</div>
+          <div class="dhp-val ${funFundBalance>=0?'cyan':'neg'}">${fmtC(funFundBalance)}</div>
+        </div>
+      </div>
+    </div>
     ${attention.join('')}
 
     <!-- Welcoming AI summary — short, personal snapshot + CTA to run a full analysis. -->
