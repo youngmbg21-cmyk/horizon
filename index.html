@@ -21988,6 +21988,13 @@ class HZMobile {
   }
   tabFromPanel(p){return ({transactions:'spend',review:'forecast',monthly:'forecast',yearly:'forecast',propiq:'property'})[p]||p;}
   panelFromTab(t){return ({spend:'transactions',forecast:'review',property:'propiq'})[t]||t;}
+  // Robust numeric coercion. Real synced data can carry numbers as strings
+  // ("1 400 000", "27,000") or omit fields entirely (an asset added but never
+  // given a balance) — raw `+x` arithmetic on those yields NaN, which then
+  // poisons every derived figure (net worth, nest egg, retire income). Every
+  // calc and hydrate path goes through here so one dirty field can never
+  // blank the whole ticker.
+  n(v,fb){if(v==null||v==='')return fb||0;const x=(typeof v==='string')?parseFloat(v.replace(/[\s ,']/g,'').replace(/[^\d.eE+-]/g,'')):+v;return Number.isFinite(x)?x:(fb||0);}
 
   // ── hydrate from real state ──
   hydrate(){
@@ -21999,28 +22006,40 @@ class HZMobile {
     d.retLens=(s.displayMode==='nominal')?'nominal':'today';
     d.citizenship=s.citizenship||'';
     d.homeBase=s.homeBase||'';
-    d.currentAge=+s.currentAge||44;
-    d.retirementAge=+s.retirementAge||69;
-    d.lifeExp=+s.lifeExp||90;
-    d.growthRate=(s.growthRate!=null)?+s.growthRate:7;
-    d.inflationRate=(s.inflationRate!=null)?+s.inflationRate:2;
-    d.postRetGrowth=(s.retirementPostGrowth!=null)?+s.retirementPostGrowth:4;
-    d.withdrawTaxRate=(s.savingsTaxRate!=null)?+s.savingsTaxRate:20;
-    d.baseSavings=(s.baseSavings!=null)?+s.baseSavings:0;
-    d.exchangeRates=Object.assign({SEK:1,USD:0.094,EUR:0.087,KES:12.1},s.exchangeRates||{});
-    d.externalAssets=(s.externalAssets||[]).map(a=>Object.assign({},a));
-    d.income=(s.baseIncome||[]).map(i=>({id:i.id,name:i.name,amount:+i.amount||0,paid:false}));
-    d.expenses=(s.baseExpenses||[]).map(e=>({id:e.id,name:e.name,amount:+e.amount||0,cat:e.cat||this.guessCat(e.name),paid:false}));
+    d.currentAge=this.n(s.currentAge,44);
+    d.retirementAge=this.n(s.retirementAge,69);
+    d.lifeExp=this.n(s.lifeExp,90);
+    d.growthRate=this.n(s.growthRate,7);
+    d.inflationRate=this.n(s.inflationRate,2);
+    d.postRetGrowth=this.n(s.retirementPostGrowth,4);
+    d.withdrawTaxRate=this.n(s.savingsTaxRate,20);
+    d.baseSavings=this.n(s.baseSavings,0);
+    const fx=s.exchangeRates||{};
+    d.exchangeRates={SEK:1,USD:this.n(fx.USD,0.094)||0.094,EUR:this.n(fx.EUR,0.087)||0.087,KES:this.n(fx.KES,12.1)||12.1};
+    // Clean copies of assets: balance/contribution coerced; growthRate coerced
+    // only when present so absent rates keep falling back to the global rate.
+    d.externalAssets=(s.externalAssets||[]).map(a=>Object.assign({},a,{
+      balance:this.n(a.balance,0),
+      monthlyContribution:this.n(a.monthlyContribution,0),
+      growthRate:(a.growthRate!=null&&a.growthRate!=='')?this.n(a.growthRate,d.growthRate):undefined
+    }));
+    d.income=(s.baseIncome||[]).map(i=>({id:i.id,name:i.name,amount:this.n(i.amount,0),paid:false}));
+    d.expenses=(s.baseExpenses||[]).map(e=>({id:e.id,name:e.name,amount:this.n(e.amount,0),cat:e.cat||this.guessCat(e.name),paid:false}));
     if(!s.mobileOverrides) s.mobileOverrides={};
     d.monthlyOverrides=s.mobileOverrides;
-    d.carryForward=(s.mobileCarryForward!=null)?+s.mobileCarryForward:0;
+    d.carryForward=this.n(s.mobileCarryForward,0);
     if(!d.selectedMonth) d.selectedMonth=this.dkey();
-    d.penAllman=(s.penAllman!=null)?+s.penAllman:0;
-    d.penITP=(s.penITP!=null)?+s.penITP:0;
-    d.penOther=(s.penOther!=null)?+s.penOther:0;
+    d.penAllman=this.n(s.penAllman,0);
+    d.penITP=this.n(s.penITP,0);
+    d.penOther=this.n(s.penOther,0);
     if(!s.property) s.property={value:0,mortgage:0,rate:3.4,monthly:0};
+    // Sanitize the shared property/net-worth objects in place (they are live
+    // references also written by persist()) so calcs never see dirty numerics.
+    s.property.value=this.n(s.property.value,0); s.property.mortgage=this.n(s.property.mortgage,0);
+    s.property.rate=this.n(s.property.rate,0); s.property.monthly=this.n(s.property.monthly,0);
     d.property=s.property;
     if(!s.mobileNetWorth) s.mobileNetWorth={property:d.property.value,mortgage:d.property.mortgage,otherDebt:0};
+    s.mobileNetWorth.otherDebt=this.n(s.mobileNetWorth.otherDebt,0);
     d.netWorth=s.mobileNetWorth;
     d.transactions=(s.transactions&&s.transactions.length)?s.transactions.map(t=>this.mapTx(t)):this.DEMO_TX.slice();
     d.catBudget=(s.catBudget&&Object.keys(s.catBudget).length)?s.catBudget:this.DEMO_CATBUDGET;
@@ -22069,20 +22088,24 @@ class HZMobile {
   }
 
   // ── calcs (self-consistent finance model) ──
-  gmd(k){const ov=this.data.monthlyOverrides[k];const inc=ov&&ov.income||this.data.income;const exp=ov&&ov.expenses||this.data.expenses;const sav=ov&&ov.savings!==undefined?ov.savings:this.data.baseSavings;const ti=inc.reduce((s,i)=>s+i.amount,0);const te=exp.reduce((s,i)=>s+i.amount,0);return{income:inc,expenses:exp,savings:sav,ti,te,disp:ti-te,fun:Math.max(0,ti-te-sav)};}
-  ti(){return this.data.income.reduce((s,i)=>s+i.amount,0);}
-  te(){return this.data.expenses.reduce((s,i)=>s+i.amount,0);}
+  // Every sum coerces through n(): monthly overrides and in-place edits can
+  // reintroduce string/empty numerics after hydrate has cleaned the baseline.
+  gmd(k){const ov=this.data.monthlyOverrides[k];const inc=ov&&ov.income||this.data.income;const exp=ov&&ov.expenses||this.data.expenses;const sav=this.n(ov&&ov.savings!==undefined?ov.savings:this.data.baseSavings,0);const ti=inc.reduce((s,i)=>s+this.n(i.amount,0),0);const te=exp.reduce((s,i)=>s+this.n(i.amount,0),0);return{income:inc,expenses:exp,savings:sav,ti,te,disp:ti-te,fun:Math.max(0,ti-te-sav)};}
+  ti(){return this.data.income.reduce((s,i)=>s+this.n(i.amount,0),0);}
+  te(){return this.data.expenses.reduce((s,i)=>s+this.n(i.amount,0),0);}
   disp(){return this.ti()-this.te();}
-  fun(){return Math.max(0,this.disp()-this.data.baseSavings);}
-  fv(P,PMT,rate,y){if(y<=0)return P;const rn=rate/100/12,nt=12*y;if(rn===0)return P+PMT*nt;const cf=Math.pow(1+rn,nt);return P*cf+PMT*((cf-1)/rn);}
-  nestEgg(ytr){ytr=ytr!==undefined?ytr:this.data.retirementAge-this.data.currentAge;let t=this.fv(0,this.data.baseSavings,this.data.growthRate,ytr);(this.data.externalAssets||[]).forEach(a=>t+=this.fv(a.balance,a.monthlyContribution||0,a.growthRate||this.data.growthRate,ytr));return t;}
+  fun(){return Math.max(0,this.disp()-this.n(this.data.baseSavings,0));}
+  fv(P,PMT,rate,y){P=this.n(P,0);PMT=this.n(PMT,0);rate=this.n(rate,0);if(y<=0)return P;const rn=rate/100/12,nt=12*y;if(rn===0)return P+PMT*nt;const cf=Math.pow(1+rn,nt);return P*cf+PMT*((cf-1)/rn);}
+  nestEgg(ytr){ytr=ytr!==undefined?ytr:this.data.retirementAge-this.data.currentAge;let t=this.fv(0,this.data.baseSavings,this.data.growthRate,ytr);(this.data.externalAssets||[]).forEach(a=>t+=this.fv(a.balance,a.monthlyContribution,(a.growthRate!=null&&a.growthRate!=='')?a.growthRate:this.data.growthRate,ytr));return t;}
   realVal(n,y){return n/Math.pow(1+this.data.inflationRate/100,y);}
   lensNe(){const ytr=this.data.retirementAge-this.data.currentAge;const ne=this.nestEgg();return this.data.retLens==='today'?this.realVal(ne,ytr):ne;}
-  pension(){return (this.data.penAllman||0)+(this.data.penITP||0)+(this.data.penOther||0);}
-  draw(ne){return (ne*0.04/12)*(1-this.data.withdrawTaxRate/100);}
-  nwTotal(){const nw=this.data.netWorth||{};const av=(this.data.externalAssets||[]).reduce((s,a)=>s+a.balance,0);return (this.data.property.value||0)+av-(this.data.property.mortgage||0)-(nw.otherDebt||0);}
-  fmt(v,cur){cur=cur||this.data.currency;const r=Object.assign({SEK:1},this.data.exchangeRates);const c=v*(r[cur]||1);const sym={SEK:'kr',USD:'$',EUR:'€',KES:'KSh'}[cur]||'kr';if(cur==='SEK')return `${Math.round(c).toLocaleString('sv-SE')} ${sym}`;if(cur==='KES')return `${sym} ${Math.round(c).toLocaleString()}`;return `${sym}${Math.round(c).toLocaleString()}`;}
-  fmtC(v){const r=Object.assign({SEK:1},this.data.exchangeRates);const cur=this.data.currency;const sym={SEK:'SEK',USD:'$',EUR:'€',KES:'KSh'}[cur]||'SEK';const c=v*(r[cur]||1);if(Math.abs(c)>=1e6)return cur==='SEK'?`${(c/1e6).toFixed(1)}M SEK`:`${sym}${(c/1e6).toFixed(1)}M`;if(Math.abs(c)>=1e3)return cur==='SEK'?`${Math.round(c/1e3)}K SEK`:`${sym}${Math.round(c/1e3)}K`;return cur==='SEK'?`${Math.round(c).toLocaleString()} SEK`:`${sym}${Math.round(c).toLocaleString()}`;}
+  pension(){return this.n(this.data.penAllman,0)+this.n(this.data.penITP,0)+this.n(this.data.penOther,0);}
+  draw(ne){return (this.n(ne,0)*0.04/12)*(1-this.n(this.data.withdrawTaxRate,0)/100);}
+  nwTotal(){const nw=this.data.netWorth||{};const av=(this.data.externalAssets||[]).reduce((s,a)=>s+this.n(a.balance,0),0);return this.n(this.data.property.value,0)+av-this.n(this.data.property.mortgage,0)-this.n(nw.otherDebt,0);}
+  // Formatters are the last line of defence: a non-finite value renders as 0,
+  // never as "NaN" in the ticker/KPIs.
+  fmt(v,cur){v=this.n(v,0);cur=cur||this.data.currency;const r=Object.assign({SEK:1},this.data.exchangeRates);const c=v*(this.n(r[cur],1)||1);const sym={SEK:'kr',USD:'$',EUR:'€',KES:'KSh'}[cur]||'kr';if(cur==='SEK')return `${Math.round(c).toLocaleString('sv-SE')} ${sym}`;if(cur==='KES')return `${sym} ${Math.round(c).toLocaleString()}`;return `${sym}${Math.round(c).toLocaleString()}`;}
+  fmtC(v){v=this.n(v,0);const r=Object.assign({SEK:1},this.data.exchangeRates);const cur=this.data.currency;const sym={SEK:'SEK',USD:'$',EUR:'€',KES:'KSh'}[cur]||'SEK';const c=v*(this.n(r[cur],1)||1);if(Math.abs(c)>=1e6)return cur==='SEK'?`${(c/1e6).toFixed(1)}M SEK`:`${sym}${(c/1e6).toFixed(1)}M`;if(Math.abs(c)>=1e3)return cur==='SEK'?`${Math.round(c/1e3)}K SEK`:`${sym}${Math.round(c/1e3)}K`;return cur==='SEK'?`${Math.round(c).toLocaleString()} SEK`:`${sym}${Math.round(c).toLocaleString()}`;}
   esc(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
   addMonths(b,n){return new Date(b.getFullYear(),b.getMonth()+n,1);}
   whenLib(check,cb){if(check()){cb();return;}let n=0;const t=setInterval(()=>{if(check()||n++>50){clearInterval(t);if(check())cb();}},100);}
