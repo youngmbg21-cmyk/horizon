@@ -4241,7 +4241,11 @@ body.light .piq-country-menu { box-shadow:0 12px 28px -10px rgba(60,40,10,0.22);
 #hzApp .hz-body::-webkit-scrollbar { width:0; height:0; display:none; }
 #hzApp .hz-x, #hzApp .hz-sb, #hzApp .hz-body { scrollbar-width:none; }
 
-@media (max-width:720px){
+/* Phone gate: portrait phones (narrow) OR landscape phones (short + touch).
+   The second clause keeps the mobile shell active when a phone is rotated to
+   landscape — where the width exceeds 720px but the height stays small on a
+   touch device — instead of falling back to the desktop layout. */
+@media (max-width:720px), (max-height:500px) and (pointer:coarse){
   /* The desktop app is fully replaced on phones. */
   body > .app { display:none !important; }
   /* Stray desktop overlays that would float over the phone shell. */
@@ -7482,7 +7486,7 @@ function _syncRefreshUI(){
   // whose focus/overlay guards could otherwise defer or skip the refresh and
   // leave the phone showing pre-sign-in data.
   if(typeof window!=='undefined' && window.HZ && typeof window.HZ.hydrate==='function'
-     && window.matchMedia && window.matchMedia('(max-width:720px)').matches){
+     && window.matchMedia && window.matchMedia('(max-width:720px), (max-height:500px) and (pointer:coarse)').matches){
     try { window.HZ.hydrate(); window.HZ.syncThemeBtn(); window.HZ.paint(true); } catch(_){}
   }
 }
@@ -22046,7 +22050,7 @@ class HZMobile {
     const fab=document.getElementById('hzFab'); if(fab) fab.addEventListener('click',()=>this.openChat());
     // Stay in sync with desktop-side state changes (welcome completion, cloud
     // pull, invariant fixes). Guarded so our own persist()→save() doesn't loop.
-    if(typeof bus!=='undefined'&&bus.on){bus.on('state:changed',()=>{if(this._persisting)return;if(!window.matchMedia('(max-width:720px)').matches)return;if(this.overlay&&this.overlay.style.display==='block')return;clearTimeout(this._syncT);this._syncT=setTimeout(()=>{if(this.overlay&&this.overlay.style.display==='block')return;if(document.activeElement&&this.body.contains(document.activeElement))return;try{this.hydrate();this.syncThemeBtn();this.paint(true);}catch(_){}},220);});}
+    if(typeof bus!=='undefined'&&bus.on){bus.on('state:changed',()=>{if(this._persisting)return;if(!window.matchMedia('(max-width:720px), (max-height:500px) and (pointer:coarse)').matches)return;if(this.overlay&&this.overlay.style.display==='block')return;clearTimeout(this._syncT);this._syncT=setTimeout(()=>{if(this.overlay&&this.overlay.style.display==='block')return;if(document.activeElement&&this.body.contains(document.activeElement))return;try{this.hydrate();this.syncThemeBtn();this.paint(true);}catch(_){}},220);});}
     this.hydrate();
     this.data.tab=this.tabFromPanel((typeof state!=='undefined'&&state.activePanel)||'dashboard');
     this.syncThemeBtn();
@@ -23038,7 +23042,10 @@ class HZMobile {
 // ── boot + breakpoint handling ───────────────────────────────────────────
 (function(){
   let hz=null;
-  const mq=window.matchMedia('(max-width:720px)');
+  // Phone gate — matches portrait phones (≤720px) OR landscape phones (short +
+  // touch), so rotating a phone to landscape keeps the mobile shell instead of
+  // dropping back to the desktop layout. Mirrors the CSS @media gate.
+  const mq=window.matchMedia('(max-width:720px), (max-height:500px) and (pointer:coarse)');
   function ensure(){
     const el=document.getElementById('hzApp');if(!el)return;
     if(mq.matches){
