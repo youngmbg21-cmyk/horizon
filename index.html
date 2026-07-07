@@ -22028,13 +22028,9 @@ class HZMobile {
     }));
     d.income=(s.baseIncome||[]).map(i=>({id:i.id,name:i.name,amount:this.n(i.amount,0),paid:false}));
     d.expenses=(s.baseExpenses||[]).map(e=>({id:e.id,name:e.name,amount:this.n(e.amount,0),cat:e.cat||this.guessCat(e.name),paid:false}));
-    if(!s.mobileOverrides) s.mobileOverrides={};
-    d.monthlyOverrides=s.mobileOverrides;
-    d.carryForward=this.n(s.mobileCarryForward,0);
+    if(!s.paidFlags||typeof s.paidFlags!=='object') s.paidFlags={};
+    if(!s.monthlyOverrides||typeof s.monthlyOverrides!=='object') s.monthlyOverrides={};
     if(!d.selectedMonth) d.selectedMonth=this.dkey();
-    d.penAllman=this.n(s.penAllman,0);
-    d.penITP=this.n(s.penITP,0);
-    d.penOther=this.n(s.penOther,0);
     if(!s.property) s.property={value:0,mortgage:0,rate:3.4,monthly:0};
     // Sanitize the shared property/net-worth objects in place (they are live
     // references also written by persist()) so calcs never see dirty numerics.
@@ -22094,8 +22090,6 @@ class HZMobile {
     s.retirementPostGrowth=d.postRetGrowth; s.savingsTaxRate=d.withdrawTaxRate;
     s.baseSavings=d.baseSavings; s.exchangeRates=d.exchangeRates;
     s.externalAssets=d.externalAssets;
-    s.mobileOverrides=d.monthlyOverrides; s.mobileCarryForward=d.carryForward;
-    s.penAllman=d.penAllman; s.penITP=d.penITP; s.penOther=d.penOther;
     s.property=d.property; s.mobileNetWorth=d.netWorth;
     s.mobileVacMonths=d.vacMonths; s.mobileTargetBudget=d.targetBudget;
     s.mobileTrips=d.savedTrips; s.mobileRetCostLevel=d.retCostLevel;
@@ -22104,21 +22098,69 @@ class HZMobile {
     if(typeof save==='function'){ this._persisting=true; try{ save(); }catch(_){} finally{ this._persisting=false; } }
   }
 
-  // ── calcs (self-consistent finance model) ──
-  // Every sum coerces through n(): monthly overrides and in-place edits can
-  // reintroduce string/empty numerics after hydrate has cleaned the baseline.
-  gmd(k){const ov=this.data.monthlyOverrides[k];const inc=ov&&ov.income||this.data.income;const exp=ov&&ov.expenses||this.data.expenses;const sav=this.n(ov&&ov.savings!==undefined?ov.savings:this.data.baseSavings,0);const ti=inc.reduce((s,i)=>s+this.n(i.amount,0),0);const te=exp.reduce((s,i)=>s+this.n(i.amount,0),0);return{income:inc,expenses:exp,savings:sav,ti,te,disp:ti-te,fun:Math.max(0,ti-te-sav)};}
-  ti(){return this.data.income.reduce((s,i)=>s+this.n(i.amount,0),0);}
-  te(){return this.data.expenses.reduce((s,i)=>s+this.n(i.amount,0),0);}
+  // ── engine bridge ─────────────────────────────────────────────────────
+  // The desktop FinancialEngine (FE) is the app's single source of truth:
+  // "Panels MUST consume numbers through this engine". The mobile shell is
+  // just another renderer, so every headline figure reads FE first; the
+  // tiny local model below survives only as a fallback if FE ever fails.
+  fe(){return (typeof FE!=='undefined')?FE:null;}
+  nums(){try{const f=this.fe();if(f)return f.retirement.numbers();}catch(_){} return null;}
+  cm(){try{const f=this.fe();if(f)return f.months.current();}catch(_){} return null;}
+  m12(){try{const f=this.fe();if(f)return f.months.next12()||[];}catch(_){} return [];}
+  // Month view for the Budget tab — the same effective month the desktop
+  // shows (base ∪ yearly bases ∪ month override, with carry-forward and trip
+  // rows injected), keyed by 'YYYY-MM'.
+  monView(k){
+    try{const f=this.fe();if(f){const m=k?f.months.find(k):f.months.current();
+      if(m)return {key:m.key,ti:this.n(m.pureIncome,0),te:this.n(m.pureExpenses,0),savings:this.n(m.savings,0),fun:Math.max(0,this.n(m.pureFunFund,0)),net:this.n(m.pureIncome,0)-this.n(m.pureExpenses,0),incomeItems:m.incomeItems||[],expenseItems:m.expenseItems||[],ov:!!(typeof state!=='undefined'&&state.monthlyOverrides&&state.monthlyOverrides[m.key])};}}catch(_){}
+    const md=this.gmd(k||this.dkey());
+    return {key:k||this.dkey(),ti:md.ti,te:md.te,savings:md.savings,fun:md.fun,net:md.disp,incomeItems:md.income,expenseItems:md.expenses,ov:false};
+  }
+  // Ensure a desktop-format month override exists and return the requested
+  // item array ('income'|'expense'), cloned from the effective month on
+  // first touch — the exact write path desktop's Monthly Review uses, so
+  // edits made on the phone appear on desktop and vice versa.
+  ovField(k,type){
+    if(typeof state==='undefined')return [];
+    if(!state.monthlyOverrides)state.monthlyOverrides={};
+    if(!state.monthlyOverrides[k])state.monthlyOverrides[k]={};
+    const ov=state.monthlyOverrides[k];const fld=(type==='income')?'income':'expenses';
+    if(!ov[fld]){
+      let src=null;
+      try{if(typeof getEffective==='function')src=getEffective(+k.slice(0,4),(+k.slice(5,7))-1);}catch(_){}
+      ov[fld]=JSON.parse(JSON.stringify(src?(fld==='income'?src.incomeItems:src.expenseItems):[]));
+    }
+    return ov[fld];
+  }
+  newId(){return (typeof genId==='function')?genId():'x'+Math.random().toString(36).slice(2,10);}
+  mSave(){if(typeof save==='function'){this._persisting=true;try{save();}catch(_){}finally{this._persisting=false;}}}
+  isPaid(k,id){const pf=(typeof state!=='undefined'&&state.paidFlags)||{};return !!(pf[k]&&pf[k][id]);}
+  // ── calcs — FE-first, local model as fallback ─────────────────────────
+  gmd(k){const inc=this.data.income,exp=this.data.expenses;const sav=this.n(this.data.baseSavings,0);const ti=inc.reduce((s,i)=>s+this.n(i.amount,0),0);const te=exp.reduce((s,i)=>s+this.n(i.amount,0),0);return{income:inc,expenses:exp,savings:sav,ti,te,disp:ti-te,fun:Math.max(0,ti-te-sav)};}
+  ti(){const c=this.cm();if(c)return this.n(c.pureIncome,0);return this.data.income.reduce((s,i)=>s+this.n(i.amount,0),0);}
+  te(){const c=this.cm();if(c)return this.n(c.pureExpenses,0);return this.data.expenses.reduce((s,i)=>s+this.n(i.amount,0),0);}
   disp(){return this.ti()-this.te();}
-  fun(){return Math.max(0,this.disp()-this.n(this.data.baseSavings,0));}
+  fun(){const c=this.cm();if(c)return Math.max(0,this.n(c.pureFunFund,0));return Math.max(0,this.disp()-this.n(this.data.baseSavings,0));}
   fv(P,PMT,rate,y){P=this.n(P,0);PMT=this.n(PMT,0);rate=this.n(rate,0);if(y<=0)return P;const rn=rate/100/12,nt=12*y;if(rn===0)return P+PMT*nt;const cf=Math.pow(1+rn,nt);return P*cf+PMT*((cf-1)/rn);}
-  nestEgg(ytr){ytr=ytr!==undefined?ytr:this.data.retirementAge-this.data.currentAge;let t=this.fv(0,this.data.baseSavings,this.data.growthRate,ytr);(this.data.externalAssets||[]).forEach(a=>t+=this.fv(a.balance,a.monthlyContribution,(a.growthRate!=null&&a.growthRate!=='')?a.growthRate:this.data.growthRate,ytr));return t;}
+  invAssets(){return (this.data.externalAssets||[]).filter(a=>(a.assetType||'investment')==='investment');}
+  penAssets(){return (this.data.externalAssets||[]).filter(a=>a.assetType==='pension');}
+  nestEgg(ytr){ytr=ytr!==undefined?ytr:this.data.retirementAge-this.data.currentAge;let t=this.fv(0,this.data.baseSavings,this.data.growthRate,ytr);this.invAssets().forEach(a=>t+=this.fv(a.balance,a.monthlyContribution,(a.growthRate!=null&&a.growthRate!=='')?a.growthRate:this.data.growthRate,ytr));return t;}
+  neNominal(){try{const f=this.fe();if(f)return this.n(f.projection.totalNominal(),0);}catch(_){} return this.nestEgg();}
+  neReal(){const nu=this.nums();if(nu)return this.n(nu.nestEgg,0);return this.realVal(this.nestEgg(),this.data.retirementAge-this.data.currentAge);}
   realVal(n,y){return n/Math.pow(1+this.data.inflationRate/100,y);}
-  lensNe(){const ytr=this.data.retirementAge-this.data.currentAge;const ne=this.nestEgg();return this.data.retLens==='today'?this.realVal(ne,ytr):ne;}
-  pension(){return this.n(this.data.penAllman,0)+this.n(this.data.penITP,0)+this.n(this.data.penOther,0);}
+  lensNe(){return this.data.retLens==='today'?this.neReal():this.neNominal();}
+  // Pension = Σ monthlyPayout across pension-type assets — the SAME model
+  // desktop uses (pensions live in externalAssets with assetType 'pension').
+  pension(){try{if(typeof getAllPensionIncome==='function')return this.n(getAllPensionIncome(),0);}catch(_){} return this.penAssets().reduce((s,p)=>s+this.n(p.monthlyPayout,0),0);}
+  // Monthly retirement income — desktop's headline (sustainable draw after
+  // tax + pension after tax, from the drawdown simulation), NOT a 4% rule.
+  retIncome(){const nu=this.nums();if(nu)return this.n(nu.totalRetirementIncome,0);return this.draw(this.nestEgg())+this.pension();}
+  portfolioDraw(){const nu=this.nums();if(nu)return this.n(nu.sustainableAfterTax,0);return this.draw(this.nestEgg());}
   draw(ne){return (this.n(ne,0)*0.04/12)*(1-this.n(this.data.withdrawTaxRate,0)/100);}
-  nwTotal(){const nw=this.data.netWorth||{};const av=(this.data.externalAssets||[]).reduce((s,a)=>s+this.n(a.balance,0),0);return this.n(this.data.property.value,0)+av-this.n(this.data.property.mortgage,0)-this.n(nw.otherDebt,0);}
+  // Net worth — desktop's Dashboard definition: Σ external asset balances.
+  // (Property equity remains a Property IQ-tab concept, not part of the
+  // headline so both form factors report the same figure.)
+  nwTotal(){return (this.data.externalAssets||[]).reduce((s,a)=>s+this.n(a.balance,0),0);}
   // Formatters are the last line of defence: a non-finite value renders as 0,
   // never as "NaN" in the ticker/KPIs.
   fmt(v,cur){v=this.n(v,0);cur=cur||this.data.currency;const r=Object.assign({SEK:1},this.data.exchangeRates);const c=v*(this.n(r[cur],1)||1);const sym={SEK:'kr',USD:'$',EUR:'€',KES:'KSh'}[cur]||'kr';if(cur==='SEK')return `${Math.round(c).toLocaleString('sv-SE')} ${sym}`;if(cur==='KES')return `${sym} ${Math.round(c).toLocaleString()}`;return `${sym}${Math.round(c).toLocaleString()}`;}
@@ -22140,7 +22182,6 @@ class HZMobile {
   btn(label,act,extra,kind){const st=kind==='g'?'background:var(--green);color:var(--bg0);border:none':kind==='add'?'background:transparent;border:1px dashed var(--border2);color:var(--text2);width:100%':'background:var(--bg4);color:var(--text);border:1px solid var(--border2)';return `<button data-act="${act}"${extra||''} style="${st};border-radius:8px;font-size:11px;font-weight:600;padding:6px 11px;cursor:pointer;white-space:nowrap">${label}</button>`;}
   bar(pct,color,h){return `<div style="height:${h||6}px;background:var(--bg3);border-radius:4px;overflow:hidden;margin:5px 0"><div style="height:100%;width:${Math.max(0,Math.min(100,pct))}%;background:${color};border-radius:4px;animation:hzbar .6s ease"></div></div>`;}
   row(l,v,c,bold){return `<div style="display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:1px solid var(--border);font-size:13px${bold?';font-weight:700':''}"><span style="color:${bold?'var(--text)':'var(--text2)'}">${l}</span><span style="font-family:var(--fm);font-weight:600;color:${c}">${v}</span></div>`;}
-  line(type,it){return `<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;${it.paid?'opacity:.45':''}"><input type="checkbox" class="hz-chk" ${it.paid?'checked':''} data-act="togpaid" data-t="${type}" data-id="${it.id}"><input value="${this.esc(it.name)}" data-model="name:${type}:${it.id}" style="flex:1;min-width:0;background:var(--bg3);border:1px solid var(--border);border-radius:6px;padding:8px 9px;color:var(--text);font-size:12.5px${it.paid?';text-decoration:line-through':''}"><div style="display:flex;align-items:center;background:var(--bg3);border:1px solid var(--border);border-radius:6px;padding:0 9px"><span style="color:var(--text3);font-size:9px;font-family:var(--fm)">kr</span><input type="number" value="${it.amount}" data-model="amt:${type}:${it.id}" style="width:70px;background:transparent;border:none;color:var(--text);font-family:var(--fm);font-size:12.5px;padding:8px 0;text-align:right"></div><button data-act="rmline" data-t="${type}" data-id="${it.id}" style="background:none;border:none;color:var(--red);font-size:17px;cursor:pointer;opacity:.5;padding:2px 3px">×</button></div>`;}
   srow(l,ctrl,last){return `<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 0;${last?'':'border-bottom:1px solid var(--border)'}"><span style="font-size:12.5px;color:var(--text)">${l}</span><div>${ctrl}</div></div>`;}
   inpS(w){return `width:${w}px;background:var(--bg3);border:1px solid var(--border);border-radius:6px;padding:6px 9px;color:var(--text);font-family:var(--fm);font-size:12px;text-align:right`;}
   seg(model,opts){const cur=this.data[model];return `<div style="display:inline-flex;gap:2px;background:var(--bg0);border:1px solid var(--border);border-radius:7px;padding:2px">${opts.map(o=>`<button data-act="seg" data-model="${model}" data-v="${o[0]}" style="border:none;border-radius:5px;padding:5px 9px;font-family:var(--fm);font-size:10px;font-weight:600;cursor:pointer;background:${cur===o[0]?'var(--green)':'transparent'};color:${cur===o[0]?'var(--bg0)':'var(--text2)'}">${o[1]}</button>`).join('')}</div>`;}
@@ -22182,26 +22223,28 @@ class HZMobile {
   }
 
   renderTicker(){
-    const ne=this.nestEgg(),ytr=this.data.retirementAge-this.data.currentAge,ff=this.fun();
-    const dr=this.draw(ne)+this.pension();
-    const it=[['NET WORTH',this.fmtC(this.nwTotal()),'total',true],['SURPLUS',this.fmt(this.disp()),'net',this.disp()>0],['FUN FUND',this.fmtC(ff),'/mo',true],['NEST EGG',this.fmtC(ne),'proj',true],['RETIRE INCOME',this.fmtC(dr),'/mo',true],['YTR',ytr+'Y','age '+this.data.retirementAge,true]];
+    const ytr=this.data.retirementAge-this.data.currentAge,ff=this.fun(),disp=this.disp();
+    const ne=this.neNominal();const dr=this.retIncome();
+    const it=[['NET WORTH',this.fmtC(this.nwTotal()),'total',true],['SURPLUS',this.fmt(disp),'net',disp>0],['FUN FUND',this.fmtC(ff),'/mo',true],['NEST EGG',this.fmtC(ne),'proj',true],['RETIRE INCOME',this.fmtC(dr),'/mo',true],['YTR',ytr+'Y','age '+this.data.retirementAge,true]];
     const one=it.map(i=>`<div style="display:inline-flex;align-items:center;gap:5px;padding:0 13px;height:28px;border-right:1px solid var(--border);font-family:var(--fm);font-size:10px"><span style="color:var(--text);font-weight:600">${i[0]}</span><span style="color:var(--text2)">${i[1]}</span><span style="padding:1px 5px;border-radius:3px;font-size:9px;font-weight:700;background:${i[3]?'var(--sage-bg)':'var(--rose-bg)'};color:${i[3]?'var(--sage-tx)':'var(--rose-tx)'}">${i[2]}</span></div>`).join('');
     const el=document.getElementById('hzTicker');if(el)el.innerHTML=one+one;
   }
 
   // ══════ DASHBOARD ══════
   vDash(){
-    const md=this.gmd(this.dkey());const ne=this.nestEgg(),ytr=this.data.retirementAge-this.data.currentAge;
-    const dr=this.draw(ne)+this.pension();const nw=this.nwTotal();
+    const nu=this.nums();const ytr=this.data.retirementAge-this.data.currentAge;
+    const ti=this.ti(),te=this.te(),disp=ti-te,fun=this.fun();
+    const cmn=this.cm();const sav=cmn?this.n(cmn.savings,0):this.n(this.data.baseSavings,0);
+    const ne=this.lensNe();const dr=this.retIncome();const nw=this.nwTotal();
     const homeBase=this.data.homeBase||'—';
     let h=this.ph('OVERVIEW','Where you stand today',`Live position · <span style="color:var(--amber)">${this.MN[new Date().getMonth()]} ${new Date().getFullYear()}</span> · ${this.esc(homeBase)}`);
-    h+=`<div style="position:relative;background:linear-gradient(140deg,var(--bg2),var(--bg1));border:1px solid var(--border2);border-radius:16px;padding:16px;margin-bottom:10px;overflow:hidden"><div style="position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,var(--green),var(--cyan),var(--blue))"></div><div style="font-size:9px;color:var(--text3);letter-spacing:.1em;font-weight:700;text-transform:uppercase;margin-bottom:6px">NET WORTH</div><div style="font-family:var(--fm);font-size:30px;font-weight:700;color:${nw>=0?'var(--green)':'var(--red)'};line-height:1">${this.fmtC(nw)}</div><div style="display:flex;gap:8px;margin-top:13px"><div style="flex:1;background:var(--bg3);border-radius:10px;padding:8px 10px"><div style="font-size:9px;color:var(--text3);font-weight:600">MONTHLY SURPLUS</div><div style="font-family:var(--fm);font-size:13px;color:${md.disp>=0?'var(--green)':'var(--red)'}">${this.fmt(md.disp)}</div></div><div style="flex:1;background:var(--bg3);border-radius:10px;padding:8px 10px"><div style="font-size:9px;color:var(--text3);font-weight:600">FUN FUND</div><div style="font-family:var(--fm);font-size:13px;color:var(--amber)">${this.fmt(md.fun)}</div></div></div></div>`;
-    h+=this.grid2([this.kpi('💰','Income',this.fmt(md.ti),'var(--green)','Monthly gross'),this.kpi('📤','Expenses',this.fmt(md.te),'var(--red)','Committed'),this.kpi('◈','Nest Egg',this.fmtC(ne),'var(--violet)','Age '+this.data.retirementAge),this.kpi('💵','Retire Income',this.fmtC(dr),'var(--green)','After tax +pension')]);
-    const pe=md.ti?md.te/md.ti*100:0,ps=md.ti?md.savings/md.ti*100:0,pf=md.ti?md.fun/md.ti*100:0;
+    h+=`<div style="position:relative;background:linear-gradient(140deg,var(--bg2),var(--bg1));border:1px solid var(--border2);border-radius:16px;padding:16px;margin-bottom:10px;overflow:hidden"><div style="position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,var(--green),var(--cyan),var(--blue))"></div><div style="font-size:9px;color:var(--text3);letter-spacing:.1em;font-weight:700;text-transform:uppercase;margin-bottom:6px">NET WORTH</div><div style="font-family:var(--fm);font-size:30px;font-weight:700;color:${nw>=0?'var(--green)':'var(--red)'};line-height:1">${this.fmtC(nw)}</div><div style="display:flex;gap:8px;margin-top:13px"><div style="flex:1;background:var(--bg3);border-radius:10px;padding:8px 10px"><div style="font-size:9px;color:var(--text3);font-weight:600">MONTHLY SURPLUS</div><div style="font-family:var(--fm);font-size:13px;color:${disp>=0?'var(--green)':'var(--red)'}">${this.fmt(disp)}</div></div><div style="flex:1;background:var(--bg3);border-radius:10px;padding:8px 10px"><div style="font-size:9px;color:var(--text3);font-weight:600">FUN FUND</div><div style="font-family:var(--fm);font-size:13px;color:var(--amber)">${this.fmt(fun)}</div></div></div></div>`;
+    h+=this.grid2([this.kpi('💰','Income',this.fmt(ti),'var(--green)','This month'),this.kpi('📤','Expenses',this.fmt(te),'var(--red)','This month'),this.kpi('◈','Nest Egg',this.fmtC(ne),'var(--violet)',(this.data.retLens==='today'?"Today's money · age ":'Nominal · age ')+this.data.retirementAge),this.kpi('💵','Retire Income',this.fmtC(dr),'var(--green)','Sustainable + pension')]);
+    const pe=ti?te/ti*100:0,ps=ti?sav/ti*100:0,pf=ti?fun/ti*100:0;
     h+=this.card(this.ct('⇄ Cash Flow This Month')+`<div style="height:8px;background:var(--bg3);border-radius:4px;display:flex;overflow:hidden"><div style="width:${pe}%;background:var(--red);opacity:.75"></div><div style="width:${ps}%;background:var(--amber);opacity:.85"></div><div style="width:${pf}%;background:var(--green)"></div></div><div style="display:flex;gap:14px;margin-top:7px;font-size:10px;color:var(--text3);font-family:var(--fm)"><span style="color:var(--red)">■ Expenses ${pe.toFixed(0)}%</span><span style="color:var(--amber)">■ Savings ${ps.toFixed(0)}%</span><span style="color:var(--green)">■ Fun ${pf.toFixed(0)}%</span></div>`);
     h+=this.card(this.ct('📊 Net Cash Flow · 12-Month')+`<div style="height:158px"><canvas id="hzDashChart"></canvas></div>`);
     const bigExp=this.data.expenses.slice().sort((a,b)=>b.amount-a.amount)[0];
-    const insight=bigExp?`Your <strong>${this.esc(bigExp.name)}</strong> line at <strong>${this.fmtC(bigExp.amount)}</strong> is your largest monthly outflow — trimming it lifts your surplus and compounds into a bigger nest egg over ${ytr} years.`:`With a monthly surplus of <strong style="color:${md.disp>=0?'var(--green)':'var(--red)'}">${this.fmt(md.disp)}</strong>, staying consistent compounds into <strong style="color:var(--green)">${this.fmtC(ne)}</strong> by age ${this.data.retirementAge}.`;
+    const insight=bigExp?`Your <strong>${this.esc(bigExp.name)}</strong> line at <strong>${this.fmtC(bigExp.amount)}</strong> is your largest monthly outflow — trimming it lifts your surplus and compounds into a bigger nest egg over ${ytr} years.`:`With a monthly surplus of <strong style="color:${disp>=0?'var(--green)':'var(--red)'}">${this.fmt(disp)}</strong>, staying consistent compounds into <strong style="color:var(--green)">${this.fmtC(this.neNominal())}</strong> by age ${this.data.retirementAge}.`;
     h+=`<div style="background:linear-gradient(135deg,var(--bg2),var(--info-bg));border:1px solid var(--border2);border-radius:14px;padding:14px;margin-bottom:10px;position:relative;overflow:hidden"><div style="position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,var(--green),var(--cyan))"></div><div style="display:flex;align-items:center;gap:7px;font-size:9px;font-weight:700;letter-spacing:.1em;color:var(--cyan);margin-bottom:8px"><span style="width:6px;height:6px;border-radius:50%;background:var(--green);animation:hzpulse 1.5s infinite"></span>HORIZON AI</div><div style="font-size:12.5px;line-height:1.6;color:var(--text)">${insight}</div><div style="margin-top:10px">${this.btn('Ask about this →','aichat','','o')}</div></div>`;
     h+=`<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:14px;padding-top:12px;border-top:1px dashed var(--border)"><span style="font-family:var(--fm);font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--text3);width:100%">Jump to</span>${[['spend','🏦','Spend'],['forecast','▦','Budget'],['retirement','🌅','Retirement']].map(r=>`<button data-act="nav" data-t="${r[0]}" style="display:inline-flex;align-items:center;gap:7px;background:var(--bg2);border:1px solid var(--border);border-radius:9px;padding:8px 11px;color:var(--text2);font-size:12px;cursor:pointer"><span>${r[1]}</span>${r[2]}<span style="color:var(--text3);margin-left:2px">↗</span></button>`).join('')}</div>`;
     return h;
@@ -22252,58 +22295,94 @@ class HZMobile {
 
   // ══════ FORECAST & REVIEW ══════
   vForecast(){
-    const now=new Date();let pills='';
-    for(let i=0;i<12;i++){const d=this.addMonths(now,i);const k=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;const cur=i===0,sel=k===(this.data.selectedMonth||this.dkey()),ov=!!this.data.monthlyOverrides[k];pills+=`<div data-act="month" data-k="${k}" style="flex-shrink:0;background:${sel?'var(--green)':'var(--bg2)'};color:${sel?'var(--bg0)':cur?'var(--amber)':'var(--text2)'};border:1px solid ${sel?'var(--green)':ov?'var(--violet)':cur?'var(--amber)':'var(--border)'};${ov&&!sel?'border-style:dashed;':''}border-radius:5px;padding:6px 11px;font-size:11px;font-weight:${sel?'700':'500'};cursor:pointer;white-space:nowrap;font-family:var(--fm)">${this.MN[d.getMonth()]} '${String(d.getFullYear()).slice(2)}</div>`;}
-    const sm=this.data.selectedMonth||this.dkey();const ov=!!this.data.monthlyOverrides[sm];const md=this.gmd(sm);const[yr,mo]=sm.split('-');
+    // Months, items, overrides and paid flags all come from the SAME
+    // structures desktop's Forecast & Review uses (FE.months over
+    // state.monthlyOverrides + state.paidFlags), so an override created on
+    // either device is what the other one shows.
+    const list=this.m12();
+    const keys=list.length?list.map(m=>m.key):Array.from({length:12},(_,i)=>{const d=this.addMonths(new Date(),i);return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;});
+    if(!keys.includes(this.data.selectedMonth))this.data.selectedMonth=keys[0];
+    const sm=this.data.selectedMonth;
+    const ovMap=(typeof state!=='undefined'&&state.monthlyOverrides)||{};
+    let pills='';
+    keys.forEach((k,i)=>{const cur=i===0,sel=k===sm,ov=!!ovMap[k];const mo=+k.slice(5,7);pills+=`<div data-act="month" data-k="${k}" style="flex-shrink:0;background:${sel?'var(--green)':'var(--bg2)'};color:${sel?'var(--bg0)':cur?'var(--amber)':'var(--text2)'};border:1px solid ${sel?'var(--green)':ov?'var(--violet)':cur?'var(--amber)':'var(--border)'};${ov&&!sel?'border-style:dashed;':''}border-radius:5px;padding:6px 11px;font-size:11px;font-weight:${sel?'700':'500'};cursor:pointer;white-space:nowrap;font-family:var(--fm)">${this.MN[mo-1]} '${k.slice(2,4)}</div>`;});
+    const mv=this.monView(sm);const[yr,mo]=sm.split('-');
     let h=this.ph('PERSONAL FINANCES','Plan the month ahead','Edit the baseline or override any single month.');
     h+=`<div class="hz-x" style="display:flex;gap:5px;overflow-x:auto;margin:0 -15px 12px;padding:0 15px 4px">${pills}</div>`;
-    h+=`<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:10px"><span style="font-family:var(--fm);font-size:12px;color:var(--amber)">${this.MN[+mo-1]} ${yr}</span>${ov?`${this.chip('plum','OVERRIDE')} ${this.btn('✕ Clear','clearov','','o')}`:this.chip('info','BASELINE')}<span style="margin-left:auto;font-size:11px;color:var(--text3);white-space:nowrap">Net <strong style="color:${md.disp>=0?'var(--green)':'var(--red)'}">${this.fmt(md.disp)}</strong></span></div>`;
-    const pe=md.ti?md.te/md.ti*100:0,ps=md.ti?md.savings/md.ti*100:0,pf=md.ti?md.fun/md.ti*100:0;
-    h+=this.card(this.ct('Flow')+`<div style="height:8px;background:var(--bg3);border-radius:4px;display:flex;overflow:hidden"><div style="width:${pe}%;background:var(--red);opacity:.75"></div><div style="width:${ps}%;background:var(--amber);opacity:.85"></div><div style="width:${pf}%;background:var(--green)"></div></div><div style="display:flex;justify-content:space-between;margin-top:8px;font-size:11px"><span style="color:var(--text2)">In ${this.fmt(md.ti)}</span><span style="color:var(--text2)">Out ${this.fmt(md.te)}</span></div>`);
-    h+=this.card(this.ct('💰 Income',this.btn('+ Add','addline',' data-t="income"','o'))+md.income.map(it=>this.line('income',it)).join(''));
-    let expHtml=md.expenses.map(it=>this.line('expense',it)).join('');
-    if(this.data.carryForward>0)expHtml+=`<div style="display:flex;align-items:center;gap:8px;padding:8px 10px;margin-top:2px;background:var(--plum-bg);border:1px dashed var(--violet);border-radius:6px;font-family:var(--fm);font-size:11px;color:var(--text2)"><span style="color:var(--violet);font-weight:700">↻</span><span style="flex:1">Carry-forward from ${this.MN[(+mo-2+12)%12]}</span><span style="color:var(--violet);font-weight:700">${this.fmt(this.data.carryForward)}</span></div>`;
-    h+=this.card(this.ct('📤 Expenses',this.btn('+ Add','addline',' data-t="expense"','o'))+expHtml);
-    h+=this.card(this.ct('🏦 Savings Allocation')+`<label style="display:block;font-size:11px;color:var(--text2);margin-bottom:5px">Monthly savings (SEK)</label><input type="number" data-model="savings" value="${md.savings}" style="width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:6px;padding:9px 11px;color:var(--text);font-family:var(--fm);font-size:14px;margin-bottom:10px">${this.row('Fun Fund (auto)',this.fmt(md.fun)+' /mo','var(--amber)',true)}`);
+    h+=`<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:10px"><span style="font-family:var(--fm);font-size:12px;color:var(--amber)">${this.MN[+mo-1]} ${yr}</span>${mv.ov?`${this.chip('plum','OVERRIDE')} ${this.btn('✕ Clear','clearov','','o')}`:this.chip('info','BASELINE')}<span style="margin-left:auto;font-size:11px;color:var(--text3);white-space:nowrap">Net <strong style="color:${mv.net>=0?'var(--green)':'var(--red)'}">${this.fmt(mv.net)}</strong></span></div>`;
+    const pe=mv.ti?mv.te/mv.ti*100:0,ps=mv.ti?mv.savings/mv.ti*100:0,pf=mv.ti?mv.fun/mv.ti*100:0;
+    h+=this.card(this.ct('Flow')+`<div style="height:8px;background:var(--bg3);border-radius:4px;display:flex;overflow:hidden"><div style="width:${pe}%;background:var(--red);opacity:.75"></div><div style="width:${ps}%;background:var(--amber);opacity:.85"></div><div style="width:${pf}%;background:var(--green)"></div></div><div style="display:flex;justify-content:space-between;margin-top:8px;font-size:11px"><span style="color:var(--text2)">In ${this.fmt(mv.ti)}</span><span style="color:var(--text2)">Out ${this.fmt(mv.te)}</span></div>`);
+    h+=this.card(this.ct('💰 Income',this.btn('+ Add','addline',' data-t="income"','o'))+(mv.incomeItems.map(it=>this.mline('income',it,sm)).join('')||`<div style="color:var(--text3);font-size:12px">No income lines.</div>`));
+    h+=this.card(this.ct('📤 Expenses',this.btn('+ Add','addline',' data-t="expense"','o'))+(mv.expenseItems.map(it=>this.mline('expense',it,sm)).join('')||`<div style="color:var(--text3);font-size:12px">No expense lines.</div>`));
+    h+=this.card(this.ct('🏦 Savings Allocation')+`<label style="display:block;font-size:11px;color:var(--text2);margin-bottom:5px">Monthly savings (${this.data.currency})</label><input type="number" data-model="savings" value="${mv.savings}" style="width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:6px;padding:9px 11px;color:var(--text);font-family:var(--fm);font-size:14px;margin-bottom:10px">${this.row('Fun Fund (auto)',this.fmt(mv.fun)+' /mo','var(--amber)',true)}`);
     h+=this.card(this.ct('📈 12-Month Forecast')+`<div style="height:170px"><canvas id="hzForecastChart"></canvas></div>`);
     return h;
   }
+  // Month line row. Synthetic rows (carry-forward rollovers, Fun Fund trip
+  // expenses) are rendered locked — they are derived by the engine, exactly
+  // as on desktop. Paid ticks live in state.paidFlags[monthKey][itemId].
+  mline(type,it,key){
+    if(it.carryForward)return `<div style="display:flex;align-items:center;gap:8px;padding:8px 10px;margin-bottom:8px;background:var(--plum-bg);border:1px dashed var(--violet);border-radius:6px;font-family:var(--fm);font-size:11px;color:var(--text2)"><span style="color:var(--violet);font-weight:700">↻</span><span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis">${this.esc(it.name||'Carry-forward')}</span><span style="color:var(--violet);font-weight:700">${this.fmt(this.n(it.amount,0))}</span></div>`;
+    if(it.fromTrip)return `<div style="display:flex;align-items:center;gap:8px;padding:8px 10px;margin-bottom:8px;background:var(--honey-bg);border:1px dashed var(--honey-bd);border-radius:6px;font-family:var(--fm);font-size:11px;color:var(--text2)"><span>✈</span><span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis">${this.esc(it.name||'Trip')}</span><span style="color:var(--honey-tx);font-weight:700">${this.fmt(this.n(it.amount,0))}</span></div>`;
+    const paid=this.isPaid(key,it.id);
+    return `<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;${paid?'opacity:.45':''}"><input type="checkbox" class="hz-chk" ${paid?'checked':''} data-act="togpaid" data-t="${type}" data-id="${it.id}"><input value="${this.esc(it.name)}" data-model="mname:${type}:${it.id}" style="flex:1;min-width:0;background:var(--bg3);border:1px solid var(--border);border-radius:6px;padding:8px 9px;color:var(--text);font-size:12.5px${paid?';text-decoration:line-through':''}"><div style="display:flex;align-items:center;background:var(--bg3);border:1px solid var(--border);border-radius:6px;padding:0 9px"><span style="color:var(--text3);font-size:9px;font-family:var(--fm)">kr</span><input type="number" value="${this.n(it.amount,0)}" data-model="mamt:${type}:${it.id}" style="width:70px;background:transparent;border:none;color:var(--text);font-family:var(--fm);font-size:12.5px;padding:8px 0;text-align:right"></div><button data-act="rmline" data-t="${type}" data-id="${it.id}" style="background:none;border:none;color:var(--red);font-size:17px;cursor:pointer;opacity:.5;padding:2px 3px">×</button></div>`;
+  }
 
   // ══════ RETIREMENT PLAN ══════
+  // Every figure reads FE.retirement.numbers() — the same drawdown
+  // simulation, verdict, pension model and per-asset taxes desktop shows.
   vRetire(){
-    const ytr=this.data.retirementAge-this.data.currentAge;const ne=this.nestEgg();const neL=this.lensNe();
-    const dr=this.draw(ne)+this.pension();const need=this.data.retNeed>0?this.data.retNeed:this.expTotal('mid');const gap=dr-need;
-    const verdict=gap>=need*0.15?['OVERFUNDED','🟢','var(--green)']:gap>=0?['ON TARGET','🟡','var(--amber)']:['UNDERFUNDED','🔴','var(--red)'];
-    const runwayYrs=this.data.lifeExp-this.data.retirementAge;
+    const ytr=this.data.retirementAge-this.data.currentAge;
+    const nu=this.nums();
+    const need=nu?this.n(nu.totalExp,0):(this.data.retNeed>0?this.data.retNeed:this.expTotal('mid'));
+    const dr=this.retIncome();const gap=nu?this.n(nu.gap,0):(dr-need);
+    const vMap={overfunded:'var(--green)',ontarget:'var(--amber)',underfunded:'var(--red)'};
+    const vColor=nu?(vMap[nu.verdictClass]||'var(--amber)'):(gap>=0?'var(--green)':'var(--red)');
+    const vText=nu?nu.verdict:(gap>=0?'On Target':'Underfunded');
+    const vIcon=nu?nu.verdictIcon:(gap>=0?'🎯':'❌');
+    const runout=nu?nu.runoutAge:null;
+    const covPct=nu?Math.round(this.n(nu.coveragePct,0)):Math.min(100,Math.round(need?dr/need*100:100));
     let h=this.ph('PERSONAL FINANCES','Are you on track?',`Projected to age ${this.data.retirementAge}, sustained to ${this.data.lifeExp}.`);
     h+=`<div style="display:inline-flex;gap:2px;background:var(--bg0);border:1px solid var(--border);border-radius:7px;padding:3px;margin-bottom:12px">${[['today','Today'],['nominal','Nominal']].map(m=>`<button data-act="lens" data-l="${m[0]}" style="border:none;border-radius:5px;padding:5px 11px;font-family:var(--fm);font-size:10px;font-weight:600;cursor:pointer;background:${this.data.retLens===m[0]?'var(--green)':'transparent'};color:${this.data.retLens===m[0]?'var(--bg0)':'var(--text2)'}">${m[1]}</button>`).join('')}</div>`;
-    h+=`<div style="background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:15px;margin-bottom:10px"><div style="display:flex;align-items:center;gap:10px;margin-bottom:10px"><span style="font-size:26px">${verdict[1]}</span><div><div style="font-family:var(--fs);font-size:19px;font-weight:600;color:${verdict[2]}">${verdict[0]}</div><div style="font-size:11px;color:var(--text2)">Draw vs ${this.fmtC(need)}/mo need</div></div></div><div style="margin-top:4px">${this.bar(Math.min(100,dr/need*100),verdict[2],8)}</div><div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px">${[['Nest egg',this.fmtC(neL)],['Monthly draw',this.fmtC(dr)],['Monthly need',this.fmtC(need)],[gap>=0?'Headroom':'Shortfall',(gap>=0?'+':'')+this.fmtC(gap)]].map((n,i)=>`<div style="background:var(--bg3);border-radius:8px;padding:9px;text-align:center"><div style="font-size:9px;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:3px">${n[0]}</div><div style="font-family:var(--fm);font-size:14px;font-weight:700;color:${i===3?verdict[2]:'var(--text)'}">${n[1]}</div></div>`).join('')}</div></div>`;
-    h+=this.grid2([this.kpi('🏛','Pension',this.fmtC(this.pension()),'var(--blue)','Allmän + ITP'),this.kpi('💵','Portfolio Draw',this.fmtC(this.draw(ne)),'var(--green)','4% after tax'),this.kpi('📅','Years to Retire',ytr+'Y','var(--amber)','Age '+this.data.currentAge+' → '+this.data.retirementAge),this.kpi('⏳','Runway',runwayYrs+'Y','var(--violet)','Age '+this.data.retirementAge+' → '+this.data.lifeExp)]);
+    h+=`<div style="background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:15px;margin-bottom:10px"><div style="display:flex;align-items:center;gap:10px;margin-bottom:10px"><span style="font-size:26px">${vIcon}</span><div><div style="font-family:var(--fs);font-size:19px;font-weight:600;color:${vColor}">${vText}</div><div style="font-size:11px;color:var(--text2)">${runout&&runout<this.data.lifeExp?`Portfolio lasts to age ${runout} (plan: ${this.data.lifeExp})`:`Income vs ${this.fmtC(need)}/mo need · ${covPct}% of years funded`}</div></div></div><div style="margin-top:4px">${this.bar(covPct,vColor,8)}</div><div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px">${[['Nest egg',this.fmtC(this.lensNe())],['Monthly income',this.fmtC(dr)],['Monthly need',this.fmtC(need)],[gap>=0?'Headroom':'Shortfall',(gap>=0?'+':'')+this.fmtC(gap)]].map((n,i)=>`<div style="background:var(--bg3);border-radius:8px;padding:9px;text-align:center"><div style="font-size:9px;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:3px">${n[0]}</div><div style="font-family:var(--fm);font-size:14px;font-weight:700;color:${i===3?vColor:'var(--text)'}">${n[1]}</div></div>`).join('')}</div></div>`;
+    const penMo=nu?this.n(nu.pensionAvgMonthly,0):this.pension();
+    h+=this.grid2([this.kpi('🏛','Pension',this.fmtC(penMo),'var(--blue)','Avg /mo in retirement'),this.kpi('💵','Portfolio Draw',this.fmtC(this.portfolioDraw()),'var(--green)','Sustainable, after tax'),this.kpi('📅','Years to Retire',ytr+'Y','var(--amber)','Age '+this.data.currentAge+' → '+this.data.retirementAge),this.kpi('⏳','Runway',runout?('Age '+runout):(this.data.lifeExp+'+'),runout&&runout<this.data.lifeExp?'var(--amber)':'var(--violet)',runout&&runout<this.data.lifeExp?'Portfolio runs out':'Lasts past age '+this.data.lifeExp)]);
     h+=this.card(this.ct('📈 Nest Egg Growth',`<label style="display:flex;align-items:center;gap:5px;font-size:10px;color:var(--text3)">${this.data.retLens==='today'?'Real':'Nominal'}</label>`)+`<div style="height:190px"><canvas id="hzNestChart"></canvas></div>`);
-    const scen=[[60,'Early 60'],[65,'Standard 65'],[this.data.retirementAge,'Target '+this.data.retirementAge],[70,'Late 70']];
-    const elig=scen.filter(s=>s[0]>=this.data.currentAge);
-    const best=elig.length?Math.max(...elig.map(s=>this.draw(this.nestEgg(s[0]-this.data.currentAge))+this.pension())):0;
-    h+=this.card(this.ct('🔀 What-If Scenarios')+`<div class="hz-x" style="display:flex;gap:9px;overflow-x:auto;margin:0 -3px;padding-left:3px;padding-bottom:3px">${elig.map(s=>{const y=s[0]-this.data.currentAge;const n=this.nestEgg(y);const dd=this.draw(n)+this.pension();const isBest=Math.abs(dd-best)<1;return `<div style="flex-shrink:0;min-width:130px;background:var(--bg3);border:1px solid ${isBest?'var(--green)':'var(--border)'};border-radius:11px;padding:12px">${isBest?this.chip('sage','OPTIMAL'):''}<div style="font-family:var(--fs);font-size:14px;font-weight:600;margin-top:${isBest?'7px':'0'}">${s[1]}</div><div style="font-family:var(--fm);font-size:15px;color:var(--violet);margin-top:4px">${this.fmtC(n)}</div><div style="font-size:10px;color:var(--text3)">nest egg</div><div style="font-family:var(--fm);font-size:13px;color:var(--green);margin-top:5px">${this.fmtC(dd)}/mo</div><div style="font-size:10px;color:var(--text3)">total income</div></div>`;}).join('')}</div>`);
-    h+=this.card(this.ct('🏛 Swedish Pension')+['penAllman','penITP','penOther'].map((k,i)=>`<div style="display:flex;align-items:center;gap:10px;padding:7px 0;border-bottom:1px solid var(--border)"><span style="flex:1;font-size:12.5px;color:var(--text2)">${['Allmänpension','ITP / Tjänste','Other / annuity'][i]}</span><div style="display:flex;align-items:center;background:var(--bg3);border:1px solid var(--border);border-radius:6px;padding:0 9px"><input type="number" value="${this.data[k]}" data-model="pen:${k}" style="width:78px;background:transparent;border:none;color:var(--text);font-family:var(--fm);font-size:12.5px;padding:7px 0;text-align:right"><span style="color:var(--text3);font-size:9px;font-family:var(--fm)">/mo</span></div></div>`).join('')+this.row('Total pension',this.fmtC(this.pension())+' /mo','var(--green)',true));
+    // Lifestyle scenarios — the desktop's lean/baseline/comfortable model
+    // (state.retirementScenario); tapping one changes it on BOTH devices.
+    const SC=[['lean','🌿','Lean','75% of expenses'],['baseline','🎯','Baseline','Your expense plan'],['comfortable','🥂','Comfortable','130% of expenses']];
+    const active=(typeof state!=='undefined'&&state.retirementScenario)||'baseline';
+    const baseNeed=nu?need/(this.n(nu.mult,1)||1):need;
+    h+=this.card(this.ct('🔀 Lifestyle Scenarios')+`<div class="hz-x" style="display:flex;gap:9px;overflow-x:auto;margin:0 -3px;padding-left:3px;padding-bottom:3px">${SC.map(s=>{const mult={lean:.75,baseline:1,comfortable:1.3}[s[0]];const scNeed=baseNeed*mult;const on=active===s[0];return `<div data-act="retscen" data-id="${s[0]}" style="flex-shrink:0;min-width:126px;background:var(--bg3);border:1px solid ${on?'var(--green)':'var(--border)'};border-radius:11px;padding:12px;cursor:pointer">${on?this.chip('sage','ACTIVE'):''}<div style="font-family:var(--fs);font-size:14px;font-weight:600;margin-top:${on?'7px':'0'}">${s[1]} ${s[2]}</div><div style="font-family:var(--fm);font-size:14px;color:var(--amber);margin-top:4px">${this.fmtC(scNeed)}/mo</div><div style="font-size:10px;color:var(--text3);margin-top:2px">${s[3]}</div></div>`;}).join('')}</div><div style="font-size:10px;color:var(--text3);margin-top:9px">Tap a scenario — the verdict above and desktop recalculate together.</div>`);
+    // Pension incomes — the REAL model: externalAssets with assetType
+    // 'pension' (monthlyPayout + startAge), shared with desktop.
+    const pens=this.penAssets();
+    h+=this.card(this.ct('🏛 Pension Income',this.btn('+ Add','penadd','','o'))+(pens.length?pens.map(p=>`<div style="display:flex;align-items:center;gap:8px;padding:9px 0;border-bottom:1px solid var(--border)"><div style="flex:1;min-width:0"><input value="${this.esc(p.name)}" data-model="aname:${p.id}" style="width:100%;background:transparent;border:none;border-bottom:1px solid var(--border);color:var(--text);font-size:12.5px;font-weight:600;padding:2px 0"></div><div style="display:flex;align-items:center;background:var(--bg3);border:1px solid var(--border);border-radius:6px;padding:0 8px"><input type="number" value="${this.n(p.monthlyPayout,0)}" data-model="ppay:${p.id}" style="width:66px;background:transparent;border:none;color:var(--text);font-family:var(--fm);font-size:12px;padding:7px 0;text-align:right"><span style="color:var(--text3);font-size:9px;font-family:var(--fm)">/mo</span></div><div style="display:flex;align-items:center;background:var(--bg3);border:1px solid var(--border);border-radius:6px;padding:0 8px"><span style="color:var(--text3);font-size:9px;font-family:var(--fm)">age</span><input type="number" value="${this.n(p.startAge,this.data.retirementAge)}" data-model="pstart:${p.id}" style="width:36px;background:transparent;border:none;color:var(--text);font-family:var(--fm);font-size:12px;padding:7px 0;text-align:right"></div><button data-act="assetrm" data-id="${p.id}" style="background:none;border:none;color:var(--red);font-size:16px;cursor:pointer;opacity:.5">×</button></div>`).join(''):`<div style="color:var(--text3);font-size:12px">No pensions yet — add Allmän, ITP or an annuity as monthly payouts.</div>`)+this.row('Total pension',this.fmtC(this.pension())+' /mo','var(--green)',true));
+    // Investment assets — projections per account come from FE so the
+    // "at retirement" figures equal desktop's to the krona.
     const colors=['#00e8a0','#4d9fff','#f5a623','#8b5cf6'];
-    h+=this.card(this.ct('◆ Investment Assets',this.btn('+ Add','assetadd','','o'))+(this.data.externalAssets||[]).map((a,i)=>{const proj=this.fv(a.balance,a.monthlyContribution||0,a.growthRate||this.data.growthRate,ytr);const rp=this.data.retLens==='today'?this.realVal(proj,ytr):proj;return `<div style="display:flex;align-items:flex-start;gap:9px;padding:11px 0;border-bottom:1px solid var(--border)"><div style="width:9px;height:9px;border-radius:50%;background:${colors[i%4]};margin-top:5px;flex-shrink:0"></div><div style="flex:1;min-width:0"><input value="${this.esc(a.name)}" data-model="aname:${a.id}" style="width:100%;background:transparent;border:none;border-bottom:1px solid var(--border);color:var(--text);font-size:12.5px;font-weight:600;padding:2px 0;margin-bottom:6px"><div style="display:flex;flex-wrap:wrap;gap:8px;font-size:10px;color:var(--text3)"><span>Bal <input type="number" value="${a.balance}" data-model="abal:${a.id}" style="width:78px;background:transparent;border:none;border-bottom:1px solid var(--border);color:var(--text2);font-family:var(--fm);font-size:10px"></span><span>+<input type="number" value="${a.monthlyContribution||0}" data-model="acon:${a.id}" style="width:58px;background:transparent;border:none;border-bottom:1px solid var(--border);color:var(--text2);font-family:var(--fm);font-size:10px">/mo</span><span><input type="number" value="${a.growthRate||this.data.growthRate}" data-model="agro:${a.id}" style="width:32px;background:transparent;border:none;border-bottom:1px solid var(--border);color:var(--text2);font-family:var(--fm);font-size:10px">%</span></div></div><div style="text-align:right;flex-shrink:0"><div style="font-family:var(--fm);font-weight:700;font-size:12px;color:${colors[i%4]}">${this.fmtC(rp)}</div><div style="font-size:9px;color:var(--text3)">at retirement</div></div><button data-act="assetrm" data-id="${a.id}" style="background:none;border:none;color:var(--red);font-size:16px;cursor:pointer;opacity:.5">×</button></div>`;}).join(''));
+    const f=this.fe();
+    h+=this.card(this.ct('◆ Investment Assets',this.btn('+ Add','assetadd','','o'))+this.invAssets().map((a,i)=>{let rp=0;try{rp=this.data.retLens==='today'?f.projection.perAccountReal(a.id):f.projection.perAccountNominal(a.id);}catch(_){ }if(!rp){const proj=this.fv(a.balance,a.monthlyContribution,(a.growthRate!=null&&a.growthRate!=='')?a.growthRate:this.data.growthRate,ytr);rp=this.data.retLens==='today'?this.realVal(proj,ytr):proj;}return `<div style="display:flex;align-items:flex-start;gap:9px;padding:11px 0;border-bottom:1px solid var(--border)"><div style="width:9px;height:9px;border-radius:50%;background:${colors[i%4]};margin-top:5px;flex-shrink:0"></div><div style="flex:1;min-width:0"><input value="${this.esc(a.name)}" data-model="aname:${a.id}" style="width:100%;background:transparent;border:none;border-bottom:1px solid var(--border);color:var(--text);font-size:12.5px;font-weight:600;padding:2px 0;margin-bottom:6px"><div style="display:flex;flex-wrap:wrap;gap:8px;font-size:10px;color:var(--text3)"><span>Bal <input type="number" value="${this.n(a.balance,0)}" data-model="abal:${a.id}" style="width:78px;background:transparent;border:none;border-bottom:1px solid var(--border);color:var(--text2);font-family:var(--fm);font-size:10px"></span><span>+<input type="number" value="${this.n(a.monthlyContribution,0)}" data-model="acon:${a.id}" style="width:58px;background:transparent;border:none;border-bottom:1px solid var(--border);color:var(--text2);font-family:var(--fm);font-size:10px">/mo</span><span><input type="number" value="${this.n(a.growthRate,this.data.growthRate)}" data-model="agro:${a.id}" style="width:32px;background:transparent;border:none;border-bottom:1px solid var(--border);color:var(--text2);font-family:var(--fm);font-size:10px">%</span></div></div><div style="text-align:right;flex-shrink:0"><div style="font-family:var(--fm);font-weight:700;font-size:12px;color:${colors[i%4]}">${this.fmtC(rp)}</div><div style="font-size:9px;color:var(--text3)">at retirement</div></div><button data-act="assetrm" data-id="${a.id}" style="background:none;border:none;color:var(--red);font-size:16px;cursor:pointer;opacity:.5">×</button></div>`;}).join(''));
     return h;
   }
 
   // ══════ FUN FUND ══════
+  ffMonths(){const list=this.m12();if(list.length)return list.map(m=>({key:m.key,ff:Math.max(0,this.n(m.pureFunFund,0))}));const now=new Date(),ff=this.fun();return Array.from({length:12},(_,i)=>{const d=this.addMonths(now,i);return {key:`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`,ff};});}
+  ffAnnual(){try{const f=this.fe();if(f&&f.funFund&&f.funFund.summary)return this.n(f.funFund.summary().capacity12mo,0);}catch(_){} return this.ffMonths().reduce((s,m)=>s+m.ff,0);}
   vFun(){
-    const ff=this.fun();const now=new Date();
+    const ff=this.fun();const months12=this.ffMonths();
+    const annual=this.ffAnnual();const six=months12.slice(0,6).reduce((s,m)=>s+m.ff,0);
     let h=this.ph('PLANNING','What can you afford?','Project your discretionary fund forward and plan your next trip.');
     if(ff<=0)h+=this.banner('honey',`<b>Fun fund is 0</b> this month — expenses plus savings currently absorb all income. Trim a line in Budget to start building it.`);
-    h+=this.grid2([this.kpi('✦','Monthly Fund',this.fmt(ff),'var(--amber)','After savings'),this.kpi('📅','Annual',this.fmt(ff*12),'var(--green)','12 months'),this.kpi('🗓','6-Month Stack',this.fmt(ff*6),'var(--cyan)','Planning window'),this.kpi('💼','Saved Trips',(this.data.savedTrips||[]).length,'var(--blue)','Planned')]);
-    const months=this.data.vacMonths,budget=ff*months;
+    h+=this.grid2([this.kpi('✦','Monthly Fund',this.fmt(ff),'var(--amber)','This month, after savings'),this.kpi('📅','Annual',this.fmt(annual),'var(--green)','Next 12 months'),this.kpi('🗓','6-Month Stack',this.fmt(six),'var(--cyan)','Planning window'),this.kpi('💼','Saved Trips',(this.data.savedTrips||[]).length,'var(--blue)','Planned')]);
+    const months=this.data.vacMonths,budget=months12.slice(0,Math.min(12,months)).reduce((s,m)=>s+m.ff,0)+(months>12?(months-12)*ff:0);
     h+=this.card(this.ct('✦ What Can You Afford?')+`<div id="hzTiers">${this.tiers(budget)}</div><div style="display:flex;align-items:center;gap:10px;margin-top:10px"><span style="font-size:11px;color:var(--text3);font-family:var(--fm)">Months</span><input type="range" min="1" max="24" value="${months}" data-slider="vacMonths" style="flex:1"><span id="hzMV" style="font-family:var(--fm);font-size:12px;color:var(--green);min-width:26px">${months}</span></div><div id="hzBL" style="font-size:11px;color:var(--text2);margin-top:6px;font-family:var(--fm)">${months} months = ${this.fmt(budget)} budget</div>`);
     h+=this.card(this.ct('🎯 When Can I Afford It?',this.btn('Plan a Trip','trip','','g'))+`<label style="display:block;font-size:11px;color:var(--text2);margin-bottom:5px">Target trip budget (SEK)</label><input type="number" data-model="target" value="${this.data.targetBudget}" placeholder="60000" style="width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:6px;padding:9px 11px;color:var(--text);font-family:var(--fm);font-size:14px;margin-bottom:10px"><div id="hzAfford">${this.afford()}</div>`);
-    let cum=0,tl='';for(let i=0;i<12;i++){cum+=ff;const d=this.addMonths(now,i);const hl=i===5||i===11;tl+=`<div style="flex-shrink:0;min-width:80px;text-align:center;background:${hl?'var(--sage-bg)':'var(--bg3)'};border:1px solid ${hl?'var(--sage-bd)':'var(--border)'};border-radius:9px;padding:9px 8px"><div style="font-size:9px;color:var(--text3)">${this.MN[d.getMonth()]}</div><div style="font-family:var(--fm);font-size:12px;font-weight:600;color:${hl?'var(--green)':'var(--text)'}">${this.fmtC(cum)}</div><div style="font-size:8px;color:var(--text3)">+${i+1}mo</div></div>`;}
+    let cum=0,tl='';months12.forEach((m,i)=>{cum+=m.ff;const hl=i===5||i===11;tl+=`<div style="flex-shrink:0;min-width:80px;text-align:center;background:${hl?'var(--sage-bg)':'var(--bg3)'};border:1px solid ${hl?'var(--sage-bd)':'var(--border)'};border-radius:9px;padding:9px 8px"><div style="font-size:9px;color:var(--text3)">${this.MN[(+m.key.slice(5,7))-1]}</div><div style="font-family:var(--fm);font-size:12px;font-weight:600;color:${hl?'var(--green)':'var(--text)'}">${this.fmtC(cum)}</div><div style="font-size:8px;color:var(--text3)">+${i+1}mo</div></div>`;});
     h+=this.card(this.ct('📅 Fun Fund Timeline')+`<div class="hz-x" style="display:flex;gap:7px;overflow-x:auto;margin:0 -3px;padding-left:3px;padding-bottom:3px">${tl}</div>`);
     const trips=this.data.savedTrips||[];
     h+=this.card(this.ct('💼 Saved Trips')+(trips.length?trips.map(t=>`<div style="display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--border)"><div style="font-size:20px">✈</div><div style="flex:1;min-width:0"><div style="font-size:13px;font-weight:600">${this.esc(t.dest)}</div><div style="font-size:10.5px;color:var(--text2)">${t.when||'No date'}${t.nights?' · '+t.nights+' nights':''}</div></div><div style="text-align:right"><div style="font-family:var(--fm);font-weight:600;color:var(--amber)">${this.fmtC(t.budget)}</div></div><button data-act="rmtrip" data-id="${t.id}" style="background:none;border:none;color:var(--red);font-size:16px;cursor:pointer;opacity:.5">×</button></div>`).join(''):`<div style="color:var(--text3);font-size:12px">No trips planned yet.</div>`));
-    const ff6=ff*6;
+    const ff6=six;
     h+=this.card(this.ct('🌍 Destination Pulse',this.btn('✦ AI Ideas','ai','','o'))+`<div style="display:grid;grid-template-columns:1fr 1fr;gap:9px">${this.PULSE.slice(0,6).map(d=>{const nums=(d.cost.match(/\d+/g)||[]).map(Number);const up=nums.length?Math.max(...nums):0;const aff=up*1000<=ff6;return `<div data-act="pulse" data-lat="${d.lat}" data-lng="${d.lng}" style="background:var(--bg3);border:1px solid var(--border);border-radius:11px;padding:11px;cursor:pointer"><div style="font-size:20px">${d.flag}</div><div style="font-weight:700;font-size:12.5px;margin-top:3px">${d.dest}</div><div style="font-size:10px;color:var(--text2);margin-top:2px;line-height:1.3">${d.why}</div><div style="font-family:var(--fm);font-size:11px;color:var(--green);margin-top:4px">${d.cost}</div><div style="margin-top:6px">${aff?this.chip('sage','IN BUDGET'):this.chip('honey','STRETCH')}</div></div>`;}).join('')}</div>`);
     h+=this.card(this.ct('🗺 Destination Map')+`<div id="hzVacMap" style="height:200px;border-radius:11px;overflow:hidden;border:1px solid var(--border)"></div>`);
     return h;
@@ -22314,7 +22393,7 @@ class HZMobile {
   // ══════ RETIRE ANYWHERE ══════
   dests(){return (this.data.places&&this.data.places.length)?this.data.places:this.RET;}
   vAnywhere(){
-    const ne=this.nestEgg();const dr=this.draw(ne)+this.pension();const ytr=this.data.retirementAge-this.data.currentAge;
+    const dr=this.retIncome();const ytr=this.data.retirementAge-this.data.currentAge;
     const DEST=this.dests();const mine=DEST!==this.RET;
     const inBudget=DEST.filter(d=>d.costK*1000<=dr).length;
     let h=this.ph('PLANNING','Where in the world?','Your dream retirement, wherever that may be.');
@@ -22327,7 +22406,7 @@ class HZMobile {
     h+=this.card(this.ct('🗺 Retirement World Map')+`<div id="hzRetMap" style="height:200px;border-radius:11px;overflow:hidden;border:1px solid var(--border)"></div>`);
     return h;
   }
-  runApex(){const ne=this.nestEgg();const dr=this.draw(ne)+this.pension();const need=this.expTotal(this.data.retCostLevel);const surplus=dr-need;const ratio=need?dr/need:1;const s=(base)=>Math.max(35,Math.min(98,Math.round(base)));const mods=[['FINANCIAL READINESS',s(ratio*70)],['LEGAL PATHWAY',82],['HEALTHCARE ACCESS',88],['COST FIT',s(ratio*68)],['TAX EFFICIENCY',76],['LIFESTYLE MATCH',this.data.dreams.length?90:70],['EXPAT COMMUNITY',84],['RUNWAY (YRS)',s(ratio*60)]];const avg=mods.reduce((a,m)=>a+m[1],0)/mods.length;const verdict=avg>=80?'FEASIBLE':avg>=62?'CONDITIONAL':'NOT FEASIBLE';const d0=this.dests()[0];this.data.apex={mods,verdict,dest:d0.name+(d0.country?', '+d0.country:''),surplus};}
+  runApex(){const dr=this.retIncome();const need=this.expTotal(this.data.retCostLevel);const surplus=dr-need;const ratio=need?dr/need:1;const s=(base)=>Math.max(35,Math.min(98,Math.round(base)));const mods=[['FINANCIAL READINESS',s(ratio*70)],['LEGAL PATHWAY',82],['HEALTHCARE ACCESS',88],['COST FIT',s(ratio*68)],['TAX EFFICIENCY',76],['LIFESTYLE MATCH',this.data.dreams.length?90:70],['EXPAT COMMUNITY',84],['RUNWAY (YRS)',s(ratio*60)]];const avg=mods.reduce((a,m)=>a+m[1],0)/mods.length;const verdict=avg>=80?'FEASIBLE':avg>=62?'CONDITIONAL':'NOT FEASIBLE';const d0=this.dests()[0];this.data.apex={mods,verdict,dest:d0.name+(d0.country?', '+d0.country:''),surplus};}
   apexHTML(){const ap=this.data.apex;const vc={FEASIBLE:'var(--green)',CONDITIONAL:'var(--amber)','NOT FEASIBLE':'var(--red)'}[ap.verdict];const vt={FEASIBLE:'sage',CONDITIONAL:'honey','NOT FEASIBLE':'rose'}[ap.verdict];return `<div style="display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-bottom:11px">${ap.mods.map(m=>{const c=m[1]>=80?'var(--green)':m[1]>=62?'var(--amber)':'var(--red)';return `<div style="background:var(--bg3);border-radius:8px;padding:9px"><div style="font-size:8px;letter-spacing:.06em;color:var(--text3);font-weight:700">${m[0]}</div><div style="font-family:var(--fm);font-size:13px;font-weight:700;color:${c};margin-top:3px">${m[1]}/100</div>${this.bar(m[1],c,4)}</div>`;}).join('')}</div><div style="border:1px solid ${vc};background:var(--${vt}-bg);border-radius:10px;padding:13px;text-align:center"><div style="font-family:var(--fs);font-size:17px;font-weight:600;color:${vc};letter-spacing:.04em">${ap.verdict} — ${this.esc(ap.dest)}</div><div style="font-size:11px;color:var(--text2);margin-top:4px;font-family:var(--fm)">Projected ${ap.surplus>=0?'surplus':'shortfall'} of ${this.fmtC(Math.abs(ap.surplus))}/mo at this cost level</div></div>`;}
 
   // ══════ LIFE WALL ══════
@@ -22342,8 +22421,28 @@ class HZMobile {
     h+=this.card(this.ct('🧱 The Wall',this.chip('honey','●'+ret+' retire'))+`<div style="display:grid;grid-template-columns:repeat(7,1fr);gap:5px">${bricks}</div><div style="font-size:10px;color:var(--text3);margin-top:11px;text-align:center">Tap any brick to see that year's projection</div>`);
     return h;
   }
-  brickSheet(age){const y=age-this.data.currentAge;let ne=this.nestEgg(y);const real=this.realVal(ne,y);const retired=age>=this.data.retirementAge;const dr=this.draw(ne)+(retired?this.pension():0);const yr=new Date().getFullYear()+y;const phase=age<this.data.retirementAge-5?'Wealth Building':age<this.data.retirementAge?'Glide Path':'Retirement';
-    this.sheet(`Age ${age} · ${yr}`,this.chip(retired?'plum':'sage',phase)+`<div style="margin-top:12px">${this.row('Projected nest egg',this.fmtC(ne),'var(--violet)')}${this.row("In today's money",this.fmtC(real),'var(--text)')}${retired?this.row('Monthly income',this.fmtC(dr)+' /mo','var(--green)'):this.row('Years from now','+'+y+'Y','var(--amber)')}${this.row(retired?'Status':'Milestone',retired?'Drawing down':(age===this.data.retirementAge?'🎉 Retirement begins':'Accumulating'),retired?'var(--violet)':'var(--green)',true)}</div>`,retired?'You are drawing on the portfolio in this chapter.':'You are still building the nest egg in this chapter.');}
+  brickSheet(age){
+    const y=age-this.data.currentAge;const retired=age>=this.data.retirementAge;
+    const yr=new Date().getFullYear()+y;
+    const phase=age<this.data.retirementAge-5?'Wealth Building':age<this.data.retirementAge?'Glide Path':'Retirement';
+    // Values from the engine: accumulation years use the projection series;
+    // retired years use the drawdown simulation balances (today's money).
+    let ne=null,real=null;
+    try{const f=this.fe();const proj=f?f.projection.yearly():[];const hit=proj.find(p=>p.age===age)||null;if(hit){ne=this.n(hit.total,0);real=this.n(hit.realTotal,0);}}catch(_){}
+    const nu=this.nums();
+    if(retired&&nu&&nu._simResult&&Array.isArray(nu._simResult.labels)){
+      const idx=nu._simResult.labels.indexOf(age);
+      if(idx>=0){real=this.n(nu._simResult.balData[idx],0);ne=null;}
+    }
+    if(ne==null&&real==null){const est=this.nestEgg(Math.min(y,this.data.retirementAge-this.data.currentAge));ne=est;real=this.realVal(est,y);}
+    const dr=this.retIncome();
+    let rows='';
+    if(ne!=null)rows+=this.row('Projected nest egg',this.fmtC(ne),'var(--violet)');
+    rows+=this.row(retired?"Portfolio (today's money)":"In today's money",this.fmtC(real!=null?real:ne),'var(--text)');
+    rows+=retired?this.row('Monthly income',this.fmtC(dr)+' /mo','var(--green)'):this.row('Years from now','+'+y+'Y','var(--amber)');
+    rows+=this.row(retired?'Status':'Milestone',retired?'Drawing down':(age===this.data.retirementAge?'🎉 Retirement begins':'Accumulating'),retired?'var(--violet)':'var(--green)',true);
+    this.sheet(`Age ${age} · ${yr}`,this.chip(retired?'plum':'sage',phase)+`<div style="margin-top:12px">${rows}</div>`,retired?'You are drawing on the portfolio in this chapter.':'You are still building the nest egg in this chapter.');
+  }
 
   // ══════ PROPERTY IQ ══════
   vProperty(){
@@ -22385,7 +22484,7 @@ class HZMobile {
     let h=this.ph('SYSTEM','Settings','Profile, assumptions and appearance. Powers every AI analysis.');
     h+=this.syncCard();
     h+=this.card(this.ct('🪪 Profile & Context')+this.srow('Citizenship',`<input value="${this.esc(this.data.citizenship)}" data-model="s:citizenship" style="${this.inpS(150)}">`)+this.srow('Home Base',`<input value="${this.esc(this.data.homeBase)}" data-model="s:homeBase" style="${this.inpS(150)}">`)+this.srow('Current Age',`<input type="number" value="${this.data.currentAge}" data-model="n:currentAge" style="${this.inpS(70)}">`)+this.srow('Retirement Age',`<input type="number" value="${this.data.retirementAge}" data-model="n:retirementAge" style="${this.inpS(70)}">`)+this.srow('Life Expectancy',`<input type="number" value="${this.data.lifeExp}" data-model="n:lifeExp" style="${this.inpS(70)}">`,true));
-    h+=this.card(this.ct('📊 Assumptions')+this.srow('Portfolio Growth %',`<input type="number" step=".5" value="${this.data.growthRate}" data-model="n:growthRate" style="${this.inpS(70)}">`)+this.srow('Inflation %',`<input type="number" step=".5" value="${this.data.inflationRate}" data-model="n:inflationRate" style="${this.inpS(70)}">`)+this.srow('Post-Retire Growth %',`<input type="number" step=".5" value="${this.data.postRetGrowth}" data-model="n:postRetGrowth" style="${this.inpS(70)}">`)+this.srow('Withdrawal Tax %',`<input type="number" value="${this.data.withdrawTaxRate}" data-model="n:withdrawTaxRate" style="${this.inpS(70)}">`,true));
+    h+=this.card(this.ct('📊 Assumptions')+this.srow('Portfolio Growth %',`<input type="number" step=".5" value="${this.data.growthRate}" data-model="n:growthRate" style="${this.inpS(70)}">`)+this.srow('Inflation %',`<input type="number" step=".5" value="${this.data.inflationRate}" data-model="n:inflationRate" style="${this.inpS(70)}">`)+this.srow('Post-Retire Growth %',`<input type="number" step=".5" value="${this.data.postRetGrowth}" data-model="n:postRetGrowth" style="${this.inpS(70)}">`)+this.srow('Savings Tax %',`<input type="number" value="${this.data.withdrawTaxRate}" data-model="n:withdrawTaxRate" style="${this.inpS(70)}">`,true));
     h+=this.card(this.ct('🎨 Appearance')+this.srow('Currency',this.seg('currency',[['SEK','kr'],['USD','$'],['EUR','€'],['KES','KSh']]))+this.srow('Language',this.seg('lang',[['EN','EN'],['SV','SV']]))+this.srow('Theme',`<button data-act="theme" style="background:var(--bg4);border:1px solid var(--border2);color:var(--text);border-radius:7px;padding:6px 12px;font-size:11px;cursor:pointer">${this.data.theme==='dark'?'☀ Switch to Light':'☾ Switch to Dark'}</button>`,true));
     h+=this.card(this.ct('💱 Exchange Rates',this.chip('sage','● Live FX pending'))+['USD','EUR','KES'].map((k,i)=>this.srow(k+' per SEK',`<input type="number" step=".001" value="${this.data.exchangeRates[k]}" data-model="fx:${k}" style="${this.inpS(90)}">`,i===2)).join(''));
     h+=this.card(this.ct('🏦 Connections')+`<div style="display:flex;gap:8px;flex-wrap:wrap">${this.btn('🏦 Connect Bank (PSD2)','bank','','o')}${this.btn('📥 Import CSV','csv','','o')}${this.btn('📊 Load Demo Data','demo','','o')}</div>`);
@@ -22433,23 +22532,27 @@ class HZMobile {
   // ══════ CHARTS ══════
   chOpts(extra){return Object.assign({responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}}},extra);}
   cc(){const g=getComputedStyle(this.root);return {t3:g.getPropertyValue('--text3').trim()||'#3d506e',t2:g.getPropertyValue('--text2').trim()||'#7a8fb0',grid:this.data.theme==='dark'?'#1a2640':'#D6CFBF'};}
-  chartDash(){this.whenLib(()=>window.Chart,()=>{const now=new Date();const labs=[],net=[];for(let i=0;i<12;i++){const d=this.addMonths(now,i);const k=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;const m=this.gmd(k);labs.push(this.MN[d.getMonth()]);net.push(Math.round(m.disp));}const c=this.cc();const ctx=document.getElementById('hzDashChart');if(!ctx)return;if(this.charts.dash)this.charts.dash.destroy();this.charts.dash=new Chart(ctx,{type:'bar',data:{labels:labs,datasets:[{data:net,backgroundColor:net.map(v=>v>=0?'#00e8a055':'#ff4d6d55'),borderColor:net.map(v=>v>=0?'#00e8a0':'#ff4d6d'),borderWidth:1,borderRadius:4}]},options:this.chOpts({scales:{x:{ticks:{color:c.t3,font:{size:9}},grid:{display:false}},y:{ticks:{color:c.t3,font:{size:9},callback:v=>this.fmtC(v)},grid:{color:c.grid}}}})});});}
+  chartDash(){this.whenLib(()=>window.Chart,()=>{const list=this.m12();const labs=[],net=[];if(list.length){list.forEach(m=>{labs.push(this.MN[(+m.key.slice(5,7))-1]);net.push(Math.round(this.n(m.pureIncome,0)-this.n(m.pureExpenses,0)));});}else{const now=new Date();for(let i=0;i<12;i++){const d=this.addMonths(now,i);labs.push(this.MN[d.getMonth()]);net.push(Math.round(this.disp()));}}const c=this.cc();const ctx=document.getElementById('hzDashChart');if(!ctx)return;if(this.charts.dash)this.charts.dash.destroy();this.charts.dash=new Chart(ctx,{type:'bar',data:{labels:labs,datasets:[{data:net,backgroundColor:net.map(v=>v>=0?'#00e8a055':'#ff4d6d55'),borderColor:net.map(v=>v>=0?'#00e8a0':'#ff4d6d'),borderWidth:1,borderRadius:4}]},options:this.chOpts({scales:{x:{ticks:{color:c.t3,font:{size:9}},grid:{display:false}},y:{ticks:{color:c.t3,font:{size:9},callback:v=>this.fmtC(v)},grid:{color:c.grid}}}})});});}
   chartSpend(){this.whenLib(()=>window.Chart,()=>{const M=this.spendMetrics();if(!M||!M.cats.length)return;const top=M.cats.slice(0,8);const labs=top.map(x=>x[0]),vals=top.map(x=>x[1]);const cols=['#00e8a0','#4d9fff','#f5a623','#8b5cf6','#00d4ff','#ec4899','#ff4d6d','#7a8fb0'];const c=this.cc();const ctx=document.getElementById('hzSpendChart');if(!ctx)return;if(this.charts.spend)this.charts.spend.destroy();this.charts.spend=new Chart(ctx,{type:'doughnut',data:{labels:labs,datasets:[{data:vals,backgroundColor:cols,borderColor:getComputedStyle(this.root).getPropertyValue('--bg2').trim(),borderWidth:2}]},options:this.chOpts({cutout:'62%',plugins:{legend:{display:true,position:'right',labels:{color:c.t2,font:{size:9},boxWidth:8,padding:6}}}})});});}
-  chartForecast(){this.whenLib(()=>window.Chart,()=>{const now=new Date();const labs=[],inc=[],exp=[];for(let i=0;i<12;i++){const d=this.addMonths(now,i);const k=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;const m=this.gmd(k);labs.push(this.MN[d.getMonth()]);inc.push(Math.round(m.ti));exp.push(Math.round(m.te));}const c=this.cc();const ctx=document.getElementById('hzForecastChart');if(!ctx)return;if(this.charts.fc)this.charts.fc.destroy();this.charts.fc=new Chart(ctx,{type:'line',data:{labels:labs,datasets:[{label:'Income',data:inc,borderColor:'#00e8a0',backgroundColor:'#00e8a015',fill:true,tension:.3,pointRadius:0},{label:'Expenses',data:exp,borderColor:'#ff4d6d',backgroundColor:'#ff4d6d10',fill:true,tension:.3,pointRadius:0}]},options:this.chOpts({plugins:{legend:{display:true,labels:{color:c.t2,font:{size:9},boxWidth:8}}},scales:{x:{ticks:{color:c.t3,font:{size:9}},grid:{display:false}},y:{ticks:{color:c.t3,font:{size:9},callback:v=>this.fmtC(v)},grid:{color:c.grid}}}})});});}
-  chartNest(){this.whenLib(()=>window.Chart,()=>{const ytr=this.data.retirementAge-this.data.currentAge;const labs=[],data=[];const step=Math.max(1,Math.floor(ytr/18));for(let y=0;y<=ytr;y+=step){let t=this.nestEgg(y);if(this.data.retLens==='today')t=this.realVal(t,y);data.push(Math.round(t/1e6*10)/10);labs.push(this.data.currentAge+y);}const c=this.cc();const ctx=document.getElementById('hzNestChart');if(!ctx)return;if(this.charts.nest)this.charts.nest.destroy();this.charts.nest=new Chart(ctx,{type:'line',data:{labels:labs,datasets:[{data,borderColor:'#8b5cf6',backgroundColor:'#8b5cf618',fill:true,tension:.4,pointRadius:0}]},options:this.chOpts({scales:{x:{ticks:{color:c.t3,font:{size:9}},grid:{display:false}},y:{ticks:{color:c.t3,font:{size:9},callback:v=>v+'M'},grid:{color:c.grid}}}})});});}
+  chartForecast(){this.whenLib(()=>window.Chart,()=>{const list=this.m12();const labs=[],inc=[],exp=[];if(list.length){list.forEach(m=>{labs.push(this.MN[(+m.key.slice(5,7))-1]);inc.push(Math.round(this.n(m.pureIncome,0)));exp.push(Math.round(this.n(m.pureExpenses,0)));});}else{const now=new Date();for(let i=0;i<12;i++){const d=this.addMonths(now,i);labs.push(this.MN[d.getMonth()]);inc.push(Math.round(this.ti()));exp.push(Math.round(this.te()));}}const c=this.cc();const ctx=document.getElementById('hzForecastChart');if(!ctx)return;if(this.charts.fc)this.charts.fc.destroy();this.charts.fc=new Chart(ctx,{type:'line',data:{labels:labs,datasets:[{label:'Income',data:inc,borderColor:'#00e8a0',backgroundColor:'#00e8a015',fill:true,tension:.3,pointRadius:0},{label:'Expenses',data:exp,borderColor:'#ff4d6d',backgroundColor:'#ff4d6d10',fill:true,tension:.3,pointRadius:0}]},options:this.chOpts({plugins:{legend:{display:true,labels:{color:c.t2,font:{size:9},boxWidth:8}}},scales:{x:{ticks:{color:c.t3,font:{size:9}},grid:{display:false}},y:{ticks:{color:c.t3,font:{size:9},callback:v=>this.fmtC(v)},grid:{color:c.grid}}}})});});}
+  chartNest(){this.whenLib(()=>window.Chart,()=>{let labs=[],data=[];try{const f=this.fe();const proj=f?f.projection.yearly():null;if(proj&&proj.length){proj.forEach(p=>{labs.push(p.age!=null?p.age:p.year);data.push(Math.round(this.n(this.data.retLens==='today'?p.realTotal:p.total,0)/1e6*10)/10);});}}catch(_){}
+    if(!labs.length){const ytr=this.data.retirementAge-this.data.currentAge;const step=Math.max(1,Math.floor(ytr/18));for(let y=0;y<=ytr;y+=step){let t=this.nestEgg(y);if(this.data.retLens==='today')t=this.realVal(t,y);data.push(Math.round(t/1e6*10)/10);labs.push(this.data.currentAge+y);}}
+    const c=this.cc();const ctx=document.getElementById('hzNestChart');if(!ctx)return;if(this.charts.nest)this.charts.nest.destroy();this.charts.nest=new Chart(ctx,{type:'line',data:{labels:labs,datasets:[{data,borderColor:'#8b5cf6',backgroundColor:'#8b5cf618',fill:true,tension:.4,pointRadius:0}]},options:this.chOpts({scales:{x:{ticks:{color:c.t3,font:{size:9}},grid:{display:false}},y:{ticks:{color:c.t3,font:{size:9},callback:v=>v+'M'},grid:{color:c.grid}}}})});});}
   chartAmort(){this.whenLib(()=>window.Chart,()=>{const p=this.data.property;const ctx=document.getElementById('hzAmortChart');if(!ctx)return;if(this.charts.amort)this.charts.amort.destroy();if(!p.mortgage||!p.monthly){this.charts.amort=null;return;}let bal=p.mortgage;const r=(p.rate||0)/100/12;const labs=[],data=[];let baseYr=new Date().getFullYear();for(let mth=0;mth<=480&&bal>0.5;mth++){if(mth%12===0){labs.push(baseYr+mth/12);data.push(Math.round(bal/1e6*100)/100);}const interest=bal*r;bal=bal-(p.monthly-interest);if(bal<0)bal=0;if(p.monthly-interest<=0)break;}const c=this.cc();this.charts.amort=new Chart(ctx,{type:'line',data:{labels:labs,datasets:[{data,borderColor:'#4d9fff',backgroundColor:'#4d9fff18',fill:true,tension:.35,pointRadius:0}]},options:this.chOpts({scales:{x:{ticks:{color:c.t3,font:{size:9},maxTicksLimit:7},grid:{display:false}},y:{ticks:{color:c.t3,font:{size:9},callback:v=>v+'M'},grid:{color:c.grid}}}})});});}
   initVacMap(){this.whenLib(()=>window.L&&document.getElementById('hzVacMap'),()=>{if(this.vacMap){this.vacMap.remove();this.vacMap=null;}const el=document.getElementById('hzVacMap');if(!el)return;this.vacMap=L.map(el,{zoomControl:false,attributionControl:false}).setView([20,20],1);L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(this.vacMap);this.PULSE.forEach(d=>{const m=L.circleMarker([d.lat,d.lng],{radius:8,fillColor:d.col,color:d.col,fillOpacity:.8,weight:2});m.bindPopup(`<strong>${d.flag} ${d.dest}</strong><br>${d.cost}`);m.addTo(this.vacMap);});setTimeout(()=>this.vacMap&&this.vacMap.invalidateSize(),140);});}
-  initRetMap(){this.whenLib(()=>window.L&&document.getElementById('hzRetMap'),()=>{if(this.retMap){this.retMap.remove();this.retMap=null;}const el=document.getElementById('hzRetMap');if(!el)return;this.retMap=L.map(el,{zoomControl:false,attributionControl:false}).setView([25,10],1);L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(this.retMap);const dr=this.draw(this.nestEgg())+this.pension();this.dests().forEach(d=>{if(!d.lat&&!d.lng)return;const col=d.costK*1000<=dr?'#00e8a0':'#f5a623';const m=L.circleMarker([d.lat,d.lng],{radius:9,fillColor:col,color:col,fillOpacity:.8,weight:2});m.bindPopup(`<strong>${d.flag} ${this.esc(d.name)}</strong><br>${d.costK}K SEK/mo`);m.addTo(this.retMap);});setTimeout(()=>this.retMap&&this.retMap.invalidateSize(),140);});}
+  initRetMap(){this.whenLib(()=>window.L&&document.getElementById('hzRetMap'),()=>{if(this.retMap){this.retMap.remove();this.retMap=null;}const el=document.getElementById('hzRetMap');if(!el)return;this.retMap=L.map(el,{zoomControl:false,attributionControl:false}).setView([25,10],1);L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(this.retMap);const dr=this.retIncome();this.dests().forEach(d=>{if(!d.lat&&!d.lng)return;const col=d.costK*1000<=dr?'#00e8a0':'#f5a623';const m=L.circleMarker([d.lat,d.lng],{radius:9,fillColor:col,color:col,fillOpacity:.8,weight:2});m.bindPopup(`<strong>${d.flag} ${this.esc(d.name)}</strong><br>${d.costK}K SEK/mo`);m.addTo(this.retMap);});setTimeout(()=>this.retMap&&this.retMap.invalidateSize(),140);});}
 
   // ══════ EVENTS ══════
   onClick(e){const el=e.target.closest('[data-act]');if(!el)return;const a=el.dataset.act;const d=el.dataset;
     if(a==='nav')return this.go(d.t);
     if(a==='month'){this.data.selectedMonth=d.k;return this.paint();}
-    if(a==='clearov'){delete this.data.monthlyOverrides[this.data.selectedMonth||this.dkey()];this.persist();return this.paint();}
-    if(a==='addline'){const ov=this.ovFor();const id='x'+Math.random().toString(36).slice(2,8);if(d.t==='income')ov.income.push({id,name:'New income',amount:0,paid:false});else ov.expenses.push({id,name:'New expense',amount:0,cat:'Other',paid:false});this.persist();return this.paint();}
-    if(a==='rmline'){const ov=this.ovFor();if(d.t==='income')ov.income=ov.income.filter(i=>i.id!==d.id);else ov.expenses=ov.expenses.filter(i=>i.id!==d.id);this.persist();return this.paint();}
-    if(a==='togpaid'){const ov=this.ovFor();const arr=d.t==='income'?ov.income:ov.expenses;const it=arr.find(i=>i.id===d.id);if(it)it.paid=!it.paid;this.persist();return this.paint();}
-    if(a==='assetadd'){this.data.externalAssets.push({id:'a'+Math.random().toString(36).slice(2,8),name:'New asset',balance:0,growthRate:this.data.growthRate,monthlyContribution:0,accountType:'standard',taxRate:30,assetType:'investment'});this.persist();return this.paint();}
+    if(a==='clearov'){const k=this.data.selectedMonth||this.dkey();if(typeof state!=='undefined'&&state.monthlyOverrides)delete state.monthlyOverrides[k];this.mSave();return this.paint();}
+    if(a==='addline'){const k=this.data.selectedMonth||this.dkey();this.ovField(k,d.t).push({id:this.newId(),name:'',amount:0,type:d.t==='income'?'fixed':'variable'});this.mSave();return this.paint();}
+    if(a==='rmline'){const k=this.data.selectedMonth||this.dkey();const fld=(d.t==='income')?'income':'expenses';this.ovField(k,d.t);state.monthlyOverrides[k][fld]=state.monthlyOverrides[k][fld].filter(i=>i.id!==d.id);this.mSave();return this.paint();}
+    if(a==='togpaid'){const k=this.data.selectedMonth||this.dkey();if(typeof state!=='undefined'){if(!state.paidFlags)state.paidFlags={};if(!state.paidFlags[k])state.paidFlags[k]={};if(state.paidFlags[k][d.id])delete state.paidFlags[k][d.id];else state.paidFlags[k][d.id]=true;this.mSave();}return this.paint();}
+    if(a==='retscen'){if(typeof state!=='undefined'){state.retirementScenario=d.id;this.mSave();}return this.paint();}
+    if(a==='penadd'){this.data.externalAssets.push({id:this.newId(),name:'New pension',balance:0,growthRate:0,monthlyContribution:0,accountType:'standard',taxRate:0,assetType:'pension',monthlyPayout:0,startAge:this.data.retirementAge});this.persist();return this.paint();}
+    if(a==='assetadd'){this.data.externalAssets.push({id:this.newId(),name:'New asset',balance:0,growthRate:this.data.growthRate,monthlyContribution:0,accountType:'standard',taxRate:30,assetType:'investment'});this.persist();return this.paint();}
     if(a==='assetrm'){this.data.externalAssets=this.data.externalAssets.filter(x=>x.id!==d.id);this.persist();return this.paint();}
     if(a==='lens'){this.data.retLens=d.l;this.persist();return this.paint();}
     if(a==='dream'){const i=this.data.dreams.indexOf(d.id);if(i>-1)this.data.dreams.splice(i,1);else this.data.dreams.push(d.id);this.persist();return this.paint();}
@@ -22480,22 +22583,25 @@ class HZMobile {
   onChange(e){const el=e.target.closest('[data-model]');if(!el)return;this.commit(el.dataset.model,el.value);this.persist();this.paint();}
   onInput(e){const s=e.target.closest('[data-slider]');if(s){this.data[s.dataset.slider]=+s.value;const ff=this.fun();const b=ff*(+s.value);const mv=document.getElementById('hzMV');const bl=document.getElementById('hzBL');const ti=document.getElementById('hzTiers');if(mv)mv.textContent=s.value;if(bl)bl.textContent=`${s.value} months = ${this.fmt(b)} budget`;if(ti)ti.innerHTML=this.tiers(b);clearTimeout(this._st);this._st=setTimeout(()=>this.persist(),400);return;}}
   commit(model,val){const p=model.split(':');const num=parseFloat(val);
-    if(p[0]==='savings'){this.ovFor().savings=num||0;this.data.baseSavings=num||0;}
-    else if(p[0]==='amt'){const ov=this.ovFor();const arr=p[1]==='income'?ov.income:ov.expenses;const it=arr.find(i=>i.id===p[2]);if(it)it.amount=num||0;}
-    else if(p[0]==='name'){const ov=this.ovFor();const arr=p[1]==='income'?ov.income:ov.expenses;const it=arr.find(i=>i.id===p[2]);if(it)it.name=val;}
-    else if(p[0]==='pen'){this.data[p[1]]=num||0;}
-    else if(p[0]==='abal'){const a=this.data.externalAssets.find(x=>x.id===p[1]);if(a)a.balance=num||0;}
-    else if(p[0]==='acon'){const a=this.data.externalAssets.find(x=>x.id===p[1]);if(a)a.monthlyContribution=num||0;}
-    else if(p[0]==='agro'){const a=this.data.externalAssets.find(x=>x.id===p[1]);if(a)a.growthRate=num||0;}
+    // Month edits (savings / mamt / mname) write straight into the
+    // desktop-format state.monthlyOverrides — the exact structure the
+    // desktop Monthly Review edits — so overrides round-trip both ways.
+    if(p[0]==='savings'){const k=this.data.selectedMonth||this.dkey();if(typeof state!=='undefined'){if(!state.monthlyOverrides)state.monthlyOverrides={};if(!state.monthlyOverrides[k])state.monthlyOverrides[k]={};state.monthlyOverrides[k].savings=this.n(num,0);}}
+    else if(p[0]==='mamt'){const k=this.data.selectedMonth||this.dkey();const it=this.ovField(k,p[1]).find(i=>i.id===p[2]);if(it)it.amount=this.n(num,0);}
+    else if(p[0]==='mname'){const k=this.data.selectedMonth||this.dkey();const it=this.ovField(k,p[1]).find(i=>i.id===p[2]);if(it)it.name=val;}
+    else if(p[0]==='abal'){const a=this.data.externalAssets.find(x=>x.id===p[1]);if(a)a.balance=this.n(num,0);}
+    else if(p[0]==='acon'){const a=this.data.externalAssets.find(x=>x.id===p[1]);if(a)a.monthlyContribution=this.n(num,0);}
+    else if(p[0]==='agro'){const a=this.data.externalAssets.find(x=>x.id===p[1]);if(a)a.growthRate=this.n(num,0);}
     else if(p[0]==='aname'){const a=this.data.externalAssets.find(x=>x.id===p[1]);if(a)a.name=val;}
+    else if(p[0]==='ppay'){const a=this.data.externalAssets.find(x=>x.id===p[1]);if(a)a.monthlyPayout=this.n(num,0);}
+    else if(p[0]==='pstart'){const a=this.data.externalAssets.find(x=>x.id===p[1]);if(a)a.startAge=this.n(num,this.data.retirementAge);}
     else if(p[0]==='target'){this.data.targetBudget=val;}
     else if(p[0]==='costlevel'){this.data.retCostLevel=val;}
-    else if(p[0]==='n'){this.data[p[1]]=num||0;}
+    else if(p[0]==='n'){this.data[p[1]]=this.n(num,0);}
     else if(p[0]==='s'){this.data[p[1]]=val;}
-    else if(p[0]==='fx'){this.data.exchangeRates[p[1]]=num||0;}
-    else if(p[0]==='prop'){this.data.property[p[1]]=num||0;if(p[1]==='value')this.data.netWorth.property=num||0;if(p[1]==='mortgage')this.data.netWorth.mortgage=num||0;}
+    else if(p[0]==='fx'){this.data.exchangeRates[p[1]]=this.n(num,0);}
+    else if(p[0]==='prop'){this.data.property[p[1]]=this.n(num,0);if(p[1]==='value')this.data.netWorth.property=this.n(num,0);if(p[1]==='mortgage')this.data.netWorth.mortgage=this.n(num,0);}
   }
-  ovFor(){const k=this.data.selectedMonth||this.dkey();if(!this.data.monthlyOverrides[k]){const md=this.gmd(k);this.data.monthlyOverrides[k]={income:JSON.parse(JSON.stringify(md.income)),expenses:JSON.parse(JSON.stringify(md.expenses)),savings:md.savings};}return this.data.monthlyOverrides[k];}
   doExport(){try{const blob=new Blob([JSON.stringify(state,null,2)],{type:'application/json'});const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download='horizon-backup.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);this.toast('Exported horizon-backup.json');}catch(_){this.toast('Export failed');}}
 
   // ══════ OVERLAYS / SHEETS ══════
