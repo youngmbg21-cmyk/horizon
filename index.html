@@ -6725,8 +6725,31 @@ let _syncInFlight = false;
 let _syncUser = null;        // current Supabase user (runtime only; drives the UI)
 
 // ── Supabase client (lazy) ───────────────────────────────────────────────────
-// Loaded on demand from esm.sh ONLY when cloud sync is configured, so pure
-// local use never touches the network and can't be broken by a CDN hiccup.
+// Loaded on demand ONLY when cloud sync is configured, so pure local use never
+// touches the network and can't be broken by a CDN hiccup.
+//
+// We import a SINGLE-FILE BUNDLED build and try several CDNs in turn. iOS
+// Safari fails a dynamic import() with the generic "Importing a module script
+// failed" whenever any request in a module's dependency graph is slow, rate-
+// limited, or blocked — so a multi-request build from one CDN is fragile on
+// phones. jsDelivr's `+esm` and esm.sh's `?bundle` each collapse the whole
+// library into one file, and the fallback list survives one CDN being down.
+const _SUPABASE_CDNS = [
+  'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm', // jsDelivr, single bundled file
+  'https://esm.sh/@supabase/supabase-js@2?bundle',             // esm.sh, deps inlined
+  'https://esm.run/@supabase/supabase-js@2',                   // jsDelivr esm.run alias (separate edge)
+];
+async function _importSupabase(){
+  let lastErr;
+  for(const u of _SUPABASE_CDNS){
+    try {
+      const m = await import(u);
+      if(m && (m.createClient || (m.default && m.default.createClient))) return m.createClient ? m : m.default;
+      lastErr = new Error('unexpected module shape');
+    } catch(e){ lastErr = e; }
+  }
+  throw new Error('sync-library-load-failed: ' + (lastErr && (lastErr.message||lastErr) || 'unknown'));
+}
 const HZCloud = (() => {
   let _client = null, _loading = null, _url = '', _key = '';
   async function _ensure(url, key){
@@ -6734,10 +6757,11 @@ const HZCloud = (() => {
     if(_client && (url !== _url || key !== _key)){ _client = null; _loading = null; }
     _url = url; _key = key;
     if(!_loading){
-      _loading = import('https://esm.sh/@supabase/supabase-js@2')
+      _loading = _importSupabase()
         .then(m => m.createClient(url, key, {
           auth:{ persistSession:true, autoRefreshToken:true, detectSessionInUrl:true }
-        }));
+        }))
+        .catch(e => { _loading = null; throw e; }); // let a later attempt retry
     }
     _client = await _loading;
     return _client;
@@ -6790,6 +6814,8 @@ function _syncErrMsg(error){
   if(/row-level security|permission denied|not authorized|unauthorized|jwt/i.test(msg))
     return 'Not authorized — sign in again, or re-check the SQL policy in Settings.';
   if(/not signed in/i.test(msg)) return 'Sign in to sync (Settings → Cloud Sync).';
+  if(/sync-library-load-failed|importing a module script failed|dynamically imported module|error loading/i.test(msg))
+    return 'Couldn’t load the sync library from the network. Check your connection and tap Send magic link again — this is usually temporary.';
   if(/failed to fetch|networkerror|load failed/i.test(msg)) return 'Network error — will retry when you’re back online.';
   return msg || 'Sync error.';
 }
