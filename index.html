@@ -9783,7 +9783,7 @@ function buildCmdpItems(){
   items.push(
     {group:ACT, icon:'🌙', label:t('cmdp.action.theme'),       hint:'⌘⇧L', keywords:'theme dark light toggle tema mörkt ljust', action:()=>toggleTheme()},
     {group:ACT, icon:'✦',  label:t('cmdp.action.openAi'),      hint:'',    keywords:'ai advisor chat assistant rådgivare', action:()=>openAIPanel()},
-    {group:ACT, icon:'⚡', label:t('cmdp.action.cascade'),     hint:'',    keywords:'cascade yearly forecast toggle kaskad årlig prognos', action:()=>{state.cascadeEnabled=!state.cascadeEnabled;save();renderAll();}},
+    {group:ACT, icon:'⚡', label:t('cmdp.action.cascade'),     hint:'',    keywords:'cascade yearly forecast toggle kaskad årlig prognos', action:()=>{state.cascadeEnabled=!state.cascadeEnabled;syncYearCascade();renderAll();}},
     {group:ACT, icon:'✈️', label:t('cmdp.action.addTrip'),     hint:panelLabel('funfund'), keywords:'trip travel add new resa', action:()=>{state.trips.push({id:genId(),name:'New Trip',country:'',budget:50000,spent:0,date:`${CY}-06`,status:'planning',icon:'✈️'});save();nav('funfund');}},
     {group:ACT, icon:'📍', label:t('cmdp.action.addLoc'),      hint:panelLabel('retireanywhere'), keywords:'location destination city retire add plats destination stad', action:()=>{nav('retireanywhere');setTimeout(()=>{if(typeof addLocation==='function')addLocation();},300);}},
     {group:ACT, icon:'🏦', label:t('cmdp.action.connectBank'), hint:'',    keywords:'bank connect transactions demo anslut', action:()=>{if(typeof connectBankDemo==='function')connectBankDemo();}},
@@ -12897,11 +12897,22 @@ function liveSyncMonthlyReview(selKey){
 function renderYearly() {
   const yr=state.selectedYear;
   const yb=state.yearlyBases[String(yr)];
-  if(yb&&yb.cascade!==undefined) state.cascadeEnabled=yb.cascade;
 
   const sorted=Object.keys(state.yearlyBases).map(Number).sort((a,b)=>a-b);
   let cascBase=null;
   for(const y of sorted){ if(y<yr&&state.yearlyBases[String(y)]?.cascade) cascBase=state.yearlyBases[String(y)]; }
+  // The toggle reflects whether the VIEWED year is actually governed by a
+  // cascade — i.e. this year or any earlier year is a live cascade source.
+  // Deriving it (instead of trusting a leftover global flag that the old
+  // code rewrote on every render) means browsing years with ◀/▶ can't leave
+  // the switch showing the wrong position, and a year that is merely
+  // INHERITING a cascade correctly shows the switch as ON. When no year at or
+  // before this one has any cascade flag set yet, we leave the global default
+  // untouched so a fresh edit still cascades forward out of the box.
+  const _cascOn      = sorted.some(y => y<=yr && state.yearlyBases[String(y)]?.cascade===true);
+  const _cascDefined = sorted.some(y => { const b=state.yearlyBases[String(y)]; return y<=yr && b && ('cascade' in b); });
+  if(_cascOn) state.cascadeEnabled = true;
+  else if(_cascDefined) state.cascadeEnabled = false;
   const incItems=yb?.income||cascBase?.income||state.baseIncome;
   const expItems=yb?.expenses||cascBase?.expenses||state.baseExpenses;
   const sav=yb?.savings??cascBase?.savings??state.baseSavings;
@@ -13040,9 +13051,26 @@ window.setYearlySavings=function(val){
   save();
 };
 window.syncYearCascade=function(){
-  const y=String(state.selectedYear);
-  if(!state.yearlyBases[y]&&state.cascadeEnabled) state.yearlyBases[y]={cascade:true};
-  if(state.yearlyBases[y]) state.yearlyBases[y].cascade=state.cascadeEnabled;
+  const yr=state.selectedYear;
+  const y=String(yr);
+  if(state.cascadeEnabled){
+    // Turn ON: make the viewed year a cascade source so its values flow to
+    // all future years. Seed a base if this year doesn't have one yet.
+    if(!state.yearlyBases[y]) state.yearlyBases[y]={};
+    state.yearlyBases[y].cascade=true;
+  } else {
+    // Turn OFF: clear the cascade flag on every source year AT OR BEFORE the
+    // viewed year, so this year and all future years stop inheriting. This is
+    // the fix — previously "off" only wrote a value when the viewed year had
+    // its own base, so switching off from a downstream (inheriting) year was
+    // a silent no-op that left the earlier source still cascading.
+    for(const k of Object.keys(state.yearlyBases)){
+      if(Number(k)<=yr && state.yearlyBases[k] && state.yearlyBases[k].cascade){
+        state.yearlyBases[k].cascade=false;
+      }
+    }
+  }
+  save();
   renderYearly();
 };
 
