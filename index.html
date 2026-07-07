@@ -4424,7 +4424,6 @@ body.light .piq-country-menu { box-shadow:0 12px 28px -10px rgba(60,40,10,0.22);
         <button id="hzGear" class="hz-icon-btn" aria-label="Settings">⚙</button>
       </div>
     </header>
-    <div class="hz-ticker"><div class="hz-ticker-track" id="hzTicker"></div></div>
     <main class="hz-body" id="hzBody"></main>
     <nav class="hz-nav-bar" id="hzNav" role="navigation" aria-label="Primary">
       <button class="hz-nav" data-nav="dashboard"><span class="hz-nav-ic">◉</span><span class="hz-nav-lbl">Home</span></button>
@@ -22381,7 +22380,6 @@ class HZMobile {
     const t=this.data.tab;
     const prevScroll=silent?this.body.scrollTop:0;
     this.nav.querySelectorAll('[data-nav]').forEach(b=>{const map={dashboard:'dashboard',spend:'spend',forecast:'forecast',retirement:'retirement'};const on=(b.dataset.nav===map[t])||(b.dataset.nav==='__more'&&!map[t]);b.classList.toggle('active',on);});
-    this.renderTicker();
     let h='';
     if(t==='dashboard')h=this.vDash();
     else if(t==='spend')h=this.vSpend();
@@ -22405,13 +22403,6 @@ class HZMobile {
     if(t==='retireanywhere')this.initRetMap();
   }
 
-  renderTicker(){
-    const ytr=this.data.retirementAge-this.data.currentAge,ff=this.fun(),disp=this.disp();
-    const ne=this.neNominal();const dr=this.retIncome();
-    const it=[['NET WORTH',this.fmtC(this.nwTotal()),'total',true],['SURPLUS',this.fmt(disp),'net',disp>0],['FUN FUND',this.fmtC(ff),'/mo',true],['NEST EGG',this.fmtC(ne),'proj',true],['RETIRE INCOME',this.fmtC(dr),'/mo',true],['YTR',ytr+'Y','age '+this.data.retirementAge,true]];
-    const one=it.map(i=>`<div style="display:inline-flex;align-items:center;gap:5px;padding:0 13px;height:28px;border-right:1px solid var(--border);font-family:var(--fm);font-size:10px"><span style="color:var(--text);font-weight:600">${i[0]}</span><span style="color:var(--text2)">${i[1]}</span><span style="padding:1px 5px;border-radius:3px;font-size:9px;font-weight:700;background:${i[3]?'var(--sage-bg)':'var(--rose-bg)'};color:${i[3]?'var(--sage-tx)':'var(--rose-tx)'}">${i[2]}</span></div>`).join('');
-    const el=document.getElementById('hzTicker');if(el)el.innerHTML=one+one;
-  }
 
   // ══════ DASHBOARD ══════
   vDash(){
