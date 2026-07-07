@@ -6055,7 +6055,7 @@ function defaultState() {
     // DEVICE-LOCAL and is deliberately EXCLUDED from the synced payload —
     // it holds the project credentials, the signed-in email, and per-device
     // reconciliation stamps. Everything else syncs; identity is handled by
-    // Supabase Auth (email magic link), so no secret is embedded here.
+    // Supabase Auth (email + password), so no secret is embedded here.
     sync:{
       enabled:false,      // has the user connected a Supabase project?
       url:'',             // https://<project>.supabase.co
@@ -6708,11 +6708,11 @@ function showSave() {}
 // an offline cache and first-paint source — nothing here changes how the app
 // works when cloud sync is switched off.
 //
-// Identity is handled by Supabase Auth (email magic link), which replaces the
-// old anon-key + passphrase + link-code scheme: "sign in with the same email
+// Identity is handled by Supabase Auth (email + password), which replaces the
+// old anon-key + passphrase + link-code scheme: "sign in with the same account
 // on both devices" is all it takes to share one dataset. supabase-js persists
-// and refreshes the session in localStorage and parses the magic-link redirect
-// on load, so a device stays signed in across reloads.
+// and refreshes the session in localStorage, so a device stays signed in across
+// reloads.
 //
 // Reconciliation is timestamp-based with an explicit conflict prompt so
 // financial data is never silently clobbered:
@@ -6753,12 +6753,17 @@ const HZCloud = (() => {
       catch(_){ return null; }
     },
     async user(){ const sess = await this.session(); return sess ? sess.user : null; },
-    async signInWithOtp(email){
+    async signInWithPassword(email, password){
       const c = await this.client();
-      const redirect = location.origin + location.pathname;
-      const { error } = await c.auth.signInWithOtp({ email, options:{ emailRedirectTo: redirect } });
-      if(error) throw new Error(error.message || 'Could not send the magic link.');
+      const { error } = await c.auth.signInWithPassword({ email, password });
+      if(error) throw new Error(error.message || 'Could not sign in.');
       return true;
+    },
+    async signUp(email, password){
+      const c = await this.client();
+      const { data, error } = await c.auth.signUp({ email, password });
+      if(error) throw new Error(error.message || 'Could not create the account.');
+      return data;
     },
     async signOut(){ try { const c = await this.client(); await c.auth.signOut(); } catch(_){} },
     async onAuth(cb){ const c = await this.client(); c.auth.onAuthStateChange((event, sess) => cb(event, sess)); },
@@ -6787,6 +6792,14 @@ function _syncErrMsg(error){
   const msg = String((error && (error.message || error.hint || error.details)) || error || '');
   if(/relation .*app_state.* does not exist|could not find the table|schema cache/i.test(msg))
     return 'Table not found — run the one-time SQL setup shown in Settings.';
+  if(/invalid login credentials/i.test(msg))
+    return 'Wrong email or password. If you’re new, tap “Create an account”.';
+  if(/user already registered|already been registered/i.test(msg))
+    return 'That email already has an account — switch to “Sign in”.';
+  if(/email not confirmed/i.test(msg))
+    return 'Email not confirmed yet — check your inbox for the confirmation link.';
+  if(/password should be at least|weak password/i.test(msg))
+    return 'Password is too weak — use at least 6 characters.';
   if(/row-level security|permission denied|not authorized|unauthorized|jwt/i.test(msg))
     return 'Not authorized — sign in again, or re-check the SQL policy in Settings.';
   if(/not signed in/i.test(msg)) return 'Sign in to sync (Settings → Cloud Sync).';
@@ -6963,32 +6976,55 @@ async function syncBootstrap(){
 
 // ── Sign-in gate ──────────────────────────────────────────────────────────
 // Shown only when cloud sync is configured but no one is signed in. Blocks the
-// app behind a magic-link sign-in. Includes an escape hatch (disconnect) so a
-// bad config can never lock the user out of their own data.
+// app behind an email + password sign-in. Includes an escape hatch (disconnect)
+// so a bad config can never lock the user out of their own data.
 function _syncShowGate(){
   if(document.getElementById('sync-auth-ov')) return;
   const email = (state.sync && state.sync.email) || '';
+  const inputStyle = 'width:100%;padding:11px 12px;border-radius:9px;border:1px solid var(--border,#1a2640);background:var(--bg3,#0a1120);color:var(--text,#e4ecf7);font-size:14px;margin-bottom:10px';
   const ov = document.createElement('div');
   ov.id = 'sync-auth-ov';
   ov.style.cssText = 'position:fixed;inset:0;z-index:9998;background:var(--bg,#060a14);display:flex;align-items:center;justify-content:center;padding:20px';
   ov.innerHTML = `
     <div style="background:var(--bg2,#0d1526);border:1px solid var(--border,#1a2640);border-radius:14px;max-width:420px;width:100%;padding:26px 26px;box-shadow:0 20px 60px rgba(0,0,0,.5)">
-      <div style="font-size:18px;font-weight:800;color:var(--text,#e4ecf7);margin-bottom:6px">☁️ Sign in to sync</div>
+      <div id="sync-auth-title" style="font-size:18px;font-weight:800;color:var(--text,#e4ecf7);margin-bottom:6px">☁️ Sign in to sync</div>
       <p style="font-size:13px;color:var(--text2,#9fb0cc);line-height:1.5;margin:0 0 16px">
-        Enter your email and we'll send a one-tap sign-in link. Use the <b>same email</b> on every device to share your data.
+        Sign in with your email and password. Use the <b>same account</b> on every device to share your data.
       </p>
       <input id="sync-auth-email" type="email" inputmode="email" autocapitalize="none" autocorrect="off" autocomplete="email" spellcheck="false"
              value="${esc(email)}" placeholder="you@example.com"
-             style="width:100%;padding:11px 12px;border-radius:9px;border:1px solid var(--border,#1a2640);background:var(--bg3,#0a1120);color:var(--text,#e4ecf7);font-size:14px;margin-bottom:10px"
-             onkeydown="if(event.key==='Enter')syncSendMagicLink('sync-auth-email')">
-      <button id="sync-auth-send" class="btn btn-g" style="width:100%" onclick="syncSendMagicLink('sync-auth-email')">Send magic link</button>
+             style="${inputStyle}"
+             onkeydown="if(event.key==='Enter')document.getElementById('sync-auth-pass').focus()">
+      <input id="sync-auth-pass" type="password" autocapitalize="none" autocorrect="off" autocomplete="current-password" spellcheck="false"
+             placeholder="Password"
+             style="${inputStyle}"
+             onkeydown="if(event.key==='Enter')syncAuthSubmit('sync-auth-email','sync-auth-pass')">
+      <button id="sync-auth-send" class="btn btn-g" style="width:100%" onclick="syncAuthSubmit('sync-auth-email','sync-auth-pass')">Sign in</button>
       <p id="sync-auth-note" style="font-size:12px;color:var(--text3,#7a8fb0);line-height:1.5;margin:12px 0 0"></p>
-      <div style="border-top:1px solid var(--border,#1a2640);margin-top:16px;padding-top:12px;text-align:center">
+      <div style="text-align:center;margin-top:12px">
+        <button class="btn" style="background:transparent;color:var(--accent,#5b9dff);font-size:12px" onclick="syncAuthToggleMode()">
+          <span id="sync-auth-toggle">New here? Create an account</span>
+        </button>
+      </div>
+      <div style="border-top:1px solid var(--border,#1a2640);margin-top:8px;padding-top:12px;text-align:center">
         <button class="btn" style="background:transparent;color:var(--text3,#7a8fb0);font-size:12px" onclick="syncDisconnect()">Use this device offline (disconnect)</button>
       </div>
     </div>`;
   document.body.appendChild(ov);
 }
+// Sign-in vs. create-account is a single form with a toggled mode. Default is
+// sign-in; the toggle flips button/title/note copy and the autocomplete hint.
+let _syncAuthMode = 'signin';
+window.syncAuthToggleMode = function(){
+  _syncAuthMode = (_syncAuthMode === 'signin') ? 'signup' : 'signin';
+  const signup = _syncAuthMode === 'signup';
+  const set = (id, fn) => { const el = document.getElementById(id); if(el) fn(el); };
+  set('sync-auth-title', el => el.textContent = signup ? '☁️ Create your account' : '☁️ Sign in to sync');
+  set('sync-auth-send',  el => el.textContent = signup ? 'Create account' : 'Sign in');
+  set('sync-auth-toggle', el => el.textContent = signup ? 'Already have an account? Sign in' : 'New here? Create an account');
+  set('sync-auth-pass',  el => el.setAttribute('autocomplete', signup ? 'new-password' : 'current-password'));
+  set('sync-auth-note',  el => el.innerHTML = '');
+};
 function _syncHideGate(){ const ov=document.getElementById('sync-auth-ov'); if(ov) ov.remove(); }
 
 // Minimal, dependency-free conflict chooser. Injected on demand.
@@ -7045,26 +7081,48 @@ window.syncConnect = async function(){
   _syncRefreshUI();
 };
 
-// Send the magic link. `fieldId` is the input to read the address from (the
-// gate and the Settings card use different ids).
-window.syncSendMagicLink = async function(fieldId){
-  const el = document.getElementById(fieldId || 'sync-auth-email');
-  const email = (el && el.value ? el.value : (state.sync.email||'')).trim();
-  if(!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)){ alert('Enter a valid email address.'); return; }
+// Email + password sign-in / sign-up. `emailId`/`passId` are the inputs to read
+// from (the gate and the Settings card use different ids). `mode` overrides the
+// toggled default (the Settings card passes it explicitly via its two buttons).
+// On success, Supabase fires onAuthStateChange(SIGNED_IN), which hides the gate
+// and pulls — so this handler only needs to surface errors and confirmations.
+window.syncAuthSubmit = async function(emailId, passId, mode){
+  const eEl = document.getElementById(emailId || 'sync-auth-email');
+  const pEl = document.getElementById(passId || 'sync-auth-pass');
+  const email = (eEl && eEl.value ? eEl.value : (state.sync.email||'')).trim();
+  const password = (pEl && pEl.value) || '';
+  const m = mode || _syncAuthMode || 'signin';
+  const note = document.getElementById('sync-auth-note');
+  const fail = (msg) => { if(note) note.innerHTML = '<span style="color:var(--red,#e5484d)">⚠ ' + esc2(msg) + '</span>'; else alert(msg); };
+  if(!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)){ fail('Enter a valid email address.'); return; }
+  if(password.length < 6){ fail('Password must be at least 6 characters.'); return; }
   state.sync.email = email; _syncPersist();
   const btn = document.getElementById('sync-auth-send');
-  if(btn){ btn.disabled = true; btn.textContent = 'Sending…'; }
+  const orig = btn ? btn.textContent : '';
+  if(btn){ btn.disabled = true; btn.textContent = (m === 'signup') ? 'Creating…' : 'Signing in…'; }
+  if(note) note.innerHTML = '';
   try {
-    await HZCloud.signInWithOtp(email);
-    const note = document.getElementById('sync-auth-note');
-    if(note) note.innerHTML = '✓ Check your email and tap the sign-in link <b>on this device</b> to finish. The link brings you back here.';
-    else alert('Check your email and tap the sign-in link on this device to finish.');
+    if(m === 'signup'){
+      await HZCloud.signUp(email, password);
+      // If "Confirm email" is ON in Supabase, signUp does NOT create a session —
+      // the user must confirm by email first. If it's OFF (the recommended
+      // setup), a session exists immediately and onAuthStateChange takes over.
+      const sess = await HZCloud.session();
+      if(!sess){
+        if(note) note.innerHTML = '✓ Account created. Check your email to confirm, then come back and sign in.';
+        else alert('Account created. Check your email to confirm, then sign in.');
+        if(btn){ btn.disabled = false; btn.textContent = orig; }
+        return;
+      }
+    } else {
+      await HZCloud.signInWithPassword(email, password);
+    }
+    // Signed in — the auth listener hides the gate and pulls. Leave the button
+    // in its "…" state; the overlay is about to be removed.
   } catch(e){
-    const m = _syncErrMsg(e);
-    const note = document.getElementById('sync-auth-note');
-    if(note) note.innerHTML = '<span style="color:var(--red,#e5484d)">⚠ ' + esc2(m) + '</span>';
-    else alert('Could not send the magic link:\n\n' + m);
-  } finally { if(btn){ btn.disabled = false; btn.textContent = 'Send magic link'; } }
+    fail(_syncErrMsg(e));
+    if(btn){ btn.disabled = false; btn.textContent = orig; }
+  }
 };
 
 window.syncSignOut = async function(){
@@ -16791,8 +16849,7 @@ function renderSyncCard(){
       <div style="font-size:12px;color:var(--text2);line-height:1.6;margin-top:8px">
         <ol style="margin:0 0 8px 18px;padding:0">
           <li>Create a free project at <b>supabase.com</b>.</li>
-          <li><b>Authentication → Providers → Email</b>: make sure it's enabled (magic link is on by default).</li>
-          <li><b>Authentication → URL Configuration</b>: set this app's address as the <b>Site URL</b> and add it under <b>Redirect URLs</b>.</li>
+          <li><b>Authentication → Providers → Email</b>: make sure it's enabled, and turn <b>OFF “Confirm email”</b> so you can sign in with just an email + password (no confirmation email needed).</li>
           <li>Open <b>SQL Editor</b> → run this once:</li>
         </ol>
         <pre style="background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:10px;overflow:auto;font-family:var(--fm);font-size:11px;white-space:pre;margin:0 0 8px">${esc(sql)}</pre>
@@ -16819,15 +16876,21 @@ function renderSyncCard(){
   let host=''; try{ host=new URL(s.url).host; }catch(_){ host=s.url; }
   const last = s.lastSyncAt ? new Date(s.lastSyncAt).toLocaleString(state.lang==='sv'?'sv-SE':undefined) : '';
 
-  // 2) Configured but not signed in — magic-link sign-in.
+  // 2) Configured but not signed in — email + password sign-in.
   if(!_syncUser){
     return `
     <div class="card" id="set-sync-section">
       <div class="card-title">☁️ Cloud Sync <span style="background:var(--bg3);color:var(--text3);border:1px solid var(--border);font-size:9px;padding:2px 7px;border-radius:4px;font-family:var(--fm);font-weight:700;letter-spacing:.06em;margin-left:6px">SIGN IN</span></div>
       <div style="font-size:12px;color:var(--text2);margin-bottom:12px">Project <b style="font-family:var(--fm)">${esc(host)}</b></div>
-      <div class="field"><label>Email <span style="font-size:10px;color:var(--text3)">(use the same one on every device)</span></label>
+      <div class="field"><label>Email <span style="font-size:10px;color:var(--text3)">(use the same account on every device)</span></label>
         <input id="sync-auth-email-set" type="email" inputmode="email" ${RAW} value="${esc(s.email||'')}" placeholder="you@example.com" oninput="syncField('email',this.value)"></div>
-      <button id="sync-auth-send" class="btn btn-g" onclick="syncSendMagicLink('sync-auth-email-set')">Send magic link</button>
+      <div class="field"><label>Password</label>
+        <input id="sync-auth-pass-set" type="password" ${RAW} autocomplete="current-password" placeholder="Password"
+               onkeydown="if(event.key==='Enter')syncAuthSubmit('sync-auth-email-set','sync-auth-pass-set','signin')"></div>
+      <div style="display:flex;gap:8px">
+        <button id="sync-auth-send" class="btn btn-g" style="flex:1" onclick="syncAuthSubmit('sync-auth-email-set','sync-auth-pass-set','signin')">Sign in</button>
+        <button class="btn btn-o" style="flex:1" onclick="syncAuthSubmit('sync-auth-email-set','sync-auth-pass-set','signup')">Create account</button>
+      </div>
       <p id="sync-auth-note" style="font-size:11px;color:var(--text3);line-height:1.5;margin:10px 0 0">${s.lastError?`<span style="color:var(--red)">⚠ ${esc2(s.lastError)}</span>`:''}</p>
       <details style="margin-top:12px"><summary style="cursor:pointer;font-size:12px;color:var(--text3)">Edit connection / disconnect</summary>
         <div style="margin-top:8px">
