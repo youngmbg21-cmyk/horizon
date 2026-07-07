@@ -3761,11 +3761,107 @@ body.light .geo-dropdown { box-shadow:0 10px 30px -10px rgba(60,40,10,0.22); }
   .dash-welcome-cta .btn { width:100%; justify-content:center; }
 }
 @media(max-width:640px) {
-  /* Phone topbar: hamburger + mark + the working toggles, one row. */
+  /* Phone topbar: mark + the working toggles, one clean row. */
   .logo-text { display:none; }
   .topbar { padding:0 12px; gap:6px; }
   .topbar-right { gap:6px; flex-wrap:nowrap; overflow-x:auto; scrollbar-width:none; }
   .topbar-right::-webkit-scrollbar { display:none; }
+}
+
+/* ══════════════════════════════════════════════════════
+   MOBILE APP SHELL — bottom tab bar · More sheet · AI FAB
+   Phone-only (≤640px). Reuses every existing panel and nav();
+   desktop is entirely untouched. Mirrors horizon-mobile-spec §5.
+   ══════════════════════════════════════════════════════ */
+:root { --mtab-h:60px; }
+.mtab, .m-sheet, .m-sheet-backdrop, .ai-fab { display:none; }
+
+@media (max-width:640px){
+  /* Scrolling content clears the fixed tab bar + the phone's home bar. */
+  .content { padding-bottom: calc(var(--mtab-h) + env(safe-area-inset-bottom, 0px)); }
+  /* The bottom tab bar replaces the hamburger drawer entirely on phones. */
+  .nav-burger { display:none !important; }
+
+  /* ── Bottom tab bar ──────────────────────────────────── */
+  .mtab {
+    display:flex; position:fixed; left:0; right:0; bottom:0; z-index:900;
+    height: calc(var(--mtab-h) + env(safe-area-inset-bottom, 0px));
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+    background: color-mix(in srgb, var(--bg2) 86%, transparent);
+    -webkit-backdrop-filter: saturate(1.4) blur(18px);
+    backdrop-filter: saturate(1.4) blur(18px);
+    border-top:1px solid var(--border);
+  }
+  .mtab-item {
+    flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center;
+    gap:3px; background:none; border:none; cursor:pointer; padding:8px 2px 6px;
+    color:var(--text3); font-family:var(--ff); position:relative;
+    -webkit-tap-highlight-color:transparent; transition:color .15s;
+  }
+  .mtab-ic { font-size:19px; line-height:1; filter:grayscale(1) opacity(.75);
+    transition:transform .18s cubic-bezier(.2,.7,.2,1), filter .18s; }
+  .mtab-lbl { font-size:10px; font-weight:600; letter-spacing:.02em; }
+  .mtab-item.active { color:var(--green); }
+  .mtab-item.active .mtab-ic { filter:none; transform:translateY(-1px); }
+  .mtab-item.active::before {
+    content:''; position:absolute; top:0; left:50%; transform:translateX(-50%);
+    width:26px; height:2.5px; border-radius:0 0 3px 3px;
+    background:var(--green); box-shadow:0 0 10px var(--green);
+  }
+  .mtab-item:active .mtab-ic { transform:scale(.88); }
+
+  /* ── AI floating action button (✦) ───────────────────── */
+  .ai-fab {
+    display:flex; position:fixed; z-index:905; right:16px;
+    bottom: calc(var(--mtab-h) + 16px + env(safe-area-inset-bottom, 0px));
+    width:52px; height:52px; border-radius:50%; border:none; cursor:pointer;
+    align-items:center; justify-content:center; font-size:22px; color:#04141b;
+    background: linear-gradient(145deg, #35e6d0, #00c2e0);
+    box-shadow: 0 6px 22px -4px rgba(0,208,255,.5), 0 2px 8px rgba(0,0,0,.35);
+    -webkit-tap-highlight-color:transparent; transition:transform .15s;
+  }
+  .ai-fab:active { transform:scale(.9); }
+  /* The topbar AI trigger AND the legacy desktop chat FAB are both redundant
+     on phones — the new ✦ FAB (above the tab bar) owns the AI entry point. */
+  .topbar .iBtn.ai-top { display:none; }
+  #ai-fab { display:none !important; }
+  /* Keep the minimized-AI tab clear of the bottom tab bar. */
+  #ai-min-tab { bottom: calc(var(--mtab-h) + env(safe-area-inset-bottom, 0px)) !important; }
+
+  /* ── More bottom sheet ───────────────────────────────── */
+  .m-sheet-backdrop {
+    display:block; position:fixed; inset:0; z-index:950; background:rgba(3,6,14,.55);
+    opacity:0; pointer-events:none; transition:opacity .22s;
+  }
+  body.light .m-sheet-backdrop { background:rgba(31,25,10,.4); }
+  .m-sheet-backdrop.open { opacity:1; pointer-events:auto; }
+  .m-sheet {
+    display:block; position:fixed; left:0; right:0; bottom:0; z-index:951;
+    background:var(--bg1); border-top:1px solid var(--border);
+    border-radius:22px 22px 0 0; max-height:82vh; overflow-y:auto;
+    padding:10px 18px calc(20px + env(safe-area-inset-bottom, 0px));
+    transform:translateY(101%); transition:transform .26s cubic-bezier(.2,.7,.2,1);
+    box-shadow:0 -12px 44px rgba(0,0,0,.45);
+  }
+  .m-sheet.open { transform:none; }
+  .m-sheet-handle { width:40px; height:4px; border-radius:999px; background:var(--border2); margin:4px auto 14px; }
+  .m-sheet-title { font-family:var(--fs); font-size:20px; font-weight:600; letter-spacing:-.01em; margin:0 0 3px; color:var(--text); }
+  .m-sheet-sub { font-size:12.5px; color:var(--text2); margin:0 0 12px; }
+  .m-grp-label { font-size:10px; font-weight:700; letter-spacing:.11em; text-transform:uppercase; color:var(--clay-tx); margin:16px 2px 8px; }
+  .m-grp:first-of-type .m-grp-label { margin-top:6px; }
+  .m-link {
+    display:flex; align-items:center; gap:13px; width:100%; text-align:left;
+    background:var(--bg2); border:1px solid var(--border); border-radius:12px;
+    padding:0 14px; margin-bottom:8px; cursor:pointer; color:var(--text);
+    font-family:var(--ff); font-size:14.5px; font-weight:500; min-height:50px;
+    -webkit-tap-highlight-color:transparent; transition:border-color .15s, background .15s;
+  }
+  .m-link:active { background:var(--bg3); }
+  .m-link.active { border-color:var(--green); box-shadow:0 0 0 1px var(--green) inset; }
+  .m-link-ic { font-size:18px; width:24px; text-align:center; flex:none; }
+  @media (prefers-reduced-motion: reduce) {
+    .mtab-ic, .ai-fab, .m-sheet, .m-sheet-backdrop { transition:none; }
+  }
 }
 
 /* ══════════════════════════════════════════════════════
@@ -3999,7 +4095,7 @@ body.light .piq-country-menu { box-shadow:0 12px 28px -10px rgba(60,40,10,0.22);
            lockstep. Rebuilt by syncDisplayModeToggle() on every render. -->
       <div class="mode-toggle" id="mode-toggle" role="group" aria-label="Money display mode"></div>
       <button class="iBtn" id="theme-btn" onclick="toggleTheme()" title="Toggle theme" data-i18n-title="topbar.theme">☀</button>
-      <button class="iBtn" onclick="toggleAIPanel()" title="AI Advisor" data-i18n-title="topbar.ai">✦</button>
+      <button class="iBtn ai-top" onclick="toggleAIPanel()" title="AI Advisor" data-i18n-title="topbar.ai">✦</button>
     </div>
   </div>
 
@@ -4067,6 +4163,47 @@ body.light .piq-country-menu { box-shadow:0 12px 28px -10px rgba(60,40,10,0.22);
     </div>
   </div>
 </div>
+
+<!-- ══════════════════════════════════════
+     MOBILE SHELL — bottom tab bar · AI FAB · More sheet
+     Phone-only (shown/hidden purely via CSS ≤640px). Reuses every
+     existing panel + nav(); see horizon-mobile-spec §5.
+══════════════════════════════════════ -->
+<nav class="mtab" id="mtab" role="navigation" aria-label="Primary">
+  <button class="mtab-item" data-mtab="dashboard"    onclick="mobileTab('dashboard')"    aria-label="Home"><span class="mtab-ic">◉</span><span class="mtab-lbl">Home</span></button>
+  <button class="mtab-item" data-mtab="transactions" onclick="mobileTab('transactions')" aria-label="Spend"><span class="mtab-ic">🏦</span><span class="mtab-lbl">Spend</span></button>
+  <button class="mtab-item" data-mtab="review"       onclick="mobileTab('review')"       aria-label="Budget"><span class="mtab-ic">▦</span><span class="mtab-lbl">Budget</span></button>
+  <button class="mtab-item" data-mtab="retirement"   onclick="mobileTab('retirement')"   aria-label="Retire"><span class="mtab-ic">🌅</span><span class="mtab-lbl">Retire</span></button>
+  <button class="mtab-item" data-mtab="__more"       onclick="mobileMore(true)"          aria-label="More"><span class="mtab-ic">⋯</span><span class="mtab-lbl">More</span></button>
+</nav>
+
+<button class="ai-fab" id="m-ai-fab" onclick="toggleAIPanel()" aria-label="Horizon AI Advisor">✦</button>
+
+<div class="m-sheet-backdrop" id="m-sheet-backdrop" onclick="mobileMore(false)"></div>
+<aside class="m-sheet" id="m-sheet" role="dialog" aria-modal="true" aria-label="More">
+  <div class="m-sheet-handle"></div>
+  <div class="m-sheet-title">More</div>
+  <div class="m-sheet-sub">Everything else in Horizon</div>
+  <div class="m-grp">
+    <div class="m-grp-label">Overview</div>
+    <button class="m-link" data-mlink="lifewall" onclick="mobileGo('lifewall')"><span class="m-link-ic">🧱</span>Life Wall</button>
+  </div>
+  <div class="m-grp">
+    <div class="m-grp-label">Planning</div>
+    <button class="m-link" data-mlink="funfund" onclick="mobileGo('funfund')"><span class="m-link-ic">✦</span>Fun Fund</button>
+    <button class="m-link" data-mlink="retireanywhere" onclick="mobileGo('retireanywhere')"><span class="m-link-ic">🌍</span>Retire Anywhere</button>
+    <button class="m-link" data-mlink="propiq" onclick="mobileGo('propiq')"><span class="m-link-ic">🏠</span>Property IQ</button>
+  </div>
+  <div class="m-grp">
+    <div class="m-grp-label">Library</div>
+    <button class="m-link" data-mlink="journal" onclick="mobileGo('journal')"><span class="m-link-ic">📓</span>Journal</button>
+    <button class="m-link" data-mlink="vault" onclick="mobileGo('vault')"><span class="m-link-ic">🗄</span>Vault</button>
+  </div>
+  <div class="m-grp">
+    <div class="m-grp-label">System</div>
+    <button class="m-link" data-mlink="settings" onclick="mobileGo('settings')"><span class="m-link-ic">⚙</span>Settings</button>
+  </div>
+</aside>
 
 <!-- AI Panel minimize tab (shown when minimized) -->
 <div id="ai-min-tab" onclick="aiUnminimize()">
@@ -9313,6 +9450,7 @@ function nav(panel, opts) {
   if(p) p.classList.add('active');
   const n=document.querySelector(`.nav-item[data-panel="${panel}"]`);
   if(n) n.classList.add('active');
+  if(typeof mobileNavSync==='function') mobileNavSync();
   renderPanel(panel);
   // Post-render chrome (breadcrumb + related-row)
   if(typeof decoratePanel==='function') decoratePanel(panel);
@@ -9341,6 +9479,44 @@ function pulseSection(section){
   el.classList.add('section-pulse');
   setTimeout(()=>el.classList.remove('section-pulse'), 1400);
 }
+
+// ─── MOBILE SHELL (bottom tab bar + More sheet) ─────────────────────────────
+// Phone-only chrome. The 5 primary tabs map to existing panels; every other
+// panel lives behind "More". Nothing here runs on desktop (the elements are
+// display:none above 640px), and it drives the same nav() as the sidebar so
+// routing, hashes, and rendering stay identical across form factors.
+const MTAB_PANELS = ['dashboard','transactions','review','retirement'];
+window.mobileTab = function(panel){ mobileMore(false); nav(panel); };
+window.mobileGo  = function(panel){ mobileMore(false); nav(panel); };
+window.mobileMore = function(open){
+  const sh = document.getElementById('m-sheet');
+  const bd = document.getElementById('m-sheet-backdrop');
+  if(!sh || !bd) return;
+  const willOpen = (typeof open === 'boolean') ? open : !sh.classList.contains('open');
+  sh.classList.toggle('open', willOpen);
+  bd.classList.toggle('open', willOpen);
+  // Lock the underlying page from scrolling while the sheet is up.
+  document.body.style.overflow = willOpen ? 'hidden' : '';
+};
+// Reflect the active panel in the tab bar + More list. Called from nav().
+function mobileNavSync(){
+  const p = (state && state.activePanel) || 'dashboard';
+  document.querySelectorAll('.mtab-item').forEach(el => {
+    const t = el.getAttribute('data-mtab');
+    const on = (t === '__more') ? !MTAB_PANELS.includes(p) : (t === p);
+    el.classList.toggle('active', on);
+  });
+  document.querySelectorAll('.m-link').forEach(el => {
+    el.classList.toggle('active', el.getAttribute('data-mlink') === p);
+  });
+}
+// Esc closes the More sheet (hardware keyboards / accessibility).
+document.addEventListener('keydown', (e) => {
+  if(e.key === 'Escape'){
+    const sh = document.getElementById('m-sheet');
+    if(sh && sh.classList.contains('open')) mobileMore(false);
+  }
+});
 // ─── DIRTY TRACKING (sidebar nav dots) ──────────────────────────────────────
 // When state changes while the user is on panel X, mark every other panel
 // as "dirty" so the sidebar surfaces that something downstream has shifted.
@@ -10019,6 +10195,7 @@ function renderAll() {
   document.querySelectorAll('.nav-item').forEach(n => {
     n.classList.toggle('active', n.getAttribute('data-panel') === panel);
   });
+  if(typeof mobileNavSync==='function') mobileNavSync();
   renderPanel(panel);
   // Decorate the panel with breadcrumb + related-row, and refresh the
   // topbar scope chip + AI chips so they always reflect the active panel.
