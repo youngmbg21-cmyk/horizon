@@ -4236,7 +4236,11 @@ body.light .piq-country-menu { box-shadow:0 12px 28px -10px rgba(60,40,10,0.22);
 ════════════════════════════════════════════════════════════════════ -->
 <style id="hz-mobile-styles">
 /* Hidden by default; the shell only exists on phones. */
-#hzApp { display:none; }
+/* Lock text sizing so iOS/WebKit does NOT auto-inflate ("boost") font sizes
+   when the phone is rotated to landscape — otherwise the enlarged text
+   persists after rotating back to portrait, making the whole app look bigger.
+   Inherited, so it covers every element inside the mobile shell. */
+#hzApp { display:none; -webkit-text-size-adjust:100%; text-size-adjust:100%; }
 #hzApp .hz-x::-webkit-scrollbar, #hzApp .hz-sb::-webkit-scrollbar,
 #hzApp .hz-body::-webkit-scrollbar { width:0; height:0; display:none; }
 #hzApp .hz-x, #hzApp .hz-sb, #hzApp .hz-body { scrollbar-width:none; }
@@ -4246,6 +4250,9 @@ body.light .piq-country-menu { box-shadow:0 12px 28px -10px rgba(60,40,10,0.22);
    landscape — where the width exceeds 720px but the height stays small on a
    touch device — instead of falling back to the desktop layout. */
 @media (max-width:720px), (max-height:500px) and (pointer:coarse){
+  /* Root-level text-size lock (in addition to #hzApp) so WebKit's landscape
+     font-boosting is disabled no matter which element it keys off. */
+  html { -webkit-text-size-adjust:100%; text-size-adjust:100%; }
   /* The desktop app is fully replaced on phones. */
   body > .app { display:none !important; }
   /* Stray desktop overlays that would float over the phone shell. */
