@@ -2,7 +2,15 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<!-- Mobile / installed-PWA chrome: dark status bar, standalone feel, and
+     safe-area support (paired with env(safe-area-inset-*) in the phone shell). -->
+<meta name="theme-color" content="#05080f" media="(prefers-color-scheme: dark)">
+<meta name="theme-color" content="#F0EBE1" media="(prefers-color-scheme: light)">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Horizon">
 <title>HORIZON FINANCE OS</title>
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700&family=JetBrains+Mono:wght@400;500&family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,600;1,9..144,400&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"/>
@@ -4215,46 +4223,191 @@ body.light .piq-country-menu { box-shadow:0 12px 28px -10px rgba(60,40,10,0.22);
   </div>
 </div>
 
-<!-- ══════════════════════════════════════
-     MOBILE SHELL — bottom tab bar · AI FAB · More sheet
-     Phone-only (shown/hidden purely via CSS ≤640px). Reuses every
-     existing panel + nav(); see horizon-mobile-spec §5.
-══════════════════════════════════════ -->
-<nav class="mtab" id="mtab" role="navigation" aria-label="Primary">
-  <button class="mtab-item" data-mtab="dashboard"    onclick="mobileTab('dashboard')"    aria-label="Home"><span class="mtab-ic">◉</span><span class="mtab-lbl">Home</span></button>
-  <button class="mtab-item" data-mtab="transactions" onclick="mobileTab('transactions')" aria-label="Spend"><span class="mtab-ic">🏦</span><span class="mtab-lbl">Spend</span></button>
-  <button class="mtab-item" data-mtab="review"       onclick="mobileTab('review')"       aria-label="Budget"><span class="mtab-ic">▦</span><span class="mtab-lbl">Budget</span></button>
-  <button class="mtab-item" data-mtab="retirement"   onclick="mobileTab('retirement')"   aria-label="Retire"><span class="mtab-ic">🌅</span><span class="mtab-lbl">Retire</span></button>
-  <button class="mtab-item" data-mtab="__more"       onclick="mobileMore(true)"          aria-label="More"><span class="mtab-ic">⋯</span><span class="mtab-lbl">More</span></button>
-</nav>
+<!-- ══════════════════════════════════════════════════════════════════
+     HORIZON MOBILE — self-contained phone shell (≤720px)
+     A bespoke, thumb-first rendering of all 11 screens, mounted only on
+     phones. It hides the desktop `.app` entirely and drives its own
+     bottom-tab navigation, seeded from + persisted to the same `state`
+     object (so data is shared with desktop and cloud sync). Ported from
+     the mobile design handoff; see HZMobile in the script below.
+════════════════════════════════════════════════════════════════════ -->
+<style id="hz-mobile-styles">
+/* Hidden by default; the shell only exists on phones. */
+#hzApp { display:none; }
+#hzApp .hz-x::-webkit-scrollbar, #hzApp .hz-sb::-webkit-scrollbar,
+#hzApp .hz-body::-webkit-scrollbar { width:0; height:0; display:none; }
+#hzApp .hz-x, #hzApp .hz-sb, #hzApp .hz-body { scrollbar-width:none; }
 
-<button class="ai-fab" id="m-ai-fab" onclick="toggleAIPanel()" aria-label="Horizon AI Advisor">✦</button>
+@media (max-width:720px){
+  /* The desktop app is fully replaced on phones. */
+  body > .app { display:none !important; }
+  /* Stray desktop overlays that would float over the phone shell. */
+  #ai-fab, #ai-min-tab { display:none !important; }
 
-<div class="m-sheet-backdrop" id="m-sheet-backdrop" onclick="mobileMore(false)"></div>
-<aside class="m-sheet" id="m-sheet" role="dialog" aria-modal="true" aria-label="More">
-  <div class="m-sheet-handle"></div>
-  <div class="m-sheet-title">More</div>
-  <div class="m-sheet-sub">Everything else in Horizon</div>
-  <div class="m-grp">
-    <div class="m-grp-label">Overview</div>
-    <button class="m-link" data-mlink="lifewall" onclick="mobileGo('lifewall')"><span class="m-link-ic">🧱</span>Life Wall</button>
+  #hzApp {
+    display:block; position:fixed; inset:0; z-index:500;
+    background:var(--bg0); color:var(--text);
+    font-family:'DM Sans',sans-serif;
+  }
+  .hz-root {
+    position:absolute; inset:0; display:flex; flex-direction:column;
+    overflow:hidden; background:var(--bg0);
+  }
+  /* Top bar — sits below the device status bar / notch. */
+  .hz-topbar {
+    flex-shrink:0; display:flex; align-items:center; gap:9px;
+    padding:calc(env(safe-area-inset-top, 0px) + 10px) 16px 9px;
+  }
+  .hz-logo { display:flex; align-items:center; gap:9px; }
+  .hz-logo-mark {
+    width:29px; height:29px; border-radius:7px; flex-shrink:0;
+    background:linear-gradient(135deg,var(--green),var(--cyan));
+    display:flex; align-items:center; justify-content:center;
+    font-size:13px; font-weight:800; color:#04120c;
+  }
+  .hz-logo-text { line-height:1; }
+  .hz-logo-text b { display:block; font-size:14px; font-weight:800; letter-spacing:.03em; color:var(--text); }
+  .hz-logo-text span { display:block; font-size:8px; font-weight:700; letter-spacing:.14em; color:var(--amber); margin-top:1px; }
+  .hz-topbar-actions { margin-left:auto; display:flex; align-items:center; gap:6px; }
+  .hz-icon-btn {
+    width:32px; height:32px; border-radius:8px; border:1px solid var(--border);
+    background:var(--bg3); color:var(--text2); font-size:13px; cursor:pointer;
+    display:flex; align-items:center; justify-content:center;
+    -webkit-tap-highlight-color:transparent; transition:border-color .15s, color .15s;
+  }
+  .hz-icon-btn:active { border-color:var(--green); color:var(--green); }
+  /* Ticker */
+  .hz-ticker {
+    height:28px; flex-shrink:0; background:var(--bg0); overflow:hidden; position:relative;
+    border-top:1px solid var(--border); border-bottom:1px solid var(--border);
+  }
+  .hz-ticker-track {
+    display:flex; position:absolute; white-space:nowrap; height:100%;
+    animation:hzticker 46s linear infinite; will-change:transform;
+  }
+  .hz-ticker-cell {
+    display:inline-flex; align-items:center; gap:5px; padding:0 13px; height:28px;
+    border-right:1px solid var(--border); font-family:var(--fm); font-size:10px;
+  }
+  .hz-ticker-cell .lbl { color:var(--text); font-weight:600; }
+  .hz-ticker-cell .val { color:var(--text2); }
+  .hz-ticker-cell .chip { padding:1px 5px; border-radius:3px; font-size:9px; font-weight:700; }
+  /* Body (only scroll region) */
+  .hz-body {
+    flex:1; overflow-y:auto; overflow-x:hidden; -webkit-overflow-scrolling:touch;
+    overscroll-behavior:contain;
+  }
+  .hz-body-inner { padding:16px 15px 34px; animation:hzfade .25s ease; }
+  .hz-body-inner.no-anim { animation:none; }
+  /* Bottom nav */
+  .hz-nav-bar {
+    flex-shrink:0; background:var(--bg1); border-top:1px solid var(--border);
+    display:flex; justify-content:space-around; align-items:flex-start;
+    padding:9px 4px calc(env(safe-area-inset-bottom, 0px) + 14px); position:relative;
+  }
+  .hz-nav {
+    background:none; border:none; cursor:pointer; display:flex; flex-direction:column;
+    align-items:center; gap:3px; color:var(--text3); min-width:52px;
+    -webkit-tap-highlight-color:transparent; transition:color .18s, transform .08s;
+  }
+  .hz-nav-ic { font-size:18px; line-height:1; }
+  .hz-nav-lbl { font-size:9px; font-weight:600; }
+  .hz-nav.active { color:var(--green); }
+  .hz-nav:active { transform:scale(.9); }
+  .hz-home-ind {
+    position:absolute; bottom:calc(env(safe-area-inset-bottom, 0px) + 8px); left:50%;
+    transform:translateX(-50%); width:132px; height:5px; border-radius:3px;
+    background:var(--text); opacity:.5;
+  }
+  /* Floating AI button */
+  .hz-fab {
+    position:absolute; right:16px; cursor:pointer; border:none; z-index:55;
+    bottom:calc(env(safe-area-inset-bottom, 0px) + 82px);
+    width:50px; height:50px; border-radius:50%; font-size:20px; color:#04120c;
+    background:linear-gradient(135deg,var(--green),var(--cyan));
+    box-shadow:0 6px 22px rgba(0,232,160,.34); transition:transform .15s;
+    display:flex; align-items:center; justify-content:center;
+  }
+  .hz-fab:active { transform:scale(.9); }
+  .hz-fab.hz-hidden { display:none; }
+  /* Overlay (bottom sheets) */
+  .hz-overlay { position:absolute; inset:0; z-index:70; display:none; }
+  /* Toast */
+  .hz-toast {
+    position:absolute; bottom:calc(env(safe-area-inset-bottom, 0px) + 98px); left:50%;
+    transform:translateX(-50%) translateY(20px); background:var(--bg4);
+    border:1px solid var(--border2); color:var(--text); font-size:12px;
+    padding:10px 15px; border-radius:12px; z-index:90; opacity:0;
+    transition:opacity .3s, transform .3s; pointer-events:none; max-width:300px;
+    text-align:center; box-shadow:0 8px 30px rgba(0,0,0,.5);
+  }
+  .hz-toast.show { opacity:1; transform:translateX(-50%) translateY(0); }
+  /* Controls inside the shell */
+  #hzApp input, #hzApp select, #hzApp textarea { font-family:inherit; outline:none; }
+  #hzApp input[type=range] { accent-color:var(--green); }
+  #hzApp a { color:var(--green); text-decoration:none; }
+  #hzApp .hz-chk {
+    appearance:none; -webkit-appearance:none; width:19px; height:19px;
+    border:1.5px solid var(--border2); border-radius:5px; background:var(--bg3);
+    cursor:pointer; position:relative; flex-shrink:0; transition:all .15s; vertical-align:middle;
+  }
+  #hzApp .hz-chk:checked { background:var(--green); border-color:var(--green); }
+  #hzApp .hz-chk:checked::after {
+    content:'✓'; position:absolute; top:50%; left:50%; transform:translate(-50%,-50%);
+    color:var(--bg0); font-size:11px; font-weight:900; line-height:1;
+  }
+  /* Leaflet tuning inside the shell */
+  #hzApp .leaflet-tile { filter:brightness(.55) saturate(.65) hue-rotate(185deg); }
+  body.light #hzApp .leaflet-tile { filter:none; }
+  #hzApp .leaflet-container { background:#0a0d17; font-family:var(--fm); }
+  body.light #hzApp .leaflet-container { background:#dfe7ef; }
+  #hzApp .leaflet-popup-content-wrapper { background:var(--bg3)!important; border:1px solid var(--border2)!important; border-radius:10px!important; color:var(--text)!important; }
+  #hzApp .leaflet-popup-content { font-size:11px; margin:8px 12px!important; }
+  #hzApp .leaflet-popup-tip { background:var(--bg3)!important; }
+  #hzApp .leaflet-control-attribution, #hzApp .leaflet-control-zoom { display:none; }
+  /* AI panel + command palette go full-screen on phones. */
+  #ai-panel { width:100vw !important; border-left:none !important; z-index:600; }
+  #ai-panel.expanded { width:100vw !important; }
+  #ai-backdrop { z-index:595; }
+}
+@keyframes hzticker { 0%{transform:translateX(0)} 100%{transform:translateX(-50%)} }
+@keyframes hzfade { from{opacity:0;transform:translateY(7px)} to{opacity:1;transform:none} }
+@keyframes hzsheet { from{transform:translateY(102%)} to{transform:translateY(0)} }
+@keyframes hzbar { from{width:0} }
+@keyframes hzpulse { 0%,100%{opacity:1} 50%{opacity:.25} }
+@media (prefers-reduced-motion: reduce){
+  .hz-ticker-track { animation:none; }
+  .hz-body-inner { animation:none; }
+}
+</style>
+<div id="hzApp" aria-hidden="true">
+  <div class="hz-root" id="hzRoot">
+    <header class="hz-topbar" id="hzTopbar">
+      <div class="hz-logo">
+        <div class="hz-logo-mark">H</div>
+        <div class="hz-logo-text"><b>HORIZON</b><span>FINANCE OS</span></div>
+      </div>
+      <div class="hz-topbar-actions">
+        <button id="hzSearch" class="hz-icon-btn" aria-label="Search">⌘</button>
+        <button id="hzTheme" class="hz-icon-btn" aria-label="Toggle theme">☀</button>
+        <button id="hzGear" class="hz-icon-btn" aria-label="Settings">⚙</button>
+      </div>
+    </header>
+    <div class="hz-ticker"><div class="hz-ticker-track" id="hzTicker"></div></div>
+    <main class="hz-body" id="hzBody"></main>
+    <nav class="hz-nav-bar" id="hzNav" role="navigation" aria-label="Primary">
+      <button class="hz-nav" data-nav="dashboard"><span class="hz-nav-ic">◉</span><span class="hz-nav-lbl">Home</span></button>
+      <button class="hz-nav" data-nav="spend"><span class="hz-nav-ic">🏦</span><span class="hz-nav-lbl">Spend</span></button>
+      <button class="hz-nav" data-nav="forecast"><span class="hz-nav-ic">▦</span><span class="hz-nav-lbl">Budget</span></button>
+      <button class="hz-nav" data-nav="retirement"><span class="hz-nav-ic">🌅</span><span class="hz-nav-lbl">Retire</span></button>
+      <button class="hz-nav" data-nav="__more"><span class="hz-nav-ic">⋯</span><span class="hz-nav-lbl">More</span></button>
+      <div class="hz-home-ind"></div>
+    </nav>
+    <button id="hzFab" class="hz-fab" aria-label="Horizon AI Advisor">✦</button>
+    <div id="hzOverlay" class="hz-overlay"></div>
+    <div id="hzToast" class="hz-toast"></div>
   </div>
-  <div class="m-grp">
-    <div class="m-grp-label">Planning</div>
-    <button class="m-link" data-mlink="funfund" onclick="mobileGo('funfund')"><span class="m-link-ic">✦</span>Fun Fund</button>
-    <button class="m-link" data-mlink="retireanywhere" onclick="mobileGo('retireanywhere')"><span class="m-link-ic">🌍</span>Retire Anywhere</button>
-    <button class="m-link" data-mlink="propiq" onclick="mobileGo('propiq')"><span class="m-link-ic">🏠</span>Property IQ</button>
-  </div>
-  <div class="m-grp">
-    <div class="m-grp-label">Library</div>
-    <button class="m-link" data-mlink="journal" onclick="mobileGo('journal')"><span class="m-link-ic">📓</span>Journal</button>
-    <button class="m-link" data-mlink="vault" onclick="mobileGo('vault')"><span class="m-link-ic">🗄</span>Vault</button>
-  </div>
-  <div class="m-grp">
-    <div class="m-grp-label">System</div>
-    <button class="m-link" data-mlink="settings" onclick="mobileGo('settings')"><span class="m-link-ic">⚙</span>Settings</button>
-  </div>
-</aside>
+</div>
 
 <!-- AI Panel minimize tab (shown when minimized) -->
 <div id="ai-min-tab" onclick="aiUnminimize()">
@@ -21743,6 +21896,529 @@ if(_origNav){
     if(panel==='settings') setTimeout(piq_injectSettingsKey, 50);
   };
 }
+</script>
+
+<!-- ═══ HORIZON MOBILE renderer (≤720px) ═══ -->
+<script>
+/* ══════════════════════════════════════════════════════════════════════
+   HORIZON MOBILE — self-contained phone renderer (≤720px)
+   Ported from the mobile design handoff and rewired to the app's real
+   `state` object. Renders all 11 screens + sheets + charts + maps into the
+   #hzApp shell. Seeds from real state; persists edits back via save().
+   The desktop app is untouched (it is display:none on phones).
+══════════════════════════════════════════════════════════════════════ */
+(function(){
+'use strict';
+
+class HZMobile {
+  constructor(){
+    this.MN=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    this.charts={}; this.vacMap=null; this.retMap=null;
+    this.data={};
+    this.PULSE=[
+      {dest:'Nairobi + Safari',flag:'🇰🇪',why:'East Africa peak season',cost:'SEK 25–45K',lat:-1.29,lng:36.82,vibe:'Safari',col:'#00e8a0'},
+      {dest:'Cape Town',flag:'🇿🇦',why:'World-class and affordable',cost:'SEK 20–40K',lat:-33.93,lng:18.42,vibe:'City',col:'#4d9fff'},
+      {dest:'Lisbon',flag:'🇵🇹',why:'Best value in W. Europe',cost:'SEK 15–28K',lat:38.72,lng:-9.14,vibe:'City',col:'#00d4ff'},
+      {dest:'Bali',flag:'🇮🇩',why:'Luxury on a budget',cost:'SEK 18–35K',lat:-8.34,lng:115.09,vibe:'Beach',col:'#f5a623'},
+      {dest:'Istanbul',flag:'🇹🇷',why:'Culture, food, value',cost:'SEK 12–22K',lat:41.01,lng:28.98,vibe:'Food',col:'#8b5cf6'},
+      {dest:'Maldives',flag:'🇲🇻',why:'Ultimate couples luxury',cost:'SEK 60–120K',lat:3.2,lng:73.22,vibe:'Luxury',col:'#ec4899'}
+    ];
+    this.RET=[
+      {flag:'🇵🇹',name:'Lisbon',country:'Portugal',costK:18,lat:38.72,lng:-9.14,tl:['Warm','Safe','EU','NHR Tax']},
+      {flag:'🇪🇸',name:'Valencia',country:'Spain',costK:16,lat:39.47,lng:-0.38,tl:['Warm','Safe','EU']},
+      {flag:'🇲🇽',name:'Mexico City',country:'Mexico',costK:14,lat:19.43,lng:-99.13,tl:['Warm','Retire Visa']},
+      {flag:'🇹🇭',name:'Chiang Mai',country:'Thailand',costK:10,lat:18.79,lng:98.99,tl:['Warm','LTR Visa']},
+      {flag:'🇰🇪',name:'Nairobi',country:'Kenya',costK:12,lat:-1.29,lng:36.82,tl:['Warm','Expat Hub']},
+      {flag:'🇬🇷',name:'Athens',country:'Greece',costK:15,lat:37.98,lng:23.73,tl:['Warm','Safe','EU']}
+    ];
+    this.DREAMS=[{id:'coastal',icon:'🏖',name:'Coastal'},{id:'city',icon:'🏙',name:'City Life'},{id:'nature',icon:'🌿',name:'Nature'},{id:'warm',icon:'☀️',name:'Warm'},{id:'culture',icon:'🎭',name:'Culture'},{id:'family',icon:'👨‍👩‍👧',name:'Family'},{id:'luxury',icon:'🥂',name:'Luxury'},{id:'adventure',icon:'🧗',name:'Adventure'},{id:'peaceful',icon:'🕊',name:'Peaceful'}];
+    this.EXP={low:{Housing:5000,Food:2500,Health:1500,Transport:800,Leisure:1200,Misc:1000},mid:{Housing:9000,Food:4000,Health:2500,Transport:1500,Leisure:2500,Misc:1500},high:{Housing:16000,Food:6000,Health:4000,Transport:2500,Leisure:5000,Misc:2500},luxury:{Housing:25000,Food:9000,Health:6000,Transport:4000,Leisure:10000,Misc:5000}};
+    this.MORE=[['dashboard','◉','Dashboard','Overview'],['lifewall','🧱','Life Wall','Overview'],['spend','🏦','Spend Insights','Personal Finances'],['forecast','▦','Forecast & Review','Personal Finances'],['retirement','🌅','Retirement Plan','Personal Finances'],['funfund','✦','Fun Fund','Planning'],['retireanywhere','🌍','Retire Anywhere','Planning'],['property','🏠','Property IQ','Planning'],['journal','📓','Journal','Library'],['vault','🗄','Vault','Library'],['settings','⚙','Settings','System']];
+    this.DEMO_TX=[
+      {d:'Jul 06',m:'ICA Maxi',c:'Groceries',a:842},{d:'Jul 06',m:'SL Access',c:'Transport',a:970},
+      {d:'Jul 05',m:'Spotify',c:'Subscriptions',a:119},{d:'Jul 05',m:'Systembolaget',c:'Dining',a:458},
+      {d:'Jul 04',m:'H&M',c:'Shopping',a:599},{d:'Jul 03',m:'Espresso House',c:'Dining',a:62},
+      {d:'Jul 03',m:'Vattenfall',c:'Utilities',a:640},{d:'Jul 02',m:'Apotek Hjärtat',c:'Health',a:214},
+      {d:'Jul 01',m:'Avgift (HOA)',c:'Housing',a:7250},{d:'Jun 30',m:'Coop',c:'Groceries',a:512},
+      {d:'Jun 29',m:'Netflix',c:'Subscriptions',a:139},{d:'Jun 28',m:'Circle K',c:'Transport',a:720}
+    ];
+    this.DEMO_CATBUDGET={Groceries:7000,Transport:2200,Dining:1500,Shopping:1200,Subscriptions:600,Utilities:900,Health:700,Housing:34250};
+    this.DEMO_VAULT=[
+      {id:'v1',icon:'📄',title:'APEX — Lisbon Feasibility',type:'AI Report',date:'May 30, 2026',size:'240 KB',tone:'plum'},
+      {id:'v2',icon:'🧾',title:'2025 Tax Return · Skatteverket',type:'Document',date:'Apr 12, 2026',size:'1.2 MB',tone:'info'},
+      {id:'v3',icon:'🏛',title:'ITP1 Pension Statement',type:'Statement',date:'Mar 01, 2026',size:'480 KB',tone:'sage'},
+      {id:'v4',icon:'🏠',title:'Mortgage Deed — SEB',type:'Document',date:'Jan 15, 2016',size:'860 KB',tone:'honey'}
+    ];
+  }
+
+  // ── mount / lifecycle ──
+  mount(){
+    this.root=document.getElementById('hzRoot');
+    this.body=document.getElementById('hzBody');
+    this.nav=document.getElementById('hzNav');
+    this.overlay=document.getElementById('hzOverlay');
+    this.body.addEventListener('click',e=>this.onClick(e));
+    this.body.addEventListener('change',e=>this.onChange(e));
+    this.body.addEventListener('input',e=>this.onInput(e));
+    this.overlay.addEventListener('click',e=>this.onClick(e));
+    this.overlay.addEventListener('change',e=>this.onChange(e));
+    this.overlay.addEventListener('input',e=>this.onInput(e));
+    this.nav.addEventListener('click',e=>{const b=e.target.closest('[data-nav]');if(!b)return;if(b.dataset.nav==='__more')this.openMore();else this.go(b.dataset.nav);});
+    const gear=document.getElementById('hzGear'); if(gear) gear.addEventListener('click',()=>this.go('settings'));
+    const srch=document.getElementById('hzSearch'); if(srch) srch.addEventListener('click',()=>this.openSearch());
+    const th=document.getElementById('hzTheme'); if(th) th.addEventListener('click',()=>this.toggleTheme());
+    const fab=document.getElementById('hzFab'); if(fab) fab.addEventListener('click',()=>this.openChat());
+    // Stay in sync with desktop-side state changes (welcome completion, cloud
+    // pull, invariant fixes). Guarded so our own persist()→save() doesn't loop.
+    if(typeof bus!=='undefined'&&bus.on){bus.on('state:changed',()=>{if(this._persisting)return;if(!window.matchMedia('(max-width:720px)').matches)return;if(this.overlay&&this.overlay.style.display==='block')return;clearTimeout(this._syncT);this._syncT=setTimeout(()=>{if(this.overlay&&this.overlay.style.display==='block')return;if(document.activeElement&&this.body.contains(document.activeElement))return;try{this.hydrate();this.syncThemeBtn();this.paint(true);}catch(_){}},220);});}
+    this.hydrate();
+    this.data.tab=this.tabFromPanel((typeof state!=='undefined'&&state.activePanel)||'dashboard');
+    this.syncThemeBtn();
+    this.paint();
+  }
+  tabFromPanel(p){return ({transactions:'spend',review:'forecast',monthly:'forecast',yearly:'forecast',propiq:'property'})[p]||p;}
+  panelFromTab(t){return ({spend:'transactions',forecast:'review',property:'propiq'})[t]||t;}
+
+  // ── hydrate from real state ──
+  hydrate(){
+    const s=(typeof state!=='undefined')?state:{};
+    const d=this.data;
+    d.currency=s.currency||'SEK';
+    d.lang=((s.lang||'en').toLowerCase()==='sv')?'SV':'EN';
+    d.theme=(s.darkMode===false)?'light':'dark';
+    d.retLens=(s.displayMode==='nominal')?'nominal':'today';
+    d.citizenship=s.citizenship||'';
+    d.homeBase=s.homeBase||'';
+    d.currentAge=+s.currentAge||44;
+    d.retirementAge=+s.retirementAge||69;
+    d.lifeExp=+s.lifeExp||90;
+    d.growthRate=(s.growthRate!=null)?+s.growthRate:7;
+    d.inflationRate=(s.inflationRate!=null)?+s.inflationRate:2;
+    d.postRetGrowth=(s.retirementPostGrowth!=null)?+s.retirementPostGrowth:4;
+    d.withdrawTaxRate=(s.savingsTaxRate!=null)?+s.savingsTaxRate:20;
+    d.baseSavings=(s.baseSavings!=null)?+s.baseSavings:0;
+    d.exchangeRates=Object.assign({SEK:1,USD:0.094,EUR:0.087,KES:12.1},s.exchangeRates||{});
+    d.externalAssets=(s.externalAssets||[]).map(a=>Object.assign({},a));
+    d.income=(s.baseIncome||[]).map(i=>({id:i.id,name:i.name,amount:+i.amount||0,paid:false}));
+    d.expenses=(s.baseExpenses||[]).map(e=>({id:e.id,name:e.name,amount:+e.amount||0,cat:e.cat||this.guessCat(e.name),paid:false}));
+    if(!s.mobileOverrides) s.mobileOverrides={};
+    d.monthlyOverrides=s.mobileOverrides;
+    d.carryForward=(s.mobileCarryForward!=null)?+s.mobileCarryForward:0;
+    if(!d.selectedMonth) d.selectedMonth=this.dkey();
+    d.penAllman=(s.penAllman!=null)?+s.penAllman:0;
+    d.penITP=(s.penITP!=null)?+s.penITP:0;
+    d.penOther=(s.penOther!=null)?+s.penOther:0;
+    if(!s.property) s.property={value:0,mortgage:0,rate:3.4,monthly:0};
+    d.property=s.property;
+    if(!s.mobileNetWorth) s.mobileNetWorth={property:d.property.value,mortgage:d.property.mortgage,otherDebt:0};
+    d.netWorth=s.mobileNetWorth;
+    d.transactions=(s.transactions&&s.transactions.length)?s.transactions.map(t=>this.mapTx(t)):this.DEMO_TX.slice();
+    d.catBudget=(s.catBudget&&Object.keys(s.catBudget).length)?s.catBudget:this.DEMO_CATBUDGET;
+    d.vacMonths=(s.mobileVacMonths!=null)?+s.mobileVacMonths:6;
+    d.targetBudget=(s.mobileTargetBudget!=null)?s.mobileTargetBudget:'';
+    if(!s.mobileTrips) s.mobileTrips=this.seedTrips(s.trips);
+    d.savedTrips=s.mobileTrips;
+    d.retCostLevel=s.mobileRetCostLevel||'mid';
+    if(!s.mobileDreams) s.mobileDreams=['warm','coastal'];
+    d.dreams=s.mobileDreams;
+    d.apex=s.mobileApex||null;
+    d.journal=(s.journal||[]).map(e=>this.mapJournalIn(e));
+    d.vault=(s.vault&&s.vault.length)?s.vault.map((x,i)=>this.mapVaultIn(x,i)):this.DEMO_VAULT.slice();
+  }
+  guessCat(name){const n=(name||'').toLowerCase();if(/mortgage|avgift|rent|hoa|home|cleaning/.test(n))return'Housing';if(/groc|ica|coop|food/.test(n))return'Groceries';if(/insur|kassa/.test(n))return'Insurance';if(/bill|util|electric|vatten/.test(n))return'Bills';if(/allow|personal/.test(n))return'Personal';if(/debt|chase|loan/.test(n))return'Debt';if(/madre|support|family/.test(n))return'Family';return'Other';}
+  mapTx(t){return {d:t.d||t.date||t.day||'',m:t.m||t.merchant||t.name||t.desc||'—',c:t.c||t.cat||t.category||'Other',a:Math.abs(+(t.a!=null?t.a:(t.amount!=null?t.amount:0)))};}
+  seedTrips(trips){return (trips||[]).map((t,i)=>{const exp=(t.expenses||[]);const budget=exp.reduce((s,e)=>s+(+e.amount||0),0);const first=exp.slice().sort((a,b)=>(a.date||'').localeCompare(b.date||''))[0];const when=first?this.monthLabel(first.date):'';return {id:t.id||('t'+i),dest:t.name+(t.country?', '+t.country:''),when,budget,nights:t.nights||0};});}
+  monthLabel(iso){if(!iso)return'';const p=String(iso).split('-');if(p.length<2)return iso;const m=+p[1]-1;return (this.MN[m]||'')+' '+p[0];}
+  mapJournalIn(e){const iso=e.date&&/^\d{4}-\d{2}/.test(e.date)?e.date:null;const disp=iso?this.fmtDate(iso):(e.date||'');const tag=['sage','honey','rose','info','plum'].includes(e.tag)?e.tag:this.tagFromKind(e.tag);const title=e.title||this.firstLine(e.content)||'Note';const body=e.body||e.content||'';return {id:e.id,date:disp,_iso:iso,tag,title,body};}
+  tagFromKind(k){return ({event:'info',decision:'sage',reflection:'plum',milestone:'honey'})[k]||'info';}
+  firstLine(s){if(!s)return'';const l=String(s).split('\n')[0].trim();return l.length>48?l.slice(0,46)+'…':l;}
+  fmtDate(iso){const dt=new Date(iso+(iso.length<=10?'T00:00:00':''));if(isNaN(dt))return iso;return dt.toLocaleDateString('en-US',{month:'short',day:'2-digit',year:'numeric'});}
+  toISO(disp){const dt=new Date(disp);if(isNaN(dt))return disp;return dt.getFullYear()+'-'+String(dt.getMonth()+1).padStart(2,'0')+'-'+String(dt.getDate()).padStart(2,'0');}
+  mapVaultIn(x,i){const type=x.type||x.kind||'Document';const tone=x.tone||({['AI Report']:'plum',Statement:'sage',Document:'info'})[type]||'info';const icon=x.icon||({['AI Report']:'📄',Statement:'🏛',Document:'🧾'})[type]||'📄';const date=x.date||(x.savedAt?this.fmtDate(String(x.savedAt).slice(0,10)):'');return {id:x.id||('v'+i),icon,title:x.title||x.name||'Saved item',type,date,size:x.size||'—',tone};}
+
+  // ── persist back to real state ──
+  persist(){
+    if(typeof state==='undefined')return;
+    const s=state,d=this.data;
+    s.currency=d.currency; s.lang=(d.lang==='SV')?'sv':'en';
+    s.darkMode=(d.theme!=='light'); s.displayMode=(d.retLens==='nominal')?'nominal':'real';
+    if(d.citizenship) s.citizenship=d.citizenship; if(d.homeBase) s.homeBase=d.homeBase;
+    s.currentAge=d.currentAge; s.retirementAge=d.retirementAge; s.lifeExp=d.lifeExp;
+    s.growthRate=d.growthRate; s.inflationRate=d.inflationRate;
+    s.retirementPostGrowth=d.postRetGrowth; s.savingsTaxRate=d.withdrawTaxRate;
+    s.baseSavings=d.baseSavings; s.exchangeRates=d.exchangeRates;
+    s.externalAssets=d.externalAssets;
+    s.mobileOverrides=d.monthlyOverrides; s.mobileCarryForward=d.carryForward;
+    s.penAllman=d.penAllman; s.penITP=d.penITP; s.penOther=d.penOther;
+    s.property=d.property; s.mobileNetWorth=d.netWorth;
+    s.mobileVacMonths=d.vacMonths; s.mobileTargetBudget=d.targetBudget;
+    s.mobileTrips=d.savedTrips; s.mobileRetCostLevel=d.retCostLevel;
+    s.mobileDreams=d.dreams; s.mobileApex=d.apex;
+    s.activePanel=this.panelFromTab(d.tab);
+    if(typeof save==='function'){ this._persisting=true; try{ save(); }catch(_){} finally{ this._persisting=false; } }
+  }
+
+  // ── calcs (self-consistent finance model) ──
+  gmd(k){const ov=this.data.monthlyOverrides[k];const inc=ov&&ov.income||this.data.income;const exp=ov&&ov.expenses||this.data.expenses;const sav=ov&&ov.savings!==undefined?ov.savings:this.data.baseSavings;const ti=inc.reduce((s,i)=>s+i.amount,0);const te=exp.reduce((s,i)=>s+i.amount,0);return{income:inc,expenses:exp,savings:sav,ti,te,disp:ti-te,fun:Math.max(0,ti-te-sav)};}
+  ti(){return this.data.income.reduce((s,i)=>s+i.amount,0);}
+  te(){return this.data.expenses.reduce((s,i)=>s+i.amount,0);}
+  disp(){return this.ti()-this.te();}
+  fun(){return Math.max(0,this.disp()-this.data.baseSavings);}
+  fv(P,PMT,rate,y){if(y<=0)return P;const rn=rate/100/12,nt=12*y;if(rn===0)return P+PMT*nt;const cf=Math.pow(1+rn,nt);return P*cf+PMT*((cf-1)/rn);}
+  nestEgg(ytr){ytr=ytr!==undefined?ytr:this.data.retirementAge-this.data.currentAge;let t=this.fv(0,this.data.baseSavings,this.data.growthRate,ytr);(this.data.externalAssets||[]).forEach(a=>t+=this.fv(a.balance,a.monthlyContribution||0,a.growthRate||this.data.growthRate,ytr));return t;}
+  realVal(n,y){return n/Math.pow(1+this.data.inflationRate/100,y);}
+  lensNe(){const ytr=this.data.retirementAge-this.data.currentAge;const ne=this.nestEgg();return this.data.retLens==='today'?this.realVal(ne,ytr):ne;}
+  pension(){return (this.data.penAllman||0)+(this.data.penITP||0)+(this.data.penOther||0);}
+  draw(ne){return (ne*0.04/12)*(1-this.data.withdrawTaxRate/100);}
+  nwTotal(){const nw=this.data.netWorth||{};const av=(this.data.externalAssets||[]).reduce((s,a)=>s+a.balance,0);return (this.data.property.value||0)+av-(this.data.property.mortgage||0)-(nw.otherDebt||0);}
+  fmt(v,cur){cur=cur||this.data.currency;const r=Object.assign({SEK:1},this.data.exchangeRates);const c=v*(r[cur]||1);const sym={SEK:'kr',USD:'$',EUR:'€',KES:'KSh'}[cur]||'kr';if(cur==='SEK')return `${Math.round(c).toLocaleString('sv-SE')} ${sym}`;if(cur==='KES')return `${sym} ${Math.round(c).toLocaleString()}`;return `${sym}${Math.round(c).toLocaleString()}`;}
+  fmtC(v){const r=Object.assign({SEK:1},this.data.exchangeRates);const cur=this.data.currency;const sym={SEK:'SEK',USD:'$',EUR:'€',KES:'KSh'}[cur]||'SEK';const c=v*(r[cur]||1);if(Math.abs(c)>=1e6)return cur==='SEK'?`${(c/1e6).toFixed(1)}M SEK`:`${sym}${(c/1e6).toFixed(1)}M`;if(Math.abs(c)>=1e3)return cur==='SEK'?`${Math.round(c/1e3)}K SEK`:`${sym}${Math.round(c/1e3)}K`;return cur==='SEK'?`${Math.round(c).toLocaleString()} SEK`:`${sym}${Math.round(c).toLocaleString()}`;}
+  esc(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+  addMonths(b,n){return new Date(b.getFullYear(),b.getMonth()+n,1);}
+  whenLib(check,cb){if(check()){cb();return;}let n=0;const t=setInterval(()=>{if(check()||n++>50){clearInterval(t);if(check())cb();}},100);}
+  dkey(){const n=new Date();return `${n.getFullYear()}-${String(n.getMonth()+1).padStart(2,'0')}`;}
+  expTotal(l){return Object.values(this.EXP[l]).reduce((s,v)=>s+v,0);}
+
+  // ── ui helpers ──
+  card(inner,mb){return `<div style="background:var(--bg2);border:1px solid var(--border);border-radius:14px;padding:14px 15px;margin-bottom:${mb===undefined?10:mb}px">${inner}</div>`;}
+  ct(t,actions){return `<div style="font-size:10.5px;letter-spacing:.05em;font-weight:600;text-transform:uppercase;color:var(--text2);margin-bottom:12px;display:flex;align-items:center;gap:8px">${t}${actions?`<div style="margin-left:auto;display:flex;gap:6px;align-items:center;text-transform:none;letter-spacing:0">${actions}</div>`:''}</div>`;}
+  ph(tag,title,sub){return `<div style="margin-bottom:16px"><div style="font-size:10px;font-weight:500;letter-spacing:.11em;text-transform:uppercase;color:var(--clay-tx);margin-bottom:5px">${tag}</div><div style="font-family:var(--fs);font-size:25px;font-weight:600;letter-spacing:-.01em;line-height:1.15;margin-bottom:4px">${title}</div>${sub?`<div style="color:var(--text2);font-size:12.5px;line-height:1.45">${sub}</div>`:''}</div>`;}
+  kpi(icon,lbl,val,color,sub,mod){const b=mod==='alert'?'border-left:3px solid var(--red)':mod==='pos'?'border-left:3px solid var(--green)':mod==='warn'?'border-left:3px solid var(--amber)':'';return `<div style="background:var(--bg2);border:1px solid var(--border);border-radius:10px;padding:13px 14px;min-height:84px;${b}"><div style="font-size:16px;margin-bottom:4px;line-height:1">${icon}</div><div style="font-size:9px;letter-spacing:.07em;color:var(--text3);text-transform:uppercase;font-weight:600;margin-bottom:4px">${lbl}</div><div style="font-family:var(--fm);font-size:18px;font-weight:700;line-height:1.1;color:${color||'var(--text)'}">${val}</div>${sub?`<div style="font-size:10px;color:var(--text2);margin-top:3px;line-height:1.3">${sub}</div>`:''}</div>`;}
+  grid2(a){return `<div style="display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-bottom:10px">${a.join('')}</div>`;}
+  banner(tone,html){const dot={sage:'var(--sage-tx)',honey:'var(--honey-tx)',rose:'var(--rose-tx)',info:'var(--info-tx)'}[tone];return `<div style="display:flex;gap:10px;align-items:flex-start;padding:11px 13px;border-radius:12px;border:1px solid var(--${tone}-bd);background:var(--${tone}-bg);font-size:12px;line-height:1.45;margin-bottom:10px;color:var(--text2)"><span style="width:7px;height:7px;border-radius:99px;margin-top:5px;flex-shrink:0;background:${dot}"></span><div style="min-width:0">${html}</div></div>`;}
+  chip(tone,txt){return `<span style="display:inline-flex;align-items:center;height:20px;padding:0 9px;border-radius:99px;font-size:10px;font-weight:600;white-space:nowrap;border:1px solid var(--${tone}-bd);background:var(--${tone}-bg);color:var(--${tone}-tx)">${txt}</span>`;}
+  btn(label,act,extra,kind){const st=kind==='g'?'background:var(--green);color:var(--bg0);border:none':kind==='add'?'background:transparent;border:1px dashed var(--border2);color:var(--text2);width:100%':'background:var(--bg4);color:var(--text);border:1px solid var(--border2)';return `<button data-act="${act}"${extra||''} style="${st};border-radius:8px;font-size:11px;font-weight:600;padding:6px 11px;cursor:pointer;white-space:nowrap">${label}</button>`;}
+  bar(pct,color,h){return `<div style="height:${h||6}px;background:var(--bg3);border-radius:4px;overflow:hidden;margin:5px 0"><div style="height:100%;width:${Math.max(0,Math.min(100,pct))}%;background:${color};border-radius:4px;animation:hzbar .6s ease"></div></div>`;}
+  row(l,v,c,bold){return `<div style="display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:1px solid var(--border);font-size:13px${bold?';font-weight:700':''}"><span style="color:${bold?'var(--text)':'var(--text2)'}">${l}</span><span style="font-family:var(--fm);font-weight:600;color:${c}">${v}</span></div>`;}
+  line(type,it){return `<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;${it.paid?'opacity:.45':''}"><input type="checkbox" class="hz-chk" ${it.paid?'checked':''} data-act="togpaid" data-t="${type}" data-id="${it.id}"><input value="${this.esc(it.name)}" data-model="name:${type}:${it.id}" style="flex:1;min-width:0;background:var(--bg3);border:1px solid var(--border);border-radius:6px;padding:8px 9px;color:var(--text);font-size:12.5px${it.paid?';text-decoration:line-through':''}"><div style="display:flex;align-items:center;background:var(--bg3);border:1px solid var(--border);border-radius:6px;padding:0 9px"><span style="color:var(--text3);font-size:9px;font-family:var(--fm)">kr</span><input type="number" value="${it.amount}" data-model="amt:${type}:${it.id}" style="width:70px;background:transparent;border:none;color:var(--text);font-family:var(--fm);font-size:12.5px;padding:8px 0;text-align:right"></div><button data-act="rmline" data-t="${type}" data-id="${it.id}" style="background:none;border:none;color:var(--red);font-size:17px;cursor:pointer;opacity:.5;padding:2px 3px">×</button></div>`;}
+  srow(l,ctrl,last){return `<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 0;${last?'':'border-bottom:1px solid var(--border)'}"><span style="font-size:12.5px;color:var(--text)">${l}</span><div>${ctrl}</div></div>`;}
+  inpS(w){return `width:${w}px;background:var(--bg3);border:1px solid var(--border);border-radius:6px;padding:6px 9px;color:var(--text);font-family:var(--fm);font-size:12px;text-align:right`;}
+  seg(model,opts){const cur=this.data[model];return `<div style="display:inline-flex;gap:2px;background:var(--bg0);border:1px solid var(--border);border-radius:7px;padding:2px">${opts.map(o=>`<button data-act="seg" data-model="${model}" data-v="${o[0]}" style="border:none;border-radius:5px;padding:5px 9px;font-family:var(--fm);font-size:10px;font-weight:600;cursor:pointer;background:${cur===o[0]?'var(--green)':'transparent'};color:${cur===o[0]?'var(--bg0)':'var(--text2)'}">${o[1]}</button>`).join('')}</div>`;}
+
+  // ── paint ──
+  go(tab){this.data.tab=tab;this.closeOverlay();if(typeof state!=='undefined'){state.activePanel=this.panelFromTab(tab);}this.paint();this.body.scrollTop=0;}
+  toast(m){const t=document.getElementById('hzToast');if(!t)return;t.textContent=m;t.classList.add('show');clearTimeout(this._tt);this._tt=setTimeout(()=>t.classList.remove('show'),2400);}
+  syncThemeBtn(){const b=document.getElementById('hzTheme');if(b)b.textContent=this.data.theme==='dark'?'☀':'☾';}
+  toggleTheme(){if(typeof toggleTheme==='function'){toggleTheme();}this.data.theme=(typeof state!=='undefined'&&state.darkMode===false)?'light':'dark';this.syncThemeBtn();this.paint();}
+  setFab(){const fab=document.getElementById('hzFab');if(fab)fab.classList.toggle('hz-hidden',this.data.tab==='settings');}
+
+  paint(silent){
+    const t=this.data.tab;
+    const prevScroll=silent?this.body.scrollTop:0;
+    this.nav.querySelectorAll('[data-nav]').forEach(b=>{const map={dashboard:'dashboard',spend:'spend',forecast:'forecast',retirement:'retirement'};const on=(b.dataset.nav===map[t])||(b.dataset.nav==='__more'&&!map[t]);b.classList.toggle('active',on);});
+    this.renderTicker();
+    let h='';
+    if(t==='dashboard')h=this.vDash();
+    else if(t==='spend')h=this.vSpend();
+    else if(t==='forecast')h=this.vForecast();
+    else if(t==='retirement')h=this.vRetire();
+    else if(t==='funfund')h=this.vFun();
+    else if(t==='retireanywhere')h=this.vAnywhere();
+    else if(t==='lifewall')h=this.vLifeWall();
+    else if(t==='property')h=this.vProperty();
+    else if(t==='journal')h=this.vJournal();
+    else if(t==='vault')h=this.vVault();
+    else if(t==='settings')h=this.vSettings();
+    this.body.innerHTML=`<div class="hz-body-inner${silent?' no-anim':''}">${h}</div>`;
+    if(silent)this.body.scrollTop=prevScroll;
+    this.setFab();
+    if(t==='dashboard')this.chartDash();
+    if(t==='spend')this.chartSpend();
+    if(t==='forecast')this.chartForecast();
+    if(t==='retirement')this.chartNest();
+    if(t==='funfund')this.initVacMap();
+    if(t==='retireanywhere')this.initRetMap();
+    if(t==='property')this.chartAmort();
+  }
+
+  renderTicker(){
+    const ne=this.nestEgg(),ytr=this.data.retirementAge-this.data.currentAge,ff=this.fun();
+    const dr=this.draw(ne)+this.pension();
+    const it=[['NET WORTH',this.fmtC(this.nwTotal()),'total',true],['SURPLUS',this.fmt(this.disp()),'net',this.disp()>0],['FUN FUND',this.fmtC(ff),'/mo',true],['NEST EGG',this.fmtC(ne),'proj',true],['RETIRE INCOME',this.fmtC(dr),'/mo',true],['YTR',ytr+'Y','age '+this.data.retirementAge,true]];
+    const one=it.map(i=>`<div style="display:inline-flex;align-items:center;gap:5px;padding:0 13px;height:28px;border-right:1px solid var(--border);font-family:var(--fm);font-size:10px"><span style="color:var(--text);font-weight:600">${i[0]}</span><span style="color:var(--text2)">${i[1]}</span><span style="padding:1px 5px;border-radius:3px;font-size:9px;font-weight:700;background:${i[3]?'var(--sage-bg)':'var(--rose-bg)'};color:${i[3]?'var(--sage-tx)':'var(--rose-tx)'}">${i[2]}</span></div>`).join('');
+    const el=document.getElementById('hzTicker');if(el)el.innerHTML=one+one;
+  }
+
+  // ══════ DASHBOARD ══════
+  vDash(){
+    const md=this.gmd(this.dkey());const ne=this.nestEgg(),ytr=this.data.retirementAge-this.data.currentAge;
+    const dr=this.draw(ne)+this.pension();const nw=this.nwTotal();
+    const homeBase=this.data.homeBase||'—';
+    let h=this.ph('OVERVIEW','Where you stand today',`Live position · <span style="color:var(--amber)">${this.MN[new Date().getMonth()]} ${new Date().getFullYear()}</span> · ${this.esc(homeBase)}`);
+    h+=`<div style="position:relative;background:linear-gradient(140deg,var(--bg2),var(--bg1));border:1px solid var(--border2);border-radius:16px;padding:16px;margin-bottom:10px;overflow:hidden"><div style="position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,var(--green),var(--cyan),var(--blue))"></div><div style="font-size:9px;color:var(--text3);letter-spacing:.1em;font-weight:700;text-transform:uppercase;margin-bottom:6px">NET WORTH</div><div style="font-family:var(--fm);font-size:30px;font-weight:700;color:${nw>=0?'var(--green)':'var(--red)'};line-height:1">${this.fmtC(nw)}</div><div style="display:flex;gap:8px;margin-top:13px"><div style="flex:1;background:var(--bg3);border-radius:10px;padding:8px 10px"><div style="font-size:9px;color:var(--text3);font-weight:600">MONTHLY SURPLUS</div><div style="font-family:var(--fm);font-size:13px;color:${md.disp>=0?'var(--green)':'var(--red)'}">${this.fmt(md.disp)}</div></div><div style="flex:1;background:var(--bg3);border-radius:10px;padding:8px 10px"><div style="font-size:9px;color:var(--text3);font-weight:600">FUN FUND</div><div style="font-family:var(--fm);font-size:13px;color:var(--amber)">${this.fmt(md.fun)}</div></div></div></div>`;
+    h+=this.grid2([this.kpi('💰','Income',this.fmt(md.ti),'var(--green)','Monthly gross'),this.kpi('📤','Expenses',this.fmt(md.te),'var(--red)','Committed'),this.kpi('◈','Nest Egg',this.fmtC(ne),'var(--violet)','Age '+this.data.retirementAge),this.kpi('💵','Retire Income',this.fmtC(dr),'var(--green)','After tax +pension')]);
+    const pe=md.ti?md.te/md.ti*100:0,ps=md.ti?md.savings/md.ti*100:0,pf=md.ti?md.fun/md.ti*100:0;
+    h+=this.card(this.ct('⇄ Cash Flow This Month')+`<div style="height:8px;background:var(--bg3);border-radius:4px;display:flex;overflow:hidden"><div style="width:${pe}%;background:var(--red);opacity:.75"></div><div style="width:${ps}%;background:var(--amber);opacity:.85"></div><div style="width:${pf}%;background:var(--green)"></div></div><div style="display:flex;gap:14px;margin-top:7px;font-size:10px;color:var(--text3);font-family:var(--fm)"><span style="color:var(--red)">■ Expenses ${pe.toFixed(0)}%</span><span style="color:var(--amber)">■ Savings ${ps.toFixed(0)}%</span><span style="color:var(--green)">■ Fun ${pf.toFixed(0)}%</span></div>`);
+    h+=this.card(this.ct('📊 Net Cash Flow · 12-Month')+`<div style="height:158px"><canvas id="hzDashChart"></canvas></div>`);
+    const bigExp=this.data.expenses.slice().sort((a,b)=>b.amount-a.amount)[0];
+    const insight=bigExp?`Your <strong>${this.esc(bigExp.name)}</strong> line at <strong>${this.fmtC(bigExp.amount)}</strong> is your largest monthly outflow — trimming it lifts your surplus and compounds into a bigger nest egg over ${ytr} years.`:`With a monthly surplus of <strong style="color:${md.disp>=0?'var(--green)':'var(--red)'}">${this.fmt(md.disp)}</strong>, staying consistent compounds into <strong style="color:var(--green)">${this.fmtC(ne)}</strong> by age ${this.data.retirementAge}.`;
+    h+=`<div style="background:linear-gradient(135deg,var(--bg2),var(--info-bg));border:1px solid var(--border2);border-radius:14px;padding:14px;margin-bottom:10px;position:relative;overflow:hidden"><div style="position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,var(--green),var(--cyan))"></div><div style="display:flex;align-items:center;gap:7px;font-size:9px;font-weight:700;letter-spacing:.1em;color:var(--cyan);margin-bottom:8px"><span style="width:6px;height:6px;border-radius:50%;background:var(--green);animation:hzpulse 1.5s infinite"></span>HORIZON AI</div><div style="font-size:12.5px;line-height:1.6;color:var(--text)">${insight}</div><div style="margin-top:10px">${this.btn('Ask about this →','aichat','','o')}</div></div>`;
+    h+=`<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:14px;padding-top:12px;border-top:1px dashed var(--border)"><span style="font-family:var(--fm);font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--text3);width:100%">Jump to</span>${[['spend','🏦','Spend'],['forecast','▦','Budget'],['retirement','🌅','Retirement']].map(r=>`<button data-act="nav" data-t="${r[0]}" style="display:inline-flex;align-items:center;gap:7px;background:var(--bg2);border:1px solid var(--border);border-radius:9px;padding:8px 11px;color:var(--text2);font-size:12px;cursor:pointer"><span>${r[1]}</span>${r[2]}<span style="color:var(--text3);margin-left:2px">↗</span></button>`).join('')}</div>`;
+    return h;
+  }
+
+  // ══════ SPEND INSIGHTS ══════
+  vSpend(){
+    const tx=this.data.transactions;const spent=tx.reduce((s,t)=>s+t.a,0);
+    const byCat={};tx.forEach(t=>byCat[t.c]=(byCat[t.c]||0)+t.a);
+    const cats=Object.entries(byCat).sort((a,b)=>b[1]-a[1]);
+    const top=cats[0]||['—',0];const budgetTot=Object.values(this.data.catBudget).reduce((s,v)=>s+v,0);
+    let h=this.ph('PERSONAL FINANCES','Where your money goes','Transactions this month, grouped and checked against budget.');
+    h+=this.banner('info',`<b>Demo data loaded.</b> Connect a bank via Open Banking (PSD2) or import a CSV to see real transactions. <a data-act="bank">Connect →</a>`);
+    h+=this.grid2([this.kpi('💳','Spent (MTD)',this.fmt(spent),'var(--red)',tx.length+' transactions'),this.kpi('🎯','vs Budget',this.fmt(budgetTot-spent),spent<=budgetTot?'var(--green)':'var(--red)',spent<=budgetTot?'Under budget':'Over budget',spent<=budgetTot?'pos':'alert'),this.kpi('🏆','Top Category',top[0],'var(--violet)',this.fmt(top[1])),this.kpi('🧾','Avg / day',this.fmt(Math.round(spent/7)),'var(--amber)','Last 7 days')]);
+    const maxc=cats.length?cats[0][1]:1;
+    h+=this.card(this.ct('▦ Spending by Category')+cats.map(([c,v])=>{const bud=this.data.catBudget[c];const over=bud&&v>bud;return `<div style="margin-bottom:11px"><div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:2px"><span style="color:var(--text)">${c}</span><span style="font-family:var(--fm);color:${over?'var(--red)':'var(--text2)'}">${this.fmt(v)}${bud?` <span style="color:var(--text3);font-size:10px">/ ${this.fmtC(bud)}</span>`:''}</span></div>${this.bar(v/maxc*100,over?'var(--red)':'var(--violet)',6)}</div>`;}).join(''));
+    h+=this.card(this.ct('🧾 Recent Transactions')+tx.map(t=>`<div style="display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--border)"><div style="width:34px;height:34px;border-radius:9px;background:var(--bg3);display:flex;align-items:center;justify-content:center;font-size:15px;flex-shrink:0">${this.catIcon(t.c)}</div><div style="flex:1;min-width:0"><div style="font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${this.esc(t.m)}</div><div style="font-size:10.5px;color:var(--text3);font-family:var(--fm)">${t.d} · ${t.c}</div></div><div style="font-family:var(--fm);font-size:13px;font-weight:600;color:var(--text)">−${this.fmt(t.a)}</div></div>`).join('')+`<div style="text-align:center;margin-top:10px">${this.btn('Import CSV','csv','','o')} ${this.btn('Connect bank','bank','','o')}</div>`);
+    h+=this.card(this.ct('🍩 Category Split')+`<div style="height:180px"><canvas id="hzSpendChart"></canvas></div>`);
+    return h;
+  }
+  catIcon(c){return {Groceries:'🛒',Transport:'🚇',Dining:'🍽',Shopping:'🛍',Subscriptions:'📺',Utilities:'💡',Health:'💊',Housing:'🏠'}[c]||'💳';}
+
+  // ══════ FORECAST & REVIEW ══════
+  vForecast(){
+    const now=new Date();let pills='';
+    for(let i=0;i<12;i++){const d=this.addMonths(now,i);const k=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;const cur=i===0,sel=k===(this.data.selectedMonth||this.dkey()),ov=!!this.data.monthlyOverrides[k];pills+=`<div data-act="month" data-k="${k}" style="flex-shrink:0;background:${sel?'var(--green)':'var(--bg2)'};color:${sel?'var(--bg0)':cur?'var(--amber)':'var(--text2)'};border:1px solid ${sel?'var(--green)':ov?'var(--violet)':cur?'var(--amber)':'var(--border)'};${ov&&!sel?'border-style:dashed;':''}border-radius:5px;padding:6px 11px;font-size:11px;font-weight:${sel?'700':'500'};cursor:pointer;white-space:nowrap;font-family:var(--fm)">${this.MN[d.getMonth()]} '${String(d.getFullYear()).slice(2)}</div>`;}
+    const sm=this.data.selectedMonth||this.dkey();const ov=!!this.data.monthlyOverrides[sm];const md=this.gmd(sm);const[yr,mo]=sm.split('-');
+    let h=this.ph('PERSONAL FINANCES','Plan the month ahead','Edit the baseline or override any single month.');
+    h+=`<div class="hz-x" style="display:flex;gap:5px;overflow-x:auto;margin:0 -15px 12px;padding:0 15px 4px">${pills}</div>`;
+    h+=`<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:10px"><span style="font-family:var(--fm);font-size:12px;color:var(--amber)">${this.MN[+mo-1]} ${yr}</span>${ov?`${this.chip('plum','OVERRIDE')} ${this.btn('✕ Clear','clearov','','o')}`:this.chip('info','BASELINE')}<span style="margin-left:auto;font-size:11px;color:var(--text3);white-space:nowrap">Net <strong style="color:${md.disp>=0?'var(--green)':'var(--red)'}">${this.fmt(md.disp)}</strong></span></div>`;
+    const pe=md.ti?md.te/md.ti*100:0,ps=md.ti?md.savings/md.ti*100:0,pf=md.ti?md.fun/md.ti*100:0;
+    h+=this.card(this.ct('Flow')+`<div style="height:8px;background:var(--bg3);border-radius:4px;display:flex;overflow:hidden"><div style="width:${pe}%;background:var(--red);opacity:.75"></div><div style="width:${ps}%;background:var(--amber);opacity:.85"></div><div style="width:${pf}%;background:var(--green)"></div></div><div style="display:flex;justify-content:space-between;margin-top:8px;font-size:11px"><span style="color:var(--text2)">In ${this.fmt(md.ti)}</span><span style="color:var(--text2)">Out ${this.fmt(md.te)}</span></div>`);
+    h+=this.card(this.ct('💰 Income',this.btn('+ Add','addline',' data-t="income"','o'))+md.income.map(it=>this.line('income',it)).join(''));
+    let expHtml=md.expenses.map(it=>this.line('expense',it)).join('');
+    if(this.data.carryForward>0)expHtml+=`<div style="display:flex;align-items:center;gap:8px;padding:8px 10px;margin-top:2px;background:var(--plum-bg);border:1px dashed var(--violet);border-radius:6px;font-family:var(--fm);font-size:11px;color:var(--text2)"><span style="color:var(--violet);font-weight:700">↻</span><span style="flex:1">Carry-forward from ${this.MN[(+mo-2+12)%12]}</span><span style="color:var(--violet);font-weight:700">${this.fmt(this.data.carryForward)}</span></div>`;
+    h+=this.card(this.ct('📤 Expenses',this.btn('+ Add','addline',' data-t="expense"','o'))+expHtml);
+    h+=this.card(this.ct('🏦 Savings Allocation')+`<label style="display:block;font-size:11px;color:var(--text2);margin-bottom:5px">Monthly savings (SEK)</label><input type="number" data-model="savings" value="${md.savings}" style="width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:6px;padding:9px 11px;color:var(--text);font-family:var(--fm);font-size:14px;margin-bottom:10px">${this.row('Fun Fund (auto)',this.fmt(md.fun)+' /mo','var(--amber)',true)}`);
+    h+=this.card(this.ct('📈 12-Month Forecast')+`<div style="height:170px"><canvas id="hzForecastChart"></canvas></div>`);
+    return h;
+  }
+
+  // ══════ RETIREMENT PLAN ══════
+  vRetire(){
+    const ytr=this.data.retirementAge-this.data.currentAge;const ne=this.nestEgg();const neL=this.lensNe();
+    const dr=this.draw(ne)+this.pension();const need=this.expTotal('mid');const gap=dr-need;
+    const verdict=gap>=need*0.15?['OVERFUNDED','🟢','var(--green)']:gap>=0?['ON TARGET','🟡','var(--amber)']:['UNDERFUNDED','🔴','var(--red)'];
+    const runwayYrs=this.data.lifeExp-this.data.retirementAge;
+    let h=this.ph('PERSONAL FINANCES','Are you on track?',`Projected to age ${this.data.retirementAge}, sustained to ${this.data.lifeExp}.`);
+    h+=`<div style="display:inline-flex;gap:2px;background:var(--bg0);border:1px solid var(--border);border-radius:7px;padding:3px;margin-bottom:12px">${[['today','Today'],['nominal','Nominal']].map(m=>`<button data-act="lens" data-l="${m[0]}" style="border:none;border-radius:5px;padding:5px 11px;font-family:var(--fm);font-size:10px;font-weight:600;cursor:pointer;background:${this.data.retLens===m[0]?'var(--green)':'transparent'};color:${this.data.retLens===m[0]?'var(--bg0)':'var(--text2)'}">${m[1]}</button>`).join('')}</div>`;
+    h+=`<div style="background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:15px;margin-bottom:10px"><div style="display:flex;align-items:center;gap:10px;margin-bottom:10px"><span style="font-size:26px">${verdict[1]}</span><div><div style="font-family:var(--fs);font-size:19px;font-weight:600;color:${verdict[2]}">${verdict[0]}</div><div style="font-size:11px;color:var(--text2)">Draw vs ${this.fmtC(need)}/mo need</div></div></div><div style="margin-top:4px">${this.bar(Math.min(100,dr/need*100),verdict[2],8)}</div><div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px">${[['Nest egg',this.fmtC(neL)],['Monthly draw',this.fmtC(dr)],['Monthly need',this.fmtC(need)],[gap>=0?'Headroom':'Shortfall',(gap>=0?'+':'')+this.fmtC(gap)]].map((n,i)=>`<div style="background:var(--bg3);border-radius:8px;padding:9px;text-align:center"><div style="font-size:9px;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:3px">${n[0]}</div><div style="font-family:var(--fm);font-size:14px;font-weight:700;color:${i===3?verdict[2]:'var(--text)'}">${n[1]}</div></div>`).join('')}</div></div>`;
+    h+=this.grid2([this.kpi('🏛','Pension',this.fmtC(this.pension()),'var(--blue)','Allmän + ITP'),this.kpi('💵','Portfolio Draw',this.fmtC(this.draw(ne)),'var(--green)','4% after tax'),this.kpi('📅','Years to Retire',ytr+'Y','var(--amber)','Age '+this.data.currentAge+' → '+this.data.retirementAge),this.kpi('⏳','Runway',runwayYrs+'Y','var(--violet)','Age '+this.data.retirementAge+' → '+this.data.lifeExp)]);
+    h+=this.card(this.ct('📈 Nest Egg Growth',`<label style="display:flex;align-items:center;gap:5px;font-size:10px;color:var(--text3)">${this.data.retLens==='today'?'Real':'Nominal'}</label>`)+`<div style="height:190px"><canvas id="hzNestChart"></canvas></div>`);
+    const scen=[[60,'Early 60'],[65,'Standard 65'],[this.data.retirementAge,'Target '+this.data.retirementAge],[70,'Late 70']];
+    const elig=scen.filter(s=>s[0]>=this.data.currentAge);
+    const best=elig.length?Math.max(...elig.map(s=>this.draw(this.nestEgg(s[0]-this.data.currentAge))+this.pension())):0;
+    h+=this.card(this.ct('🔀 What-If Scenarios')+`<div class="hz-x" style="display:flex;gap:9px;overflow-x:auto;margin:0 -3px;padding-left:3px;padding-bottom:3px">${elig.map(s=>{const y=s[0]-this.data.currentAge;const n=this.nestEgg(y);const dd=this.draw(n)+this.pension();const isBest=Math.abs(dd-best)<1;return `<div style="flex-shrink:0;min-width:130px;background:var(--bg3);border:1px solid ${isBest?'var(--green)':'var(--border)'};border-radius:11px;padding:12px">${isBest?this.chip('sage','OPTIMAL'):''}<div style="font-family:var(--fs);font-size:14px;font-weight:600;margin-top:${isBest?'7px':'0'}">${s[1]}</div><div style="font-family:var(--fm);font-size:15px;color:var(--violet);margin-top:4px">${this.fmtC(n)}</div><div style="font-size:10px;color:var(--text3)">nest egg</div><div style="font-family:var(--fm);font-size:13px;color:var(--green);margin-top:5px">${this.fmtC(dd)}/mo</div><div style="font-size:10px;color:var(--text3)">total income</div></div>`;}).join('')}</div>`);
+    h+=this.card(this.ct('🏛 Swedish Pension')+['penAllman','penITP','penOther'].map((k,i)=>`<div style="display:flex;align-items:center;gap:10px;padding:7px 0;border-bottom:1px solid var(--border)"><span style="flex:1;font-size:12.5px;color:var(--text2)">${['Allmänpension','ITP / Tjänste','Other / annuity'][i]}</span><div style="display:flex;align-items:center;background:var(--bg3);border:1px solid var(--border);border-radius:6px;padding:0 9px"><input type="number" value="${this.data[k]}" data-model="pen:${k}" style="width:78px;background:transparent;border:none;color:var(--text);font-family:var(--fm);font-size:12.5px;padding:7px 0;text-align:right"><span style="color:var(--text3);font-size:9px;font-family:var(--fm)">/mo</span></div></div>`).join('')+this.row('Total pension',this.fmtC(this.pension())+' /mo','var(--green)',true));
+    const colors=['#00e8a0','#4d9fff','#f5a623','#8b5cf6'];
+    h+=this.card(this.ct('◆ Investment Assets',this.btn('+ Add','assetadd','','o'))+(this.data.externalAssets||[]).map((a,i)=>{const proj=this.fv(a.balance,a.monthlyContribution||0,a.growthRate||this.data.growthRate,ytr);const rp=this.data.retLens==='today'?this.realVal(proj,ytr):proj;return `<div style="display:flex;align-items:flex-start;gap:9px;padding:11px 0;border-bottom:1px solid var(--border)"><div style="width:9px;height:9px;border-radius:50%;background:${colors[i%4]};margin-top:5px;flex-shrink:0"></div><div style="flex:1;min-width:0"><input value="${this.esc(a.name)}" data-model="aname:${a.id}" style="width:100%;background:transparent;border:none;border-bottom:1px solid var(--border);color:var(--text);font-size:12.5px;font-weight:600;padding:2px 0;margin-bottom:6px"><div style="display:flex;flex-wrap:wrap;gap:8px;font-size:10px;color:var(--text3)"><span>Bal <input type="number" value="${a.balance}" data-model="abal:${a.id}" style="width:78px;background:transparent;border:none;border-bottom:1px solid var(--border);color:var(--text2);font-family:var(--fm);font-size:10px"></span><span>+<input type="number" value="${a.monthlyContribution||0}" data-model="acon:${a.id}" style="width:58px;background:transparent;border:none;border-bottom:1px solid var(--border);color:var(--text2);font-family:var(--fm);font-size:10px">/mo</span><span><input type="number" value="${a.growthRate||this.data.growthRate}" data-model="agro:${a.id}" style="width:32px;background:transparent;border:none;border-bottom:1px solid var(--border);color:var(--text2);font-family:var(--fm);font-size:10px">%</span></div></div><div style="text-align:right;flex-shrink:0"><div style="font-family:var(--fm);font-weight:700;font-size:12px;color:${colors[i%4]}">${this.fmtC(rp)}</div><div style="font-size:9px;color:var(--text3)">at retirement</div></div><button data-act="assetrm" data-id="${a.id}" style="background:none;border:none;color:var(--red);font-size:16px;cursor:pointer;opacity:.5">×</button></div>`;}).join(''));
+    return h;
+  }
+
+  // ══════ FUN FUND ══════
+  vFun(){
+    const ff=this.fun();const now=new Date();
+    let h=this.ph('PLANNING','What can you afford?','Project your discretionary fund forward and plan your next trip.');
+    if(ff<=0)h+=this.banner('honey',`<b>Fun fund is 0</b> this month — expenses plus savings currently absorb all income. Trim a line in Budget to start building it.`);
+    h+=this.grid2([this.kpi('✦','Monthly Fund',this.fmt(ff),'var(--amber)','After savings'),this.kpi('📅','Annual',this.fmt(ff*12),'var(--green)','12 months'),this.kpi('🗓','6-Month Stack',this.fmt(ff*6),'var(--cyan)','Planning window'),this.kpi('💼','Saved Trips',(this.data.savedTrips||[]).length,'var(--blue)','Planned')]);
+    const months=this.data.vacMonths,budget=ff*months;
+    h+=this.card(this.ct('✦ What Can You Afford?')+`<div id="hzTiers">${this.tiers(budget)}</div><div style="display:flex;align-items:center;gap:10px;margin-top:10px"><span style="font-size:11px;color:var(--text3);font-family:var(--fm)">Months</span><input type="range" min="1" max="24" value="${months}" data-slider="vacMonths" style="flex:1"><span id="hzMV" style="font-family:var(--fm);font-size:12px;color:var(--green);min-width:26px">${months}</span></div><div id="hzBL" style="font-size:11px;color:var(--text2);margin-top:6px;font-family:var(--fm)">${months} months = ${this.fmt(budget)} budget</div>`);
+    h+=this.card(this.ct('🎯 When Can I Afford It?',this.btn('Plan a Trip','trip','','g'))+`<label style="display:block;font-size:11px;color:var(--text2);margin-bottom:5px">Target trip budget (SEK)</label><input type="number" data-model="target" value="${this.data.targetBudget}" placeholder="60000" style="width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:6px;padding:9px 11px;color:var(--text);font-family:var(--fm);font-size:14px;margin-bottom:10px"><div id="hzAfford">${this.afford()}</div>`);
+    let cum=0,tl='';for(let i=0;i<12;i++){cum+=ff;const d=this.addMonths(now,i);const hl=i===5||i===11;tl+=`<div style="flex-shrink:0;min-width:80px;text-align:center;background:${hl?'var(--sage-bg)':'var(--bg3)'};border:1px solid ${hl?'var(--sage-bd)':'var(--border)'};border-radius:9px;padding:9px 8px"><div style="font-size:9px;color:var(--text3)">${this.MN[d.getMonth()]}</div><div style="font-family:var(--fm);font-size:12px;font-weight:600;color:${hl?'var(--green)':'var(--text)'}">${this.fmtC(cum)}</div><div style="font-size:8px;color:var(--text3)">+${i+1}mo</div></div>`;}
+    h+=this.card(this.ct('📅 Fun Fund Timeline')+`<div class="hz-x" style="display:flex;gap:7px;overflow-x:auto;margin:0 -3px;padding-left:3px;padding-bottom:3px">${tl}</div>`);
+    const trips=this.data.savedTrips||[];
+    h+=this.card(this.ct('💼 Saved Trips')+(trips.length?trips.map(t=>`<div style="display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--border)"><div style="font-size:20px">✈</div><div style="flex:1;min-width:0"><div style="font-size:13px;font-weight:600">${this.esc(t.dest)}</div><div style="font-size:10.5px;color:var(--text2)">${t.when||'No date'}${t.nights?' · '+t.nights+' nights':''}</div></div><div style="text-align:right"><div style="font-family:var(--fm);font-weight:600;color:var(--amber)">${this.fmtC(t.budget)}</div></div><button data-act="rmtrip" data-id="${t.id}" style="background:none;border:none;color:var(--red);font-size:16px;cursor:pointer;opacity:.5">×</button></div>`).join(''):`<div style="color:var(--text3);font-size:12px">No trips planned yet.</div>`));
+    const ff6=ff*6;
+    h+=this.card(this.ct('🌍 Destination Pulse',this.btn('✦ AI Ideas','ai','','o'))+`<div style="display:grid;grid-template-columns:1fr 1fr;gap:9px">${this.PULSE.slice(0,6).map(d=>{const nums=(d.cost.match(/\d+/g)||[]).map(Number);const up=nums.length?Math.max(...nums):0;const aff=up*1000<=ff6;return `<div data-act="pulse" data-lat="${d.lat}" data-lng="${d.lng}" style="background:var(--bg3);border:1px solid var(--border);border-radius:11px;padding:11px;cursor:pointer"><div style="font-size:20px">${d.flag}</div><div style="font-weight:700;font-size:12.5px;margin-top:3px">${d.dest}</div><div style="font-size:10px;color:var(--text2);margin-top:2px;line-height:1.3">${d.why}</div><div style="font-family:var(--fm);font-size:11px;color:var(--green);margin-top:4px">${d.cost}</div><div style="margin-top:6px">${aff?this.chip('sage','IN BUDGET'):this.chip('honey','STRETCH')}</div></div>`;}).join('')}</div>`);
+    h+=this.card(this.ct('🗺 Destination Map')+`<div id="hzVacMap" style="height:200px;border-radius:11px;overflow:hidden;border:1px solid var(--border)"></div>`);
+    return h;
+  }
+  tiers(budget){const t=[['🎒','Budget Explorer','Hostels, local transport, street food',20000],['🏨','Mid-Range Comfort','3★ hotels, flights, dining out',60000],['🥂','Luxury Experience','5★ resorts, business class',Infinity]];const sel=budget>=60000?2:budget>=20000?1:0;return `<div style="display:flex;flex-direction:column;gap:8px">${t.map((x,i)=>`<div style="background:var(--bg3);border:1px solid ${i===sel?'var(--green)':'var(--border)'};border-radius:11px;padding:11px;display:flex;align-items:center;gap:11px"><span style="font-size:22px">${x[0]}</span><div style="flex:1"><div style="font-weight:700;font-size:13px">${x[1]}</div><div style="font-size:10.5px;color:var(--text3)">${x[2]}</div></div>${i===sel?this.chip('sage','YOUR RANGE'):''}</div>`).join('')}</div>`;}
+  afford(){const ff=this.fun();const t=+this.data.targetBudget||0;if(!t||ff<=0)return `<div style="color:var(--text3);font-size:12px">Enter a target budget above.</div>`;const m=Math.ceil(t/ff);const r=this.addMonths(new Date(),m);return `<div style="font-family:var(--fm);font-size:12px;line-height:1.9"><div>Target: <strong style="color:var(--amber)">${this.fmt(t)}</strong></div><div>Monthly fund: <strong style="color:var(--green)">${this.fmt(ff)}</strong></div><div>Save for: <strong style="color:var(--cyan)">${m} months</strong></div><div>Ready by: <strong style="color:var(--green)">${this.MN[r.getMonth()]} ${r.getFullYear()}</strong></div></div>${this.bar(Math.min(100,ff/t*100),'var(--green)',6)}<div style="font-size:10px;color:var(--text3);font-family:var(--fm)">${Math.min(100,Math.round(ff/t*100))}% funded today</div>`;}
+
+  // ══════ RETIRE ANYWHERE ══════
+  vAnywhere(){
+    const ne=this.nestEgg();const dr=this.draw(ne)+this.pension();const ytr=this.data.retirementAge-this.data.currentAge;
+    const inBudget=this.RET.filter(d=>d.costK*1000<=dr).length;
+    let h=this.ph('PLANNING','Where in the world?','Your dream retirement, wherever that may be.');
+    h+=this.grid2([this.kpi('✦','Monthly Income',this.fmtC(dr),'var(--green)','Draw + pension'),this.kpi('🌍','Cities in Budget',inBudget+'/'+this.RET.length,'var(--cyan)','Curated list'),this.kpi('🏛','Pension',this.fmtC(this.pension()),'var(--blue)','/mo'),this.kpi('📅','Years to Go',ytr+'Y','var(--amber)','Age '+this.data.retirementAge)]);
+    h+=this.card(this.ct('💭 Your Dream Retirement')+`<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px">${this.DREAMS.map(d=>{const on=this.data.dreams.includes(d.id);return `<div data-act="dream" data-id="${d.id}" style="background:${on?'var(--plum-bg)':'var(--bg3)'};border:1px solid ${on?'var(--violet)':'var(--border)'};border-radius:9px;padding:10px;text-align:center;cursor:pointer"><div style="font-size:19px;margin-bottom:3px">${d.icon}</div><div style="font-size:11px;font-weight:600;color:${on?'var(--plum-tx)':'var(--text2)'}">${d.name}</div></div>`;}).join('')}</div>`);
+    const lvl=this.data.retCostLevel;const m=this.EXP[lvl];const need=this.expTotal(lvl);const surplus=dr-need;
+    h+=this.card(this.ct('🧮 Retirement Cost Model')+`<select data-model="costlevel" style="width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:6px;padding:9px 11px;color:var(--text);font-size:13px;margin-bottom:12px">${[['low','Low Cost · 12K/mo'],['mid','Mid Range · 20K/mo'],['high','High Standard · 35K/mo'],['luxury','Luxury · 55K/mo']].map(o=>`<option value="${o[0]}" ${lvl===o[0]?'selected':''}>${o[1]}</option>`).join('')}</select><div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px">${Object.entries(m).map(([k,v])=>`<div style="background:var(--bg3);border-radius:8px;padding:9px 10px"><div style="font-size:10px;color:var(--text3)">${k}</div><div style="font-family:var(--fm);font-size:12px;font-weight:600">${this.fmtC(v)}</div>${this.bar(v/need*100,'var(--violet)',4)}</div>`).join('')}</div><div style="display:flex;gap:12px;flex-wrap:wrap;background:var(--bg3);border-radius:8px;padding:11px;font-family:var(--fm);font-size:11.5px"><span>Need <strong style="color:var(--amber)">${this.fmtC(need)}</strong></span><span>Draw <strong style="color:var(--green)">${this.fmtC(dr)}</strong></span><span style="margin-left:auto">${surplus>=0?this.chip('sage','SUSTAINABLE ✓'):this.chip('rose','SHORTFALL')}</span></div>`);
+    h+=this.card(this.ct('📍 Destinations',this.btn('+ Add','adddest','','o'))+`<div style="display:grid;grid-template-columns:1fr 1fr;gap:9px">${this.RET.map(d=>{const aff=d.costK*1000<=dr;return `<div style="background:var(--bg3);border:1px solid var(--border);border-radius:11px;padding:12px"><div style="font-size:24px">${d.flag}</div><div style="font-weight:700;font-size:13px;margin-top:4px">${d.name}</div><div style="font-size:10px;color:var(--text3)">${d.country}</div><div style="font-family:var(--fm);font-size:13px;color:var(--green);margin-top:5px">${d.costK}K SEK<span style="font-size:9px;color:var(--text3)">/mo</span></div><div style="display:flex;flex-wrap:wrap;gap:3px;margin-top:6px">${d.tl.slice(0,3).map(x=>`<span style="font-size:8px;padding:2px 5px;border-radius:3px;background:var(--info-bg);color:var(--info-tx)">${x}</span>`).join('')}</div><div style="margin-top:6px">${aff?this.chip('sage','WITHIN BUDGET'):this.chip('honey','STRETCH')}</div></div>`;}).join('')}</div>`);
+    h+=this.card(this.ct('⚡ APEX Feasibility',this.btn('Run Check','apex','','g'))+`<div id="hzApex">${this.data.apex?this.apexHTML():`<div style="color:var(--text3);font-size:12px">Run an APEX feasibility scan against your top destination to see financial, legal, healthcare and lifestyle scores.</div>`}</div>`);
+    h+=this.card(this.ct('🗺 Retirement World Map')+`<div id="hzRetMap" style="height:200px;border-radius:11px;overflow:hidden;border:1px solid var(--border)"></div>`);
+    return h;
+  }
+  runApex(){const ne=this.nestEgg();const dr=this.draw(ne)+this.pension();const need=this.expTotal(this.data.retCostLevel);const surplus=dr-need;const ratio=need?dr/need:1;const s=(base)=>Math.max(35,Math.min(98,Math.round(base)));const mods=[['FINANCIAL READINESS',s(ratio*70)],['LEGAL PATHWAY',82],['HEALTHCARE ACCESS',88],['COST FIT',s(ratio*68)],['TAX EFFICIENCY',76],['LIFESTYLE MATCH',this.data.dreams.length?90:70],['EXPAT COMMUNITY',84],['RUNWAY (YRS)',s(ratio*60)]];const avg=mods.reduce((a,m)=>a+m[1],0)/mods.length;const verdict=avg>=80?'FEASIBLE':avg>=62?'CONDITIONAL':'NOT FEASIBLE';this.data.apex={mods,verdict,dest:this.RET[0].name+', '+this.RET[0].country,surplus};}
+  apexHTML(){const ap=this.data.apex;const vc={FEASIBLE:'var(--green)',CONDITIONAL:'var(--amber)','NOT FEASIBLE':'var(--red)'}[ap.verdict];const vt={FEASIBLE:'sage',CONDITIONAL:'honey','NOT FEASIBLE':'rose'}[ap.verdict];return `<div style="display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-bottom:11px">${ap.mods.map(m=>{const c=m[1]>=80?'var(--green)':m[1]>=62?'var(--amber)':'var(--red)';return `<div style="background:var(--bg3);border-radius:8px;padding:9px"><div style="font-size:8px;letter-spacing:.06em;color:var(--text3);font-weight:700">${m[0]}</div><div style="font-family:var(--fm);font-size:13px;font-weight:700;color:${c};margin-top:3px">${m[1]}/100</div>${this.bar(m[1],c,4)}</div>`;}).join('')}</div><div style="border:1px solid ${vc};background:var(--${vt}-bg);border-radius:10px;padding:13px;text-align:center"><div style="font-family:var(--fs);font-size:17px;font-weight:600;color:${vc};letter-spacing:.04em">${ap.verdict} — ${this.esc(ap.dest)}</div><div style="font-size:11px;color:var(--text2);margin-top:4px;font-family:var(--fm)">Projected ${ap.surplus>=0?'surplus':'shortfall'} of ${this.fmtC(Math.abs(ap.surplus))}/mo at this cost level</div></div>`;}
+
+  // ══════ LIFE WALL ══════
+  vLifeWall(){
+    const a0=this.data.currentAge,ret=this.data.retirementAge,le=this.data.lifeExp;
+    const ch=a0<ret-5?['Wealth Building','var(--green)']:a0<ret?['Glide Path','var(--amber)']:['Retirement','var(--violet)'];
+    let h=this.ph('OVERVIEW','Life Wall',`Every year from now to ${le}, one brick at a time.`);
+    h+=`<div style="position:relative;background:linear-gradient(140deg,var(--bg2),var(--bg1));border:1px solid var(--border2);border-radius:16px;padding:16px;margin-bottom:12px;overflow:hidden"><div style="position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,var(--green),var(--amber),var(--violet))"></div><div style="font-size:9px;letter-spacing:.1em;color:var(--text3);font-weight:700;text-transform:uppercase;margin-bottom:5px">CURRENT LIFE CHAPTER</div><div style="font-family:var(--fs);font-size:23px;font-weight:600;color:${ch[1]}">${ch[0]}</div><div style="font-size:12px;color:var(--text2);margin-top:3px">Age ${a0} · ${new Date().getFullYear()} · ${ret-a0} years to retirement · ${le-a0} to plan for</div></div>`;
+    h+=`<div style="display:flex;gap:13px;flex-wrap:wrap;margin-bottom:12px;font-size:10px;color:var(--text2)">${[['Building','var(--green)'],['Glide path','var(--amber)'],['Retirement','var(--violet)']].map(l=>`<span style="display:inline-flex;align-items:center;gap:5px"><span style="width:11px;height:11px;border-radius:3px;background:${l[1]}"></span>${l[0]}</span>`).join('')}</div>`;
+    let bricks='';
+    for(let age=a0;age<=le;age++){const ph=age<ret-5?['var(--green)','var(--sage-bg)','var(--sage-bd)']:age<ret?['var(--amber)','var(--honey-bg)','var(--honey-bd)']:['var(--violet)','var(--plum-bg)','var(--plum-bd)'];const ms=age===ret||age===65||age===le;bricks+=`<div data-act="brick" data-age="${age}" style="aspect-ratio:1;border-radius:6px;background:${ph[1]};border:1px solid ${ms?ph[0]:ph[2]};display:flex;align-items:center;justify-content:center;font-family:var(--fm);font-size:10px;font-weight:${ms?'700':'500'};color:${ms?ph[0]:'var(--text2)'};cursor:pointer;${age===a0?'box-shadow:0 0 0 2px var(--green)':''}">${age}</div>`;}
+    h+=this.card(this.ct('🧱 The Wall',this.chip('honey','●'+ret+' retire'))+`<div style="display:grid;grid-template-columns:repeat(7,1fr);gap:5px">${bricks}</div><div style="font-size:10px;color:var(--text3);margin-top:11px;text-align:center">Tap any brick to see that year's projection</div>`);
+    return h;
+  }
+  brickSheet(age){const y=age-this.data.currentAge;let ne=this.nestEgg(y);const real=this.realVal(ne,y);const retired=age>=this.data.retirementAge;const dr=this.draw(ne)+(retired?this.pension():0);const yr=new Date().getFullYear()+y;const phase=age<this.data.retirementAge-5?'Wealth Building':age<this.data.retirementAge?'Glide Path':'Retirement';
+    this.sheet(`Age ${age} · ${yr}`,this.chip(retired?'plum':'sage',phase)+`<div style="margin-top:12px">${this.row('Projected nest egg',this.fmtC(ne),'var(--violet)')}${this.row("In today's money",this.fmtC(real),'var(--text)')}${retired?this.row('Monthly income',this.fmtC(dr)+' /mo','var(--green)'):this.row('Years from now','+'+y+'Y','var(--amber)')}${this.row(retired?'Status':'Milestone',retired?'Drawing down':(age===this.data.retirementAge?'🎉 Retirement begins':'Accumulating'),retired?'var(--violet)':'var(--green)',true)}</div>`,retired?'You are drawing on the portfolio in this chapter.':'You are still building the nest egg in this chapter.');}
+
+  // ══════ PROPERTY IQ ══════
+  vProperty(){
+    const p=this.data.property;const eq=p.value-p.mortgage;const ltv=p.value?p.mortgage/p.value*100:0;
+    const tone=ltv<70?'sage':ltv<85?'honey':'rose';const bc=ltv<70?'var(--green)':ltv<85?'var(--amber)':'var(--red)';
+    let h=this.ph('PLANNING','Property IQ','Your home as a financial asset — equity, leverage and payoff.');
+    if(!p.value)h+=this.banner('info',`<b>No property added yet.</b> Enter your home's market value and mortgage below to model equity, leverage and payoff — it feeds your Net Worth.`);
+    h+=this.grid2([this.kpi('🏠','Value',this.fmtC(p.value),'var(--text)','Market est.'),this.kpi('💎','Equity',this.fmtC(eq),'var(--green)',(100-ltv).toFixed(0)+'% owned','pos'),this.kpi('🏦','Mortgage',this.fmtC(p.mortgage),'var(--red)',(p.rate||0)+'% · SEB'),this.kpi('📉','LTV',ltv.toFixed(0)+'%',bc,ltv<70?'Healthy':ltv<85?'Moderate':'High',tone==='sage'?'pos':tone==='honey'?'warn':'alert')]);
+    h+=this.card(this.ct('💎 Equity Position')+this.row('Market value',this.fmtC(p.value),'var(--text)')+this.row('Mortgage outstanding','−'+this.fmtC(p.mortgage),'var(--red)')+this.row('Your equity',this.fmtC(eq),'var(--green)',true)+`<div style="margin-top:10px"><div style="display:flex;justify-content:space-between;font-size:10px;color:var(--text3);font-family:var(--fm);margin-bottom:3px"><span>Loan-to-value</span><span style="color:${bc}">${ltv.toFixed(0)}%</span></div>${this.bar(ltv,bc,8)}</div>`);
+    h+=this.card(this.ct('✎ Details')+['value','mortgage','rate','monthly'].map((k,i)=>this.srow(['Market value','Mortgage','Interest rate %','Monthly payment'][i],`<div style="display:flex;align-items:center;background:var(--bg3);border:1px solid var(--border);border-radius:6px;padding:0 9px"><input type="number" value="${p[k]||0}" data-model="prop:${k}" style="width:${k==='rate'?'56':'96'}px;background:transparent;border:none;color:var(--text);font-family:var(--fm);font-size:12px;padding:7px 0;text-align:right"><span style="color:var(--text3);font-size:9px;font-family:var(--fm)">${k==='rate'?'%':'kr'}</span></div>`,i===3)).join(''));
+    h+=this.card(this.ct('📉 Mortgage Payoff')+`<div style="height:180px"><canvas id="hzAmortChart"></canvas></div>`);
+    h+=this.banner(tone,`At <b>${ltv.toFixed(0)}% LTV</b> you hold <b>${this.fmtC(eq)}</b> of equity. ${ltv<70?'Comfortable leverage — this equity backs your net worth and could part-fund a retirement move.':'Consider extra amortisation to lift your equity buffer.'} <a data-act="nav" data-t="retirement">See in Retirement →</a>`);
+    return h;
+  }
+
+  // ══════ JOURNAL ══════
+  vJournal(){
+    let h=this.ph('LIBRARY','Journal','Decisions and notes, timestamped alongside your numbers.');
+    const j=this.data.journal||[];
+    h+=this.card(this.ct('📓 Entries',this.btn('+ New','newjournal','','o'))+(j.length?j.map(e=>`<div data-act="openjournal" data-id="${e.id}" style="padding:12px 0;border-bottom:1px solid var(--border);cursor:pointer"><div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">${this.chip(e.tag,e.date)}</div><div style="font-family:var(--fs);font-size:15px;font-weight:600;margin-bottom:4px">${this.esc(e.title)}</div><div style="font-size:12px;color:var(--text2);line-height:1.5;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden">${this.esc(e.body)}</div></div>`).join(''):`<div style="color:var(--text3);font-size:12px">No entries yet. Tap “+ New” to record a decision.</div>`));
+    return h;
+  }
+  openJournal(id){const e=this.data.journal.find(x=>x.id===id);if(!e)return;this.sheet(e.title,this.chip(e.tag,e.date)+`<div style="margin-top:12px;font-size:13.5px;line-height:1.7;color:var(--text);white-space:pre-wrap">${this.esc(e.body)}</div>`);}
+  openNewJournal(){this.sheet('New Journal Entry',`<div style="display:flex;flex-direction:column;gap:10px"><input id="njTitle" placeholder="Title" style="width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:9px 11px;color:var(--text);font-size:14px"><textarea id="njBody" placeholder="What did you decide, and why?" style="width:100%;min-height:110px;background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:9px 11px;color:var(--text);font-size:13px;line-height:1.5;resize:vertical"></textarea></div><div style="margin-top:14px">${this.btn('Save Entry','savejournal','','g')}</div>`,'Capture the thinking behind a money decision.');}
+  saveJournal(){const tEl=document.getElementById('njTitle');const bEl=document.getElementById('njBody');const t=(tEl&&tEl.value||'').trim();if(!t)return this.toast('Enter a title');const b=(bEl&&bEl.value||'').trim();const iso=this.dkeyFull();const disp=this.fmtDate(iso);const id='j'+Date.now();this.data.journal.unshift({id,date:disp,_iso:iso,tag:'info',title:t,body:b});if(typeof state!=='undefined'){if(!Array.isArray(state.journal))state.journal=[];state.journal.unshift({id,date:iso,tag:'reflection',title:t,body:b,content:b});if(typeof save==='function')save();}this.closeOverlay();if(this.data.tab!=='journal')this.go('journal');else this.paint();this.toast('Entry saved ✓');}
+  dkeyFull(){const n=new Date();return n.getFullYear()+'-'+String(n.getMonth()+1).padStart(2,'0')+'-'+String(n.getDate()).padStart(2,'0');}
+
+  // ══════ VAULT ══════
+  vVault(){
+    const v=this.data.vault||[];const total=v.length;
+    let h=this.ph('LIBRARY','Vault','Documents, statements and AI reports — encrypted at rest.');
+    h+=this.banner('info',`<b>${total} items</b> in your encrypted vault. Upload files or save analyses from anywhere in the app with <b>🗄 Save to Vault</b>.`);
+    h+=this.card(this.ct('🗄 Items',this.btn('⬆ Upload','upload','','o'))+(v.length?v.map(x=>`<div data-act="openvault" data-id="${x.id}" style="display:flex;align-items:center;gap:11px;padding:10px 0;border-bottom:1px solid var(--border);cursor:pointer"><div style="width:38px;height:38px;border-radius:9px;background:var(--${x.tone}-bg);border:1px solid var(--${x.tone}-bd);display:flex;align-items:center;justify-content:center;font-size:17px;flex-shrink:0">${x.icon}</div><div style="flex:1;min-width:0"><div style="font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${this.esc(x.title)}</div><div style="font-size:10.5px;color:var(--text3);font-family:var(--fm)">${x.type} · ${x.date}</div></div><div style="text-align:right;flex-shrink:0"><div style="font-family:var(--fm);font-size:11px;color:var(--text2)">${x.size}</div><span style="color:var(--text3);font-size:14px">›</span></div></div>`).join(''):`<div style="color:var(--text3);font-size:12px">Your vault is empty.</div>`));
+    return h;
+  }
+
+  // ══════ SETTINGS ══════
+  vSettings(){
+    let h=this.ph('SYSTEM','Settings','Profile, assumptions and appearance. Powers every AI analysis.');
+    h+=this.card(this.ct('🪪 Profile & Context')+this.srow('Citizenship',`<input value="${this.esc(this.data.citizenship)}" data-model="s:citizenship" style="${this.inpS(150)}">`)+this.srow('Home Base',`<input value="${this.esc(this.data.homeBase)}" data-model="s:homeBase" style="${this.inpS(150)}">`)+this.srow('Current Age',`<input type="number" value="${this.data.currentAge}" data-model="n:currentAge" style="${this.inpS(70)}">`)+this.srow('Retirement Age',`<input type="number" value="${this.data.retirementAge}" data-model="n:retirementAge" style="${this.inpS(70)}">`)+this.srow('Life Expectancy',`<input type="number" value="${this.data.lifeExp}" data-model="n:lifeExp" style="${this.inpS(70)}">`,true));
+    h+=this.card(this.ct('📊 Assumptions')+this.srow('Portfolio Growth %',`<input type="number" step=".5" value="${this.data.growthRate}" data-model="n:growthRate" style="${this.inpS(70)}">`)+this.srow('Inflation %',`<input type="number" step=".5" value="${this.data.inflationRate}" data-model="n:inflationRate" style="${this.inpS(70)}">`)+this.srow('Post-Retire Growth %',`<input type="number" step=".5" value="${this.data.postRetGrowth}" data-model="n:postRetGrowth" style="${this.inpS(70)}">`)+this.srow('Withdrawal Tax %',`<input type="number" value="${this.data.withdrawTaxRate}" data-model="n:withdrawTaxRate" style="${this.inpS(70)}">`,true));
+    h+=this.card(this.ct('🎨 Appearance')+this.srow('Currency',this.seg('currency',[['SEK','kr'],['USD','$'],['EUR','€'],['KES','KSh']]))+this.srow('Language',this.seg('lang',[['EN','EN'],['SV','SV']]))+this.srow('Theme',`<button data-act="theme" style="background:var(--bg4);border:1px solid var(--border2);color:var(--text);border-radius:7px;padding:6px 12px;font-size:11px;cursor:pointer">${this.data.theme==='dark'?'☀ Switch to Light':'☾ Switch to Dark'}</button>`,true));
+    h+=this.card(this.ct('💱 Exchange Rates',this.chip('sage','● Live FX pending'))+['USD','EUR','KES'].map((k,i)=>this.srow(k+' per SEK',`<input type="number" step=".001" value="${this.data.exchangeRates[k]}" data-model="fx:${k}" style="${this.inpS(90)}">`,i===2)).join(''));
+    h+=this.card(this.ct('🏦 Connections')+`<div style="display:flex;gap:8px;flex-wrap:wrap">${this.btn('🏦 Connect Bank (PSD2)','bank','','o')}${this.btn('📥 Import CSV','csv','','o')}${this.btn('📊 Load Demo Data','demo','','o')}</div>`);
+    h+=this.card(this.ct('💾 Data')+`<div style="display:flex;gap:8px;flex-wrap:wrap">${this.btn('⬇ Export JSON','export','','o')}${this.btn('⬆ Import','import','','o')}<button data-act="reset" style="background:var(--rose-bg);color:var(--rose-tx);border:1px solid var(--rose-bd);border-radius:8px;font-size:11px;font-weight:600;padding:6px 11px;cursor:pointer">⚠ Reset</button></div>`);
+    h+=`<div style="text-align:center;color:var(--text3);font-size:10px;font-family:var(--fm);margin-top:6px">HORIZON FINANCE OS · mobile</div>`;
+    return h;
+  }
+
+  // ══════ CHARTS ══════
+  chOpts(extra){return Object.assign({responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}}},extra);}
+  cc(){const g=getComputedStyle(this.root);return {t3:g.getPropertyValue('--text3').trim()||'#3d506e',t2:g.getPropertyValue('--text2').trim()||'#7a8fb0',grid:this.data.theme==='dark'?'#1a2640':'#D6CFBF'};}
+  chartDash(){this.whenLib(()=>window.Chart,()=>{const now=new Date();const labs=[],net=[];for(let i=0;i<12;i++){const d=this.addMonths(now,i);const k=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;const m=this.gmd(k);labs.push(this.MN[d.getMonth()]);net.push(Math.round(m.disp));}const c=this.cc();const ctx=document.getElementById('hzDashChart');if(!ctx)return;if(this.charts.dash)this.charts.dash.destroy();this.charts.dash=new Chart(ctx,{type:'bar',data:{labels:labs,datasets:[{data:net,backgroundColor:net.map(v=>v>=0?'#00e8a055':'#ff4d6d55'),borderColor:net.map(v=>v>=0?'#00e8a0':'#ff4d6d'),borderWidth:1,borderRadius:4}]},options:this.chOpts({scales:{x:{ticks:{color:c.t3,font:{size:9}},grid:{display:false}},y:{ticks:{color:c.t3,font:{size:9},callback:v=>this.fmtC(v)},grid:{color:c.grid}}}})});});}
+  chartSpend(){this.whenLib(()=>window.Chart,()=>{const byCat={};this.data.transactions.forEach(t=>byCat[t.c]=(byCat[t.c]||0)+t.a);const labs=Object.keys(byCat),vals=Object.values(byCat);const cols=['#00e8a0','#4d9fff','#f5a623','#8b5cf6','#00d4ff','#ec4899','#ff4d6d','#7a8fb0'];const c=this.cc();const ctx=document.getElementById('hzSpendChart');if(!ctx)return;if(this.charts.spend)this.charts.spend.destroy();this.charts.spend=new Chart(ctx,{type:'doughnut',data:{labels:labs,datasets:[{data:vals,backgroundColor:cols,borderColor:getComputedStyle(this.root).getPropertyValue('--bg2').trim(),borderWidth:2}]},options:this.chOpts({cutout:'62%',plugins:{legend:{display:true,position:'right',labels:{color:c.t2,font:{size:9},boxWidth:8,padding:6}}}})});});}
+  chartForecast(){this.whenLib(()=>window.Chart,()=>{const now=new Date();const labs=[],inc=[],exp=[];for(let i=0;i<12;i++){const d=this.addMonths(now,i);const k=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;const m=this.gmd(k);labs.push(this.MN[d.getMonth()]);inc.push(Math.round(m.ti));exp.push(Math.round(m.te));}const c=this.cc();const ctx=document.getElementById('hzForecastChart');if(!ctx)return;if(this.charts.fc)this.charts.fc.destroy();this.charts.fc=new Chart(ctx,{type:'line',data:{labels:labs,datasets:[{label:'Income',data:inc,borderColor:'#00e8a0',backgroundColor:'#00e8a015',fill:true,tension:.3,pointRadius:0},{label:'Expenses',data:exp,borderColor:'#ff4d6d',backgroundColor:'#ff4d6d10',fill:true,tension:.3,pointRadius:0}]},options:this.chOpts({plugins:{legend:{display:true,labels:{color:c.t2,font:{size:9},boxWidth:8}}},scales:{x:{ticks:{color:c.t3,font:{size:9}},grid:{display:false}},y:{ticks:{color:c.t3,font:{size:9},callback:v=>this.fmtC(v)},grid:{color:c.grid}}}})});});}
+  chartNest(){this.whenLib(()=>window.Chart,()=>{const ytr=this.data.retirementAge-this.data.currentAge;const labs=[],data=[];const step=Math.max(1,Math.floor(ytr/18));for(let y=0;y<=ytr;y+=step){let t=this.nestEgg(y);if(this.data.retLens==='today')t=this.realVal(t,y);data.push(Math.round(t/1e6*10)/10);labs.push(this.data.currentAge+y);}const c=this.cc();const ctx=document.getElementById('hzNestChart');if(!ctx)return;if(this.charts.nest)this.charts.nest.destroy();this.charts.nest=new Chart(ctx,{type:'line',data:{labels:labs,datasets:[{data,borderColor:'#8b5cf6',backgroundColor:'#8b5cf618',fill:true,tension:.4,pointRadius:0}]},options:this.chOpts({scales:{x:{ticks:{color:c.t3,font:{size:9}},grid:{display:false}},y:{ticks:{color:c.t3,font:{size:9},callback:v=>v+'M'},grid:{color:c.grid}}}})});});}
+  chartAmort(){this.whenLib(()=>window.Chart,()=>{const p=this.data.property;const ctx=document.getElementById('hzAmortChart');if(!ctx)return;if(this.charts.amort)this.charts.amort.destroy();if(!p.mortgage||!p.monthly){this.charts.amort=null;return;}let bal=p.mortgage;const r=(p.rate||0)/100/12;const labs=[],data=[];let baseYr=new Date().getFullYear();for(let mth=0;mth<=480&&bal>0.5;mth++){if(mth%12===0){labs.push(baseYr+mth/12);data.push(Math.round(bal/1e6*100)/100);}const interest=bal*r;bal=bal-(p.monthly-interest);if(bal<0)bal=0;if(p.monthly-interest<=0)break;}const c=this.cc();this.charts.amort=new Chart(ctx,{type:'line',data:{labels:labs,datasets:[{data,borderColor:'#4d9fff',backgroundColor:'#4d9fff18',fill:true,tension:.35,pointRadius:0}]},options:this.chOpts({scales:{x:{ticks:{color:c.t3,font:{size:9},maxTicksLimit:7},grid:{display:false}},y:{ticks:{color:c.t3,font:{size:9},callback:v=>v+'M'},grid:{color:c.grid}}}})});});}
+  initVacMap(){this.whenLib(()=>window.L&&document.getElementById('hzVacMap'),()=>{if(this.vacMap){this.vacMap.remove();this.vacMap=null;}const el=document.getElementById('hzVacMap');if(!el)return;this.vacMap=L.map(el,{zoomControl:false,attributionControl:false}).setView([20,20],1);L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(this.vacMap);this.PULSE.forEach(d=>{const m=L.circleMarker([d.lat,d.lng],{radius:8,fillColor:d.col,color:d.col,fillOpacity:.8,weight:2});m.bindPopup(`<strong>${d.flag} ${d.dest}</strong><br>${d.cost}`);m.addTo(this.vacMap);});setTimeout(()=>this.vacMap&&this.vacMap.invalidateSize(),140);});}
+  initRetMap(){this.whenLib(()=>window.L&&document.getElementById('hzRetMap'),()=>{if(this.retMap){this.retMap.remove();this.retMap=null;}const el=document.getElementById('hzRetMap');if(!el)return;this.retMap=L.map(el,{zoomControl:false,attributionControl:false}).setView([25,10],1);L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(this.retMap);const dr=this.draw(this.nestEgg())+this.pension();this.RET.forEach(d=>{const col=d.costK*1000<=dr?'#00e8a0':'#f5a623';const m=L.circleMarker([d.lat,d.lng],{radius:9,fillColor:col,color:col,fillOpacity:.8,weight:2});m.bindPopup(`<strong>${d.flag} ${d.name}</strong><br>${d.costK}K SEK/mo`);m.addTo(this.retMap);});setTimeout(()=>this.retMap&&this.retMap.invalidateSize(),140);});}
+
+  // ══════ EVENTS ══════
+  onClick(e){const el=e.target.closest('[data-act]');if(!el)return;const a=el.dataset.act;const d=el.dataset;
+    if(a==='nav')return this.go(d.t);
+    if(a==='month'){this.data.selectedMonth=d.k;return this.paint();}
+    if(a==='clearov'){delete this.data.monthlyOverrides[this.data.selectedMonth||this.dkey()];this.persist();return this.paint();}
+    if(a==='addline'){const ov=this.ovFor();const id='x'+Math.random().toString(36).slice(2,8);if(d.t==='income')ov.income.push({id,name:'New income',amount:0,paid:false});else ov.expenses.push({id,name:'New expense',amount:0,cat:'Other',paid:false});this.persist();return this.paint();}
+    if(a==='rmline'){const ov=this.ovFor();if(d.t==='income')ov.income=ov.income.filter(i=>i.id!==d.id);else ov.expenses=ov.expenses.filter(i=>i.id!==d.id);this.persist();return this.paint();}
+    if(a==='togpaid'){const ov=this.ovFor();const arr=d.t==='income'?ov.income:ov.expenses;const it=arr.find(i=>i.id===d.id);if(it)it.paid=!it.paid;this.persist();return this.paint();}
+    if(a==='assetadd'){this.data.externalAssets.push({id:'a'+Math.random().toString(36).slice(2,8),name:'New asset',balance:0,growthRate:this.data.growthRate,monthlyContribution:0,accountType:'standard',taxRate:30,assetType:'investment'});this.persist();return this.paint();}
+    if(a==='assetrm'){this.data.externalAssets=this.data.externalAssets.filter(x=>x.id!==d.id);this.persist();return this.paint();}
+    if(a==='lens'){this.data.retLens=d.l;this.persist();return this.paint();}
+    if(a==='dream'){const i=this.data.dreams.indexOf(d.id);if(i>-1)this.data.dreams.splice(i,1);else this.data.dreams.push(d.id);this.persist();return this.paint();}
+    if(a==='pulse'&&this.vacMap){this.vacMap.setView([+d.lat,+d.lng],4);return;}
+    if(a==='apex'){this.runApex();this.persist();this.paint();return this.toast('APEX scan complete');}
+    if(a==='theme')return this.toggleTheme();
+    if(a==='seg'){this.data[d.model]=d.v;this.persist();return this.paint();}
+    if(a==='rmtrip'){this.data.savedTrips=this.data.savedTrips.filter(t=>t.id!==d.id);this.persist();return this.paint();}
+    if(a==='trip')return this.openTrip();
+    if(a==='adddest')return this.openAddDest();
+    if(a==='bank')return this.openBank();
+    if(a==='ai'||a==='aichat')return this.openChat();
+    if(a==='csv')return this.toast('CSV import — connect a bank export to map columns');
+    if(a==='demo')return this.toast('Demo spend data is already loaded ✓');
+    if(a==='export')return this.doExport();
+    if(a==='import')return this.toast('Use Settings → Data on desktop to import a backup');
+    if(a==='reset')return this.toast('Reset lives in desktop Settings for safety');
+    if(a==='brick')return this.brickSheet(+d.age);
+    if(a==='openjournal')return this.openJournal(d.id);
+    if(a==='newjournal')return this.openNewJournal();
+    if(a==='savejournal')return this.saveJournal();
+    if(a==='openvault')return this.toast('Open this document on desktop to view it');
+    if(a==='upload')return this.toast('Save analyses to your vault from any AI report');
+    if(a==='closeov')return this.closeOverlay();
+    if(a==='savetrip')return this.saveTrip();
+    if(a==='morenav')return this.go(d.t);
+  }
+  onChange(e){const el=e.target.closest('[data-model]');if(!el)return;this.commit(el.dataset.model,el.value);this.persist();this.paint();}
+  onInput(e){const s=e.target.closest('[data-slider]');if(s){this.data[s.dataset.slider]=+s.value;const ff=this.fun();const b=ff*(+s.value);const mv=document.getElementById('hzMV');const bl=document.getElementById('hzBL');const ti=document.getElementById('hzTiers');if(mv)mv.textContent=s.value;if(bl)bl.textContent=`${s.value} months = ${this.fmt(b)} budget`;if(ti)ti.innerHTML=this.tiers(b);clearTimeout(this._st);this._st=setTimeout(()=>this.persist(),400);return;}}
+  commit(model,val){const p=model.split(':');const num=parseFloat(val);
+    if(p[0]==='savings'){this.ovFor().savings=num||0;this.data.baseSavings=num||0;}
+    else if(p[0]==='amt'){const ov=this.ovFor();const arr=p[1]==='income'?ov.income:ov.expenses;const it=arr.find(i=>i.id===p[2]);if(it)it.amount=num||0;}
+    else if(p[0]==='name'){const ov=this.ovFor();const arr=p[1]==='income'?ov.income:ov.expenses;const it=arr.find(i=>i.id===p[2]);if(it)it.name=val;}
+    else if(p[0]==='pen'){this.data[p[1]]=num||0;}
+    else if(p[0]==='abal'){const a=this.data.externalAssets.find(x=>x.id===p[1]);if(a)a.balance=num||0;}
+    else if(p[0]==='acon'){const a=this.data.externalAssets.find(x=>x.id===p[1]);if(a)a.monthlyContribution=num||0;}
+    else if(p[0]==='agro'){const a=this.data.externalAssets.find(x=>x.id===p[1]);if(a)a.growthRate=num||0;}
+    else if(p[0]==='aname'){const a=this.data.externalAssets.find(x=>x.id===p[1]);if(a)a.name=val;}
+    else if(p[0]==='target'){this.data.targetBudget=val;}
+    else if(p[0]==='costlevel'){this.data.retCostLevel=val;}
+    else if(p[0]==='n'){this.data[p[1]]=num||0;}
+    else if(p[0]==='s'){this.data[p[1]]=val;}
+    else if(p[0]==='fx'){this.data.exchangeRates[p[1]]=num||0;}
+    else if(p[0]==='prop'){this.data.property[p[1]]=num||0;if(p[1]==='value')this.data.netWorth.property=num||0;if(p[1]==='mortgage')this.data.netWorth.mortgage=num||0;}
+  }
+  ovFor(){const k=this.data.selectedMonth||this.dkey();if(!this.data.monthlyOverrides[k]){const md=this.gmd(k);this.data.monthlyOverrides[k]={income:JSON.parse(JSON.stringify(md.income)),expenses:JSON.parse(JSON.stringify(md.expenses)),savings:md.savings};}return this.data.monthlyOverrides[k];}
+  doExport(){try{const blob=new Blob([JSON.stringify(state,null,2)],{type:'application/json'});const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download='horizon-backup.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);this.toast('Exported horizon-backup.json');}catch(_){this.toast('Export failed');}}
+
+  // ══════ OVERLAYS / SHEETS ══════
+  closeOverlay(){this.overlay.style.display='none';this.overlay.innerHTML='';}
+  sheet(title,body,sub){this.overlay.style.display='block';this.overlay.innerHTML=`<div data-act="closeov" style="position:absolute;inset:0;background:rgba(0,0,0,.6);backdrop-filter:blur(2px);-webkit-backdrop-filter:blur(2px)"></div><div class="hz-sb" style="position:absolute;left:0;right:0;bottom:0;max-height:82%;overflow-y:auto;background:var(--bg1);border-top:1px solid var(--border2);border-radius:22px 22px 0 0;padding:8px 18px calc(env(safe-area-inset-bottom, 0px) + 26px);animation:hzsheet .3s cubic-bezier(.2,.8,.2,1)"><div style="width:38px;height:4px;border-radius:3px;background:var(--border2);margin:6px auto 14px"></div><div style="display:flex;align-items:center;gap:10px;margin-bottom:${sub?'4px':'14px'}"><div style="font-family:var(--fs);font-size:19px;font-weight:600;flex:1">${title}</div><button data-act="closeov" style="width:30px;height:30px;border-radius:8px;border:1px solid var(--border);background:var(--bg3);color:var(--text2);font-size:13px;cursor:pointer">✕</button></div>${sub?`<div style="font-size:12px;color:var(--text2);margin-bottom:14px;line-height:1.5">${sub}</div>`:''}${body}</div>`;}
+  openMore(){this.sheet('More','<div style="display:flex;flex-direction:column;gap:6px">'+this.MORE.map(m=>`<button data-act="morenav" data-t="${m[0]}" style="display:flex;align-items:center;gap:13px;background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:13px 14px;color:var(--text);cursor:pointer;text-align:left"><span style="font-size:20px;width:26px;text-align:center">${m[1]}</span><div style="flex:1"><div style="font-size:14px;font-weight:600">${m[2]}</div><div style="font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.06em">${m[3]}</div></div><span style="color:var(--text3)">›</span></button>`).join('')+'</div>');}
+  openSearch(){const items=this.MORE;this.sheet('Search','<input autofocus placeholder="Jump to a tab or action…" style="width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:9px;padding:11px 13px;color:var(--text);font-size:14px;margin-bottom:12px"><div style="font-family:var(--fm);font-size:9px;letter-spacing:.1em;color:var(--text3);text-transform:uppercase;margin-bottom:8px">Navigate</div><div style="display:flex;flex-direction:column;gap:5px">'+items.map(m=>`<button data-act="morenav" data-t="${m[0]}" style="display:flex;align-items:center;gap:12px;background:var(--bg2);border:1px solid var(--border);border-radius:10px;padding:11px 13px;color:var(--text);cursor:pointer;text-align:left"><span style="font-size:16px;width:22px;text-align:center">${m[1]}</span><span style="flex:1;font-size:13px">${m[2]}</span><span style="font-family:var(--fm);font-size:9px;color:var(--text3)">↵</span></button>`).join('')+'</div>');}
+  openBank(){this.sheet('Connect Bank','<div style="display:flex;flex-direction:column;gap:10px">'+[['Open Banking (PSD2)','Requires bank credentials','🏦','info'],['Manual / Demo Mode','Pre-loaded sample data','📊','sage']].map(o=>`<div style="background:var(--${o[3]}-bg);border:1px solid var(--${o[3]}-bd);border-radius:12px;padding:13px;display:flex;align-items:center;gap:12px"><span style="font-size:22px">${o[2]}</span><div style="flex:1"><div style="font-size:13px;font-weight:600;color:var(--text)">${o[0]}</div><div style="font-size:11px;color:var(--text2)">${o[1]}</div></div></div>`).join('')+'</div><label style="display:block;font-size:11px;color:var(--text2);margin:14px 0 5px">Select your bank</label><select style="width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:10px 12px;color:var(--text);font-size:13px"><option>SEB</option><option>Swedbank</option><option>Handelsbanken</option><option>Nordea</option><option>Danske Bank</option><option>Other (PSD2)</option></select><div style="display:flex;gap:8px;margin-top:14px">'+this.btn('📊 Load Demo','demo','','g')+this.btn('🏦 Connect Live','bank','','o')+'</div>','Connect via Open Banking (PSD2) to pull real transactions, or use demo mode. Supported: SEB, Swedbank, Handelsbanken, Nordea, Danske Bank and all EU PSD2 banks.');}
+  openTrip(){this.sheet('Plan a Trip','<div style="display:flex;flex-direction:column;gap:10px"><div><label style="display:block;font-size:11px;color:var(--text2);margin-bottom:4px">Destination</label><input id="tpDest" placeholder="e.g. Cape Town, South Africa" style="width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:9px 11px;color:var(--text);font-size:13px"></div><div style="display:flex;gap:8px"><div style="flex:1"><label style="display:block;font-size:11px;color:var(--text2);margin-bottom:4px">When</label><input id="tpWhen" placeholder="Dec 2026" style="width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:9px 11px;color:var(--text);font-size:13px"></div><div style="width:90px"><label style="display:block;font-size:11px;color:var(--text2);margin-bottom:4px">Nights</label><input id="tpNights" type="number" value="10" style="width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:9px 11px;color:var(--text);font-family:var(--fm);font-size:13px"></div></div><div><label style="display:block;font-size:11px;color:var(--text2);margin-bottom:4px">Total budget (SEK)</label><input id="tpBudget" type="number" placeholder="60000" style="width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:9px 11px;color:var(--text);font-family:var(--fm);font-size:13px"></div></div><div style="margin-top:14px">'+this.btn('Save Trip','savetrip','','g')+'</div>','Plan a specific trip and see exactly what it does to your fun fund.');}
+  saveTrip(){const dEl=document.getElementById('tpDest');const dest=(dEl&&dEl.value||'').trim();if(!dest)return this.toast('Enter a destination');this.data.savedTrips.push({id:'t'+Date.now(),dest,when:(document.getElementById('tpWhen')||{}).value||'',budget:+(document.getElementById('tpBudget')||{}).value||0,nights:+(document.getElementById('tpNights')||{}).value||0});this.persist();this.closeOverlay();if(this.data.tab!=='funfund')this.go('funfund');else this.paint();this.toast('Trip saved ✓');}
+  openAddDest(){this.sheet('Add Destination','<input placeholder="🔍 Search city or country…" style="width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:9px;padding:11px 13px;color:var(--text);font-size:14px;margin-bottom:12px"><div style="font-size:11.5px;color:var(--text3);line-height:1.6">Pick a match to pre-fill cost of living, tax, climate and coordinates. Add and manage full destinations from Retire Anywhere on desktop.</div>','Search by city or country to add a retirement destination.');}
+  openChat(){this.closeOverlay();if(typeof toggleAIPanel==='function'){try{toggleAIPanel();return;}catch(_){}}this.sheet('Horizon AI Advisor','<div style="background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:13px;font-size:12.5px;line-height:1.6;color:var(--text);margin-bottom:12px">Ask me anything about your finances, retirement timeline, where to retire, or travel budget. I have full context of your data.</div>','Aware of your financial context');}
+}
+
+// ── boot + breakpoint handling ───────────────────────────────────────────
+(function(){
+  let hz=null;
+  const mq=window.matchMedia('(max-width:720px)');
+  function ensure(){
+    const el=document.getElementById('hzApp');if(!el)return;
+    if(mq.matches){
+      el.setAttribute('aria-hidden','false');
+      if(!hz){hz=new HZMobile();window.HZ=hz;try{hz.mount();}catch(err){console.warn('[hz] mount failed',err);}}
+      else {try{hz.hydrate();hz.syncThemeBtn();hz.paint();}catch(err){console.warn('[hz] repaint failed',err);}}
+    } else {
+      el.setAttribute('aria-hidden','true');
+    }
+  }
+  function onMQ(){ensure();if(!mq.matches&&typeof renderPanel==='function'&&typeof state!=='undefined'){try{renderPanel(state.activePanel);}catch(_){}}}
+  if(document.readyState==='loading')window.addEventListener('DOMContentLoaded',()=>setTimeout(ensure,0));
+  else setTimeout(ensure,0);
+  window.addEventListener('load',()=>setTimeout(ensure,60));
+  if(mq.addEventListener)mq.addEventListener('change',onMQ);else if(mq.addListener)mq.addListener(onMQ);
+  window.addEventListener('hz:refresh',ensure);
+})();
+
+})();
+
 </script>
 </body>
 </html>
