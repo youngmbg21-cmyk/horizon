@@ -7436,10 +7436,15 @@ function _syncRefreshUI(){
   if(state.activePanel === 'settings' && typeof renderSettings === 'function'){
     try { renderSettings(); } catch(_){}
   }
-  // Mirror the refresh into the mobile shell's Settings so the Cloud Sync card
-  // reflects connect / sign-in / sign-out / error transitions live on phones.
-  if(typeof window!=='undefined' && window.HZ && window.HZ.data && window.HZ.data.tab==='settings'){
-    try { window.HZ.paint(true); } catch(_){}
+  // Keep the mobile shell in lock-step with sync transitions. A cloud PULL
+  // applies remote data into `state` and then calls here — so we must
+  // re-hydrate the phone view from the freshly-applied state (on ANY tab,
+  // immediately) rather than relying on the debounced state:changed handler,
+  // whose focus/overlay guards could otherwise defer or skip the refresh and
+  // leave the phone showing pre-sign-in data.
+  if(typeof window!=='undefined' && window.HZ && typeof window.HZ.hydrate==='function'
+     && window.matchMedia && window.matchMedia('(max-width:720px)').matches){
+    try { window.HZ.hydrate(); window.HZ.syncThemeBtn(); window.HZ.paint(true); } catch(_){}
   }
 }
 
