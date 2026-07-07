@@ -74,3 +74,39 @@ Format per entry: **Bug** → **Root cause** → **Fix** → **Pattern**.
 
 ## Phase 3/4 — Discovered issues + fixes
 (appended below as found)
+
+### Discovered & fixed (this sweep)
+
+D1. **Chart tooltips showed raw native kr, not the selected currency**
+   - Where: `chartDash`, `chartForecast`, `chartSpend` (mobile).
+   - Root cause: axes used `fmtC` but Chart.js default tooltips print the raw
+     datapoint; `chartSpend` (doughnut) had no currency formatting at all.
+   - Fix: added `tooltip.callbacks.label` routed through `fmtC` (with series /
+     category name for multi-series). Verified: bar→"$1K", line→"Income: $1K",
+     doughnut→"Groceries: $1K".
+   - Pattern: **P3**. (Also confirmed the previously-fixed nest/mortgage/balance
+     charts remain correct — no other mobile `new Chart(` lacks a converting tooltip.)
+
+D2. **Inline × delete buttons were 9–13px wide (untappable)**
+   - Where: trip remover (Fun Fund), pension/investment removers (Retirement).
+   - Root cause: bare `font-size:16px` glyph buttons with no padding.
+   - Fix: padding + line-height (negative margin to limit row growth) → ~27×34px,
+     plus `aria-label`. Verified.
+   - Pattern: **touch targets under ~44px.**
+
+D3. **Orphaned `// PROPERTY IQ` comment** left after the tab removal — deleted (cosmetic).
+
+### Verified clean (no fix needed)
+- **Overflow**: all 10 tabs at 375px and 390px, with full data, empty data, and
+  68-char names — zero horizontal overflow.
+- **Dead ends**: every `data-act` (literal + `btn()`-generated) maps to a handler.
+- **Overlays/sheets**: all 9 (More, Search, Plan/Edit Trip, Add/Edit Destination,
+  View Report, New Journal, Bank) open, expose a close control, don't overflow,
+  and dismiss.
+- **Empty states**: Journal, Vault, Trips, Destinations, Pensions all show helpful
+  copy; data tabs render zeros (not broken) with no data.
+- **Light theme**: correct contrast (dark text on light bg), no unstyled defaults.
+- **Async signals**: AI dashboard/spend reports, Deep Dive, and sync all show
+  running/error states.
+- **Console**: zero errors/warnings across all tabs except the environment-only
+  FX-rate fetch (see DEFERRED).
