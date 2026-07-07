@@ -22675,6 +22675,10 @@ class HZMobile {
     const vchip={feasible:['sage','FEASIBLE'],conditional:['honey','CONDITIONAL'],infeasible:['rose','INFEASIBLE']}[loc.verdict]||['info',String(loc.verdict||'').toUpperCase()];
     const aff=Math.max(0,Math.min(100,Math.round(this.n(loc.affordabilityScore,0)*100)));
     const rank=(loc.incomePercentile!=null)?`<div style="font-size:9.5px;color:var(--text3);font-family:var(--fm);margin-top:6px">Income rank · locally: <span style="color:var(--text2)">Top ${loc.incomePercentile}% earner</span></div>`:'';
+    const cached=this.locDeepDive(loc.id);
+    const ai=`<div style="margin-top:10px;display:flex;gap:8px">${cached
+      ? `<button data-act="ddview" data-id="${loc.id}" style="flex:1;background:var(--sage-bg);border:1px solid var(--sage-bd);color:var(--sage-tx);border-radius:7px;font-size:11px;font-weight:600;padding:7px;cursor:pointer">📄 View AI report</button><button data-act="ddrun" data-id="${loc.id}" title="Re-run" style="background:var(--bg4);border:1px solid var(--border2);color:var(--text2);border-radius:7px;font-size:11px;padding:7px 10px;cursor:pointer">↻</button>`
+      : `<button data-act="ddrun" data-id="${loc.id}" style="flex:1;background:var(--bg4);border:1px solid var(--border2);color:var(--text);border-radius:7px;font-size:11px;font-weight:600;padding:7px;cursor:pointer">🔬 AI Deep Dive</button>`}</div>`;
     return `<div data-act="editdest" data-id="${loc.id}" style="padding:12px 0;border-bottom:1px solid var(--border);cursor:pointer">
       <div style="display:flex;align-items:flex-start;gap:10px">
         <div style="font-size:22px">${loc.flag||'📍'}</div>
@@ -22687,8 +22691,45 @@ class HZMobile {
         ${this.raRow('Cost of living',this.fmt(this.n(loc.costOfLiving,0))+'/mo','var(--text)')}
         ${this.raRow('Net income · after '+this.n(loc.taxRate,0)+'% local tax',this.fmt(this.n(loc.netIncome,0))+'/mo','var(--green)')}
         ${this.raRow('Monthly surplus',this.fmt(this.n(loc.surplus,0))+'/mo',this.n(loc.surplus,0)>=0?'var(--green)':'var(--red)')}
-      </div>${rank}
+      </div>${rank}${ai}
     </div>`;
+  }
+  // Cached Deep Dive report for a destination (shared vault, type 'deepdive' —
+  // the SAME entries desktop writes, so a report run on either side shows on both).
+  locDeepDive(id){const v=(typeof state!=='undefined'&&state.vault)||[];return v.find(x=>x&&x.type==='deepdive'&&x.locationId===id)||null;}
+  openLocReport(id){
+    const rep=this.locDeepDive(id);if(!rep)return;
+    let md='';try{md=(typeof mdParse==='function')?mdParse(rep.markdown||''):this.esc(rep.markdown||'');}catch(_){md=this.esc(rep.markdown||'');}
+    this.sheet(`${rep.flag||'📍'} ${this.esc(rep.location||'')} · Deep Dive`,`<div class="md hz-md" style="font-size:12.5px;line-height:1.65;color:var(--text2)">${md}</div><div style="margin-top:14px">`+this.btn('↻ Re-run analysis','ddrun',' data-id="'+id+'"','o')+`</div>`,`Generated ${this.fmtWhenShort(rep.date)} · saved to Vault`);
+  }
+  // Per-destination Deep Dive — reuses the desktop AI stack (callClaude +
+  // buildPersonalContext + getRetirementNumbers) and the SAME prompt skeleton,
+  // saves the result to the vault as a 'deepdive' entry (syncs with desktop and
+  // flips the card to "View AI report"), and back-fills medianMonthlyIncome so
+  // the "Income rank" line appears. Rendered in a bottom sheet via mdParse.
+  async runLocDeepDive(id){
+    if(!this.hasAIKey()){this.toast('Add your Claude API key in Settings');this.go('settings');setTimeout(()=>{const el=document.getElementById('hz-ai-key');if(el)el.focus();},400);return;}
+    if(typeof state==='undefined'||!state.citizenship||!state.homeBase){this.toast('Set Citizenship & Home Base in Settings first');this.go('settings');return;}
+    const loc=(typeof retirePlaces==='function'?retirePlaces():[]).find(l=>l.id===id);if(!loc){return;}
+    const key=state.aiKeys.claude;
+    this.sheet(`${loc.flag||'📍'} ${this.esc(loc.name)} · Deep Dive`,`<div style="display:flex;align-items:center;gap:10px;color:var(--text2);font-size:13px;padding:10px 0"><span style="font-size:18px">🤖</span><span>Generating your Deep Dive report… this takes 20–40 seconds. You can keep using the app.</span></div>`,'Tailored to your citizenship, home base and retirement income.');
+    try{
+      const nums=(typeof getRetirementNumbers==='function')?getRetirementNumbers():null;
+      const income=nums?this.n(nums.grossRetirementIncome,0):this.retIncome();
+      const ctx=(typeof buildPersonalContext==='function')?buildPersonalContext():'';
+      const cz=(typeof countryInfo==='function')?countryInfo(state.citizenship):{name:state.citizenship};
+      const hb=(typeof countryInfo==='function')?countryInfo(state.homeBase):{name:state.homeBase};
+      const suf=(typeof langSuffix==='function')?langSuffix():'';
+      const prompt=`${ctx}\n\nGenerate a comprehensive, professional DEEP DIVE retirement relocation report for **${loc.name}, ${loc.country}**.\n\nCONTEXT\n- Prospective retiree holds ${cz.name} citizenship, currently based in ${hb.name}.\n- Projected monthly retirement income: ${this.fmt(income)} (in today's money), from portfolio draw-down and pensions.\n- Target monthly cost of living at destination: ${this.fmt(this.n(loc.costOfLiving,0))}.\n- Destination headline income tax rate: ${this.n(loc.taxRate,0)}%.\n\nEvery monetary figure in CONTEXT is in TODAY'S MONEY — quote destination figures in today's money too. Return a single markdown document (no preamble, no JSON). Use H2 headings and markdown tables where numbers help. Ground everything in 2024–2025 reality and the user's citizenship/home base. Be honest — flag visa traps and tax gotchas. Structure EXACTLY:\n\n## Executive Summary\n## Cost of Living\n## Healthcare\n## Visa & Residency\n## Tax Implications\n## Climate & Lifestyle\n## Real Estate\n## Pros & Cons\n## Final Verdict\n\nAfter the Final Verdict, on its own line, append exactly this (integer only, no symbols): MEDIAN_INCOME_USD: [median monthly gross personal income in USD for this city]${suf}`;
+      const reply=await callClaude(prompt,3000,key);
+      const mm=reply.match(/MEDIAN_INCOME_USD:\s*(\d+(?:\.\d+)?)/i);
+      if(mm){const usd=parseFloat(mm[1]);const toSek=1/(((typeof rate==='function'?rate('USD'):0)||0.11));const lref=(state.places||[]).find(l=>l.id===id);if(lref&&usd>0)lref.medianMonthlyIncome=Math.round(usd*toSek);}
+      const clean=reply.replace(/\nMEDIAN_INCOME_USD:\s*[\d.]+[^\n]*/gi,'');
+      const entry={id:'dd-'+Date.now(),type:'deepdive',locationId:id,location:loc.name,country:loc.country,flag:loc.flag||'🌍',date:new Date().toISOString(),lang:state.lang,citizenship:state.citizenship,homeBase:state.homeBase,markdown:clean};
+      if(!Array.isArray(state.vault))state.vault=[];state.vault.unshift(entry);if(state.vault.length>50)state.vault=state.vault.slice(0,50);
+      if(typeof saveVault==='function')saveVault();if(typeof save==='function')save();
+      this.hydrate();this.openLocReport(id);this.toast('Deep Dive saved to Vault ✓');
+    }catch(e){this.sheet('Deep Dive',`<div style="color:var(--red);font-size:13px;padding:8px 0">Analysis failed: ${this.esc((e&&e.message)||'error')}</div><div style="margin-top:12px">`+this.btn('Try again','ddrun',' data-id="'+id+'"','o')+`</div>`);}
   }
   vAnywhere(){
     const nums=this.raNums();
@@ -22885,6 +22926,8 @@ class HZMobile {
     if(a==='pulse'&&this.vacMap){this.vacMap.setView([+d.lat,+d.lng],4);return;}
     if(a==='pickdest'){const db=(typeof CITY_DB!=='undefined')?CITY_DB:[];const c=db[+d.i];if(c&&typeof state!=='undefined'){if(!Array.isArray(state.places))state.places=[];const key=(c.name||'').toLowerCase()+'|'+(c.country||'').toLowerCase();if(!state.places.some(p=>(p.kind||'retirement')==='retirement'&&((p.name||'').toLowerCase()+'|'+(p.country||'').toLowerCase())===key)){state.places.push({id:this.newId(),kind:'retirement',name:c.name,country:c.country||'',flag:c.flag||'🌍',costOfLiving:this.n(c.costOfLiving,40000),taxRate:this.n(c.taxRate,15),climate:c.climate||'Temperate',healthcare:c.healthcare||'Good',infrastructure:c.infrastructure||'Good',medianMonthlyIncome:c.medianMonthlyIncome||null,notes:'',lat:this.n(c.lat,0),lng:this.n(c.lng,0)});if(typeof save==='function')save();}}this.closeOverlay();this.paint();return this.toast('Destination added ✓');}
     if(a==='editdest')return this.openEditDest(d.id);
+    if(a==='ddrun')return this.runLocDeepDive(d.id);
+    if(a==='ddview')return this.openLocReport(d.id);
     if(a==='savedest')return this.saveDest();
     if(a==='rmdest'){if(typeof state!=='undefined'&&Array.isArray(state.places)){state.places=state.places.filter(l=>l.id!==d.id);if(typeof save==='function')save();}this.closeOverlay();this.paint();return this.toast('Destination removed');}
     if(a==='theme')return this.toggleTheme();
