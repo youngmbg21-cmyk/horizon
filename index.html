@@ -2,7 +2,10 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<!-- maximum-scale=1 stops iOS Safari's automatic zoom-in when focusing
+     inputs (which visually "expands" the app and leaves it cropped, since the
+     shell is overflow:hidden). iOS still honours user pinch-zoom gestures. -->
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1, viewport-fit=cover">
 <!-- Mobile / installed-PWA chrome: dark status bar, standalone feel, and
      safe-area support (paired with env(safe-area-inset-*) in the phone shell). -->
 <meta name="theme-color" content="#05080f" media="(prefers-color-scheme: dark)">
@@ -4365,10 +4368,25 @@ body.light .piq-country-menu { box-shadow:0 12px 28px -10px rgba(60,40,10,0.22);
   #hzApp .leaflet-popup-content { font-size:11px; margin:8px 12px!important; }
   #hzApp .leaflet-popup-tip { background:var(--bg3)!important; }
   #hzApp .leaflet-control-attribution, #hzApp .leaflet-control-zoom { display:none; }
-  /* AI panel + command palette go full-screen on phones. */
-  #ai-panel { width:100vw !important; border-left:none !important; z-index:600; }
+  /* AI panel goes full-screen on phones — and stays KEYBOARD-SAFE: its height
+     tracks the visual viewport (--hz-vvh, set from the visualViewport API), so
+     when the on-screen keyboard opens the panel shrinks and the input row
+     stays visible above the keys instead of being buried under them. */
+  #ai-panel {
+    width:100vw !important; border-left:none !important; z-index:600;
+    top:auto !important; bottom:0;
+    height:var(--hz-vvh, 100dvh); max-height:100dvh;
+  }
   #ai-panel.expanded { width:100vw !important; }
   #ai-backdrop { z-index:595; }
+  /* ⛶ expand is meaningless at 100vw and clutters the header. */
+  #ai-panel .aip-expand { display:none !important; }
+  /* 16px keeps iOS from auto-zooming into the chat box; cap its auto-grow so
+     a long draft never swallows the message list on a small screen. */
+  #ai-panel .aip-textarea { font-size:16px !important; max-height:96px !important; }
+  #ai-panel .aip-input-area { padding-bottom:calc(env(safe-area-inset-bottom, 0px) + 8px); }
+  /* Message list scrolls within whatever height the keyboard leaves. */
+  #ai-panel .aip-msgs { overscroll-behavior:contain; min-height:0; }
 }
 @keyframes hzticker { 0%{transform:translateX(0)} 100%{transform:translateX(-50%)} }
 @keyframes hzfade { from{opacity:0;transform:translateY(7px)} to{opacity:1;transform:none} }
@@ -21944,21 +21962,6 @@ class HZMobile {
     this.DREAMS=[{id:'coastal',icon:'🏖',name:'Coastal'},{id:'city',icon:'🏙',name:'City Life'},{id:'nature',icon:'🌿',name:'Nature'},{id:'warm',icon:'☀️',name:'Warm'},{id:'culture',icon:'🎭',name:'Culture'},{id:'family',icon:'👨‍👩‍👧',name:'Family'},{id:'luxury',icon:'🥂',name:'Luxury'},{id:'adventure',icon:'🧗',name:'Adventure'},{id:'peaceful',icon:'🕊',name:'Peaceful'}];
     this.EXP={low:{Housing:5000,Food:2500,Health:1500,Transport:800,Leisure:1200,Misc:1000},mid:{Housing:9000,Food:4000,Health:2500,Transport:1500,Leisure:2500,Misc:1500},high:{Housing:16000,Food:6000,Health:4000,Transport:2500,Leisure:5000,Misc:2500},luxury:{Housing:25000,Food:9000,Health:6000,Transport:4000,Leisure:10000,Misc:5000}};
     this.MORE=[['dashboard','◉','Dashboard','Overview'],['lifewall','🧱','Life Wall','Overview'],['spend','🏦','Spend Insights','Personal Finances'],['forecast','▦','Forecast & Review','Personal Finances'],['retirement','🌅','Retirement Plan','Personal Finances'],['funfund','✦','Fun Fund','Planning'],['retireanywhere','🌍','Retire Anywhere','Planning'],['property','🏠','Property IQ','Planning'],['journal','📓','Journal','Library'],['vault','🗄','Vault','Library'],['settings','⚙','Settings','System']];
-    this.DEMO_TX=[
-      {d:'Jul 06',m:'ICA Maxi',c:'Groceries',a:842},{d:'Jul 06',m:'SL Access',c:'Transport',a:970},
-      {d:'Jul 05',m:'Spotify',c:'Subscriptions',a:119},{d:'Jul 05',m:'Systembolaget',c:'Dining',a:458},
-      {d:'Jul 04',m:'H&M',c:'Shopping',a:599},{d:'Jul 03',m:'Espresso House',c:'Dining',a:62},
-      {d:'Jul 03',m:'Vattenfall',c:'Utilities',a:640},{d:'Jul 02',m:'Apotek Hjärtat',c:'Health',a:214},
-      {d:'Jul 01',m:'Avgift (HOA)',c:'Housing',a:7250},{d:'Jun 30',m:'Coop',c:'Groceries',a:512},
-      {d:'Jun 29',m:'Netflix',c:'Subscriptions',a:139},{d:'Jun 28',m:'Circle K',c:'Transport',a:720}
-    ];
-    this.DEMO_CATBUDGET={Groceries:7000,Transport:2200,Dining:1500,Shopping:1200,Subscriptions:600,Utilities:900,Health:700,Housing:34250};
-    this.DEMO_VAULT=[
-      {id:'v1',icon:'📄',title:'APEX — Lisbon Feasibility',type:'AI Report',date:'May 30, 2026',size:'240 KB',tone:'plum'},
-      {id:'v2',icon:'🧾',title:'2025 Tax Return · Skatteverket',type:'Document',date:'Apr 12, 2026',size:'1.2 MB',tone:'info'},
-      {id:'v3',icon:'🏛',title:'ITP1 Pension Statement',type:'Statement',date:'Mar 01, 2026',size:'480 KB',tone:'sage'},
-      {id:'v4',icon:'🏠',title:'Mortgage Deed — SEB',type:'Document',date:'Jan 15, 2016',size:'860 KB',tone:'honey'}
-    ];
   }
 
   // ── mount / lifecycle ──
@@ -22041,21 +22044,35 @@ class HZMobile {
     if(!s.mobileNetWorth) s.mobileNetWorth={property:d.property.value,mortgage:d.property.mortgage,otherDebt:0};
     s.mobileNetWorth.otherDebt=this.n(s.mobileNetWorth.otherDebt,0);
     d.netWorth=s.mobileNetWorth;
-    d.transactions=(s.transactions&&s.transactions.length)?s.transactions.map(t=>this.mapTx(t)):this.DEMO_TX.slice();
-    d.catBudget=(s.catBudget&&Object.keys(s.catBudget).length)?s.catBudget:this.DEMO_CATBUDGET;
-    d.vacMonths=(s.mobileVacMonths!=null)?+s.mobileVacMonths:6;
+    d.vacMonths=this.n(s.mobileVacMonths,6)||6;
     d.targetBudget=(s.mobileTargetBudget!=null)?s.mobileTargetBudget:'';
-    if(!s.mobileTrips) s.mobileTrips=this.seedTrips(s.trips);
+    // Trips are two-way: desktop trips are re-derived on EVERY hydrate (so
+    // trips added or edited on desktop always appear here), then mobile-created
+    // ones (_m flag) are appended. Previously the seed ran once and desktop
+    // additions never showed up on the phone.
+    const mobileOnlyTrips=(s.mobileTrips||[]).filter(t=>t&&t._m);
+    s.mobileTrips=this.seedTrips(s.trips).concat(mobileOnlyTrips);
     d.savedTrips=s.mobileTrips;
+    // Desktop's retirement "monthly need" is the sum of state.retirementExpenses
+    // — use the same source so the sustainability verdict matches desktop.
+    d.retNeed=(s.retirementExpenses||[]).reduce((t,e)=>t+this.n(e&&e.amount,0),0);
+    // Retire Anywhere destinations come from the user's real `places`
+    // collection (shared with desktop); the built-in RET list is only a
+    // starter for accounts with no places yet.
+    d.places=(s.places||[]).filter(p=>p&&p.kind==='retirement'&&p.name).map(p=>({
+      flag:p.flag||'📍',name:p.name,country:p.country||'',
+      costK:Math.max(1,Math.round(this.n(p.costOfLiving,0)/1000)),
+      lat:this.n(p.lat,0),lng:this.n(p.lng,0),
+      tl:[p.climate,p.taxRate!=null?('Tax '+this.n(p.taxRate,0)+'%'):null,p.healthcare?(p.healthcare+' health'):null].filter(Boolean)
+    }));
     d.retCostLevel=s.mobileRetCostLevel||'mid';
     if(!s.mobileDreams) s.mobileDreams=['warm','coastal'];
     d.dreams=s.mobileDreams;
     d.apex=s.mobileApex||null;
     d.journal=(s.journal||[]).map(e=>this.mapJournalIn(e));
-    d.vault=(s.vault&&s.vault.length)?s.vault.map((x,i)=>this.mapVaultIn(x,i)):this.DEMO_VAULT.slice();
+    d.vault=(s.vault||[]).map((x,i)=>this.mapVaultIn(x,i));
   }
   guessCat(name){const n=(name||'').toLowerCase();if(/mortgage|avgift|rent|hoa|home|cleaning/.test(n))return'Housing';if(/groc|ica|coop|food/.test(n))return'Groceries';if(/insur|kassa/.test(n))return'Insurance';if(/bill|util|electric|vatten/.test(n))return'Bills';if(/allow|personal/.test(n))return'Personal';if(/debt|chase|loan/.test(n))return'Debt';if(/madre|support|family/.test(n))return'Family';return'Other';}
-  mapTx(t){return {d:t.d||t.date||t.day||'',m:t.m||t.merchant||t.name||t.desc||'—',c:t.c||t.cat||t.category||'Other',a:Math.abs(+(t.a!=null?t.a:(t.amount!=null?t.amount:0)))};}
   seedTrips(trips){return (trips||[]).map((t,i)=>{const exp=(t.expenses||[]);const budget=exp.reduce((s,e)=>s+(+e.amount||0),0);const first=exp.slice().sort((a,b)=>(a.date||'').localeCompare(b.date||''))[0];const when=first?this.monthLabel(first.date):'';return {id:t.id||('t'+i),dest:t.name+(t.country?', '+t.country:''),when,budget,nights:t.nights||0};});}
   monthLabel(iso){if(!iso)return'';const p=String(iso).split('-');if(p.length<2)return iso;const m=+p[1]-1;return (this.MN[m]||'')+' '+p[0];}
   mapJournalIn(e){const iso=e.date&&/^\d{4}-\d{2}/.test(e.date)?e.date:null;const disp=iso?this.fmtDate(iso):(e.date||'');const tag=['sage','honey','rose','info','plum'].includes(e.tag)?e.tag:this.tagFromKind(e.tag);const title=e.title||this.firstLine(e.content)||'Note';const body=e.body||e.content||'';return {id:e.id,date:disp,_iso:iso,tag,title,body};}
@@ -22191,21 +22208,47 @@ class HZMobile {
   }
 
   // ══════ SPEND INSIGHTS ══════
+  // Computed from the SAME engine as desktop (_siMetrics over
+  // state.transactions), so both form factors always tell one story:
+  // credit-card payments/refunds are classified identically, categories
+  // come from the upload, and there is no invented demo data — an empty
+  // state explains where the data comes from instead.
+  spendMetrics(){ try{ if(typeof _siMetrics==='function') return _siMetrics(); }catch(_){} return null; }
   vSpend(){
-    const tx=this.data.transactions;const spent=tx.reduce((s,t)=>s+t.a,0);
-    const byCat={};tx.forEach(t=>byCat[t.c]=(byCat[t.c]||0)+t.a);
-    const cats=Object.entries(byCat).sort((a,b)=>b[1]-a[1]);
-    const top=cats[0]||['—',0];const budgetTot=Object.values(this.data.catBudget).reduce((s,v)=>s+v,0);
-    let h=this.ph('PERSONAL FINANCES','Where your money goes','Transactions this month, grouped and checked against budget.');
-    h+=this.banner('info',`<b>Demo data loaded.</b> Connect a bank via Open Banking (PSD2) or import a CSV to see real transactions. <a data-act="bank">Connect →</a>`);
-    h+=this.grid2([this.kpi('💳','Spent (MTD)',this.fmt(spent),'var(--red)',tx.length+' transactions'),this.kpi('🎯','vs Budget',this.fmt(budgetTot-spent),spent<=budgetTot?'var(--green)':'var(--red)',spent<=budgetTot?'Under budget':'Over budget',spent<=budgetTot?'pos':'alert'),this.kpi('🏆','Top Category',top[0],'var(--violet)',this.fmt(top[1])),this.kpi('🧾','Avg / day',this.fmt(Math.round(spent/7)),'var(--amber)','Last 7 days')]);
-    const maxc=cats.length?cats[0][1]:1;
-    h+=this.card(this.ct('▦ Spending by Category')+cats.map(([c,v])=>{const bud=this.data.catBudget[c];const over=bud&&v>bud;return `<div style="margin-bottom:11px"><div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:2px"><span style="color:var(--text)">${c}</span><span style="font-family:var(--fm);color:${over?'var(--red)':'var(--text2)'}">${this.fmt(v)}${bud?` <span style="color:var(--text3);font-size:10px">/ ${this.fmtC(bud)}</span>`:''}</span></div>${this.bar(v/maxc*100,over?'var(--red)':'var(--violet)',6)}</div>`;}).join(''));
-    h+=this.card(this.ct('🧾 Recent Transactions')+tx.map(t=>`<div style="display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--border)"><div style="width:34px;height:34px;border-radius:9px;background:var(--bg3);display:flex;align-items:center;justify-content:center;font-size:15px;flex-shrink:0">${this.catIcon(t.c)}</div><div style="flex:1;min-width:0"><div style="font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${this.esc(t.m)}</div><div style="font-size:10.5px;color:var(--text3);font-family:var(--fm)">${t.d} · ${t.c}</div></div><div style="font-family:var(--fm);font-size:13px;font-weight:600;color:var(--text)">−${this.fmt(t.a)}</div></div>`).join('')+`<div style="text-align:center;margin-top:10px">${this.btn('Import CSV','csv','','o')} ${this.btn('Connect bank','bank','','o')}</div>`);
+    const M=this.spendMetrics();
+    const has=!!(M&&M.count>0);
+    if(!has){
+      let h=this.ph('PERSONAL FINANCES','Where your money goes','Bank transactions, grouped and analysed.');
+      h+=this.banner('info',`<b>No bank data on this account yet.</b> Upload your bank's CSV/Excel export in <b>Spend Insights on desktop</b> — it syncs here automatically. Or load sample data to explore.`);
+      h+=this.card(this.ct('🏦 Get started')+`<div style="font-size:12.5px;color:var(--text2);line-height:1.6;margin-bottom:12px">Most banks offer <b>“Export as CSV”</b> under Statements or Transactions. Horizon reads it privately in your browser and syncs the result to every signed-in device.</div><div style="display:flex;gap:8px;flex-wrap:wrap">${this.btn('🏦 Connect bank','bank','','o')}${this.btn('📊 Load demo data','demo','','g')}</div>`);
+      return h;
+    }
+    const credit=M.accountType==='credit';
+    const range=(typeof _siRangeLabel==='function')?_siRangeLabel(M):'';
+    const lastYm=M.months[M.months.length-1]||'';
+    const mm=M.byMonth[lastYm]||{spend:0,income:0,payments:0};
+    const lastLbl=lastYm?this.MN[(+lastYm.slice(5))-1]+' '+lastYm.slice(0,4):'—';
+    // Average daily spend over the actual span of the data.
+    const dates=M.txs.map(t=>String(t.date||'')).filter(d=>/^\d{4}-\d{2}-\d{2}/.test(d)).sort();
+    const span=dates.length>1?Math.max(1,Math.round((new Date(dates[dates.length-1])-new Date(dates[0]))/864e5)+1):30;
+    const top=M.cats[0]||['—',0];
+    let h=this.ph('PERSONAL FINANCES','Where your money goes',`${M.count} transactions · <span style="color:var(--amber)">${this.esc(range)}</span>${credit?' · credit card':''}`);
+    h+=this.grid2([
+      this.kpi('💳','Total Spend',this.fmt(M.spend),'var(--red)',credit?'Purchases − refunds':'All debits'),
+      this.kpi('📅',lastLbl,this.fmt(mm.spend),'var(--amber)','Latest month'),
+      this.kpi('🏆','Top Category',this.esc(top[0]),'var(--violet)',this.fmt(top[1])),
+      this.kpi('🧾','Avg / day',this.fmt(Math.round(M.spend/span)),'var(--cyan)',`Over ${span} days`)
+    ]);
+    h+=this.card(this.ct(credit?'⇄ Card Flow':'⇄ Money Flow')+`<div style="display:flex;gap:12px;flex-wrap:wrap;font-family:var(--fm);font-size:11.5px"><span>${credit?'Purchases':'Out'} <strong style="color:var(--red)">${this.fmt(M.spend)}</strong></span><span>${credit?'Payments':'In'} <strong style="color:var(--green)">${this.fmt(credit?M.payments:M.income)}</strong></span>${credit?`<span>Refunds <strong style="color:var(--cyan)">${this.fmt(M.refunds)}</strong></span>`:`<span>Net <strong style="color:${M.net>=0?'var(--green)':'var(--red)'}">${this.fmt(M.net)}</strong></span>`}</div>`);
+    const maxc=M.cats.length?M.cats[0][1]:1;
+    h+=this.card(this.ct('▦ Spending by Category')+M.cats.map(([c,v])=>`<div style="margin-bottom:11px"><div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:2px"><span style="color:var(--text)">${this.esc(c)}</span><span style="font-family:var(--fm);color:var(--text2)">${this.fmt(v)} <span style="color:var(--text3);font-size:10px">${M.spend?Math.round(v/M.spend*100):0}%</span></span></div>${this.bar(v/maxc*100,'var(--violet)',6)}</div>`).join(''));
+    const recent=M.txs.slice().sort((a,b)=>String(b.date||'').localeCompare(String(a.date||''))).slice(0,14);
+    h+=this.card(this.ct('🧾 Recent Transactions')+recent.map(t=>{const amt=this.n(t.amount,0);const neg=amt<0;const cat=t.category||'Other';return `<div style="display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--border)"><div style="width:34px;height:34px;border-radius:9px;background:var(--bg3);display:flex;align-items:center;justify-content:center;font-size:15px;flex-shrink:0">${this.catIcon(cat)}</div><div style="flex:1;min-width:0"><div style="font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${this.esc(t.name||cat)}</div><div style="font-size:10.5px;color:var(--text3);font-family:var(--fm)">${this.txDate(t.date)} · ${this.esc(cat)}</div></div><div style="font-family:var(--fm);font-size:13px;font-weight:600;color:${neg?'var(--text)':'var(--green)'}">${neg?'−':'+'}${this.fmt(Math.abs(amt))}</div></div>`;}).join('')+`<div style="font-size:10.5px;color:var(--text3);text-align:center;margin-top:10px">Showing ${recent.length} of ${M.count} · upload more in Spend Insights on desktop</div>`);
     h+=this.card(this.ct('🍩 Category Split')+`<div style="height:180px"><canvas id="hzSpendChart"></canvas></div>`);
     return h;
   }
-  catIcon(c){return {Groceries:'🛒',Transport:'🚇',Dining:'🍽',Shopping:'🛍',Subscriptions:'📺',Utilities:'💡',Health:'💊',Housing:'🏠'}[c]||'💳';}
+  txDate(d){const s=String(d||'');const m=s.match(/^(\d{4})-(\d{2})-(\d{2})/);return m?`${this.MN[(+m[2])-1]} ${m[3]}`:s;}
+  catIcon(c){const k=(c||'').toLowerCase();if(/groc/.test(k))return'🛒';if(/rent|mortgage|hous/.test(k))return'🏠';if(/transport|travel|fuel/.test(k))return'🚇';if(/din|drink|restaur|coffee/.test(k))return'🍽';if(/shop|cloth/.test(k))return'🛍';if(/subscri|stream/.test(k))return'📺';if(/util|electric|water/.test(k))return'💡';if(/health|pharma|medic/.test(k))return'💊';if(/insur/.test(k))return'🛡';if(/entertain|fun/.test(k))return'🎭';if(/clean/.test(k))return'🧹';return'💳';}
 
   // ══════ FORECAST & REVIEW ══════
   vForecast(){
@@ -22229,7 +22272,7 @@ class HZMobile {
   // ══════ RETIREMENT PLAN ══════
   vRetire(){
     const ytr=this.data.retirementAge-this.data.currentAge;const ne=this.nestEgg();const neL=this.lensNe();
-    const dr=this.draw(ne)+this.pension();const need=this.expTotal('mid');const gap=dr-need;
+    const dr=this.draw(ne)+this.pension();const need=this.data.retNeed>0?this.data.retNeed:this.expTotal('mid');const gap=dr-need;
     const verdict=gap>=need*0.15?['OVERFUNDED','🟢','var(--green)']:gap>=0?['ON TARGET','🟡','var(--amber)']:['UNDERFUNDED','🔴','var(--red)'];
     const runwayYrs=this.data.lifeExp-this.data.retirementAge;
     let h=this.ph('PERSONAL FINANCES','Are you on track?',`Projected to age ${this.data.retirementAge}, sustained to ${this.data.lifeExp}.`);
@@ -22269,20 +22312,22 @@ class HZMobile {
   afford(){const ff=this.fun();const t=+this.data.targetBudget||0;if(!t||ff<=0)return `<div style="color:var(--text3);font-size:12px">Enter a target budget above.</div>`;const m=Math.ceil(t/ff);const r=this.addMonths(new Date(),m);return `<div style="font-family:var(--fm);font-size:12px;line-height:1.9"><div>Target: <strong style="color:var(--amber)">${this.fmt(t)}</strong></div><div>Monthly fund: <strong style="color:var(--green)">${this.fmt(ff)}</strong></div><div>Save for: <strong style="color:var(--cyan)">${m} months</strong></div><div>Ready by: <strong style="color:var(--green)">${this.MN[r.getMonth()]} ${r.getFullYear()}</strong></div></div>${this.bar(Math.min(100,ff/t*100),'var(--green)',6)}<div style="font-size:10px;color:var(--text3);font-family:var(--fm)">${Math.min(100,Math.round(ff/t*100))}% funded today</div>`;}
 
   // ══════ RETIRE ANYWHERE ══════
+  dests(){return (this.data.places&&this.data.places.length)?this.data.places:this.RET;}
   vAnywhere(){
     const ne=this.nestEgg();const dr=this.draw(ne)+this.pension();const ytr=this.data.retirementAge-this.data.currentAge;
-    const inBudget=this.RET.filter(d=>d.costK*1000<=dr).length;
+    const DEST=this.dests();const mine=DEST!==this.RET;
+    const inBudget=DEST.filter(d=>d.costK*1000<=dr).length;
     let h=this.ph('PLANNING','Where in the world?','Your dream retirement, wherever that may be.');
-    h+=this.grid2([this.kpi('✦','Monthly Income',this.fmtC(dr),'var(--green)','Draw + pension'),this.kpi('🌍','Cities in Budget',inBudget+'/'+this.RET.length,'var(--cyan)','Curated list'),this.kpi('🏛','Pension',this.fmtC(this.pension()),'var(--blue)','/mo'),this.kpi('📅','Years to Go',ytr+'Y','var(--amber)','Age '+this.data.retirementAge)]);
+    h+=this.grid2([this.kpi('✦','Monthly Income',this.fmtC(dr),'var(--green)','Draw + pension'),this.kpi('🌍','Cities in Budget',inBudget+'/'+DEST.length,'var(--cyan)',mine?'Your destinations':'Starter list'),this.kpi('🏛','Pension',this.fmtC(this.pension()),'var(--blue)','/mo'),this.kpi('📅','Years to Go',ytr+'Y','var(--amber)','Age '+this.data.retirementAge)]);
     h+=this.card(this.ct('💭 Your Dream Retirement')+`<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px">${this.DREAMS.map(d=>{const on=this.data.dreams.includes(d.id);return `<div data-act="dream" data-id="${d.id}" style="background:${on?'var(--plum-bg)':'var(--bg3)'};border:1px solid ${on?'var(--violet)':'var(--border)'};border-radius:9px;padding:10px;text-align:center;cursor:pointer"><div style="font-size:19px;margin-bottom:3px">${d.icon}</div><div style="font-size:11px;font-weight:600;color:${on?'var(--plum-tx)':'var(--text2)'}">${d.name}</div></div>`;}).join('')}</div>`);
     const lvl=this.data.retCostLevel;const m=this.EXP[lvl];const need=this.expTotal(lvl);const surplus=dr-need;
     h+=this.card(this.ct('🧮 Retirement Cost Model')+`<select data-model="costlevel" style="width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:6px;padding:9px 11px;color:var(--text);font-size:13px;margin-bottom:12px">${[['low','Low Cost · 12K/mo'],['mid','Mid Range · 20K/mo'],['high','High Standard · 35K/mo'],['luxury','Luxury · 55K/mo']].map(o=>`<option value="${o[0]}" ${lvl===o[0]?'selected':''}>${o[1]}</option>`).join('')}</select><div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px">${Object.entries(m).map(([k,v])=>`<div style="background:var(--bg3);border-radius:8px;padding:9px 10px"><div style="font-size:10px;color:var(--text3)">${k}</div><div style="font-family:var(--fm);font-size:12px;font-weight:600">${this.fmtC(v)}</div>${this.bar(v/need*100,'var(--violet)',4)}</div>`).join('')}</div><div style="display:flex;gap:12px;flex-wrap:wrap;background:var(--bg3);border-radius:8px;padding:11px;font-family:var(--fm);font-size:11.5px"><span>Need <strong style="color:var(--amber)">${this.fmtC(need)}</strong></span><span>Draw <strong style="color:var(--green)">${this.fmtC(dr)}</strong></span><span style="margin-left:auto">${surplus>=0?this.chip('sage','SUSTAINABLE ✓'):this.chip('rose','SHORTFALL')}</span></div>`);
-    h+=this.card(this.ct('📍 Destinations',this.btn('+ Add','adddest','','o'))+`<div style="display:grid;grid-template-columns:1fr 1fr;gap:9px">${this.RET.map(d=>{const aff=d.costK*1000<=dr;return `<div style="background:var(--bg3);border:1px solid var(--border);border-radius:11px;padding:12px"><div style="font-size:24px">${d.flag}</div><div style="font-weight:700;font-size:13px;margin-top:4px">${d.name}</div><div style="font-size:10px;color:var(--text3)">${d.country}</div><div style="font-family:var(--fm);font-size:13px;color:var(--green);margin-top:5px">${d.costK}K SEK<span style="font-size:9px;color:var(--text3)">/mo</span></div><div style="display:flex;flex-wrap:wrap;gap:3px;margin-top:6px">${d.tl.slice(0,3).map(x=>`<span style="font-size:8px;padding:2px 5px;border-radius:3px;background:var(--info-bg);color:var(--info-tx)">${x}</span>`).join('')}</div><div style="margin-top:6px">${aff?this.chip('sage','WITHIN BUDGET'):this.chip('honey','STRETCH')}</div></div>`;}).join('')}</div>`);
+    h+=this.card(this.ct('📍 Destinations'+(mine?'':' · starter list'),this.btn('+ Add','adddest','','o'))+`<div style="display:grid;grid-template-columns:1fr 1fr;gap:9px">${DEST.map(d=>{const aff=d.costK*1000<=dr;return `<div style="background:var(--bg3);border:1px solid var(--border);border-radius:11px;padding:12px"><div style="font-size:24px">${d.flag}</div><div style="font-weight:700;font-size:13px;margin-top:4px">${this.esc(d.name)}</div><div style="font-size:10px;color:var(--text3)">${this.esc(d.country)}</div><div style="font-family:var(--fm);font-size:13px;color:var(--green);margin-top:5px">${d.costK}K SEK<span style="font-size:9px;color:var(--text3)">/mo</span></div><div style="display:flex;flex-wrap:wrap;gap:3px;margin-top:6px">${d.tl.slice(0,3).map(x=>`<span style="font-size:8px;padding:2px 5px;border-radius:3px;background:var(--info-bg);color:var(--info-tx)">${this.esc(x)}</span>`).join('')}</div><div style="margin-top:6px">${aff?this.chip('sage','WITHIN BUDGET'):this.chip('honey','STRETCH')}</div></div>`;}).join('')}</div>`);
     h+=this.card(this.ct('⚡ APEX Feasibility',this.btn('Run Check','apex','','g'))+`<div id="hzApex">${this.data.apex?this.apexHTML():`<div style="color:var(--text3);font-size:12px">Run an APEX feasibility scan against your top destination to see financial, legal, healthcare and lifestyle scores.</div>`}</div>`);
     h+=this.card(this.ct('🗺 Retirement World Map')+`<div id="hzRetMap" style="height:200px;border-radius:11px;overflow:hidden;border:1px solid var(--border)"></div>`);
     return h;
   }
-  runApex(){const ne=this.nestEgg();const dr=this.draw(ne)+this.pension();const need=this.expTotal(this.data.retCostLevel);const surplus=dr-need;const ratio=need?dr/need:1;const s=(base)=>Math.max(35,Math.min(98,Math.round(base)));const mods=[['FINANCIAL READINESS',s(ratio*70)],['LEGAL PATHWAY',82],['HEALTHCARE ACCESS',88],['COST FIT',s(ratio*68)],['TAX EFFICIENCY',76],['LIFESTYLE MATCH',this.data.dreams.length?90:70],['EXPAT COMMUNITY',84],['RUNWAY (YRS)',s(ratio*60)]];const avg=mods.reduce((a,m)=>a+m[1],0)/mods.length;const verdict=avg>=80?'FEASIBLE':avg>=62?'CONDITIONAL':'NOT FEASIBLE';this.data.apex={mods,verdict,dest:this.RET[0].name+', '+this.RET[0].country,surplus};}
+  runApex(){const ne=this.nestEgg();const dr=this.draw(ne)+this.pension();const need=this.expTotal(this.data.retCostLevel);const surplus=dr-need;const ratio=need?dr/need:1;const s=(base)=>Math.max(35,Math.min(98,Math.round(base)));const mods=[['FINANCIAL READINESS',s(ratio*70)],['LEGAL PATHWAY',82],['HEALTHCARE ACCESS',88],['COST FIT',s(ratio*68)],['TAX EFFICIENCY',76],['LIFESTYLE MATCH',this.data.dreams.length?90:70],['EXPAT COMMUNITY',84],['RUNWAY (YRS)',s(ratio*60)]];const avg=mods.reduce((a,m)=>a+m[1],0)/mods.length;const verdict=avg>=80?'FEASIBLE':avg>=62?'CONDITIONAL':'NOT FEASIBLE';const d0=this.dests()[0];this.data.apex={mods,verdict,dest:d0.name+(d0.country?', '+d0.country:''),surplus};}
   apexHTML(){const ap=this.data.apex;const vc={FEASIBLE:'var(--green)',CONDITIONAL:'var(--amber)','NOT FEASIBLE':'var(--red)'}[ap.verdict];const vt={FEASIBLE:'sage',CONDITIONAL:'honey','NOT FEASIBLE':'rose'}[ap.verdict];return `<div style="display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-bottom:11px">${ap.mods.map(m=>{const c=m[1]>=80?'var(--green)':m[1]>=62?'var(--amber)':'var(--red)';return `<div style="background:var(--bg3);border-radius:8px;padding:9px"><div style="font-size:8px;letter-spacing:.06em;color:var(--text3);font-weight:700">${m[0]}</div><div style="font-family:var(--fm);font-size:13px;font-weight:700;color:${c};margin-top:3px">${m[1]}/100</div>${this.bar(m[1],c,4)}</div>`;}).join('')}</div><div style="border:1px solid ${vc};background:var(--${vt}-bg);border-radius:10px;padding:13px;text-align:center"><div style="font-family:var(--fs);font-size:17px;font-weight:600;color:${vc};letter-spacing:.04em">${ap.verdict} — ${this.esc(ap.dest)}</div><div style="font-size:11px;color:var(--text2);margin-top:4px;font-family:var(--fm)">Projected ${ap.surplus>=0?'surplus':'shortfall'} of ${this.fmtC(Math.abs(ap.surplus))}/mo at this cost level</div></div>`;}
 
   // ══════ LIFE WALL ══════
@@ -22389,12 +22434,12 @@ class HZMobile {
   chOpts(extra){return Object.assign({responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}}},extra);}
   cc(){const g=getComputedStyle(this.root);return {t3:g.getPropertyValue('--text3').trim()||'#3d506e',t2:g.getPropertyValue('--text2').trim()||'#7a8fb0',grid:this.data.theme==='dark'?'#1a2640':'#D6CFBF'};}
   chartDash(){this.whenLib(()=>window.Chart,()=>{const now=new Date();const labs=[],net=[];for(let i=0;i<12;i++){const d=this.addMonths(now,i);const k=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;const m=this.gmd(k);labs.push(this.MN[d.getMonth()]);net.push(Math.round(m.disp));}const c=this.cc();const ctx=document.getElementById('hzDashChart');if(!ctx)return;if(this.charts.dash)this.charts.dash.destroy();this.charts.dash=new Chart(ctx,{type:'bar',data:{labels:labs,datasets:[{data:net,backgroundColor:net.map(v=>v>=0?'#00e8a055':'#ff4d6d55'),borderColor:net.map(v=>v>=0?'#00e8a0':'#ff4d6d'),borderWidth:1,borderRadius:4}]},options:this.chOpts({scales:{x:{ticks:{color:c.t3,font:{size:9}},grid:{display:false}},y:{ticks:{color:c.t3,font:{size:9},callback:v=>this.fmtC(v)},grid:{color:c.grid}}}})});});}
-  chartSpend(){this.whenLib(()=>window.Chart,()=>{const byCat={};this.data.transactions.forEach(t=>byCat[t.c]=(byCat[t.c]||0)+t.a);const labs=Object.keys(byCat),vals=Object.values(byCat);const cols=['#00e8a0','#4d9fff','#f5a623','#8b5cf6','#00d4ff','#ec4899','#ff4d6d','#7a8fb0'];const c=this.cc();const ctx=document.getElementById('hzSpendChart');if(!ctx)return;if(this.charts.spend)this.charts.spend.destroy();this.charts.spend=new Chart(ctx,{type:'doughnut',data:{labels:labs,datasets:[{data:vals,backgroundColor:cols,borderColor:getComputedStyle(this.root).getPropertyValue('--bg2').trim(),borderWidth:2}]},options:this.chOpts({cutout:'62%',plugins:{legend:{display:true,position:'right',labels:{color:c.t2,font:{size:9},boxWidth:8,padding:6}}}})});});}
+  chartSpend(){this.whenLib(()=>window.Chart,()=>{const M=this.spendMetrics();if(!M||!M.cats.length)return;const top=M.cats.slice(0,8);const labs=top.map(x=>x[0]),vals=top.map(x=>x[1]);const cols=['#00e8a0','#4d9fff','#f5a623','#8b5cf6','#00d4ff','#ec4899','#ff4d6d','#7a8fb0'];const c=this.cc();const ctx=document.getElementById('hzSpendChart');if(!ctx)return;if(this.charts.spend)this.charts.spend.destroy();this.charts.spend=new Chart(ctx,{type:'doughnut',data:{labels:labs,datasets:[{data:vals,backgroundColor:cols,borderColor:getComputedStyle(this.root).getPropertyValue('--bg2').trim(),borderWidth:2}]},options:this.chOpts({cutout:'62%',plugins:{legend:{display:true,position:'right',labels:{color:c.t2,font:{size:9},boxWidth:8,padding:6}}}})});});}
   chartForecast(){this.whenLib(()=>window.Chart,()=>{const now=new Date();const labs=[],inc=[],exp=[];for(let i=0;i<12;i++){const d=this.addMonths(now,i);const k=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;const m=this.gmd(k);labs.push(this.MN[d.getMonth()]);inc.push(Math.round(m.ti));exp.push(Math.round(m.te));}const c=this.cc();const ctx=document.getElementById('hzForecastChart');if(!ctx)return;if(this.charts.fc)this.charts.fc.destroy();this.charts.fc=new Chart(ctx,{type:'line',data:{labels:labs,datasets:[{label:'Income',data:inc,borderColor:'#00e8a0',backgroundColor:'#00e8a015',fill:true,tension:.3,pointRadius:0},{label:'Expenses',data:exp,borderColor:'#ff4d6d',backgroundColor:'#ff4d6d10',fill:true,tension:.3,pointRadius:0}]},options:this.chOpts({plugins:{legend:{display:true,labels:{color:c.t2,font:{size:9},boxWidth:8}}},scales:{x:{ticks:{color:c.t3,font:{size:9}},grid:{display:false}},y:{ticks:{color:c.t3,font:{size:9},callback:v=>this.fmtC(v)},grid:{color:c.grid}}}})});});}
   chartNest(){this.whenLib(()=>window.Chart,()=>{const ytr=this.data.retirementAge-this.data.currentAge;const labs=[],data=[];const step=Math.max(1,Math.floor(ytr/18));for(let y=0;y<=ytr;y+=step){let t=this.nestEgg(y);if(this.data.retLens==='today')t=this.realVal(t,y);data.push(Math.round(t/1e6*10)/10);labs.push(this.data.currentAge+y);}const c=this.cc();const ctx=document.getElementById('hzNestChart');if(!ctx)return;if(this.charts.nest)this.charts.nest.destroy();this.charts.nest=new Chart(ctx,{type:'line',data:{labels:labs,datasets:[{data,borderColor:'#8b5cf6',backgroundColor:'#8b5cf618',fill:true,tension:.4,pointRadius:0}]},options:this.chOpts({scales:{x:{ticks:{color:c.t3,font:{size:9}},grid:{display:false}},y:{ticks:{color:c.t3,font:{size:9},callback:v=>v+'M'},grid:{color:c.grid}}}})});});}
   chartAmort(){this.whenLib(()=>window.Chart,()=>{const p=this.data.property;const ctx=document.getElementById('hzAmortChart');if(!ctx)return;if(this.charts.amort)this.charts.amort.destroy();if(!p.mortgage||!p.monthly){this.charts.amort=null;return;}let bal=p.mortgage;const r=(p.rate||0)/100/12;const labs=[],data=[];let baseYr=new Date().getFullYear();for(let mth=0;mth<=480&&bal>0.5;mth++){if(mth%12===0){labs.push(baseYr+mth/12);data.push(Math.round(bal/1e6*100)/100);}const interest=bal*r;bal=bal-(p.monthly-interest);if(bal<0)bal=0;if(p.monthly-interest<=0)break;}const c=this.cc();this.charts.amort=new Chart(ctx,{type:'line',data:{labels:labs,datasets:[{data,borderColor:'#4d9fff',backgroundColor:'#4d9fff18',fill:true,tension:.35,pointRadius:0}]},options:this.chOpts({scales:{x:{ticks:{color:c.t3,font:{size:9},maxTicksLimit:7},grid:{display:false}},y:{ticks:{color:c.t3,font:{size:9},callback:v=>v+'M'},grid:{color:c.grid}}}})});});}
   initVacMap(){this.whenLib(()=>window.L&&document.getElementById('hzVacMap'),()=>{if(this.vacMap){this.vacMap.remove();this.vacMap=null;}const el=document.getElementById('hzVacMap');if(!el)return;this.vacMap=L.map(el,{zoomControl:false,attributionControl:false}).setView([20,20],1);L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(this.vacMap);this.PULSE.forEach(d=>{const m=L.circleMarker([d.lat,d.lng],{radius:8,fillColor:d.col,color:d.col,fillOpacity:.8,weight:2});m.bindPopup(`<strong>${d.flag} ${d.dest}</strong><br>${d.cost}`);m.addTo(this.vacMap);});setTimeout(()=>this.vacMap&&this.vacMap.invalidateSize(),140);});}
-  initRetMap(){this.whenLib(()=>window.L&&document.getElementById('hzRetMap'),()=>{if(this.retMap){this.retMap.remove();this.retMap=null;}const el=document.getElementById('hzRetMap');if(!el)return;this.retMap=L.map(el,{zoomControl:false,attributionControl:false}).setView([25,10],1);L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(this.retMap);const dr=this.draw(this.nestEgg())+this.pension();this.RET.forEach(d=>{const col=d.costK*1000<=dr?'#00e8a0':'#f5a623';const m=L.circleMarker([d.lat,d.lng],{radius:9,fillColor:col,color:col,fillOpacity:.8,weight:2});m.bindPopup(`<strong>${d.flag} ${d.name}</strong><br>${d.costK}K SEK/mo`);m.addTo(this.retMap);});setTimeout(()=>this.retMap&&this.retMap.invalidateSize(),140);});}
+  initRetMap(){this.whenLib(()=>window.L&&document.getElementById('hzRetMap'),()=>{if(this.retMap){this.retMap.remove();this.retMap=null;}const el=document.getElementById('hzRetMap');if(!el)return;this.retMap=L.map(el,{zoomControl:false,attributionControl:false}).setView([25,10],1);L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(this.retMap);const dr=this.draw(this.nestEgg())+this.pension();this.dests().forEach(d=>{if(!d.lat&&!d.lng)return;const col=d.costK*1000<=dr?'#00e8a0':'#f5a623';const m=L.circleMarker([d.lat,d.lng],{radius:9,fillColor:col,color:col,fillOpacity:.8,weight:2});m.bindPopup(`<strong>${d.flag} ${this.esc(d.name)}</strong><br>${d.costK}K SEK/mo`);m.addTo(this.retMap);});setTimeout(()=>this.retMap&&this.retMap.invalidateSize(),140);});}
 
   // ══════ EVENTS ══════
   onClick(e){const el=e.target.closest('[data-act]');if(!el)return;const a=el.dataset.act;const d=el.dataset;
@@ -22412,13 +22457,13 @@ class HZMobile {
     if(a==='apex'){this.runApex();this.persist();this.paint();return this.toast('APEX scan complete');}
     if(a==='theme')return this.toggleTheme();
     if(a==='seg'){this.data[d.model]=d.v;this.persist();return this.paint();}
-    if(a==='rmtrip'){this.data.savedTrips=this.data.savedTrips.filter(t=>t.id!==d.id);this.persist();return this.paint();}
+    if(a==='rmtrip'){const trip=this.data.savedTrips.find(t=>t.id===d.id);if(trip&&!trip._m&&typeof state!=='undefined'&&Array.isArray(state.trips)){state.trips=state.trips.filter(t=>t.id!==d.id);}this.data.savedTrips=this.data.savedTrips.filter(t=>t.id!==d.id);if(typeof state!=='undefined')state.mobileTrips=this.data.savedTrips;this.persist();return this.paint();}
     if(a==='trip')return this.openTrip();
     if(a==='adddest')return this.openAddDest();
     if(a==='bank')return this.openBank();
     if(a==='ai'||a==='aichat')return this.openChat();
-    if(a==='csv')return this.toast('CSV import — connect a bank export to map columns');
-    if(a==='demo')return this.toast('Demo spend data is already loaded ✓');
+    if(a==='csv')return this.toast('Upload your bank CSV in Spend Insights on desktop');
+    if(a==='demo'){if(typeof state!=='undefined'&&typeof DEMO_TRANSACTIONS!=='undefined'){state.bankConnected=true;state.bankMode='demo';state.transactions=[...DEMO_TRANSACTIONS];state.spendInsights=null;this.persist();this.closeOverlay();if(this.data.tab!=='spend')this.go('spend');else this.paint();return this.toast('Demo transactions loaded ✓');}return this.toast('Demo data unavailable');}
     if(a==='export')return this.doExport();
     if(a==='import')return this.toast('Use Settings → Data on desktop to import a backup');
     if(a==='reset')return this.toast('Reset lives in desktop Settings for safety');
@@ -22460,7 +22505,7 @@ class HZMobile {
   openSearch(){const items=this.MORE;this.sheet('Search','<input autofocus placeholder="Jump to a tab or action…" style="width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:9px;padding:11px 13px;color:var(--text);font-size:14px;margin-bottom:12px"><div style="font-family:var(--fm);font-size:9px;letter-spacing:.1em;color:var(--text3);text-transform:uppercase;margin-bottom:8px">Navigate</div><div style="display:flex;flex-direction:column;gap:5px">'+items.map(m=>`<button data-act="morenav" data-t="${m[0]}" style="display:flex;align-items:center;gap:12px;background:var(--bg2);border:1px solid var(--border);border-radius:10px;padding:11px 13px;color:var(--text);cursor:pointer;text-align:left"><span style="font-size:16px;width:22px;text-align:center">${m[1]}</span><span style="flex:1;font-size:13px">${m[2]}</span><span style="font-family:var(--fm);font-size:9px;color:var(--text3)">↵</span></button>`).join('')+'</div>');}
   openBank(){this.sheet('Connect Bank','<div style="display:flex;flex-direction:column;gap:10px">'+[['Open Banking (PSD2)','Requires bank credentials','🏦','info'],['Manual / Demo Mode','Pre-loaded sample data','📊','sage']].map(o=>`<div style="background:var(--${o[3]}-bg);border:1px solid var(--${o[3]}-bd);border-radius:12px;padding:13px;display:flex;align-items:center;gap:12px"><span style="font-size:22px">${o[2]}</span><div style="flex:1"><div style="font-size:13px;font-weight:600;color:var(--text)">${o[0]}</div><div style="font-size:11px;color:var(--text2)">${o[1]}</div></div></div>`).join('')+'</div><label style="display:block;font-size:11px;color:var(--text2);margin:14px 0 5px">Select your bank</label><select style="width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:10px 12px;color:var(--text);font-size:13px"><option>SEB</option><option>Swedbank</option><option>Handelsbanken</option><option>Nordea</option><option>Danske Bank</option><option>Other (PSD2)</option></select><div style="display:flex;gap:8px;margin-top:14px">'+this.btn('📊 Load Demo','demo','','g')+this.btn('🏦 Connect Live','bank','','o')+'</div>','Connect via Open Banking (PSD2) to pull real transactions, or use demo mode. Supported: SEB, Swedbank, Handelsbanken, Nordea, Danske Bank and all EU PSD2 banks.');}
   openTrip(){this.sheet('Plan a Trip','<div style="display:flex;flex-direction:column;gap:10px"><div><label style="display:block;font-size:11px;color:var(--text2);margin-bottom:4px">Destination</label><input id="tpDest" placeholder="e.g. Cape Town, South Africa" style="width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:9px 11px;color:var(--text);font-size:13px"></div><div style="display:flex;gap:8px"><div style="flex:1"><label style="display:block;font-size:11px;color:var(--text2);margin-bottom:4px">When</label><input id="tpWhen" placeholder="Dec 2026" style="width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:9px 11px;color:var(--text);font-size:13px"></div><div style="width:90px"><label style="display:block;font-size:11px;color:var(--text2);margin-bottom:4px">Nights</label><input id="tpNights" type="number" value="10" style="width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:9px 11px;color:var(--text);font-family:var(--fm);font-size:13px"></div></div><div><label style="display:block;font-size:11px;color:var(--text2);margin-bottom:4px">Total budget (SEK)</label><input id="tpBudget" type="number" placeholder="60000" style="width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:9px 11px;color:var(--text);font-family:var(--fm);font-size:13px"></div></div><div style="margin-top:14px">'+this.btn('Save Trip','savetrip','','g')+'</div>','Plan a specific trip and see exactly what it does to your fun fund.');}
-  saveTrip(){const dEl=document.getElementById('tpDest');const dest=(dEl&&dEl.value||'').trim();if(!dest)return this.toast('Enter a destination');this.data.savedTrips.push({id:'t'+Date.now(),dest,when:(document.getElementById('tpWhen')||{}).value||'',budget:+(document.getElementById('tpBudget')||{}).value||0,nights:+(document.getElementById('tpNights')||{}).value||0});this.persist();this.closeOverlay();if(this.data.tab!=='funfund')this.go('funfund');else this.paint();this.toast('Trip saved ✓');}
+  saveTrip(){const dEl=document.getElementById('tpDest');const dest=(dEl&&dEl.value||'').trim();if(!dest)return this.toast('Enter a destination');this.data.savedTrips.push({id:'t'+Date.now(),dest,when:(document.getElementById('tpWhen')||{}).value||'',budget:+(document.getElementById('tpBudget')||{}).value||0,nights:+(document.getElementById('tpNights')||{}).value||0,_m:true});this.persist();this.closeOverlay();if(this.data.tab!=='funfund')this.go('funfund');else this.paint();this.toast('Trip saved ✓');}
   openAddDest(){this.sheet('Add Destination','<input placeholder="🔍 Search city or country…" style="width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:9px;padding:11px 13px;color:var(--text);font-size:14px;margin-bottom:12px"><div style="font-size:11.5px;color:var(--text3);line-height:1.6">Pick a match to pre-fill cost of living, tax, climate and coordinates. Add and manage full destinations from Retire Anywhere on desktop.</div>','Search by city or country to add a retirement destination.');}
   openChat(){this.closeOverlay();if(typeof toggleAIPanel==='function'){try{toggleAIPanel();return;}catch(_){}}this.sheet('Horizon AI Advisor','<div style="background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:13px;font-size:12.5px;line-height:1.6;color:var(--text);margin-bottom:12px">Ask me anything about your finances, retirement timeline, where to retire, or travel budget. I have full context of your data.</div>','Aware of your financial context');}
 }
@@ -22485,6 +22530,18 @@ class HZMobile {
   window.addEventListener('load',()=>setTimeout(ensure,60));
   if(mq.addEventListener)mq.addEventListener('change',onMQ);else if(mq.addListener)mq.addListener(onMQ);
   window.addEventListener('hz:refresh',ensure);
+  // Keyboard-safe chat: --hz-vvh tracks the visual viewport height so the
+  // full-screen AI panel shrinks when the on-screen keyboard opens (the
+  // layout viewport does NOT resize on iOS — only visualViewport reports the
+  // keyboard). Skipped while pinch-zoomed, where vv.height means "zoomed
+  // window", not "keyboard space".
+  if(window.visualViewport){
+    const vv=window.visualViewport;
+    const setVVH=()=>{ if(vv.scale&&vv.scale>1.05) return; document.documentElement.style.setProperty('--hz-vvh', Math.round(vv.height)+'px'); };
+    vv.addEventListener('resize',setVVH);
+    vv.addEventListener('scroll',setVVH);
+    setVVH();
+  }
 })();
 
 })();
