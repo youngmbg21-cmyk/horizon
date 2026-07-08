@@ -4405,6 +4405,10 @@ body.light .piq-country-menu { box-shadow:0 12px 28px -10px rgba(60,40,10,0.22);
   #ai-panel .aip-msgs { overscroll-behavior:contain; min-height:0; }
 }
 @keyframes hzspin { to{transform:rotate(360deg)} }
+/* Life Wall "crumble" brick — years after the portfolio is exhausted. A faint
+   crack-line overlay + a broken top-right corner, mirroring the desktop wall. */
+#hzApp .hz-lw-dry::before{ content:""; position:absolute; inset:0; pointer-events:none; border-radius:6px; opacity:.6; background:url("data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 40' preserveAspectRatio='none'%3E%3Cg fill='none' stroke='%23ff4d6d' stroke-width='1' stroke-linecap='round'%3E%3Cpath d='M9 3 L15 14 L11 22 L19 27 L15 37'/%3E%3Cpath d='M29 5 L25 15 L31 24'/%3E%3C/g%3E%3C/svg%3E") no-repeat center/100% 100%; }
+#hzApp .hz-lw-dry::after{ content:""; position:absolute; top:0; right:0; width:11px; height:11px; background:linear-gradient(135deg,transparent 48%,var(--bg1) 50%); pointer-events:none; }
 /* AI analysis markdown inside the phone shell — inherits the app's .md
    tone-marker spans; these just size it for mobile cards. */
 #hzApp .hz-md p { margin:0 0 8px; }
@@ -22795,12 +22799,37 @@ class HZMobile {
   vLifeWall(){
     const a0=this.data.currentAge,ret=this.data.retirementAge,le=this.data.lifeExp;
     const ch=a0<ret-5?['Wealth Building','var(--green)']:a0<ret?['Glide Path','var(--amber)']:['Retirement','var(--violet)'];
+    // Depletion year: the shared retirement simulation's runoutAge — the age the
+    // portfolio is exhausted, after which pension alone must cover the budget.
+    // From that year the wall "crumbles". null → funds never run dry.
+    const nu=this.nums();
+    const runout=(nu&&nu.runoutAge!=null&&nu.runoutAge<=le)?Math.round(this.n(nu.runoutAge,0)):null;
     let h=this.ph('OVERVIEW','Life Wall',`Every year from now to ${le}, one brick at a time.`);
-    h+=`<div style="position:relative;background:linear-gradient(140deg,var(--bg2),var(--bg1));border:1px solid var(--border2);border-radius:16px;padding:16px;margin-bottom:12px;overflow:hidden"><div style="position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,var(--green),var(--amber),var(--violet))"></div><div style="font-size:9px;letter-spacing:.1em;color:var(--text3);font-weight:700;text-transform:uppercase;margin-bottom:5px">CURRENT LIFE CHAPTER</div><div style="font-family:var(--fs);font-size:23px;font-weight:600;color:${ch[1]}">${ch[0]}</div><div style="font-size:12px;color:var(--text2);margin-top:3px">Age ${a0} · ${new Date().getFullYear()} · ${ret-a0} years to retirement · ${le-a0} to plan for</div></div>`;
-    h+=`<div style="display:flex;gap:13px;flex-wrap:wrap;margin-bottom:12px;font-size:10px;color:var(--text2)">${[['Building','var(--green)'],['Glide path','var(--amber)'],['Retirement','var(--violet)']].map(l=>`<span style="display:inline-flex;align-items:center;gap:5px"><span style="width:11px;height:11px;border-radius:3px;background:${l[1]}"></span>${l[0]}</span>`).join('')}</div>`;
+    const chapterNote=runout
+      ? `<div style="font-size:12px;color:var(--red);font-weight:600;margin-top:7px;line-height:1.4">⚠ Funds run dry at age ${runout} — pension alone won't cover your budget after that.</div>`
+      : (nu?`<div style="font-size:12px;color:var(--green);font-weight:600;margin-top:7px">✓ Funds are projected to last through age ${le}.</div>`:'');
+    h+=`<div style="position:relative;background:linear-gradient(140deg,var(--bg2),var(--bg1));border:1px solid var(--border2);border-radius:16px;padding:16px;margin-bottom:12px;overflow:hidden"><div style="position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,var(--green),var(--amber),var(--violet)${runout?',var(--red)':''})"></div><div style="font-size:9px;letter-spacing:.1em;color:var(--text3);font-weight:700;text-transform:uppercase;margin-bottom:5px">CURRENT LIFE CHAPTER</div><div style="font-family:var(--fs);font-size:23px;font-weight:600;color:${ch[1]}">${ch[0]}</div><div style="font-size:12px;color:var(--text2);margin-top:3px">Age ${a0} · ${new Date().getFullYear()} · ${ret-a0} years to retirement · ${le-a0} to plan for</div>${chapterNote}</div>`;
+    const legend=[['Building','var(--green)'],['Glide path','var(--amber)'],['Retirement','var(--violet)']];
+    if(runout)legend.push(['Funds run dry','var(--red)']);
+    h+=`<div style="display:flex;gap:13px;flex-wrap:wrap;margin-bottom:12px;font-size:10px;color:var(--text2)">${legend.map(l=>`<span style="display:inline-flex;align-items:center;gap:5px"><span style="width:11px;height:11px;border-radius:3px;background:${l[1]}"></span>${l[0]}</span>`).join('')}</div>`;
     let bricks='';
-    for(let age=a0;age<=le;age++){const ph=age<ret-5?['var(--green)','var(--sage-bg)','var(--sage-bd)']:age<ret?['var(--amber)','var(--honey-bg)','var(--honey-bd)']:['var(--violet)','var(--plum-bg)','var(--plum-bd)'];const ms=age===ret||age===65||age===le;bricks+=`<div data-act="brick" data-age="${age}" style="aspect-ratio:1;border-radius:6px;background:${ph[1]};border:1px solid ${ms?ph[0]:ph[2]};display:flex;align-items:center;justify-content:center;font-family:var(--fm);font-size:10px;font-weight:${ms?'700':'500'};color:${ms?ph[0]:'var(--text2)'};cursor:pointer;${age===a0?'box-shadow:0 0 0 2px var(--green)':''}">${age}</div>`;}
-    h+=this.card(this.ct('🧱 The Wall',this.chip('honey','●'+ret+' retire'))+`<div style="display:grid;grid-template-columns:repeat(7,1fr);gap:5px">${bricks}</div><div style="font-size:10px;color:var(--text3);margin-top:11px;text-align:center">Tap any brick to see that year's projection</div>`);
+    for(let age=a0;age<=le;age++){
+      const dry=runout&&age>=runout;
+      const ph=age<ret-5?['var(--green)','var(--sage-bg)','var(--sage-bd)']:age<ret?['var(--amber)','var(--honey-bg)','var(--honey-bd)']:['var(--violet)','var(--plum-bg)','var(--plum-bd)'];
+      const ms=age===ret||age===65||age===le;
+      const bg=dry?'var(--rose-bg)':ph[1];
+      const bd=dry?(age===runout?'var(--red)':'var(--rose-bd)'):(ms?ph[0]:ph[2]);
+      const col=dry?'var(--red)':(ms?ph[0]:'var(--text2)');
+      let ring='';
+      if(age===a0)ring='box-shadow:0 0 0 2px var(--green);';
+      else if(age===runout)ring='box-shadow:0 0 0 2px var(--red);';
+      bricks+=`<div data-act="brick" data-age="${age}"${dry?' class="hz-lw-dry"':''} style="position:relative;aspect-ratio:1;border-radius:6px;background:${bg};border:1px solid ${bd};display:flex;align-items:center;justify-content:center;font-family:var(--fm);font-size:10px;font-weight:${(ms||dry)?'700':'500'};color:${col};cursor:pointer;${ring}"><span style="position:relative;z-index:1">${age}</span></div>`;
+    }
+    const headChips=this.chip('honey','●'+ret+' retire')+(runout?this.chip('rose','⚠ '+runout+' dry'):'');
+    const foot=runout
+      ? `Tap any brick to see that year's projection. <b style="color:var(--red)">${runout}</b> is the year your portfolio is exhausted and the wall starts to crumble.`
+      : `Tap any brick to see that year's projection.`;
+    h+=this.card(this.ct('🧱 The Wall',headChips)+`<div style="display:grid;grid-template-columns:repeat(7,1fr);gap:5px">${bricks}</div><div style="font-size:10px;color:var(--text3);margin-top:11px;text-align:center;line-height:1.5">${foot}</div>`);
     return h;
   }
   brickSheet(age){
@@ -22812,18 +22841,23 @@ class HZMobile {
     let ne=null,real=null;
     try{const f=this.fe();const proj=f?f.projection.yearly():[];const hit=proj.find(p=>p.age===age)||null;if(hit){ne=this.n(hit.total,0);real=this.n(hit.realTotal,0);}}catch(_){}
     const nu=this.nums();
+    const runout=(nu&&nu.runoutAge!=null)?Math.round(this.n(nu.runoutAge,0)):null;
+    const dry=!!(runout&&age>=runout);
+    let shortMo=0,penMo=0;
     if(retired&&nu&&nu._simResult&&Array.isArray(nu._simResult.labels)){
       const idx=nu._simResult.labels.indexOf(age);
-      if(idx>=0){real=this.n(nu._simResult.balData[idx],0);ne=null;}
+      if(idx>=0){real=this.n(nu._simResult.balData[idx],0);ne=null;shortMo=this.n((nu._simResult.shortfall||[])[idx],0)/12;penMo=this.n((nu._simResult.pensionData||[])[idx],0)/12;}
     }
     if(ne==null&&real==null){const est=this.nestEgg(Math.min(y,this.data.retirementAge-this.data.currentAge));ne=est;real=this.realVal(est,y);}
     const dr=this.retIncome();
     let rows='';
     if(ne!=null)rows+=this.row('Projected nest egg',this.fmtC(ne),'var(--violet)');
-    rows+=this.row(retired?"Portfolio (today's money)":"In today's money",this.fmtC(real!=null?real:ne),'var(--text)');
-    rows+=retired?this.row('Monthly income',this.fmtC(dr)+' /mo','var(--green)'):this.row('Years from now','+'+y+'Y','var(--amber)');
-    rows+=this.row(retired?'Status':'Milestone',retired?'Drawing down':(age===this.data.retirementAge?'🎉 Retirement begins':'Accumulating'),retired?'var(--violet)':'var(--green)',true);
-    this.sheet(`Age ${age} · ${yr}`,this.chip(retired?'plum':'sage',phase)+`<div style="margin-top:12px">${rows}</div>`,retired?'You are drawing on the portfolio in this chapter.':'You are still building the nest egg in this chapter.');
+    rows+=this.row(retired?"Portfolio (today's money)":"In today's money",this.fmtC(real!=null?real:ne),dry?'var(--red)':'var(--text)');
+    if(dry){rows+=this.row('Pension income',this.fmtC(penMo)+' /mo','var(--green)');if(shortMo>0)rows+=this.row('Monthly shortfall','−'+this.fmtC(shortMo)+' /mo','var(--red)');}
+    else rows+=retired?this.row('Monthly income',this.fmtC(dr)+' /mo','var(--green)'):this.row('Years from now','+'+y+'Y','var(--amber)');
+    rows+=this.row(retired?'Status':'Milestone',dry?'⚠ Funds depleted · pension only':(retired?'Drawing down':(age===this.data.retirementAge?'🎉 Retirement begins':'Accumulating')),dry?'var(--red)':(retired?'var(--violet)':'var(--green)'),true);
+    const sub=dry?`Your portfolio is exhausted by this year — only pension income remains, leaving a gap against your budget.`:(retired?'You are drawing on the portfolio in this chapter.':'You are still building the nest egg in this chapter.');
+    this.sheet(`Age ${age} · ${yr}`,this.chip(dry?'rose':(retired?'plum':'sage'),dry?'Wall crumbling':phase)+`<div style="margin-top:12px">${rows}</div>`,sub);
   }
 
   // ══════ JOURNAL ══════
