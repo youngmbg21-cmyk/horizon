@@ -16419,7 +16419,6 @@ function renderRetireAnywhere() {
     // a re-run, never "Not analysed"; nothing yet → prompt a Deep Dive.
     const analysed = !!loc.analysed;
     const staleReport = !analysed && !!cached;
-    const affordAnswer = loc.verdict==='feasible' ? 'Yes — comfortably' : loc.verdict==='conditional' ? 'Tight — possible with care' : 'No — income falls short';
     const affordColor  = loc.verdict==='feasible' ? 'var(--green)' : loc.verdict==='conditional' ? 'var(--amber)' : 'var(--red)';
     const verdictBadge = running
       ? `<span class="loc-verdict conditional">Analysing…</span>`
@@ -16428,19 +16427,26 @@ function renderRetireAnywhere() {
         : staleReport
           ? `<span class="loc-verdict" style="background:var(--bg4);color:var(--text3)">Refresh KPIs</span>`
           : `<span class="loc-verdict" style="background:var(--bg4);color:var(--text3)">Not analysed</span>`;
-    const statsHtml = analysed ? `
-      <div class="loc-affordability-bar"><div class="loc-affordability-fill" style="width:${Math.round(loc.affordabilityScore*100)}%;background:${affordColor}"></div></div>
-      <div style="font-size:10px;color:var(--text3);font-family:var(--fm);margin-bottom:10px">${esc2(t('ra.card.affordable', { pct: Math.round(loc.affordabilityScore*100) }))}</div>
-      <div class="loc-stat"><span class="loc-stat-lbl">Can you afford it?</span><span class="loc-stat-val" style="color:${affordColor};font-weight:700">${affordAnswer}</span></div>
+    // KPI grid — the four headline KPIs are ALWAYS shown as labelled slots.
+    // Their values fill in once a Deep Dive has produced them; before that
+    // (or for an older report predating them) each value reads "—".
+    const discPct = (analysed && loc.netIncome>0) ? Math.round(loc.surplus/loc.netIncome*100) : null;
+    const affordShort = loc.verdict==='feasible' ? 'Feasible' : loc.verdict==='conditional' ? 'Conditional' : 'Infeasible';
+    const kpiTile = (lbl,val,color)=>`<div style="background:var(--bg3);border:1px solid var(--border);border-radius:9px;padding:8px 10px"><div style="font-size:9px;font-family:var(--fm);letter-spacing:.05em;text-transform:uppercase;color:var(--text3)">${lbl}</div><div style="font-size:15px;font-weight:700;font-family:var(--fm);margin-top:3px;color:${val==='—'?'var(--text3)':color}">${val}</div></div>`;
+    const kpiGrid = `<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:10px 0">
+      ${kpiTile('Affordable?', analysed?affordShort:'—', affordColor)}
+      ${kpiTile('Discretionary', discPct!=null?discPct+'%':'—', (discPct!=null&&discPct<0)?'var(--red)':'var(--green)')}
+      ${kpiTile('Effective tax', analysed?Math.round(loc.effTaxPct)+'%':'—', 'var(--text)')}
+      ${kpiTile('Income rank', (analysed&&loc.incomePercentile!=null)?'Top '+loc.incomePercentile+'%':'—', 'var(--text2)')}
+    </div>`;
+    const statsHtml = kpiGrid + (analysed ? `
       <div class="loc-stat"><span class="loc-stat-lbl">Discretionary left · /mo</span><span class="loc-stat-val ${loc.surplus>=0?'pos':'neg'}">${fmt(loc.surplus)}</span></div>
-      <div class="loc-stat"><span class="loc-stat-lbl">Effective tax on your income</span><span class="loc-stat-val">${Math.round(loc.effTaxPct)}%</span></div>
-      ${loc.incomePercentile != null ? `<div class="loc-stat"><span class="loc-stat-lbl">Income rank · locally</span><span class="loc-stat-val" style="color:var(--text2)">Top ${loc.incomePercentile}% earner</span></div>` : ''}
       <div class="loc-stat"><span class="loc-stat-lbl">${esc2(t('ra.card.cost'))}${loc.householdSize===2?' · couple':''}</span><span class="loc-stat-val">${fmt(loc.effCostOfLiving)}</span></div>
       ${loc.qol!=null ? `<div class="loc-stat"><span class="loc-stat-lbl">Quality of life</span><span class="loc-stat-val" style="color:var(--violet)">${loc.qol.toFixed(1)} / 10</span></div>` : ''}
       ${loc.taxNote ? `<div style="font-size:10px;color:var(--text3);font-style:italic;margin:2px 0 4px;line-height:1.4">⚑ ${esc(loc.taxNote)}</div>` : ''}`
       : staleReport
-        ? `<div style="font-size:12px;color:var(--text3);line-height:1.5;margin:2px 0 10px">This report predates the new KPIs. <strong style="color:var(--text2)">Re-run</strong> to load your affordability, effective tax rate and income percentile.</div>`
-        : `<div style="font-size:12px;color:var(--text3);line-height:1.5;margin:2px 0 10px">Run a Deep Dive to get accurate cost of living, effective tax and discretionary income for ${raHouseholdSize()===2?'you and your partner':'you'} — tailored to this city.</div>`;
+        ? `<div style="font-size:11px;color:var(--text3);line-height:1.5;margin:0 0 8px">This report predates these KPIs — <strong style="color:var(--text2)">re-run</strong> to fill them in.</div>`
+        : `<div style="font-size:11px;color:var(--text3);line-height:1.5;margin:0 0 8px">Run the analysis to fill these in for ${raHouseholdSize()===2?'you and your partner':'you'}.</div>`);
     return `<div class="loc-card ${analysed?loc.verdict:'pending'}">
       <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:6px">
         <div>
@@ -22913,25 +22919,31 @@ class HZMobile {
         : staleReport
           ? this.chip('info','REFRESH KPIS')
           : this.chip('info','NOT ANALYSED');
-    let body;
+    // KPI grid — the four headline KPIs are ALWAYS shown as labelled slots;
+    // values fill once a Deep Dive has produced them, otherwise read "—".
+    const vc={feasible:'var(--green)',conditional:'var(--amber)',infeasible:'var(--red)'}[loc.verdict]||'var(--text3)';
+    const affordShort=loc.verdict==='feasible'?'Feasible':loc.verdict==='conditional'?'Conditional':'Infeasible';
+    const discPct=(analysed&&this.n(loc.netIncome,0)>0)?Math.round(this.n(loc.surplus,0)/this.n(loc.netIncome,1)*100):null;
+    const tile=(lbl,val,color)=>`<div style="background:var(--bg3);border:1px solid var(--border);border-radius:9px;padding:8px 10px"><div style="font-size:8.5px;font-family:var(--fm);letter-spacing:.04em;text-transform:uppercase;color:var(--text3)">${lbl}</div><div style="font-size:14px;font-weight:700;font-family:var(--fm);margin-top:2px;color:${val==='—'?'var(--text3)':color}">${val}</div></div>`;
+    const kpiGrid=`<div style="display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-top:10px">
+      ${tile('Affordable?',analysed?affordShort:'—',vc)}
+      ${tile('Discretionary',discPct!=null?discPct+'%':'—',(discPct!=null&&discPct<0)?'var(--red)':'var(--green)')}
+      ${tile('Effective tax',analysed?Math.round(this.n(loc.effTaxPct,0))+'%':'—','var(--text)')}
+      ${tile('Income rank',(analysed&&loc.incomePercentile!=null)?'Top '+loc.incomePercentile+'%':'—','var(--text2)')}
+    </div>`;
+    let detail;
     if(analysed){
-      const vc={feasible:'var(--green)',conditional:'var(--amber)',infeasible:'var(--red)'}[loc.verdict]||'var(--text3)';
-      const affordAnswer=loc.verdict==='feasible'?'Yes — comfortably':loc.verdict==='conditional'?'Tight — possible':'No — falls short';
-      const aff=Math.max(0,Math.min(100,Math.round(this.n(loc.affordabilityScore,0)*100)));
-      body=`<div style="margin-top:9px">${this.bar(aff,vc,5)}</div>
-      <div style="margin-top:9px;display:flex;flex-direction:column;gap:5px;font-family:var(--fm);font-size:11.5px">
-        ${this.raRow('Can you afford it?','<span style="font-weight:700">'+affordAnswer+'</span>',vc)}
+      detail=`<div style="margin-top:9px;display:flex;flex-direction:column;gap:5px;font-family:var(--fm);font-size:11.5px">
         ${this.raRow('Discretionary left · /mo',this.fmt(this.n(loc.surplus,0))+'/mo',this.n(loc.surplus,0)>=0?'var(--green)':'var(--red)')}
-        ${this.raRow('Effective tax on your income',Math.round(this.n(loc.effTaxPct,0))+'%','var(--text)')}
-        ${loc.incomePercentile!=null?this.raRow('Income rank · locally','Top '+loc.incomePercentile+'% earner','var(--text2)'):''}
         ${this.raRow('Cost of living'+(loc.householdSize===2?' · couple':''),this.fmt(this.n(loc.effCostOfLiving,0))+'/mo','var(--text)')}
         ${loc.qol!=null?this.raRow('Quality of life',this.n(loc.qol,0).toFixed(1)+' / 10','var(--violet)'):''}
       </div>${loc.taxNote?`<div style="font-size:9px;color:var(--text3);font-style:italic;margin-top:5px;line-height:1.4">⚑ ${this.esc(loc.taxNote)}</div>`:''}`;
     } else if(staleReport){
-      body=`<div style="margin-top:9px;font-size:11.5px;color:var(--text3);line-height:1.5">This report predates the new KPIs. <strong style="color:var(--text2)">Re-run</strong> to load your affordability, effective tax rate and income percentile.</div>`;
+      detail=`<div style="margin-top:8px;font-size:11px;color:var(--text3);line-height:1.5">This report predates these KPIs — <strong style="color:var(--text2)">re-run</strong> to fill them in.</div>`;
     } else {
-      body=`<div style="margin-top:9px;font-size:11.5px;color:var(--text3);line-height:1.5">Run a Deep Dive to get accurate cost of living, effective tax and discretionary income for ${(typeof raHouseholdSize==='function'&&raHouseholdSize()===2)?'you and your partner':'you'} — tailored to this city.</div>`;
+      detail=`<div style="margin-top:8px;font-size:11px;color:var(--text3);line-height:1.5">Run the analysis to fill these in for ${(typeof raHouseholdSize==='function'&&raHouseholdSize()===2)?'you and your partner':'you'}.</div>`;
     }
+    const body=kpiGrid+detail;
     return `<div data-act="editdest" data-id="${loc.id}" style="padding:12px 0;border-bottom:1px solid var(--border);cursor:pointer">
       <div style="display:flex;align-items:flex-start;gap:10px">
         <div style="font-size:22px">${loc.flag||'📍'}</div>
