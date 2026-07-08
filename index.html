@@ -5207,8 +5207,10 @@ const STRINGS = {
   'ra.page.title':          { en:'Where Can You Retire?', sv:'Var kan du gå i pension?' },
   'ra.page.sub':            { en:'Where in the world does your <strong>{income}/mo</strong> live well?',
                               sv:'Var i världen räcker dina <strong>{income}/mån</strong> till ett gott liv?' },
-  'ra.callout':             { en:'<strong>Your Retirement Income: {income}/mo</strong> ({port}/mo from portfolio + {pen}/mo avg pension) — all values in <strong>today\u2019s money</strong>, the inflation-adjusted real purchasing power your nest egg can sustain.<br>Destinations are rated by whether your real income can comfortably cover local cost of living, after accounting for local tax.',
-                              sv:'<strong>Din pensionsinkomst: {income}/mån</strong> ({port}/mån från portfölj + {pen}/mån snittpension) — alla värden i <strong>dagens penningvärde</strong>, den inflationsjusterade reella köpkraft som ditt pensionskapital kan upprätthålla.<br>Destinationer rankas efter om din reella inkomst bekvämt kan täcka lokala levnadskostnader, efter att lokal skatt räknats av.' },
+  'ra.callout':             { en:'<strong>Your Target Retirement Income: {income}/mo</strong> — the pre-tax income your plan needs to sustain your chosen lifestyle, shown in <strong>{lens}</strong>. This is the same figure as “Total income needed · pre-tax” on your Retirement Plan.<br>Destinations are rated by whether this income can comfortably cover local cost of living, after accounting for local tax.',
+                              sv:'<strong>Din målpensionsinkomst: {income}/mån</strong> — den inkomst före skatt som din plan behöver för att upprätthålla din valda livsstil, visad i <strong>{lens}</strong>. Detta är samma siffra som ”Total inkomst som behövs · före skatt” i din Pensionsplan.<br>Destinationer rankas efter om denna inkomst bekvämt kan täcka lokala levnadskostnader, efter att lokal skatt räknats av.' },
+  'ra.lens.today':          { en:'today’s money', sv:'dagens penningvärde' },
+  'ra.lens.nominal':        { en:'nominal · future kr', sv:'nominellt · framtida kr' },
   // KPI row
   'ra.kpi.feasible':        { en:'FEASIBLE DESTINATIONS', sv:'GENOMFÖRBARA DESTINATIONER' },
   'ra.kpi.feasible.sub':    { en:'Income > 100% of costs',
@@ -5216,10 +5218,10 @@ const STRINGS = {
   'ra.kpi.conditional':     { en:'CONDITIONAL',           sv:'VILLKORLIGT' },
   'ra.kpi.conditional.sub': { en:'Income 80–100% of costs',
                               sv:'Inkomst 80–100% av kostnader' },
-  'ra.kpi.income':          { en:'YOUR MONTHLY INCOME · TODAY\u2019S MONEY',
-                              sv:'DIN MÅNADSINKOMST · DAGENS PENNINGVÄRDE' },
-  'ra.kpi.income.sub':      { en:'At retirement age {age} · real value',
-                              sv:'Vid pensionsålder {age} · reellt värde' },
+  'ra.kpi.income':          { en:'YOUR MONTHLY INCOME · PRE-TAX',
+                              sv:'DIN MÅNADSINKOMST · FÖRE SKATT' },
+  'ra.kpi.income.sub':      { en:'At retirement age {age} · {lens}',
+                              sv:'Vid pensionsålder {age} · {lens}' },
   // Verdict pill labels (data layer keeps English; we translate at read)
   'ra.verdict.feasible':    { en:'FEASIBLE',              sv:'GENOMFÖRBAR' },
   'ra.verdict.conditional': { en:'CONDITIONAL',           sv:'VILLKORLIG' },
@@ -8320,9 +8322,12 @@ function getRetirementNumbers() {
     // totalRetirementIncome: consistently after home-country tax so the gap
     // vs totalExp (also after-tax) is a meaningful net surplus/shortfall.
     const totalRetirementIncome = sustainableAfterTax + pensionAvgMonthlyAfterTax;
-    // grossRetirementIncome: total before any tax — used by Retire Anywhere
-    // which applies the destination tax separately, and by AI prompts that
-    // pass pre-tax income to be taxed at the destination rate.
+    // grossRetirementIncome: the income the plan will actually GENERATE before
+    // any tax (portfolio drawdown + average pension). Used by the general AI
+    // advisor context and the mobile retirement verdict card. NOTE: the Retire
+    // Anywhere tab deliberately does NOT use this — it scores destinations
+    // against totalGross (the pre-tax "income needed" target) so it matches the
+    // Retirement Plan tab's headline figure.
     const grossRetirementIncome = sustainableMonthly + pensionAvgMonthly;
     const gap = totalRetirementIncome - totalExp;
     const coveragePct = simResult.totalYears > 0
@@ -9790,10 +9795,13 @@ function scoreLocation(loc) {
   // household size too so toggling single/couple re-scores correctly.
   return memoSelect('loc:'+(loc.id||loc.name)+':hh'+raHouseholdSize(), () => {
     const nums = getRetirementNumbers();
-    // Use gross income so destination tax is applied cleanly. The previous
-    // totalRetirementIncome mixed after-tax portfolio + gross pension, which
-    // double-counted the home-country tax when the destination rate was applied.
-    const monthlyIncome = nums.grossRetirementIncome;
+    // Income = the plan's pre-tax "income needed" figure (totalGross), the
+    // SAME number the Retirement Plan tab shows as "Total income needed ·
+    // pre-tax". It is pre-tax, so the destination's effective tax applies
+    // cleanly below without double-counting home-country tax. Kept in real
+    // (today's money) here so verdicts never shift with the display lens;
+    // renderRetireAnywhere scales the DISPLAY to nominal when needed.
+    const monthlyIncome = nums.totalGross;
     const hh = raHouseholdSize();
     const ai = loc.aiStats || null;
     // HYBRID: the app owns YOUR income; the AI owns the DESTINATION's facts.
@@ -16458,7 +16466,16 @@ function renderRetireAnywhere() {
   });
   const r=rate();
   const nums=getRetirementNumbers();
-  const monthlyIncome=nums.grossRetirementIncome;
+  // Retire Anywhere income = the plan's pre-tax "income needed" figure — the
+  // same number the Retirement Plan tab shows as "Total income needed ·
+  // pre-tax" — so both tabs agree on one source of truth. Displayed money
+  // scales to nominal/future kr when the global Today/Nominal lens is set to
+  // Nominal; scoreLocation's verdict math stays in real (today's money) so the
+  // lens never changes a destination's Feasible/Conditional/Infeasible rating.
+  const isNom = FE.display.isNominal();
+  const raD = (v)=>Math.round(FE.display.scaleReal(v||0, nums.ytr));
+  const lensLbl = isNom ? t('ra.lens.nominal') : t('ra.lens.today');
+  const monthlyIncome = raD(nums.totalGross);
 
   const locCards=scored.map(loc=>{
     // Is there a cached Deep Dive report for this location in the Vault?
@@ -16502,8 +16519,8 @@ function renderRetireAnywhere() {
       ${kpiTile('Income rank', (analysed&&loc.incomePercentile!=null)?'Top '+loc.incomePercentile+'%':'—', 'var(--text2)')}
     </div>`;
     const statsHtml = kpiGrid + (analysed ? `
-      <div class="loc-stat"><span class="loc-stat-lbl">Discretionary left · /mo</span><span class="loc-stat-val ${loc.surplus>=0?'pos':'neg'}">${fmt(loc.surplus)}</span></div>
-      <div class="loc-stat"><span class="loc-stat-lbl">${esc2(t('ra.card.cost'))}${loc.householdSize===2?' · couple':''}</span><span class="loc-stat-val">${fmt(loc.effCostOfLiving)}</span></div>
+      <div class="loc-stat"><span class="loc-stat-lbl">Discretionary left · /mo</span><span class="loc-stat-val ${loc.surplus>=0?'pos':'neg'}">${fmt(raD(loc.surplus))}</span></div>
+      <div class="loc-stat"><span class="loc-stat-lbl">${esc2(t('ra.card.cost'))}${loc.householdSize===2?' · couple':''}</span><span class="loc-stat-val">${fmt(raD(loc.effCostOfLiving))}</span></div>
       ${loc.qol!=null ? `<div class="loc-stat"><span class="loc-stat-lbl">Quality of life</span><span class="loc-stat-val" style="color:var(--violet)">${loc.qol.toFixed(1)} / 10</span></div>` : ''}
       ${loc.taxNote ? `<div style="font-size:10px;color:var(--text3);font-style:italic;margin:2px 0 4px;line-height:1.4">⚑ ${esc(loc.taxNote)}</div>` : ''}`
       : staleReport
@@ -16532,7 +16549,7 @@ function renderRetireAnywhere() {
 
     <div class="callout">
       <span>💡</span>
-      <div>${t('ra.callout', { income: fmt(monthlyIncome), port: fmt(nums.sustainableMonthly), pen: fmt(nums.pensionAvgMonthly) })}</div>
+      <div>${t('ra.callout', { income: fmt(monthlyIncome), lens: lensLbl })}</div>
     </div>
 
     ${raHouseholdControl()}
@@ -16540,7 +16557,7 @@ function renderRetireAnywhere() {
     ${ui.kpiRow([
       {icon:'✅', label:t('ra.kpi.feasible'),    value:scored.filter(l=>l.analysed && l.verdict==='feasible').length, tone:'pos', sub:t('ra.kpi.feasible.sub')},
       {icon:'🎯', label:t('ra.kpi.conditional'), value:`<span class="amb">${scored.filter(l=>l.analysed && l.verdict==='conditional').length}</span>`, sub:t('ra.kpi.conditional.sub')},
-      {icon:'💰', label:t('ra.kpi.income'),      value:fmt(monthlyIncome), sub:t('ra.kpi.income.sub', { age: state.retirementAge }), link:'retirement', section:'runway'},
+      {icon:'💰', label:t('ra.kpi.income'),      value:fmt(monthlyIncome), sub:t('ra.kpi.income.sub', { age: state.retirementAge, lens: lensLbl }), link:'retirement', section:'runway'},
     ])}
 
     <div id="retire-map" data-section="map"></div>
@@ -16571,7 +16588,7 @@ function renderRetireAnywhere() {
                   : loc.verdict==='conditional' ? '#f5a623'
                   : '#ff4d6d';
       const popup = loc.analysed
-        ? `<strong>${loc.flag} ${esc(loc.name)}</strong><br><span style="color:${color};font-weight:700">${esc(loc.label)}</span><br>Cost${loc.householdSize===2?' · couple':''}: ${fmt(loc.effCostOfLiving)}/mo<br>Discretionary: ${fmt(loc.surplus)}/mo`
+        ? `<strong>${loc.flag} ${esc(loc.name)}</strong><br><span style="color:${color};font-weight:700">${esc(loc.label)}</span><br>Cost${loc.householdSize===2?' · couple':''}: ${fmt(raD(loc.effCostOfLiving))}/mo<br>Discretionary: ${fmt(raD(loc.surplus))}/mo`
         : `<strong>${loc.flag} ${esc(loc.name)}</strong><br><span style="color:${color}">Not analysed — run a Deep Dive</span>`;
       return { lat: loc.lat, lng: loc.lng, color, popup };
     });
@@ -16584,7 +16601,7 @@ window.showLocDetail=function(id){
   const r=rate(); const s=sym();
   const months=get12Months();
   const nums=getRetirementNumbers();
-  const monthlyIncome=nums.grossRetirementIncome;
+  const monthlyIncome=nums.totalGross; // pre-tax "income needed" — matches Retirement Plan tab
   document.getElementById('loc-modal-content').innerHTML=`
     <div style="font-size:28px;margin-bottom:6px">${loc.flag}</div>
     <div class="modal-title">${esc(loc.name)}, ${esc(loc.country)}</div>
@@ -16659,7 +16676,7 @@ function renderLocAnalysisSlideover(opts){
   if(!loc) return;
   const r = rate(); const s = sym();
   const nums = getRetirementNumbers();
-  const monthlyIncome = nums.grossRetirementIncome;
+  const monthlyIncome = nums.totalGross; // pre-tax "income needed" — matches Retirement Plan tab
   const cached = (state.vault||[]).find(v => v.type==='deepdive' && v.locationId===id);
 
   // Header
@@ -16685,7 +16702,7 @@ function renderLocAnalysisSlideover(opts){
   // with a prompt to analyse — no estimate presented as fact.
   const financialFacts = loc.analysed ? `
         <div class="retire-so-fact"><div class="retire-so-fact-lbl">${esc2(t('ra.so.facts.cost'))}${loc.householdSize===2?' · couple':''}</div><div class="retire-so-fact-val">${fmt(loc.effCostOfLiving)}</div></div>
-        <div class="retire-so-fact"><div class="retire-so-fact-lbl">Gross income · portfolio + pension</div><div class="retire-so-fact-val">${fmt(monthlyIncome)}</div></div>
+        <div class="retire-so-fact"><div class="retire-so-fact-lbl">Target income · pre-tax</div><div class="retire-so-fact-val">${fmt(monthlyIncome)}</div></div>
         <div class="retire-so-fact"><div class="retire-so-fact-lbl">Net income · after ${Math.round(loc.effTaxPct)}% tax</div><div class="retire-so-fact-val pos">${fmt(loc.netIncome)}</div></div>
         <div class="retire-so-fact"><div class="retire-so-fact-lbl">Discretionary · after costs</div><div class="retire-so-fact-val ${loc.surplus>=0?'pos':'neg'}">${fmt(loc.surplus)}</div></div>
         <div class="retire-so-fact"><div class="retire-so-fact-lbl">${esc2(t('ra.so.facts.tax'))}</div><div class="retire-so-fact-val">${Math.round(loc.effTaxPct)}%</div></div>` : '';
@@ -16792,7 +16809,7 @@ window.runLocAnalysis = function(id, opts){
   const cz = countryInfo(state.citizenship);
   const hb = countryInfo(state.homeBase);
   const nums = getRetirementNumbers();
-  const income = nums.grossRetirementIncome;
+  const income = nums.totalGross; // pre-tax "income needed" — matches Retirement Plan tab
   // If rerun, strip the previous cached entry so the new one replaces it
   if(opts && opts.force){
     state.vault = (state.vault||[]).filter(v => !(v.type==='deepdive' && v.locationId===id));
@@ -17519,7 +17536,7 @@ window.aiAnalyzeLocations=function(){
   const key=state.aiKeys?.claude;
   if(!key){toggleAIPanel();return;}
   const nums=getRetirementNumbers();
-  const income=nums.grossRetirementIncome;
+  const income=nums.totalGross; // pre-tax "income needed" — matches Retirement Plan tab
   const ctx = (typeof buildPersonalContext==='function') ? buildPersonalContext() : '';
   const prompt=`${ctx}\n\nThe user is planning to retire with a monthly income of ${fmt(income)} (this is TODAY'S MONEY — real, inflation-adjusted purchasing power, not nominal future kr). Recommend the BEST retirement destinations globally based on this real income. Consider: cost of living, healthcare quality, climate, expat communities, visa/residency requirements, and lifestyle. Tailor visa and tax-treaty advice to the user's citizenship and home base. Give 5 specific recommendations with monthly cost estimates (also in today's money / local-currency-equivalent), an estimated monthly surplus, and a viability score. Format as a structured list. End the reply with ONE fenced \`\`\`horizon-chart\`\`\` block of kind "quoted" plotting the estimated monthly surplus for each of your 5 recommendations, using EXACTLY the surplus figures you stated in the text (same currency, monthly).${langSuffix()}`;
   // Kick off in the background (fire-and-forget); the UI is driven by the
@@ -17534,7 +17551,7 @@ window.aiAnalyzeLoc=async function(id){
   const key=state.aiKeys?.claude;
   if(!key){alert('Add your Claude API key in Settings first.');return;}
   const nums=getRetirementNumbers();
-  const income=nums.grossRetirementIncome;
+  const income=nums.totalGross; // pre-tax "income needed" — matches Retirement Plan tab
   const el=document.getElementById('loc-ai-out'); el.innerHTML='<span class="pulse">🤖 Analyzing…</span>';
   const ctx = buildPersonalContext();
   const prompt=`${ctx}\n\nDetailed retirement feasibility analysis for ${loc.name}, ${loc.country}. The retiree has a monthly income of ${fmt(income)} (in today's money). Local cost of living: ${fmt(loc.costOfLiving)}/mo. Local income tax: ${loc.taxRate}%. Cover: actual cost of living breakdown, healthcare quality, visa/residency for the user's citizenship, quality of life, pros/cons, and an overall verdict. Be specific and practical. Under 250 words.${langSuffix()}`;
@@ -17561,7 +17578,7 @@ window.aiDeepDive = function(id){
   const cz = countryInfo(state.citizenship);
   const hb = countryInfo(state.homeBase);
   const nums = getRetirementNumbers();
-  const income = nums.grossRetirementIncome;
+  const income = nums.totalGross; // pre-tax "income needed" — matches Retirement Plan tab
   const el = document.getElementById('loc-ai-out');
   if(el) el.innerHTML = '<div class="card" style="padding:16px"><div class="state-spinner" style="display:inline-block;vertical-align:middle;margin-right:10px;width:16px;height:16px;border-width:2px"></div><span style="color:var(--accent-positive);font-family:var(--fm);font-size:12px">Generating Deep Dive report… this takes 20–40 seconds.</span></div>';
   const ctx = buildPersonalContext();
@@ -22876,11 +22893,32 @@ class HZMobile {
     h+=this.grid2([this.kpi('🏛','Pension',this.fmtC(penMo),'var(--blue)','Avg /mo in retirement'),this.kpi('💵','Portfolio Draw',this.fmtC(this.portfolioDraw()),'var(--green)','Sustainable, after tax'),this.kpi('📅','Years to Retire',ytr+'Y','var(--amber)','Age '+this.data.currentAge+' → '+this.data.retirementAge),this.kpi('⏳','Runway',runout?('Age '+runout):(this.data.lifeExp+'+'),runout&&runout<this.data.lifeExp?'var(--amber)':'var(--violet)',runout&&runout<this.data.lifeExp?'Portfolio runs out':'Lasts past age '+this.data.lifeExp)]);
     h+=this.card(this.ct('📈 Nest Egg Growth',`<label style="display:flex;align-items:center;gap:5px;font-size:10px;color:var(--text3)">${this.data.retLens==='today'?'Real':'Nominal'}</label>`)+`<div style="height:190px"><canvas id="hzNestChart"></canvas></div>`);
     // Lifestyle scenarios — the desktop's lean/baseline/comfortable model
-    // (state.retirementScenario); tapping one changes it on BOTH devices.
-    const SC=[['lean','🌿','Lean','75% of expenses'],['baseline','🎯','Baseline','Your expense plan'],['comfortable','🥂','Comfortable','130% of expenses']];
+    // (state.retirementScenario). Tapping a box switches the active scenario on
+    // BOTH devices and recomputes the verdict, nest egg, AND the portfolio-at-
+    // life-expectancy figure shown at the top of this card. Laid out as a
+    // 3-column grid so all three fit on screen without horizontal scrolling.
+    const SC=[['lean','🌿','Lean','−25%'],['baseline','🎯','Baseline','Your plan'],['comfortable','🥂','Comfortable','+30%']];
     const active=(typeof state!=='undefined'&&state.retirementScenario)||'baseline';
+    const scName={lean:'Lean',baseline:'Baseline',comfortable:'Comfortable'}[active]||'Baseline';
     const baseNeed=nu?need/(this.n(nu.mult,1)||1):need;
-    h+=this.card(this.ct('🔀 Lifestyle Scenarios')+`<div class="hz-x" style="display:flex;gap:9px;overflow-x:auto;margin:0 -3px;padding-left:3px;padding-bottom:3px">${SC.map(s=>{const mult={lean:.75,baseline:1,comfortable:1.3}[s[0]];const scNeed=baseNeed*mult;const on=active===s[0];return `<div data-act="retscen" data-id="${s[0]}" style="flex-shrink:0;min-width:126px;background:var(--bg3);border:1px solid ${on?'var(--green)':'var(--border)'};border-radius:11px;padding:12px;cursor:pointer">${on?this.chip('sage','ACTIVE'):''}<div style="font-family:var(--fs);font-size:14px;font-weight:600;margin-top:${on?'7px':'0'}">${s[1]} ${s[2]}</div><div style="font-family:var(--fm);font-size:14px;color:var(--amber);margin-top:4px">${this.fmtC(scNeed)}/mo</div><div style="font-size:10px;color:var(--text3);margin-top:2px">${s[3]}</div></div>`;}).join('')}</div><div style="font-size:10px;color:var(--text3);margin-top:9px">Tap a scenario — the verdict above and desktop recalculate together.</div>`);
+    // Portfolio balance remaining at life expectancy for the ACTIVE scenario,
+    // read from the shared drawdown simulation (balData is in today's money;
+    // 0 once the portfolio depletes). Lens-aware: inflate to nominal/future kr
+    // when the Nominal lens is active, matching the Nest Egg card above.
+    const lifeAge=this.data.lifeExp||90;
+    const ytrLife=Math.max(0,lifeAge-this.data.currentAge);
+    const balData=(nu&&nu._simResult&&Array.isArray(nu._simResult.balData))?nu._simResult.balData:null;
+    const balReal=(balData&&balData.length)?this.n(balData[balData.length-1],0):0;
+    const balLens=this.data.retLens==='nominal'?balReal*Math.pow(1+this.n(this.data.inflationRate,0)/100,ytrLife):balReal;
+    const scRunout=nu?nu.runoutAge:null;
+    const scDepletes=scRunout&&scRunout<lifeAge;
+    const balColor=scDepletes?'var(--red)':(balReal>0?'var(--green)':'var(--text2)');
+    const balSub=scDepletes?`Runs dry at age ${scRunout} — nothing left at ${lifeAge}`
+      :(balReal>0?`Projected leftover · ${this.data.retLens==='nominal'?'nominal':'today’s money'}`
+        :`Fully drawn down by age ${lifeAge}`);
+    const balBox=`<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;background:var(--bg3);border:1px solid var(--border);border-radius:9px;padding:11px 12px;margin-bottom:10px"><div style="min-width:0"><div style="font-size:9px;color:var(--text3);text-transform:uppercase;letter-spacing:.05em">Portfolio at age ${lifeAge} · ${this.esc(scName)}</div><div style="font-size:10px;color:var(--text3);margin-top:2px">${balSub}</div></div><div style="font-family:var(--fm);font-size:16px;font-weight:700;color:${balColor};flex-shrink:0">${this.fmtC(balLens)}</div></div>`;
+    const grid=`<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:7px">${SC.map(s=>{const mult={lean:.75,baseline:1,comfortable:1.3}[s[0]];const scNeed=baseNeed*mult;const on=active===s[0];return `<div data-act="retscen" data-id="${s[0]}" role="button" style="background:${on?'var(--sage-bg)':'var(--bg3)'};border:1.5px solid ${on?'var(--green)':'var(--border)'};border-radius:11px;padding:10px 6px;cursor:pointer;text-align:center">${on?`<div style="font-size:8px;font-weight:700;letter-spacing:.06em;color:var(--green)">● ACTIVE</div>`:`<div style="height:11px"></div>`}<div style="font-size:19px;line-height:1;margin-top:3px">${s[1]}</div><div style="font-family:var(--fs);font-size:12px;font-weight:600;margin-top:4px">${s[2]}</div><div style="font-family:var(--fm);font-size:12.5px;font-weight:700;color:var(--amber);margin-top:3px">${this.fmtC(scNeed)}</div><div style="font-size:8.5px;color:var(--text3);margin-top:2px">/mo · ${s[3]}</div></div>`;}).join('')}</div>`;
+    h+=this.card(this.ct('🔀 Lifestyle Scenarios')+balBox+grid+`<div style="font-size:10px;color:var(--text3);margin-top:9px">Tap a scenario — the portfolio balance above, the verdict, and desktop all recalculate together.</div>`);
     // Pension incomes — the REAL model: externalAssets with assetType
     // 'pension' (monthlyPayout + startAge), shared with desktop.
     const pens=this.penAssets();
@@ -23040,7 +23078,7 @@ class HZMobile {
     this.sheet(`${loc.flag||'📍'} ${this.esc(loc.name)} · Deep Dive`,`<div style="display:flex;align-items:center;gap:10px;color:var(--text2);font-size:13px;padding:10px 0"><span style="width:16px;height:16px;border:2px solid var(--border2);border-top-color:var(--green);border-radius:50%;display:inline-block;animation:hzspin .8s linear infinite;flex-shrink:0"></span><span>Generating your Deep Dive report… this takes 20–40 seconds. You can close this and keep using the app — the card shows progress.</span></div>`,'Tailored to your citizenship, home base and retirement income.');
     try{
       const nums=(typeof getRetirementNumbers==='function')?getRetirementNumbers():null;
-      const income=nums?this.n(nums.grossRetirementIncome,0):this.retIncome();
+      const income=nums?this.n(nums.totalGross,0):this.retIncome();
       const cz=(typeof countryInfo==='function')?countryInfo(state.citizenship):{name:state.citizenship};
       const hb=(typeof countryInfo==='function')?countryInfo(state.homeBase):{name:state.homeBase};
       // Shared, household-aware Deep Dive contract — identical prompt and
@@ -23062,13 +23100,13 @@ class HZMobile {
   }
   vAnywhere(){
     const nums=this.raNums();
-    const income=nums?this.n(nums.grossRetirementIncome,0):this.retIncome();
+    const income=nums?this.n(nums.totalGross,0):this.retIncome();
     const scored=this.raScored();
     const feas=scored.filter(l=>l.analysed && l.verdict==='feasible').length;
     const cond=scored.filter(l=>l.analysed && l.verdict==='conditional').length;
     const ytr=this.data.retirementAge-this.data.currentAge;
-    let h=this.ph('PLANNING','Retire anywhere',`Every destination scored against your ${this.fmtC(income)}/mo retirement income — net of each country's local tax.`);
-    if(nums)h+=this.banner('info',`Projected retirement income <b>${this.fmt(income)}/mo</b> — <b>${this.fmt(this.n(nums.sustainableMonthly,0))}</b> portfolio draw + <b>${this.fmt(this.n(nums.pensionAvgMonthly,0))}</b> pension. Each destination applies its own local tax before comparing to cost of living.`);
+    let h=this.ph('PLANNING','Retire anywhere',`Every destination scored against your ${this.fmtC(income)}/mo target retirement income (pre-tax) — net of each country's local tax.`);
+    if(nums)h+=this.banner('info',`Target retirement income <b>${this.fmt(income)}/mo</b> (pre-tax) — the same "income needed" figure as your Retirement Plan. Each destination applies its own local tax before comparing to cost of living.`);
     h+=this.raHouseholdCtl();
     h+=this.grid2([this.kpi('✅','Feasible',feas,'var(--green)','Comfortably affordable','pos'),this.kpi('🎯','Conditional',cond,'var(--amber)','Tight but possible','warn'),this.kpi('💰','Income',this.fmtC(income),'var(--blue)','At age '+this.data.retirementAge),this.kpi('📅','Years to Go',ytr+'Y','var(--text)','Until retirement')]);
     h+=this.card(this.ct('🗺 Retirement World Map')+`<div id="hzRetMap" style="height:210px;border-radius:11px;overflow:hidden;border:1px solid var(--border)"></div>`);
