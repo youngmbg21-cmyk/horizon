@@ -22434,7 +22434,7 @@ class HZMobile {
     const nu2=this.nums();const covPct=nu2?Math.round(this.n(nu2.coveragePct,0)):Math.min(100,Math.round((retInc/(nu2?this.n(nu2.totalExp,1):1))*100));
     const vClass=nu2?nu2.verdictClass:'ontarget';const vCol=vClass==='overfunded'?'var(--green)':vClass==='underfunded'?'var(--red)':'var(--amber)';
     h+=this.grid2([
-      this.kpi('💰','Income · 12mo',this.fmt(inc12),'var(--green)',`${this.fmt(inc12/12)}/mo · ${streams} streams`),
+      this.kpi('💰','Net Income · 12mo',this.fmt(inc12),'var(--green)',`${this.fmt(inc12/12)}/mo · ${streams} streams`),
       this.kpi('📤','Expenses · 12mo',this.fmt(exp12),'var(--red)',`${this.fmt(exp12/12)}/mo · ${inc12>0?Math.round(exp12/inc12*100):0}% of income`),
       this.kpi('🏦','Savings · 12mo',this.fmt(sav12),'var(--amber)',`${this.fmt(sav12/12)}/mo · ${inc12>0?Math.round(sav12/inc12*100):0}% rate`),
       this.kpi('✦','Fun Fund · 12mo',this.fmt(ffBal),ffBal>=0?'var(--cyan)':'var(--red)',`balance · ${this.fmt(ffCap)} capacity`),
