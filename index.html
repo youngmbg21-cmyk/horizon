@@ -5872,8 +5872,8 @@ const STRINGS = {
   // Subtitle under the runway chart — two templates depending on
   // whether a pension gap exists between retirement age and the
   // earliest pension start age.
-  'runway.sub.noGap':       { en:'How long your nest egg lasts on {scenario} expenses ({mo}/mo) — withdrawing {gross}/mo gross at {rate}% real growth · {lens}',
-                              sv:'Hur länge ditt pensionskapital räcker vid {scenario} utgifter ({mo}/mån) — uttag {gross}/mån brutto vid {rate}% reell tillväxt · {lens}' },
+  'runway.sub.noGap':       { en:'How long your nest egg lasts on {scenario} expenses ({mo}/mo) — withdrawing {gross}/mo pre-tax at {rate}% real growth · {lens}',
+                              sv:'Hur länge ditt pensionskapital räcker vid {scenario} utgifter ({mo}/mån) — uttag {gross}/mån före skatt vid {rate}% reell tillväxt · {lens}' },
   'runway.sub.gap':         { en:'How long your nest egg lasts on {scenario} expenses ({mo}/mo) — Phase 1: {gross}/mo (age {a}\u2013{b}), Phase 2: reduced withdrawal + pension (age {c}+) at {rate}% real growth · {lens}',
                               sv:'Hur länge ditt pensionskapital räcker vid {scenario} utgifter ({mo}/mån) — Fas 1: {gross}/mån (ålder {a}\u2013{b}), Fas 2: minskat uttag + pension (ålder {c}+) vid {rate}% reell tillväxt · {lens}' },
   // Age snapshot rows
@@ -5944,8 +5944,8 @@ const STRINGS = {
                               sv:'Inkomstbehov' },
   's3.ireq.afterTax':       { en:'After-tax expenses needed',
                               sv:'Utgifter efter skatt som behövs' },
-  's3.ireq.grossNeeded':    { en:'Gross needed (\u00f7{f})',
-                              sv:'Brutto som behövs (\u00f7{f})' },
+  's3.ireq.grossNeeded':    { en:'Pre-tax needed (\u00f7{f})',
+                              sv:'Före skatt som behövs (\u00f7{f})' },
   's3.ireq.pensionOffset':  { en:'Pension income offset',
                               sv:'Pensionsinkomstavdrag' },
   's3.ireq.avg':            { en:'(avg)',               sv:'(snitt)' },
@@ -6052,8 +6052,8 @@ const STRINGS = {
                                  sv:'Utgifter (efter skatt)' },
   'ireq.kpi.expensesSub':   { en:'{yr}/yr · today\u2019s money',
                               sv:'{yr}/år · dagens penningvärde' },
-  'ireq.kpi.grossNeeded':   { en:'Total gross income needed',
-                              sv:'Total bruttoinkomst som behövs' },
+  'ireq.kpi.grossNeeded':   { en:'Total income needed · pre-tax',
+                              sv:'Total inkomst som behövs · före skatt' },
   'ireq.kpi.grossSub':      { en:'{yr}/yr · \u00f7(1\u2212{pct}% tax) · today\u2019s money',
                               sv:'{yr}/år · \u00f7(1\u2212{pct}% skatt) · dagens penningvärde' },
   'ireq.kpi.pensionCovers': { en:'Pension covers',
@@ -6084,8 +6084,8 @@ const STRINGS = {
   // Formula line
   'ireq.formula.expenses':  { en:'<strong>{mo}/mo</strong> expenses',
                               sv:'<strong>{mo}/mån</strong> utgifter' },
-  'ireq.formula.grossNeeded':{en:'= <strong>{mo}</strong> gross needed',
-                              sv:'= <strong>{mo}</strong> brutto som behövs' },
+  'ireq.formula.grossNeeded':{en:'= <strong>{mo}</strong> pre-tax needed',
+                              sv:'= <strong>{mo}</strong> före skatt som behövs' },
   'ireq.formula.pension':   { en:'<strong>{mo}/mo</strong> pension',
                               sv:'<strong>{mo}/mån</strong> pension' },
   'ireq.formula.portBurden':{ en:'<strong>{mo}/mo</strong> portfolio burden',
@@ -16685,7 +16685,7 @@ function renderLocAnalysisSlideover(opts){
   // with a prompt to analyse — no estimate presented as fact.
   const financialFacts = loc.analysed ? `
         <div class="retire-so-fact"><div class="retire-so-fact-lbl">${esc2(t('ra.so.facts.cost'))}${loc.householdSize===2?' · couple':''}</div><div class="retire-so-fact-val">${fmt(loc.effCostOfLiving)}</div></div>
-        <div class="retire-so-fact"><div class="retire-so-fact-lbl">Gross income</div><div class="retire-so-fact-val">${fmt(monthlyIncome)}</div></div>
+        <div class="retire-so-fact"><div class="retire-so-fact-lbl">Gross income · portfolio + pension</div><div class="retire-so-fact-val">${fmt(monthlyIncome)}</div></div>
         <div class="retire-so-fact"><div class="retire-so-fact-lbl">Net income · after ${Math.round(loc.effTaxPct)}% tax</div><div class="retire-so-fact-val pos">${fmt(loc.netIncome)}</div></div>
         <div class="retire-so-fact"><div class="retire-so-fact-lbl">Discretionary · after costs</div><div class="retire-so-fact-val ${loc.surplus>=0?'pos':'neg'}">${fmt(loc.surplus)}</div></div>
         <div class="retire-so-fact"><div class="retire-so-fact-lbl">${esc2(t('ra.so.facts.tax'))}</div><div class="retire-so-fact-val">${Math.round(loc.effTaxPct)}%</div></div>` : '';
@@ -19473,7 +19473,7 @@ Runway simulation (x-axis = age, retirementAge → life expectancy):
 - runway.portfolioWithdrawal — Portfolio withdrawal · annual (currency, age)
 - runway.pensionIncome — Pension income · annual (currency, age)
 - runway.shortfall — Shortfall vs need (currency, age)
-- runway.needed — Gross income needed (currency, age)
+- runway.needed — Pre-tax income needed (currency, age)
 - runway.withdrawalRate — Withdrawal rate · % (percent, age)
 - runway.coverage — Coverage · cumulative % (percent, age)
 
@@ -19960,7 +19960,7 @@ function buildSeriesCatalog(){
   addRunwaySeries('runway.portfolioWithdrawal', 'Portfolio withdrawal · annual', 'currency', (s,i) => s.portWithdrawal[i] || 0);
   addRunwaySeries('runway.pensionIncome',       'Pension income · annual',       'currency', (s,i) => s.pensionData[i] || 0);
   addRunwaySeries('runway.shortfall',           'Shortfall vs need',             'currency', (s,i) => s.shortfall?.[i] || 0);
-  addRunwaySeries('runway.needed',              'Gross income needed',           'currency', (s,i) => s.needed?.[i] || 0);
+  addRunwaySeries('runway.needed',              'Pre-tax income needed',         'currency', (s,i) => s.needed?.[i] || 0);
 
   // Withdrawal rate per year: portfolioWithdrawal / balance * 100. Clamped
   // to 0 once the portfolio is depleted so the trace doesn't flatline at a
