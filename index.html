@@ -5231,6 +5231,8 @@ const STRINGS = {
   'ra.btn.addLocation':     { en:'+ Add Location',        sv:'+ Lägg till plats' },
   'ra.btn.aiRecommend':     { en:'🤖 AI: Recommend destinations for me',
                               sv:'🤖 AI: Föreslå destinationer åt mig' },
+  'ra.deepDiveAll.doneMsg': { en:'All destinations are already analysed. Use ↻ on a card to refresh one.',
+                              sv:'Alla destinationer är redan analyserade. Använd ↻ på ett kort för att uppdatera en.' },
   // addLocation defaults
   'ra.new.name':            { en:'New Destination',       sv:'Ny destination' },
 
@@ -6471,6 +6473,12 @@ function defaultState() {
       householdIncome:0,   // combined household monthly (SEK)
       goals:'',            // free-text financial goals / aspirations
     },
+    // Retire Anywhere — household size the affordability engine sizes cost
+    // of living to. null = auto-derive from profile.maritalStatus (partnered
+    // /married → 2, else 1). A couple doesn't cost 2× a single person, so the
+    // static pre-analysis estimate is scaled by COUPLE_COL_FACTOR; once a Deep
+    // Dive runs, the AI returns a real household cost that supersedes it.
+    raHouseholdSize:null, // null | 1 | 2
     // Journal — dated log of events, decisions, and reflections. Each
     // entry is { id, date:'YYYY-MM-DD', tag, content, updatedAt }.
     // The recent entries also flow into the AI context so advice
@@ -9528,29 +9536,217 @@ function locMedianIncomeSEK(loc) {
   return Math.round(usd / usdPerSek);
 }
 
+// ─── HOUSEHOLD-AWARE HYBRID ENGINE ──────────────────────────────────────────
+// A couple does not cost 2× a single person (shared housing, utilities), so
+// the curated CITY_DB cost-of-living values — sized for ONE person — are
+// scaled by this factor when the household is a couple and NO AI figure is
+// available yet. Once a Deep Dive runs, the model returns a real household
+// cost that supersedes the scaled estimate entirely.
+const COUPLE_COL_FACTOR = 1.6;
+// Resolve the effective household size: an explicit user choice wins,
+// otherwise derive it from marital status (partnered / married → 2).
+function raHouseholdSize(){
+  const v = (typeof state!=='undefined') ? state.raHouseholdSize : null;
+  if(v===1 || v===2) return v;
+  const m = ((typeof state!=='undefined' && state.profile) || {}).maritalStatus;
+  return (m==='partnered' || m==='married') ? 2 : 1;
+}
+function raColFactor(hh){ return (hh||raHouseholdSize())===2 ? COUPLE_COL_FACTOR : 1; }
+// Provenance chip (desktop): 'ai' = the AI Deep Dive estimated this figure for
+// the city; 'est' = a rough starting estimate (curated data, couple-scaled) the
+// user can refine by running a Deep Dive. Keeps the numbers honest about how
+// much to trust them.
+function raProvTag(src){
+  return src==='ai'
+    ? `<span title="Estimated by the AI Deep Dive for this city" style="font-family:var(--fm);font-size:8px;font-weight:600;letter-spacing:.05em;color:var(--violet);border:1px solid var(--violet);border-radius:4px;padding:0 4px;margin-left:6px;vertical-align:middle;opacity:.9">AI</span>`
+    : `<span title="Rough estimate — run a Deep Dive for a figure tailored to your household" style="font-family:var(--fm);font-size:8px;font-weight:600;letter-spacing:.05em;color:var(--text3);border:1px solid var(--border2);border-radius:4px;padding:0 4px;margin-left:6px;vertical-align:middle">EST</span>`;
+}
+// Household toggle used on the Retire Anywhere header (desktop). A couple is
+// costed at COUPLE_COL_FACTOR× a single person until a Deep Dive returns a real
+// household figure.
+function raHouseholdControl(){
+  const hh = raHouseholdSize();
+  const btn = (n,lbl) => `<button onclick="setRaHousehold(${n})" style="font-family:var(--fm);font-size:11px;font-weight:600;padding:5px 12px;border:1px solid ${hh===n?'var(--green)':'var(--border2)'};background:${hh===n?'var(--sage-bg)':'var(--bg3)'};color:${hh===n?'var(--green)':'var(--text2)'};border-radius:7px;cursor:pointer">${lbl}</button>`;
+  return `<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:14px">
+    <span style="font-size:11px;color:var(--text3);font-family:var(--fm);text-transform:uppercase;letter-spacing:.08em">Household</span>
+    ${btn(1,'👤 Single')}${btn(2,'👥 Couple')}
+    <span style="font-size:11px;color:var(--text3)">Cost of living is sized to your household${hh===2?` (≈${COUPLE_COL_FACTOR}× single until a Deep Dive refines it)`:''}.</span>
+  </div>`;
+}
+// Persist an explicit household choice and re-score every destination.
+function setRaHousehold(n){
+  if(typeof state==='undefined') return;
+  state.raHouseholdSize = (n===2 ? 2 : 1);
+  if(typeof save==='function') save();
+  if(typeof invalidateSelectors==='function') invalidateSelectors();
+  if(state.activePanel==='retireanywhere' && typeof renderRetireAnywhere==='function') renderRetireAnywhere();
+}
+
+// ── Shared Deep Dive contract ───────────────────────────────────────────────
+// One prompt-builder + one parser used by every surface (desktop slide-over
+// and mobile sheet) so the couple-awareness and the structured stat block are
+// defined in exactly one place. The model returns its usual markdown report
+// AND a final machine-readable HORIZON_STATS line the app parses back into
+// loc.aiStats — the values that then flow through scoreLocation() as the
+// authoritative cost of living, effective tax, income rank and quality score.
+function buildDeepDivePrompt(loc, o){
+  o = o || {};
+  const ctx = (typeof buildPersonalContext==='function') ? buildPersonalContext() : '';
+  const cz = o.cz || {}; const hb = o.hb || {};
+  const hh = o.household || raHouseholdSize();
+  const household = hh===2
+    ? 'a retiring COUPLE (two people sharing one home)'
+    : 'a single retiree (one person)';
+  const suf = (typeof langSuffix==='function') ? langSuffix() : '';
+  const money = (typeof fmt==='function') ? fmt : (x=>Math.round(x));
+  return `${ctx}
+
+Generate a comprehensive, professional DEEP DIVE retirement relocation report for **${loc.name}, ${loc.country}**.
+
+CONTEXT
+- Prospective retiree holds ${cz.name||'?'}${cz.code?` (${cz.code})`:''} citizenship, currently based in ${hb.name||'?'}${hb.code?` (${hb.code})`:''}.
+- Household: ${household}. Size every cost-of-living and tax figure to THIS household, not a single person unless it is one.
+- Projected monthly retirement income for the household: ${money(o.income||0)} (in today's money), from portfolio draw-down and pensions.
+
+VALUE BASIS
+Every figure in CONTEXT is in TODAY'S MONEY (real, inflation-adjusted). Quote all destination figures in today's money too; if you must give a nominal figure label it "nominal".
+
+REQUIREMENTS
+Return a single markdown document (no preamble, no wrapping). Use H2 headings for each section and markdown tables where numbers help. Every section must be grounded in 2024–2025 reality and the user's specific personal context (citizenship, home base, household). Be honest — flag red flags, visa traps, and tax gotchas.
+
+Structure EXACTLY as follows:
+
+## Executive Summary
+One punchy paragraph: is this destination viable for THIS household? Headline numbers, discretionary surplus/shortfall for the household, one-sentence verdict.
+
+## Cost of Living
+A markdown table with rows for Housing, Groceries, Utilities, Transport, Healthcare, Dining, Leisure — typical monthly ranges in local currency + the user's home-base currency equivalent, sized to the ${hh===2?'two-person household':'single person'}. One paragraph on how realistic the household total is.
+
+## Healthcare
+Quality of public vs private system, costs for over-65s, expat insurance expectations, any bilateral agreements with ${cz.name||'the home country'} or ${hb.name||'the home base'}, and a specific hospital/clinic recommendation if the city has one.
+
+## Visa & Residency
+Specifically for ${cz.name||'the retiree’s'} citizens${hh===2?' and an accompanying spouse/partner':''}. Which visa route applies (retirement/passive-income/golden visa)? Minimum income thresholds. Path to permanent residency, timeline, red flags, cost.
+
+## Tax Implications
+Tailored to a ${cz.name||'?'} citizen currently tax-resident in ${hb.name||'?'} moving to ${loc.country}. Cover: double-tax treaty; treatment of pension income, portfolio withdrawals and capital gains; the EFFECTIVE local rate at this income level and household; exit-tax from ${hb.name||'home base'}; and any special regime (NHR, Beckham, foreign-source exemption). Be explicit when a headline rate does NOT apply.
+
+## Climate & Lifestyle
+Month-by-month climate, air quality, walkability, expat community size, language requirements, cultural notes.
+
+## Real Estate
+Buy vs rent at this income level. Typical prices in the main expat districts. Foreigner ownership restrictions. Expected rental yield and property tax. Mortgage availability for non-residents.
+
+## Pros & Cons
+Two short markdown bullet lists. Specific and concrete — no filler.
+
+## Final Verdict
+One paragraph. Recommendation: "proceed", "proceed with caveats", or "reconsider". State the single biggest risk and the single biggest opportunity.
+
+After the Final Verdict, on its own FINAL line, append EXACTLY this machine-readable line and nothing after it. Money fields are integer monthly amounts in the user's home-base currency (${hb.name||''} kr), in today's money, for the HOUSEHOLD above. eff_tax_pct is the EFFECTIVE percentage of this retiree's income actually paid in local tax at this income level and household (progressive brackets, pension treatment and any special regime already accounted for — NOT the headline top band). tax_note names the basis in a few words (e.g. "assumes NHR pensioner regime — must qualify"):
+HORIZON_STATS: {"col_household_sek": <int>, "eff_tax_pct": <number>, "median_income_usd": <int>, "qol_score": <number 0-10>, "tax_note": "<short string>"}${suf}`;
+}
+// Parse the model reply → { markdown (stats line stripped), stats|null }.
+// Tolerant: accepts the new HORIZON_STATS JSON line and, for backward
+// compatibility, the legacy MEDIAN_INCOME_USD line still cached in old vault
+// entries and returned by any un-updated prompt path.
+function parseDeepDiveStats(reply){
+  reply = String(reply||'');
+  let stats = null, markdown = reply;
+  const m = reply.match(/HORIZON_STATS:\s*(\{[\s\S]*?\})/i);
+  if(m){
+    try{
+      const raw = JSON.parse(m[1]);
+      stats = {
+        colHousehold: Number(raw.col_household_sek)>0 ? Math.round(Number(raw.col_household_sek)) : null,
+        effTaxPct:    (raw.eff_tax_pct!=null && isFinite(raw.eff_tax_pct)) ? Number(raw.eff_tax_pct) : null,
+        medianUSD:    Number(raw.median_income_usd)>0 ? Math.round(Number(raw.median_income_usd)) : null,
+        qol:          (raw.qol_score!=null && isFinite(raw.qol_score)) ? Math.max(0,Math.min(10,Number(raw.qol_score))) : null,
+        taxNote:      (typeof raw.tax_note==='string') ? raw.tax_note.slice(0,140) : '',
+      };
+    }catch(_){ stats = null; }
+    markdown = reply.replace(/\n?HORIZON_STATS:\s*\{[\s\S]*?\}[^\n]*/i,'').trim();
+  }
+  // Legacy fallback — median-only line.
+  if(!stats || stats.medianUSD==null){
+    const mm = reply.match(/MEDIAN_INCOME_USD:\s*(\d+(?:\.\d+)?)/i);
+    if(mm){
+      const usd = Math.round(parseFloat(mm[1]));
+      stats = stats || { colHousehold:null, effTaxPct:null, medianUSD:null, qol:null, taxNote:'' };
+      if(usd>0) stats.medianUSD = usd;
+    }
+  }
+  markdown = markdown.replace(/\n?MEDIAN_INCOME_USD:\s*[\d.]+[^\n]*/gi,'').trim();
+  return { markdown, stats };
+}
+// Write parsed stats onto the place and invalidate the score cache so the
+// couple-aware, AI-derived numbers take effect immediately everywhere.
+function applyDeepDiveResult(id, parsed){
+  if(typeof state==='undefined' || !parsed) return;
+  const loc = (state.places||[]).find(l => l.id===id);
+  if(!loc) return;
+  const st = parsed.stats;
+  if(st){
+    if(st.medianUSD>0){
+      const usdToSek = 1/(((typeof rate==='function'?rate('USD'):0)) || (typeof DEFAULT_RATES!=='undefined'?DEFAULT_RATES.USD:0.11) || 0.11);
+      loc.medianMonthlyIncome = Math.round(st.medianUSD * usdToSek);
+    }
+    if(st.colHousehold!=null || st.effTaxPct!=null || st.qol!=null || st.taxNote){
+      loc.aiStats = {
+        colHousehold: st.colHousehold,
+        effTaxPct:    st.effTaxPct,
+        qol:          st.qol,
+        taxNote:      st.taxNote || '',
+        household:    raHouseholdSize(),   // basis this report was sized to
+      };
+    }
+  }
+  if(typeof invalidateSelectors==='function') invalidateSelectors();
+}
+
 function scoreLocation(loc) {
   // Keyed memo: the retirement numbers are shared across locations, so we
-  // only recompute per-location fields and cache per id.
-  return memoSelect('loc:'+(loc.id||loc.name), () => {
+  // only recompute per-location fields and cache per id. Cache is keyed on
+  // household size too so toggling single/couple re-scores correctly.
+  return memoSelect('loc:'+(loc.id||loc.name)+':hh'+raHouseholdSize(), () => {
     const nums = getRetirementNumbers();
     // Use gross income so destination tax is applied cleanly. The previous
     // totalRetirementIncome mixed after-tax portfolio + gross pension, which
     // double-counted the home-country tax when the destination rate was applied.
     const monthlyIncome = nums.grossRetirementIncome;
-    const netIncome = monthlyIncome * (1 - (loc.taxRate || 0) / 100);
-    const ratio = netIncome > 0 ? loc.costOfLiving / netIncome : 2;
+    const hh = raHouseholdSize();
+    const ai = loc.aiStats || null;
+    // HYBRID: the app owns YOUR income; the AI owns the DESTINATION's facts.
+    // Effective cost of living — AI household figure once analysed, otherwise
+    // the curated single-person value scaled to the household. Effective tax —
+    // the AI's effective rate once analysed, otherwise the static headline.
+    const analysed   = !!(ai && (ai.colHousehold!=null || ai.effTaxPct!=null));
+    const colSource  = (ai && ai.colHousehold!=null) ? 'ai' : 'est';
+    const taxSource  = (ai && ai.effTaxPct!=null) ? 'ai' : 'est';
+    const effTaxPct  = (ai && ai.effTaxPct!=null) ? ai.effTaxPct : (loc.taxRate || 0);
+    const effCostOfLiving = (ai && ai.colHousehold!=null)
+      ? ai.colHousehold
+      : (loc.costOfLiving || 0) * raColFactor(hh);
+    const netIncome = monthlyIncome * (1 - effTaxPct / 100);
+    const ratio = netIncome > 0 ? effCostOfLiving / netIncome : 2;
     const affordabilityScore = Math.max(0, Math.min(1, 1 - ratio));
     let verdict='infeasible', label='INFEASIBLE';
     if(ratio<=0.7){ verdict='feasible'; label='FEASIBLE'; }
     else if(ratio<=0.9){ verdict='conditional'; label='CONDITIONAL'; }
-    const surplus = netIncome - loc.costOfLiving;
+    // Discretionary income = what's left after local tax and household living
+    // costs. App-computed from the effective figures, never taken from prose.
+    const surplus = netIncome - effCostOfLiving;
     // Median income: city-specific value from an AI Deep Dive when
     // available, otherwise the national fallback table — so the
     // "Income rank · locally" line renders on every card, not just the
     // ones the user has deep-dived.
     const medianIncome = locMedianIncomeSEK(loc);
     const incomePercentile = topIncomePercentile(monthlyIncome, medianIncome);
-    return { ...loc, verdict, label, ratio, surplus, affordabilityScore, monthlyIncome, netIncome, incomePercentile };
+    return { ...loc, verdict, label, ratio, surplus, affordabilityScore,
+             monthlyIncome, netIncome, incomePercentile,
+             effCostOfLiving, effTaxPct, analysed, colSource, taxSource,
+             householdSize: hh, qol: ai ? ai.qol : null, taxNote: ai ? (ai.taxNote||'') : '',
+             reportHousehold: ai ? ai.household : null };
   });
 }
 
@@ -16210,11 +16406,13 @@ function renderRetireAnywhere() {
       </div>
       <div class="loc-affordability-bar"><div class="loc-affordability-fill" style="width:${Math.round(loc.affordabilityScore*100)}%;background:${loc.verdict==='feasible'?'var(--green)':loc.verdict==='conditional'?'var(--amber)':'var(--red)'}"></div></div>
       <div style="font-size:10px;color:var(--text3);font-family:var(--fm);margin-bottom:10px">${esc2(t('ra.card.affordable', { pct: Math.round(loc.affordabilityScore*100) }))}</div>
-      ${loc.incomePercentile != null ? `<div class="loc-stat"><span class="loc-stat-lbl">Income rank · locally</span><span class="loc-stat-val" style="color:var(--text2)">Top ${loc.incomePercentile}% earner</span></div>` : ''}
-      <div class="loc-stat"><span class="loc-stat-lbl">${esc2(t('ra.card.cost'))}</span><span class="loc-stat-val">${fmt(loc.costOfLiving)}</span></div>
+      ${loc.incomePercentile != null ? `<div class="loc-stat"><span class="loc-stat-lbl">Income rank · locally${raProvTag(loc.analysed?'ai':'est')}</span><span class="loc-stat-val" style="color:var(--text2)">Top ${loc.incomePercentile}% earner</span></div>` : ''}
+      <div class="loc-stat"><span class="loc-stat-lbl">${esc2(t('ra.card.cost'))}${loc.householdSize===2?' · couple':''}${raProvTag(loc.colSource)}</span><span class="loc-stat-val">${fmt(loc.effCostOfLiving)}</span></div>
       <div class="loc-stat"><span class="loc-stat-lbl">Gross income · today's money</span><span class="loc-stat-val">${fmt(monthlyIncome)}</span></div>
-      <div class="loc-stat"><span class="loc-stat-lbl">Net income · after ${loc.taxRate}% local tax</span><span class="loc-stat-val pos">${fmt(loc.netIncome)}</span></div>
-      <div class="loc-stat"><span class="loc-stat-lbl">${esc2(t('ra.card.surplus'))}</span><span class="loc-stat-val ${loc.surplus>=0?'pos':'neg'}">${fmt(loc.surplus)}</span></div>
+      <div class="loc-stat"><span class="loc-stat-lbl">Net income · after ${Math.round(loc.effTaxPct)}% tax${raProvTag(loc.taxSource)}</span><span class="loc-stat-val pos">${fmt(loc.netIncome)}</span></div>
+      <div class="loc-stat"><span class="loc-stat-lbl">Discretionary · after living costs</span><span class="loc-stat-val ${loc.surplus>=0?'pos':'neg'}">${fmt(loc.surplus)}</span></div>
+      ${loc.qol!=null ? `<div class="loc-stat"><span class="loc-stat-lbl">Quality of life${raProvTag('ai')}</span><span class="loc-stat-val" style="color:var(--violet)">${loc.qol.toFixed(1)} / 10</span></div>` : ''}
+      ${loc.taxNote ? `<div style="font-size:10px;color:var(--text3);font-style:italic;margin:2px 0 4px;line-height:1.4">⚑ ${esc(loc.taxNote)}</div>` : ''}
       <div class="loc-stat"><span class="loc-stat-lbl">${esc2(t('ra.card.climate'))}</span><span class="loc-stat-val muted">${esc(loc.climate||'')}</span></div>
       <div class="loc-card-actions">
         <button class="${primaryClass} loc-card-cta" ${primaryOnclick}>${esc2(primaryLabel)}</button>
@@ -16232,6 +16430,8 @@ function renderRetireAnywhere() {
       <div>${t('ra.callout', { income: fmt(monthlyIncome), port: fmt(nums.sustainableMonthly), pen: fmt(nums.pensionAvgMonthly) })}</div>
     </div>
 
+    ${raHouseholdControl()}
+
     ${ui.kpiRow([
       {icon:'✅', label:t('ra.kpi.feasible'),    value:scored.filter(l=>l.verdict==='feasible').length, tone:'pos', sub:t('ra.kpi.feasible.sub')},
       {icon:'🎯', label:t('ra.kpi.conditional'), value:`<span class="amb">${scored.filter(l=>l.verdict==='conditional').length}</span>`, sub:t('ra.kpi.conditional.sub')},
@@ -16244,6 +16444,7 @@ function renderRetireAnywhere() {
 
     <div style="display:flex;gap:10px;margin-bottom:14px;flex-wrap:wrap">
       <button class="btn btn-g" onclick="addLocation()">${esc2(t('ra.btn.addLocation'))}</button>
+      ${scored.some(l=>!l.analysed) ? `<button class="btn btn-o" onclick="deepDiveAll()">🔬 Deep Dive all</button>` : ''}
       <button class="btn btn-o" onclick="aiAnalyzeLocations()">${esc2(t('ra.btn.aiRecommend'))}</button>
     </div>
 
@@ -16263,7 +16464,7 @@ function renderRetireAnywhere() {
                   : '#ff4d6d';
       return {
         lat: loc.lat, lng: loc.lng, color,
-        popup: `<strong>${loc.flag} ${esc(loc.name)}</strong><br><span style="color:${color};font-weight:700">${esc(loc.label)}</span><br>Cost: ${fmt(loc.costOfLiving)}/mo<br>Surplus: ${fmt(loc.surplus)}/mo`
+        popup: `<strong>${loc.flag} ${esc(loc.name)}</strong><br><span style="color:${color};font-weight:700">${esc(loc.label)}</span><br>Cost${loc.householdSize===2?' · couple':''}: ${fmt(loc.effCostOfLiving)}/mo<br>Discretionary: ${fmt(loc.surplus)}/mo`
       };
     });
     retireMap = createWorldMap('retire-map', points, {center:[20,20], zoom:2});
@@ -16375,11 +16576,11 @@ function renderLocAnalysisSlideover(opts){
     <div class="retire-so-section">
       <div class="retire-so-section-hd">${esc2(t('ra.so.facts.title'))}</div>
       <div class="retire-so-fact-grid">
-        <div class="retire-so-fact"><div class="retire-so-fact-lbl">${esc2(t('ra.so.facts.cost'))}</div><div class="retire-so-fact-val">${fmt(loc.costOfLiving)}</div></div>
+        <div class="retire-so-fact"><div class="retire-so-fact-lbl">${esc2(t('ra.so.facts.cost'))}${loc.householdSize===2?' · couple':''}${raProvTag(loc.colSource)}</div><div class="retire-so-fact-val">${fmt(loc.effCostOfLiving)}</div></div>
         <div class="retire-so-fact"><div class="retire-so-fact-lbl">Gross income</div><div class="retire-so-fact-val">${fmt(monthlyIncome)}</div></div>
-        <div class="retire-so-fact"><div class="retire-so-fact-lbl">Net income · after ${loc.taxRate}% tax</div><div class="retire-so-fact-val pos">${fmt(loc.netIncome)}</div></div>
-        <div class="retire-so-fact"><div class="retire-so-fact-lbl">${esc2(t('ra.so.facts.surplus'))}</div><div class="retire-so-fact-val ${loc.surplus>=0?'pos':'neg'}">${fmt(loc.surplus)}</div></div>
-        <div class="retire-so-fact"><div class="retire-so-fact-lbl">${esc2(t('ra.so.facts.tax'))}</div><div class="retire-so-fact-val">${loc.taxRate}%</div></div>
+        <div class="retire-so-fact"><div class="retire-so-fact-lbl">Net income · after ${Math.round(loc.effTaxPct)}% tax${raProvTag(loc.taxSource)}</div><div class="retire-so-fact-val pos">${fmt(loc.netIncome)}</div></div>
+        <div class="retire-so-fact"><div class="retire-so-fact-lbl">Discretionary · after costs</div><div class="retire-so-fact-val ${loc.surplus>=0?'pos':'neg'}">${fmt(loc.surplus)}</div></div>
+        <div class="retire-so-fact"><div class="retire-so-fact-lbl">${esc2(t('ra.so.facts.tax'))}${raProvTag(loc.taxSource)}</div><div class="retire-so-fact-val">${Math.round(loc.effTaxPct)}%</div></div>
         <div class="retire-so-fact"><div class="retire-so-fact-lbl">${esc2(t('ra.so.facts.climate'))}</div><div class="retire-so-fact-val" style="font-size:12px">${esc(loc.climate||dash)}</div></div>
         <div class="retire-so-fact"><div class="retire-so-fact-lbl">${esc2(t('ra.so.facts.healthcare'))}</div><div class="retire-so-fact-val" style="font-size:12px">${esc(loc.healthcare||dash)}</div></div>
       </div>
@@ -16494,78 +16695,17 @@ window.runLocAnalysis = function(id, opts){
       <span class="state-spinner" style="width:18px;height:18px;border-width:2px"></span>
       <span>${t('ra.so.analysis.loading', { name: esc(loc.name) })}</span>
     </div>`;
-  const ctx = buildPersonalContext();
-  const prompt = `${ctx}
-
-Generate a comprehensive, professional DEEP DIVE retirement relocation report for **${loc.name}, ${loc.country}**.
-
-CONTEXT
-- Prospective retiree holds ${cz.name} (${cz.code}) citizenship, currently based in ${hb.name} (${hb.code}).
-- Projected monthly retirement income: ${fmt(income)} (in today's money), sourced from portfolio draw-down and any pensions.
-- Target monthly cost of living at destination: ${fmt(loc.costOfLiving)}.
-- Destination headline income tax rate: ${loc.taxRate}%.
-
-VALUE BASIS
-Every monetary figure provided in this CONTEXT block is in TODAY'S MONEY (real value, inflation-adjusted purchasing power). Treat all the user's income, surplus, and cost numbers as real values throughout your analysis. When you quote any figure for the destination — cost of living, healthcare costs, real estate, rental yields — quote it in today's money too. If you ever need to mention a nominal/future figure, label it explicitly as "nominal" or "future kr". Never present a nominal figure as the headline.
-
-REQUIREMENTS
-Return a single markdown document (no JSON, no preamble, no wrapping). Use H2 headings for each section and markdown tables where numbers help. Every section must be grounded in 2024–2025 reality and the user's specific personal context (citizenship, home base). Be honest — flag red flags, visa traps, and tax gotchas.
-
-Structure EXACTLY as follows:
-
-## Executive Summary
-One punchy paragraph: is this destination viable for this specific person? Headline numbers, surplus/shortfall, one-sentence verdict.
-
-## Cost of Living
-A markdown table with rows for Housing, Groceries, Utilities, Transport, Healthcare, Dining, Leisure — with typical monthly ranges in local currency + the user's home-base currency equivalent. One paragraph of commentary on how realistic the assumed ${fmt(loc.costOfLiving)} is.
-
-## Healthcare
-Quality of public vs private system, costs for over-65s, expat insurance expectations, any bilateral agreements with ${cz.name} or ${hb.name}, and a specific hospital/clinic recommendation if the city has one.
-
-## Visa & Residency
-Specifically for ${cz.name} citizens. What visa route applies (retirement visa, D-visa, golden visa, passive income visa)? Minimum income thresholds. Path to permanent residency. Timeline. Red flags. Cost.
-
-## Tax Implications
-Tailored to a ${cz.name} citizen currently tax-resident in ${hb.name} who is moving to ${loc.country}. Cover:
-- Whether a double-tax treaty exists between ${hb.name} and ${loc.country}
-- Treatment of pension income, portfolio withdrawals, and capital gains
-- Effective local tax rate at this income level
-- Exit-tax considerations from ${hb.name}
-- Any special regimes (NHR, Beckham, foreign-sourced income exemptions)
-
-## Climate & Lifestyle
-Month-by-month climate summary, air quality, walkability, expat community size, language requirements, major cultural notes.
-
-## Real Estate
-Buy vs rent economics at this income level. Typical purchase prices in the main expat districts. Foreigner ownership restrictions (if any). Expected rental yield and property tax. Mortgage availability for non-residents.
-
-## Pros & Cons
-Two short markdown bullet lists. Be specific and concrete — no generic filler.
-
-## Final Verdict
-One paragraph. Recommendation: "proceed", "proceed with caveats", or "reconsider". State the single biggest risk and the single biggest opportunity.
-
-After the Final Verdict, on its own line, append exactly this (integer only, no symbols, no explanation):
-MEDIAN_INCOME_USD: [median monthly gross personal income in USD for this city]${langSuffix()}`;
+  const prompt = buildDeepDivePrompt(loc, { income, cz, hb, household: raHouseholdSize() });
   (async () => {
     try {
       const reply = await callClaude(prompt, 3000, key);
-      // Extract and store median income so the card can show Top X% for any city.
-      const medianMatch = reply.match(/MEDIAN_INCOME_USD:\s*(\d+(?:\.\d+)?)/i);
-      if(medianMatch) {
-        const medianUSD = parseFloat(medianMatch[1]);
-        // Convert through the live (user-approved) rate, not the ship-time
-        // default — DEFAULT_RATES drifts as soon as rates are updated.
-        const usdToSek = 1 / (rate('USD') || DEFAULT_RATES.USD || 0.11);
-        const locRef = state.places.find(l => l.id === id);
-        if(locRef && medianUSD > 0){
-        locRef.medianMonthlyIncome = Math.round(medianUSD * usdToSek);
-        // Invalidate the memoSelect cache so scoreLocation() recomputes
-        // incomePercentile with the newly-stored median income.
-        invalidateSelectors();
-      }
-      }
-      const cleanReply = reply.replace(/\nMEDIAN_INCOME_USD:\s*[\d.]+[^\n]*/gi, '');
+      // Parse the structured HORIZON_STATS block (couple cost of living,
+      // effective tax, median income, quality of life) and write it onto the
+      // place via the shared applier — this is what makes the card's numbers
+      // couple-aware and AI-derived instead of static single-person defaults.
+      const parsed = parseDeepDiveStats(reply);
+      applyDeepDiveResult(id, parsed);
+      const cleanReply = parsed.markdown;
       // Save to Vault automatically so the slide-over, the Vault tab,
       // and the card CTA all update in lockstep.
       const entry = {
@@ -16611,6 +16751,17 @@ MEDIAN_INCOME_USD: [median monthly gross personal income in USD for this city]${
   })();
 };
 
+// Run a Deep Dive for every destination that hasn't been analysed yet, so the
+// whole comparison becomes couple-aware and AI-derived in one action. Staggered
+// (not all-at-once) and capped so a long list can't fire a burst of API calls.
+window.deepDiveAll = function(){
+  const key = state.aiKeys && state.aiKeys.claude;
+  if(!key){ alert(t('ra.so.analysis.noKey')); return; }
+  if(!state.citizenship || !state.homeBase){ alert(t('ra.so.analysis.noContext')); nav('settings'); return; }
+  const todo = retirePlaces().filter(l => !l.aiStats && !_runningAnalysis.has(l.id));
+  if(!todo.length){ alert(t('ra.deepDiveAll.doneMsg')); return; }
+  todo.slice(0, 5).forEach((l, i) => setTimeout(() => { try{ runLocAnalysis(l.id); }catch(_){}}, i * 350));
+};
 window.slideoverSaveToVault = function(){
   // Already saved automatically when the analysis completes. This button
   // is a visual "saved" confirmation — if somehow the report exists in
@@ -22676,6 +22827,18 @@ class HZMobile {
   raScored(){try{if(typeof retirePlaces==='function'&&typeof scoreLocation==='function'){const rank={infeasible:0,conditional:1,feasible:2};return retirePlaces().map(scoreLocation).sort((a,b)=>{const ra=rank[a.verdict]??2,rb=rank[b.verdict]??2;if(ra!==rb)return ra-rb;return ra<2?(this.n(a.surplus,0)-this.n(b.surplus,0)):(this.n(b.surplus,0)-this.n(a.surplus,0));});}}catch(_){}return [];}
   raNums(){try{if(typeof getRetirementNumbers==='function')return getRetirementNumbers();}catch(_){}return null;}
   raRow(l,v,c){return `<div style="display:flex;justify-content:space-between;gap:10px"><span style="color:var(--text3)">${l}</span><span style="color:${c};font-weight:600">${v}</span></div>`;}
+  // Household toggle (mobile) — mirrors desktop raHouseholdControl(). Sizes
+  // cost of living to a single person or a couple until a Deep Dive returns a
+  // real household figure.
+  raHouseholdCtl(){
+    const hh=(typeof raHouseholdSize==='function')?raHouseholdSize():1;
+    const b=(n,lbl)=>`<button data-act="rahh" data-n="${n}" style="flex:1;font-family:var(--fm);font-size:12px;font-weight:600;padding:8px;border:1px solid ${hh===n?'var(--sage-bd)':'var(--border2)'};background:${hh===n?'var(--sage-bg)':'var(--bg3)'};color:${hh===n?'var(--sage-tx)':'var(--text2)'};border-radius:9px;cursor:pointer">${lbl}</button>`;
+    return `<div style="margin-bottom:11px"><div style="font-size:10px;color:var(--text3);font-family:var(--fm);text-transform:uppercase;letter-spacing:.08em;margin-bottom:6px">Household</div><div style="display:flex;gap:8px">${b(1,'👤 Single')}${b(2,'👥 Couple')}</div>${hh===2?`<div style="font-size:10px;color:var(--text3);margin-top:6px;line-height:1.4">Cost of living ≈${(typeof COUPLE_COL_FACTOR!=='undefined'?COUPLE_COL_FACTOR:1.6)}× single until a Deep Dive refines it for each city.</div>`:''}</div>`;
+  }
+  setHousehold(n){
+    if(typeof state!=='undefined'){ state.raHouseholdSize=(n===2?2:1); if(typeof save==='function')save(); if(typeof invalidateSelectors==='function')invalidateSelectors(); }
+    this.paint(true);
+  }
   raCard(loc){
     const vc={feasible:'var(--green)',conditional:'var(--amber)',infeasible:'var(--red)'}[loc.verdict]||'var(--text3)';
     const vchip={feasible:['sage','FEASIBLE'],conditional:['honey','CONDITIONAL'],infeasible:['rose','INFEASIBLE']}[loc.verdict]||['info',String(loc.verdict||'').toUpperCase()];
@@ -22699,10 +22862,11 @@ class HZMobile {
       <div style="margin-top:9px">${this.bar(aff,vc,5)}</div>
       <div style="font-size:9.5px;color:var(--text3);font-family:var(--fm);margin-top:3px">${aff}% discretionary income · after local tax &amp; living costs</div>
       <div style="margin-top:9px;display:flex;flex-direction:column;gap:5px;font-family:var(--fm);font-size:11.5px">
-        ${this.raRow('Cost of living',this.fmt(this.n(loc.costOfLiving,0))+'/mo','var(--text)')}
-        ${this.raRow('Net income · after '+this.n(loc.taxRate,0)+'% local tax',this.fmt(this.n(loc.netIncome,0))+'/mo','var(--green)')}
-        ${this.raRow('Monthly surplus',this.fmt(this.n(loc.surplus,0))+'/mo',this.n(loc.surplus,0)>=0?'var(--green)':'var(--red)')}
-      </div>${rank}${ai}
+        ${this.raRow('Cost of living'+(loc.householdSize===2?' · couple':'')+(typeof raProvTag==='function'?raProvTag(loc.colSource):''),this.fmt(this.n(loc.effCostOfLiving,0))+'/mo','var(--text)')}
+        ${this.raRow('Net income · after '+Math.round(this.n(loc.effTaxPct,0))+'% tax'+(typeof raProvTag==='function'?raProvTag(loc.taxSource):''),this.fmt(this.n(loc.netIncome,0))+'/mo','var(--green)')}
+        ${this.raRow('Discretionary · after costs',this.fmt(this.n(loc.surplus,0))+'/mo',this.n(loc.surplus,0)>=0?'var(--green)':'var(--red)')}
+        ${loc.qol!=null?this.raRow('Quality of life'+(typeof raProvTag==='function'?raProvTag('ai'):''),this.n(loc.qol,0).toFixed(1)+' / 10','var(--violet)'):''}
+      </div>${loc.taxNote?`<div style="font-size:9px;color:var(--text3);font-style:italic;margin-top:5px;line-height:1.4">⚑ ${this.esc(loc.taxNote)}</div>`:''}${rank}${ai}
     </div>`;
   }
   // Cached Deep Dive report for a destination (shared vault, type 'deepdive' —
@@ -22732,15 +22896,16 @@ class HZMobile {
     try{
       const nums=(typeof getRetirementNumbers==='function')?getRetirementNumbers():null;
       const income=nums?this.n(nums.grossRetirementIncome,0):this.retIncome();
-      const ctx=(typeof buildPersonalContext==='function')?buildPersonalContext():'';
       const cz=(typeof countryInfo==='function')?countryInfo(state.citizenship):{name:state.citizenship};
       const hb=(typeof countryInfo==='function')?countryInfo(state.homeBase):{name:state.homeBase};
-      const suf=(typeof langSuffix==='function')?langSuffix():'';
-      const prompt=`${ctx}\n\nGenerate a comprehensive, professional DEEP DIVE retirement relocation report for **${loc.name}, ${loc.country}**.\n\nCONTEXT\n- Prospective retiree holds ${cz.name} citizenship, currently based in ${hb.name}.\n- Projected monthly retirement income: ${this.fmt(income)} (in today's money), from portfolio draw-down and pensions.\n- Target monthly cost of living at destination: ${this.fmt(this.n(loc.costOfLiving,0))}.\n- Destination headline income tax rate: ${this.n(loc.taxRate,0)}%.\n\nEvery monetary figure in CONTEXT is in TODAY'S MONEY — quote destination figures in today's money too. Return a single markdown document (no preamble, no JSON). Use H2 headings and markdown tables where numbers help. Ground everything in 2024–2025 reality and the user's citizenship/home base. Be honest — flag visa traps and tax gotchas. Structure EXACTLY:\n\n## Executive Summary\n## Cost of Living\n## Healthcare\n## Visa & Residency\n## Tax Implications\n## Climate & Lifestyle\n## Real Estate\n## Pros & Cons\n## Final Verdict\n\nAfter the Final Verdict, on its own line, append exactly this (integer only, no symbols): MEDIAN_INCOME_USD: [median monthly gross personal income in USD for this city]${suf}`;
+      // Shared, household-aware Deep Dive contract — identical prompt and
+      // structured-stats parsing as desktop, so a report run on either side
+      // makes the numbers couple-aware everywhere.
+      const prompt=buildDeepDivePrompt(loc,{income,cz,hb,household:(typeof raHouseholdSize==='function'?raHouseholdSize():1)});
       const reply=await callClaude(prompt,3000,key);
-      const mm=reply.match(/MEDIAN_INCOME_USD:\s*(\d+(?:\.\d+)?)/i);
-      if(mm){const usd=parseFloat(mm[1]);const toSek=1/(((typeof rate==='function'?rate('USD'):0)||0.11));const lref=(state.places||[]).find(l=>l.id===id);if(lref&&usd>0)lref.medianMonthlyIncome=Math.round(usd*toSek);}
-      const clean=reply.replace(/\nMEDIAN_INCOME_USD:\s*[\d.]+[^\n]*/gi,'');
+      const parsed=(typeof parseDeepDiveStats==='function')?parseDeepDiveStats(reply):{markdown:reply,stats:null};
+      if(typeof applyDeepDiveResult==='function')applyDeepDiveResult(id,parsed);
+      const clean=parsed.markdown;
       const entry={id:'dd-'+Date.now(),type:'deepdive',locationId:id,location:loc.name,country:loc.country,flag:loc.flag||'🌍',date:new Date().toISOString(),lang:state.lang,citizenship:state.citizenship,homeBase:state.homeBase,markdown:clean};
       if(!Array.isArray(state.vault))state.vault=[];state.vault.unshift(entry);if(state.vault.length>50)state.vault=state.vault.slice(0,50);
       if(typeof saveVault==='function')saveVault();if(typeof save==='function')save();
@@ -22757,6 +22922,7 @@ class HZMobile {
     const ytr=this.data.retirementAge-this.data.currentAge;
     let h=this.ph('PLANNING','Retire anywhere',`Every destination scored against your ${this.fmtC(income)}/mo retirement income — net of each country's local tax.`);
     if(nums)h+=this.banner('info',`Projected retirement income <b>${this.fmt(income)}/mo</b> — <b>${this.fmt(this.n(nums.sustainableMonthly,0))}</b> portfolio draw + <b>${this.fmt(this.n(nums.pensionAvgMonthly,0))}</b> pension. Each destination applies its own local tax before comparing to cost of living.`);
+    h+=this.raHouseholdCtl();
     h+=this.grid2([this.kpi('✅','Feasible',feas,'var(--green)','Comfortably affordable','pos'),this.kpi('🎯','Conditional',cond,'var(--amber)','Tight but possible','warn'),this.kpi('💰','Income',this.fmtC(income),'var(--blue)','At age '+this.data.retirementAge),this.kpi('📅','Years to Go',ytr+'Y','var(--text)','Until retirement')]);
     h+=this.card(this.ct('🗺 Retirement World Map')+`<div id="hzRetMap" style="height:210px;border-radius:11px;overflow:hidden;border:1px solid var(--border)"></div>`);
     h+=this.card(this.ct('📍 Destinations',this.btn('+ Add','adddest','','o'))+(scored.length?scored.map(l=>this.raCard(l)).join(''):`<div style="color:var(--text3);font-size:12px">No destinations yet — tap “+ Add” to score a city against your retirement income. Your picks sync with desktop.</div>`));
@@ -22972,6 +23138,7 @@ class HZMobile {
     if(a==='pulse'&&this.vacMap){this.vacMap.setView([+d.lat,+d.lng],4);return;}
     if(a==='pickdest'){const db=(typeof CITY_DB!=='undefined')?CITY_DB:[];const c=db[+d.i];if(c&&typeof state!=='undefined'){if(!Array.isArray(state.places))state.places=[];const key=(c.name||'').toLowerCase()+'|'+(c.country||'').toLowerCase();if(!state.places.some(p=>(p.kind||'retirement')==='retirement'&&((p.name||'').toLowerCase()+'|'+(p.country||'').toLowerCase())===key)){state.places.push({id:this.newId(),kind:'retirement',name:c.name,country:c.country||'',flag:c.flag||'🌍',costOfLiving:this.n(c.costOfLiving,40000),taxRate:this.n(c.taxRate,15),climate:c.climate||'Temperate',healthcare:c.healthcare||'Good',infrastructure:c.infrastructure||'Good',medianMonthlyIncome:c.medianMonthlyIncome||null,notes:'',lat:this.n(c.lat,0),lng:this.n(c.lng,0)});if(typeof save==='function')save();}}this.closeOverlay();this.paint();return this.toast('Destination added ✓');}
     if(a==='editdest')return this.openEditDest(d.id);
+    if(a==='rahh')return this.setHousehold(+d.n);
     if(a==='ddrun')return this.runLocDeepDive(d.id);
     if(a==='ddview')return this.openLocReport(d.id);
     if(a==='savedest')return this.saveDest();
