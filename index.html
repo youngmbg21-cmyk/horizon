@@ -9552,15 +9552,6 @@ function raHouseholdSize(){
   return (m==='partnered' || m==='married') ? 2 : 1;
 }
 function raColFactor(hh){ return (hh||raHouseholdSize())===2 ? COUPLE_COL_FACTOR : 1; }
-// Provenance chip (desktop): 'ai' = the AI Deep Dive estimated this figure for
-// the city; 'est' = a rough starting estimate (curated data, couple-scaled) the
-// user can refine by running a Deep Dive. Keeps the numbers honest about how
-// much to trust them.
-function raProvTag(src){
-  return src==='ai'
-    ? `<span title="Estimated by the AI Deep Dive for this city" style="font-family:var(--fm);font-size:8px;font-weight:600;letter-spacing:.05em;color:var(--violet);border:1px solid var(--violet);border-radius:4px;padding:0 4px;margin-left:6px;vertical-align:middle;opacity:.9">AI</span>`
-    : `<span title="Rough estimate — run a Deep Dive for a figure tailored to your household" style="font-family:var(--fm);font-size:8px;font-weight:600;letter-spacing:.05em;color:var(--text3);border:1px solid var(--border2);border-radius:4px;padding:0 4px;margin-left:6px;vertical-align:middle">EST</span>`;
-}
 // Household toggle used on the Retire Anywhere header (desktop). A couple is
 // costed at COUPLE_COL_FACTOR× a single person until a Deep Dive returns a real
 // household figure.
@@ -9570,7 +9561,7 @@ function raHouseholdControl(){
   return `<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:14px">
     <span style="font-size:11px;color:var(--text3);font-family:var(--fm);text-transform:uppercase;letter-spacing:.08em">Household</span>
     ${btn(1,'👤 Single')}${btn(2,'👥 Couple')}
-    <span style="font-size:11px;color:var(--text3)">Cost of living is sized to your household${hh===2?` (≈${COUPLE_COL_FACTOR}× single until a Deep Dive refines it)`:''}.</span>
+    <span style="font-size:11px;color:var(--text3)">Deep Dives size cost of living, tax &amp; discretionary income to ${hh===2?'you and your partner':'a single person'}.</span>
   </div>`;
 }
 // Persist an explicit household choice and re-score every destination.
@@ -16396,23 +16387,35 @@ function renderRetireAnywhere() {
     // English `loc.label` from scoreLocation() stays the canonical
     // source of truth (still used by AI prompts that read it).
     const verdictText = STRINGS['ra.verdict.'+loc.verdict] ? t('ra.verdict.'+loc.verdict) : loc.label;
-    return `<div class="loc-card ${loc.verdict}">
+    // Only surface financial figures + verdict once a Deep Dive has produced
+    // real, city-specific numbers. Before that the card shows just the
+    // destination and a prompt to analyse — no estimate dressed up as fact.
+    const analysed = !!loc.analysed;
+    const verdictBadge = running
+      ? `<span class="loc-verdict conditional">Analysing…</span>`
+      : analysed
+        ? `<span class="loc-verdict ${loc.verdict}">${esc2(verdictText)}</span>`
+        : `<span class="loc-verdict" style="background:var(--bg4);color:var(--text3)">Not analysed</span>`;
+    const statsHtml = analysed ? `
+      <div class="loc-affordability-bar"><div class="loc-affordability-fill" style="width:${Math.round(loc.affordabilityScore*100)}%;background:${loc.verdict==='feasible'?'var(--green)':loc.verdict==='conditional'?'var(--amber)':'var(--red)'}"></div></div>
+      <div style="font-size:10px;color:var(--text3);font-family:var(--fm);margin-bottom:10px">${esc2(t('ra.card.affordable', { pct: Math.round(loc.affordabilityScore*100) }))}</div>
+      ${loc.incomePercentile != null ? `<div class="loc-stat"><span class="loc-stat-lbl">Income rank · locally</span><span class="loc-stat-val" style="color:var(--text2)">Top ${loc.incomePercentile}% earner</span></div>` : ''}
+      <div class="loc-stat"><span class="loc-stat-lbl">${esc2(t('ra.card.cost'))}${loc.householdSize===2?' · couple':''}</span><span class="loc-stat-val">${fmt(loc.effCostOfLiving)}</span></div>
+      <div class="loc-stat"><span class="loc-stat-lbl">Gross income · today's money</span><span class="loc-stat-val">${fmt(monthlyIncome)}</span></div>
+      <div class="loc-stat"><span class="loc-stat-lbl">Net income · after ${Math.round(loc.effTaxPct)}% tax</span><span class="loc-stat-val pos">${fmt(loc.netIncome)}</span></div>
+      <div class="loc-stat"><span class="loc-stat-lbl">Discretionary · after living costs</span><span class="loc-stat-val ${loc.surplus>=0?'pos':'neg'}">${fmt(loc.surplus)}</span></div>
+      ${loc.qol!=null ? `<div class="loc-stat"><span class="loc-stat-lbl">Quality of life</span><span class="loc-stat-val" style="color:var(--violet)">${loc.qol.toFixed(1)} / 10</span></div>` : ''}
+      ${loc.taxNote ? `<div style="font-size:10px;color:var(--text3);font-style:italic;margin:2px 0 4px;line-height:1.4">⚑ ${esc(loc.taxNote)}</div>` : ''}`
+      : `<div style="font-size:12px;color:var(--text3);line-height:1.5;margin:2px 0 10px">Run a Deep Dive to get accurate cost of living, effective tax and discretionary income for ${raHouseholdSize()===2?'you and your partner':'you'} — tailored to this city.</div>`;
+    return `<div class="loc-card ${analysed?loc.verdict:'pending'}">
       <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:6px">
         <div>
           <div class="loc-name">${loc.flag} ${esc(loc.name)}</div>
           <div class="loc-country">${esc(loc.country)}</div>
         </div>
-        <span class="loc-verdict ${loc.verdict}">${esc2(verdictText)}</span>
+        ${verdictBadge}
       </div>
-      <div class="loc-affordability-bar"><div class="loc-affordability-fill" style="width:${Math.round(loc.affordabilityScore*100)}%;background:${loc.verdict==='feasible'?'var(--green)':loc.verdict==='conditional'?'var(--amber)':'var(--red)'}"></div></div>
-      <div style="font-size:10px;color:var(--text3);font-family:var(--fm);margin-bottom:10px">${esc2(t('ra.card.affordable', { pct: Math.round(loc.affordabilityScore*100) }))}</div>
-      ${loc.incomePercentile != null ? `<div class="loc-stat"><span class="loc-stat-lbl">Income rank · locally${raProvTag(loc.analysed?'ai':'est')}</span><span class="loc-stat-val" style="color:var(--text2)">Top ${loc.incomePercentile}% earner</span></div>` : ''}
-      <div class="loc-stat"><span class="loc-stat-lbl">${esc2(t('ra.card.cost'))}${loc.householdSize===2?' · couple':''}${raProvTag(loc.colSource)}</span><span class="loc-stat-val">${fmt(loc.effCostOfLiving)}</span></div>
-      <div class="loc-stat"><span class="loc-stat-lbl">Gross income · today's money</span><span class="loc-stat-val">${fmt(monthlyIncome)}</span></div>
-      <div class="loc-stat"><span class="loc-stat-lbl">Net income · after ${Math.round(loc.effTaxPct)}% tax${raProvTag(loc.taxSource)}</span><span class="loc-stat-val pos">${fmt(loc.netIncome)}</span></div>
-      <div class="loc-stat"><span class="loc-stat-lbl">Discretionary · after living costs</span><span class="loc-stat-val ${loc.surplus>=0?'pos':'neg'}">${fmt(loc.surplus)}</span></div>
-      ${loc.qol!=null ? `<div class="loc-stat"><span class="loc-stat-lbl">Quality of life${raProvTag('ai')}</span><span class="loc-stat-val" style="color:var(--violet)">${loc.qol.toFixed(1)} / 10</span></div>` : ''}
-      ${loc.taxNote ? `<div style="font-size:10px;color:var(--text3);font-style:italic;margin:2px 0 4px;line-height:1.4">⚑ ${esc(loc.taxNote)}</div>` : ''}
+      ${statsHtml}
       <div class="loc-stat"><span class="loc-stat-lbl">${esc2(t('ra.card.climate'))}</span><span class="loc-stat-val muted">${esc(loc.climate||'')}</span></div>
       <div class="loc-card-actions">
         <button class="${primaryClass} loc-card-cta" ${primaryOnclick}>${esc2(primaryLabel)}</button>
@@ -16433,8 +16436,8 @@ function renderRetireAnywhere() {
     ${raHouseholdControl()}
 
     ${ui.kpiRow([
-      {icon:'✅', label:t('ra.kpi.feasible'),    value:scored.filter(l=>l.verdict==='feasible').length, tone:'pos', sub:t('ra.kpi.feasible.sub')},
-      {icon:'🎯', label:t('ra.kpi.conditional'), value:`<span class="amb">${scored.filter(l=>l.verdict==='conditional').length}</span>`, sub:t('ra.kpi.conditional.sub')},
+      {icon:'✅', label:t('ra.kpi.feasible'),    value:scored.filter(l=>l.analysed && l.verdict==='feasible').length, tone:'pos', sub:t('ra.kpi.feasible.sub')},
+      {icon:'🎯', label:t('ra.kpi.conditional'), value:`<span class="amb">${scored.filter(l=>l.analysed && l.verdict==='conditional').length}</span>`, sub:t('ra.kpi.conditional.sub')},
       {icon:'💰', label:t('ra.kpi.income'),      value:fmt(monthlyIncome), sub:t('ra.kpi.income.sub', { age: state.retirementAge }), link:'retirement', section:'runway'},
     ])}
 
@@ -16459,13 +16462,16 @@ function renderRetireAnywhere() {
   setTimeout(()=>{
     if(retireMap) { try{retireMap.remove();}catch(e){} retireMap=null; }
     const points = scored.map(loc => {
-      const color = loc.verdict==='feasible' ? '#00e8a0'
+      // Unanalysed destinations show as neutral markers with no figures —
+      // colour + numbers only appear once a Deep Dive has produced them.
+      const color = !loc.analysed ? '#7a8fb0'
+                  : loc.verdict==='feasible' ? '#00e8a0'
                   : loc.verdict==='conditional' ? '#f5a623'
                   : '#ff4d6d';
-      return {
-        lat: loc.lat, lng: loc.lng, color,
-        popup: `<strong>${loc.flag} ${esc(loc.name)}</strong><br><span style="color:${color};font-weight:700">${esc(loc.label)}</span><br>Cost${loc.householdSize===2?' · couple':''}: ${fmt(loc.effCostOfLiving)}/mo<br>Discretionary: ${fmt(loc.surplus)}/mo`
-      };
+      const popup = loc.analysed
+        ? `<strong>${loc.flag} ${esc(loc.name)}</strong><br><span style="color:${color};font-weight:700">${esc(loc.label)}</span><br>Cost${loc.householdSize===2?' · couple':''}: ${fmt(loc.effCostOfLiving)}/mo<br>Discretionary: ${fmt(loc.surplus)}/mo`
+        : `<strong>${loc.flag} ${esc(loc.name)}</strong><br><span style="color:${color}">Not analysed — run a Deep Dive</span>`;
+      return { lat: loc.lat, lng: loc.lng, color, popup };
     });
     retireMap = createWorldMap('retire-map', points, {center:[20,20], zoom:2});
   }, 100);
@@ -16572,15 +16578,21 @@ function renderLocAnalysisSlideover(opts){
   // Body
   const body = document.getElementById('retire-so-body');
   const dash = t('ra.so.unknown');
+  // Financial facts appear only after a Deep Dive has produced real,
+  // city-specific numbers. Before that, only the qualitative facts show,
+  // with a prompt to analyse — no estimate presented as fact.
+  const financialFacts = loc.analysed ? `
+        <div class="retire-so-fact"><div class="retire-so-fact-lbl">${esc2(t('ra.so.facts.cost'))}${loc.householdSize===2?' · couple':''}</div><div class="retire-so-fact-val">${fmt(loc.effCostOfLiving)}</div></div>
+        <div class="retire-so-fact"><div class="retire-so-fact-lbl">Gross income</div><div class="retire-so-fact-val">${fmt(monthlyIncome)}</div></div>
+        <div class="retire-so-fact"><div class="retire-so-fact-lbl">Net income · after ${Math.round(loc.effTaxPct)}% tax</div><div class="retire-so-fact-val pos">${fmt(loc.netIncome)}</div></div>
+        <div class="retire-so-fact"><div class="retire-so-fact-lbl">Discretionary · after costs</div><div class="retire-so-fact-val ${loc.surplus>=0?'pos':'neg'}">${fmt(loc.surplus)}</div></div>
+        <div class="retire-so-fact"><div class="retire-so-fact-lbl">${esc2(t('ra.so.facts.tax'))}</div><div class="retire-so-fact-val">${Math.round(loc.effTaxPct)}%</div></div>` : '';
   const factsHtml = `
     <div class="retire-so-section">
       <div class="retire-so-section-hd">${esc2(t('ra.so.facts.title'))}</div>
+      ${loc.analysed ? '' : `<div style="font-size:12px;color:var(--text3);line-height:1.5;margin-bottom:10px">Run the Deep Dive below for accurate cost of living, effective tax and discretionary income — sized to your ${raHouseholdSize()===2?'two-person household':'household'} and tailored to this city.</div>`}
       <div class="retire-so-fact-grid">
-        <div class="retire-so-fact"><div class="retire-so-fact-lbl">${esc2(t('ra.so.facts.cost'))}${loc.householdSize===2?' · couple':''}${raProvTag(loc.colSource)}</div><div class="retire-so-fact-val">${fmt(loc.effCostOfLiving)}</div></div>
-        <div class="retire-so-fact"><div class="retire-so-fact-lbl">Gross income</div><div class="retire-so-fact-val">${fmt(monthlyIncome)}</div></div>
-        <div class="retire-so-fact"><div class="retire-so-fact-lbl">Net income · after ${Math.round(loc.effTaxPct)}% tax${raProvTag(loc.taxSource)}</div><div class="retire-so-fact-val pos">${fmt(loc.netIncome)}</div></div>
-        <div class="retire-so-fact"><div class="retire-so-fact-lbl">Discretionary · after costs</div><div class="retire-so-fact-val ${loc.surplus>=0?'pos':'neg'}">${fmt(loc.surplus)}</div></div>
-        <div class="retire-so-fact"><div class="retire-so-fact-lbl">${esc2(t('ra.so.facts.tax'))}${raProvTag(loc.taxSource)}</div><div class="retire-so-fact-val">${Math.round(loc.effTaxPct)}%</div></div>
+        ${financialFacts}
         <div class="retire-so-fact"><div class="retire-so-fact-lbl">${esc2(t('ra.so.facts.climate'))}</div><div class="retire-so-fact-val" style="font-size:12px">${esc(loc.climate||dash)}</div></div>
         <div class="retire-so-fact"><div class="retire-so-fact-lbl">${esc2(t('ra.so.facts.healthcare'))}</div><div class="retire-so-fact-val" style="font-size:12px">${esc(loc.healthcare||dash)}</div></div>
       </div>
@@ -16589,8 +16601,8 @@ function renderLocAnalysisSlideover(opts){
     <div class="retire-so-section">
       <div class="retire-so-section-hd">${esc2(t('ra.so.edit.title'))}</div>
       <div class="retire-so-edit-row">
-        <div class="field"><label>${esc2(t('ra.so.edit.cost', { s }))}</label><input type="text" inputmode="decimal" data-lang-num="1" value="${Math.round(loc.costOfLiving*r)}" oninput="updateLocCost('${loc.id}',parseNum(this.value)/${r})" onchange="commitRender('renderLocAnalysisSlideover')"></div>
-        <div class="field"><label>${esc2(t('ra.so.edit.tax'))}</label><input type="text" inputmode="decimal" data-lang-num="1" value="${loc.taxRate}" oninput="updateLocTax('${loc.id}',parseNum(this.value))" onchange="commitRender('renderLocAnalysisSlideover')"></div>
+        <div class="field"><label>${esc2(t('ra.so.edit.cost', { s }))}${loc.analysed?' · couple':''}</label><input type="text" inputmode="decimal" data-lang-num="1" value="${Math.round((loc.analysed?loc.effCostOfLiving:loc.costOfLiving)*r)}" oninput="updateLocCost('${loc.id}',parseNum(this.value)/${r})" onchange="commitRender('renderLocAnalysisSlideover')"></div>
+        <div class="field"><label>${esc2(t('ra.so.edit.tax'))}</label><input type="text" inputmode="decimal" data-lang-num="1" value="${loc.analysed?Math.round(loc.effTaxPct):loc.taxRate}" oninput="updateLocTax('${loc.id}',parseNum(this.value))" onchange="commitRender('renderLocAnalysisSlideover')"></div>
         <div class="field retire-so-notes"><label>${esc2(t('ra.so.edit.notes'))}</label><input value="${esc(loc.notes||'')}" oninput="updateLocNotes('${loc.id}',this.value)"></div>
       </div>
       <div style="margin-top:10px;display:flex;gap:8px">
@@ -16780,8 +16792,11 @@ window.slideoverExportPdf = function(){
 // slide-over instead of the old narrow modal.
 window.showLocDetail = function(id){ openLocAnalysis(id); };
 
-window.updateLocCost=function(id,val){ const l=state.places.find(l=>l.id===id); if(l){l.costOfLiving=parseNum(val);save();} };
-window.updateLocTax=function(id,val){ const l=state.places.find(l=>l.id===id); if(l){l.taxRate=parseNum(val);save();} };
+// Cost/tax editors are aiStats-aware: once a Deep Dive has produced real
+// figures, editing corrects THOSE (so the change is visible and the source
+// stays 'analysed'); before analysis they set the raw baseline the prompt uses.
+window.updateLocCost=function(id,val){ const l=state.places.find(l=>l.id===id); if(l){ const v=parseNum(val); if(l.aiStats && l.aiStats.colHousehold!=null){ l.aiStats.colHousehold=v; } else { l.costOfLiving=v; } if(typeof invalidateSelectors==='function')invalidateSelectors(); save();} };
+window.updateLocTax=function(id,val){ const l=state.places.find(l=>l.id===id); if(l){ const v=parseNum(val); if(l.aiStats && l.aiStats.effTaxPct!=null){ l.aiStats.effTaxPct=v; } else { l.taxRate=v; } if(typeof invalidateSelectors==='function')invalidateSelectors(); save();} };
 window.updateLocNotes=function(id,val){ const l=state.places.find(l=>l.id===id); if(l){l.notes=val;save();} };
 window.removeLoc=function(id){ state.places=state.places.filter(l=>l.id!==id);save();closeModal('loc-modal');renderRetireAnywhere(); };
 // ─── GLOBAL GEOCODE AUTOCOMPLETE (Photon / OSM) ─────────────────────────────
@@ -22833,19 +22848,16 @@ class HZMobile {
   raHouseholdCtl(){
     const hh=(typeof raHouseholdSize==='function')?raHouseholdSize():1;
     const b=(n,lbl)=>`<button data-act="rahh" data-n="${n}" style="flex:1;font-family:var(--fm);font-size:12px;font-weight:600;padding:8px;border:1px solid ${hh===n?'var(--sage-bd)':'var(--border2)'};background:${hh===n?'var(--sage-bg)':'var(--bg3)'};color:${hh===n?'var(--sage-tx)':'var(--text2)'};border-radius:9px;cursor:pointer">${lbl}</button>`;
-    return `<div style="margin-bottom:11px"><div style="font-size:10px;color:var(--text3);font-family:var(--fm);text-transform:uppercase;letter-spacing:.08em;margin-bottom:6px">Household</div><div style="display:flex;gap:8px">${b(1,'👤 Single')}${b(2,'👥 Couple')}</div>${hh===2?`<div style="font-size:10px;color:var(--text3);margin-top:6px;line-height:1.4">Cost of living ≈${(typeof COUPLE_COL_FACTOR!=='undefined'?COUPLE_COL_FACTOR:1.6)}× single until a Deep Dive refines it for each city.</div>`:''}</div>`;
+    return `<div style="margin-bottom:11px"><div style="font-size:10px;color:var(--text3);font-family:var(--fm);text-transform:uppercase;letter-spacing:.08em;margin-bottom:6px">Household</div><div style="display:flex;gap:8px">${b(1,'👤 Single')}${b(2,'👥 Couple')}</div><div style="font-size:10px;color:var(--text3);margin-top:6px;line-height:1.4">Deep Dives size cost of living, tax &amp; discretionary income to ${hh===2?'you and your partner':'you'}.</div></div>`;
   }
   setHousehold(n){
     if(typeof state!=='undefined'){ state.raHouseholdSize=(n===2?2:1); if(typeof save==='function')save(); if(typeof invalidateSelectors==='function')invalidateSelectors(); }
     this.paint(true);
   }
   raCard(loc){
-    const vc={feasible:'var(--green)',conditional:'var(--amber)',infeasible:'var(--red)'}[loc.verdict]||'var(--text3)';
-    const vchip={feasible:['sage','FEASIBLE'],conditional:['honey','CONDITIONAL'],infeasible:['rose','INFEASIBLE']}[loc.verdict]||['info',String(loc.verdict||'').toUpperCase()];
-    const aff=Math.max(0,Math.min(100,Math.round(this.n(loc.affordabilityScore,0)*100)));
-    const rank=(loc.incomePercentile!=null)?`<div style="font-size:9.5px;color:var(--text3);font-family:var(--fm);margin-top:6px">Income rank · locally: <span style="color:var(--text2)">Top ${loc.incomePercentile}% earner</span></div>`:'';
     const cached=this.locDeepDive(loc.id);
     const running=!!(this._ddRunning&&this._ddRunning.has(loc.id));
+    const analysed=!!loc.analysed;
     const spinner=`<span style="width:13px;height:13px;border:2px solid currentColor;border-top-color:transparent;border-radius:50%;display:inline-block;animation:hzspin .8s linear infinite"></span>`;
     const ai=`<div style="margin-top:10px;display:flex;gap:8px">${
       running
@@ -22853,20 +22865,36 @@ class HZMobile {
         : cached
           ? `<button data-act="ddview" data-id="${loc.id}" style="flex:1;background:var(--sage-bg);border:1px solid var(--sage-bd);color:var(--sage-tx);border-radius:7px;font-size:11px;font-weight:600;padding:7px;cursor:pointer">📄 View AI report</button><button data-act="ddrun" data-id="${loc.id}" title="Re-run" style="background:var(--bg4);border:1px solid var(--border2);color:var(--text2);border-radius:7px;font-size:11px;padding:7px 10px;cursor:pointer">↻</button>`
           : `<button data-act="ddrun" data-id="${loc.id}" style="flex:1;background:var(--bg4);border:1px solid var(--border2);color:var(--text);border-radius:7px;font-size:11px;font-weight:600;padding:7px;cursor:pointer">🔬 AI Deep Dive</button>`}</div>`;
+    // Header chip: verdict only once a Deep Dive has produced real figures;
+    // otherwise a neutral "not analysed" marker. No numbers are shown before
+    // analysis — an estimate presented as fact is worse than no number.
+    const headChip = running
+      ? this.chip('honey','ANALYZING…')
+      : analysed
+        ? this.chip(({feasible:'sage',conditional:'honey',infeasible:'rose'}[loc.verdict]||'info'),String(loc.label||loc.verdict||'').toUpperCase())
+        : this.chip('info','NOT ANALYSED');
+    let body;
+    if(analysed){
+      const vc={feasible:'var(--green)',conditional:'var(--amber)',infeasible:'var(--red)'}[loc.verdict]||'var(--text3)';
+      const aff=Math.max(0,Math.min(100,Math.round(this.n(loc.affordabilityScore,0)*100)));
+      const rank=(loc.incomePercentile!=null)?`<div style="font-size:9.5px;color:var(--text3);font-family:var(--fm);margin-top:6px">Income rank · locally: <span style="color:var(--text2)">Top ${loc.incomePercentile}% earner</span></div>`:'';
+      body=`<div style="margin-top:9px">${this.bar(aff,vc,5)}</div>
+      <div style="font-size:9.5px;color:var(--text3);font-family:var(--fm);margin-top:3px">${aff}% discretionary income · after local tax &amp; living costs</div>
+      <div style="margin-top:9px;display:flex;flex-direction:column;gap:5px;font-family:var(--fm);font-size:11.5px">
+        ${this.raRow('Cost of living'+(loc.householdSize===2?' · couple':''),this.fmt(this.n(loc.effCostOfLiving,0))+'/mo','var(--text)')}
+        ${this.raRow('Net income · after '+Math.round(this.n(loc.effTaxPct,0))+'% tax',this.fmt(this.n(loc.netIncome,0))+'/mo','var(--green)')}
+        ${this.raRow('Discretionary · after costs',this.fmt(this.n(loc.surplus,0))+'/mo',this.n(loc.surplus,0)>=0?'var(--green)':'var(--red)')}
+        ${loc.qol!=null?this.raRow('Quality of life',this.n(loc.qol,0).toFixed(1)+' / 10','var(--violet)'):''}
+      </div>${loc.taxNote?`<div style="font-size:9px;color:var(--text3);font-style:italic;margin-top:5px;line-height:1.4">⚑ ${this.esc(loc.taxNote)}</div>`:''}${rank}`;
+    } else {
+      body=`<div style="margin-top:9px;font-size:11.5px;color:var(--text3);line-height:1.5">Run a Deep Dive to get accurate cost of living, effective tax and discretionary income for ${(typeof raHouseholdSize==='function'&&raHouseholdSize()===2)?'you and your partner':'you'} — tailored to this city.</div>`;
+    }
     return `<div data-act="editdest" data-id="${loc.id}" style="padding:12px 0;border-bottom:1px solid var(--border);cursor:pointer">
       <div style="display:flex;align-items:flex-start;gap:10px">
         <div style="font-size:22px">${loc.flag||'📍'}</div>
         <div style="flex:1;min-width:0"><div style="font-size:14px;font-weight:600">${this.esc(loc.name)}</div><div style="font-size:10.5px;color:var(--text3)">${this.esc(loc.country||'')}${loc.climate?' · '+this.esc(loc.climate):''}</div></div>
-        ${this.chip(vchip[0],vchip[1])}
-      </div>
-      <div style="margin-top:9px">${this.bar(aff,vc,5)}</div>
-      <div style="font-size:9.5px;color:var(--text3);font-family:var(--fm);margin-top:3px">${aff}% discretionary income · after local tax &amp; living costs</div>
-      <div style="margin-top:9px;display:flex;flex-direction:column;gap:5px;font-family:var(--fm);font-size:11.5px">
-        ${this.raRow('Cost of living'+(loc.householdSize===2?' · couple':'')+(typeof raProvTag==='function'?raProvTag(loc.colSource):''),this.fmt(this.n(loc.effCostOfLiving,0))+'/mo','var(--text)')}
-        ${this.raRow('Net income · after '+Math.round(this.n(loc.effTaxPct,0))+'% tax'+(typeof raProvTag==='function'?raProvTag(loc.taxSource):''),this.fmt(this.n(loc.netIncome,0))+'/mo','var(--green)')}
-        ${this.raRow('Discretionary · after costs',this.fmt(this.n(loc.surplus,0))+'/mo',this.n(loc.surplus,0)>=0?'var(--green)':'var(--red)')}
-        ${loc.qol!=null?this.raRow('Quality of life'+(typeof raProvTag==='function'?raProvTag('ai'):''),this.n(loc.qol,0).toFixed(1)+' / 10','var(--violet)'):''}
-      </div>${loc.taxNote?`<div style="font-size:9px;color:var(--text3);font-style:italic;margin-top:5px;line-height:1.4">⚑ ${this.esc(loc.taxNote)}</div>`:''}${rank}${ai}
+        ${headChip}
+      </div>${body}${ai}
     </div>`;
   }
   // Cached Deep Dive report for a destination (shared vault, type 'deepdive' —
@@ -22917,8 +22945,8 @@ class HZMobile {
     const nums=this.raNums();
     const income=nums?this.n(nums.grossRetirementIncome,0):this.retIncome();
     const scored=this.raScored();
-    const feas=scored.filter(l=>l.verdict==='feasible').length;
-    const cond=scored.filter(l=>l.verdict==='conditional').length;
+    const feas=scored.filter(l=>l.analysed && l.verdict==='feasible').length;
+    const cond=scored.filter(l=>l.analysed && l.verdict==='conditional').length;
     const ytr=this.data.retirementAge-this.data.currentAge;
     let h=this.ph('PLANNING','Retire anywhere',`Every destination scored against your ${this.fmtC(income)}/mo retirement income — net of each country's local tax.`);
     if(nums)h+=this.banner('info',`Projected retirement income <b>${this.fmt(income)}/mo</b> — <b>${this.fmt(this.n(nums.sustainableMonthly,0))}</b> portfolio draw + <b>${this.fmt(this.n(nums.pensionAvgMonthly,0))}</b> pension. Each destination applies its own local tax before comparing to cost of living.`);
@@ -22943,8 +22971,8 @@ class HZMobile {
     const inp='width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:9px 11px;color:var(--text);font-size:13px;font-family:var(--fm)';
     const lbl='display:block;font-size:11px;color:var(--text2);margin-bottom:4px';
     const body=`<input type="hidden" id="edId" value="${id}"><div style="display:flex;flex-direction:column;gap:11px">`
-      +`<div><label style="${lbl}">Monthly cost of living (SEK)</label><input id="edCost" type="number" value="${this.n(loc.costOfLiving,0)}" style="${inp}"></div>`
-      +`<div style="display:flex;gap:8px"><div style="flex:1"><label style="${lbl}">Local tax rate (%)</label><input id="edTax" type="number" value="${this.n(loc.taxRate,0)}" style="${inp}"></div><div style="flex:1"><label style="${lbl}">Climate</label><input id="edClimate" value="${this.esc(loc.climate||'')}" style="${inp}"></div></div>`
+      +`<div><label style="${lbl}">Monthly cost of living (SEK)${loc.aiStats&&loc.aiStats.colHousehold!=null?' · couple, from Deep Dive':''}</label><input id="edCost" type="number" value="${this.n(loc.aiStats&&loc.aiStats.colHousehold!=null?loc.aiStats.colHousehold:loc.costOfLiving,0)}" style="${inp}"></div>`
+      +`<div style="display:flex;gap:8px"><div style="flex:1"><label style="${lbl}">Effective tax rate (%)</label><input id="edTax" type="number" value="${this.n(loc.aiStats&&loc.aiStats.effTaxPct!=null?loc.aiStats.effTaxPct:loc.taxRate,0)}" style="${inp}"></div><div style="flex:1"><label style="${lbl}">Climate</label><input id="edClimate" value="${this.esc(loc.climate||'')}" style="${inp}"></div></div>`
       +`<div><label style="${lbl}">Notes</label><input id="edNotes" value="${this.esc(loc.notes||'')}" placeholder="Visa, healthcare, anything to remember" style="${inp}"></div>`
       +`</div><div style="margin-top:14px">`+this.btn('Save','savedest','','g')
       +`<button data-act="rmdest" data-id="${id}" style="width:100%;margin-top:8px;background:var(--rose-bg);color:var(--rose-tx);border:1px solid var(--rose-bd);border-radius:8px;padding:10px;font-size:12px;font-weight:600;cursor:pointer">Remove destination</button></div>`;
@@ -22953,10 +22981,15 @@ class HZMobile {
   saveDest(){
     const id=(document.getElementById('edId')||{}).value;if(!id||typeof state==='undefined')return;
     const loc=(state.places||[]).find(l=>l.id===id);if(!loc)return;
-    loc.costOfLiving=this.n((document.getElementById('edCost')||{}).value,loc.costOfLiving);
-    loc.taxRate=this.n((document.getElementById('edTax')||{}).value,loc.taxRate);
+    const cv=this.n((document.getElementById('edCost')||{}).value,null);
+    const tv=this.n((document.getElementById('edTax')||{}).value,null);
+    // Once analysed, corrections update the Deep Dive figures (so they stay
+    // visible and keep 'analysed' provenance); otherwise the raw baseline.
+    if(cv!=null){ if(loc.aiStats&&loc.aiStats.colHousehold!=null){loc.aiStats.colHousehold=cv;} else {loc.costOfLiving=cv;} }
+    if(tv!=null){ if(loc.aiStats&&loc.aiStats.effTaxPct!=null){loc.aiStats.effTaxPct=tv;} else {loc.taxRate=tv;} }
     loc.climate=((document.getElementById('edClimate')||{}).value||'').trim()||loc.climate;
     loc.notes=(document.getElementById('edNotes')||{}).value||'';
+    if(typeof invalidateSelectors==='function')invalidateSelectors();
     if(typeof save==='function')save();
     this.closeOverlay();this.paint();this.toast('Destination updated ✓');
   }
