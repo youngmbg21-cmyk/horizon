@@ -820,7 +820,12 @@ body.light .card.card-clickable:hover {
 .ireq-head { margin-bottom:14px; }
 .ireq-title { font-family:var(--ff); font-size:18px; font-weight:800; color:var(--text); letter-spacing:-.01em; margin-bottom:3px; }
 .ireq-sub { font-size:12px; color:var(--text2); }
-.ireq-kpi-row { display:grid; grid-template-columns:repeat(auto-fit, minmax(150px, 1fr)); gap:10px; margin-bottom:14px; }
+/* All Income Requirements KPIs share one row, equal width. grid-auto-flow
+   column + minmax(0,1fr) keeps every card on a single line whether there are
+   5 (no pension) or 6 (with pension) of them, shrinking to fit rather than
+   wrapping to a ragged second row. */
+.ireq-kpi-row { display:grid; grid-auto-flow:column; grid-auto-columns:minmax(0,1fr); gap:10px; margin-bottom:14px; }
+@media (max-width:640px){ .ireq-kpi-row { grid-auto-flow:row; grid-template-columns:repeat(2,minmax(0,1fr)); grid-auto-columns:auto; } }
 .ireq-kpi-val.ireq-blue  { color:#4d9fff; }
 .ireq-kpi { background:var(--bg3); border:1px solid var(--border); border-radius:10px; padding:14px 12px; text-align:center; min-height:96px; display:flex; flex-direction:column; justify-content:center; align-items:center; gap:4px; }
 .ireq-kpi-lbl { font-family:var(--fm); font-size:9px; font-weight:700; letter-spacing:.08em; color:var(--text2); text-transform:uppercase; margin-bottom:2px; }
