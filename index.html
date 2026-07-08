@@ -4325,7 +4325,7 @@ body.light .piq-country-menu { box-shadow:0 12px 28px -10px rgba(60,40,10,0.22);
     -webkit-tap-highlight-color:transparent; transition:color .18s, transform .08s;
   }
   .hz-nav-ic { font-size:18px; line-height:1; }
-  .hz-nav-lbl { font-size:9px; font-weight:600; }
+  .hz-nav-lbl { font-size:9px; font-weight:600; white-space:nowrap; }
   .hz-nav.active { color:var(--green); }
   .hz-nav:active { transform:scale(.9); }
   .hz-home-ind {
@@ -4438,8 +4438,8 @@ body.light .piq-country-menu { box-shadow:0 12px 28px -10px rgba(60,40,10,0.22);
     <main class="hz-body" id="hzBody"></main>
     <nav class="hz-nav-bar" id="hzNav" role="navigation" aria-label="Primary">
       <button class="hz-nav" data-nav="dashboard"><span class="hz-nav-ic">◉</span><span class="hz-nav-lbl">Home</span></button>
+      <button class="hz-nav" data-nav="lifewall"><span class="hz-nav-ic">🧱</span><span class="hz-nav-lbl">Life Wall</span></button>
       <button class="hz-nav" data-nav="spend"><span class="hz-nav-ic">🏦</span><span class="hz-nav-lbl">Spend</span></button>
-      <button class="hz-nav" data-nav="forecast"><span class="hz-nav-ic">▦</span><span class="hz-nav-lbl">Budget</span></button>
       <button class="hz-nav" data-nav="retirement"><span class="hz-nav-ic">🌅</span><span class="hz-nav-lbl">Retire</span></button>
       <button class="hz-nav" data-nav="__more"><span class="hz-nav-ic">⋯</span><span class="hz-nav-lbl">More</span></button>
       <div class="hz-home-ind"></div>
@@ -22390,7 +22390,7 @@ class HZMobile {
     if(this.data.tab==='property'||this.data.tab==='propiq')this.data.tab='dashboard';
     const t=this.data.tab;
     const prevScroll=silent?this.body.scrollTop:0;
-    this.nav.querySelectorAll('[data-nav]').forEach(b=>{const map={dashboard:'dashboard',spend:'spend',forecast:'forecast',retirement:'retirement'};const on=(b.dataset.nav===map[t])||(b.dataset.nav==='__more'&&!map[t]);b.classList.toggle('active',on);});
+    this.nav.querySelectorAll('[data-nav]').forEach(b=>{const map={dashboard:'dashboard',lifewall:'lifewall',spend:'spend',retirement:'retirement'};const on=(b.dataset.nav===map[t])||(b.dataset.nav==='__more'&&!map[t]);b.classList.toggle('active',on);});
     let h='';
     if(t==='dashboard')h=this.vDash();
     else if(t==='spend')h=this.vSpend();
