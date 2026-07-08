@@ -12283,7 +12283,7 @@ WORD BUDGET · HARD CONSTRAINT: every section MUST be between 230 and 250 words.
 
 FORMATTING · Follow these rules exactly.
 
-1. **Bold** every currency figure, percentage, rate, ratio, and key metric. Example: "Your **29% savings rate** produces **27 000 kr/mo** of surplus."
+1. **Bold** every currency figure, percentage, rate, ratio, and key metric. Example: "Your **29% savings rate** produces a healthy monthly surplus." Render every currency figure in the user's display currency per the CURRENCY rule in the system prompt — never write "kr"/"SEK" unless that IS the display currency.
 
 2. Use these inline colour markers to tone-code numbers and verdicts (the UI renders them as coloured spans):
    · {+text} → POSITIVE signal (green). Surpluses, strong savings rates, coverage above target, good trends.
@@ -19262,6 +19262,11 @@ function buildAIContext() {
   const panel = state.activePanel || 'dashboard';
   const viewLabel = (PANEL_META[panel] && PANEL_META[panel].label) || panel;
   const section = state.activeSection ? ` (focused on: ${state.activeSection})` : '';
+  // Display-currency directive inputs. Snapshot figures are stored in SEK; the
+  // model must render its whole answer in the user's SELECTED display currency.
+  const dispCur  = state.currency || 'SEK';
+  const dispSym  = (typeof sym==='function') ? sym(dispCur) : (dispCur==='SEK'?'kr':dispCur);
+  const dispRate = (typeof rate==='function') ? (rate(dispCur)||1) : 1;
   const mode = state.aiMode || 'expert';
   const modeInstruction = mode === 'simple'
     ? `RESPONSE STYLE: SIMPLE. Explain like you're talking to a smart friend who is new to personal finance. Avoid jargon (or define it in 4–6 words when unavoidable). Short sentences. No bullet soup; write in plain paragraphs. Skip hedging. Use at most one number per idea and round generously. If the user asks something technical, answer it in everyday language first, then add ONE optional sentence of detail at the end.`
@@ -19330,10 +19335,17 @@ ${modeInstruction}
 VALUE BASIS — IMPORTANT
 Every monetary retirement figure below is in TODAY'S MONEY (real, inflation-adjusted). When you quote retirement income, portfolio balance, withdrawals, or pension payouts in your response, use these real figures as the headline value. If you want to mention nominal/future kr for context, label it explicitly as "nominal" or "future value". Never present a nominal figure as the headline.
 
-CURRENCY & EXCHANGE RATES — CRITICAL
-All values in this snapshot are stored in SEK (kr). When the user asks for amounts in another currency, use ONLY the rates below — never guess or use a market rate from your training data.
+CURRENCY — CRITICAL OUTPUT RULE
+The user's SELECTED DISPLAY CURRENCY is ${dispCur} (${dispSym}). Present EVERY monetary amount in your ENTIRE response in ${dispCur} — always, even when the user does not mention currency, and including the headline figures, tables, and any charts.
+${dispCur==='SEK'
+  ? `All figures in this snapshot are already in SEK (kr) — quote them in kr.`
+  : `The figures in this snapshot are the app's source data, stored in SEK (kr). Convert each SEK figure to ${dispCur} BEFORE quoting it, using EXACTLY this rate — never a market/training-data rate:
+  • 1 SEK = ${dispRate} ${dispCur}   (equivalently 1 ${dispCur} = ${(1/dispRate).toFixed(4)} kr)
+  • Worked example: a figure shown as "20 000 kr" must be quoted as ${dispSym}${Math.round(20000*dispRate).toLocaleString()}.
+  • Any amount ALREADY written with the "${dispSym}" symbol is already in ${dispCur} — quote it as-is, do NOT convert it a second time.
+  • Do NOT write "kr" or "SEK" anywhere in your answer unless the user explicitly asks to see the SEK value.`}
+Reference exchange rates (use ONLY these, never a training-data rate) for any other currency the user might ask about:
 ${Object.entries(state.exchangeRates || {USD:0.11,EUR:0.09,KES:14.27}).filter(([c])=>c!=='SEK').map(([c,r])=>`- 1 SEK = ${r} ${c}  (1 ${c} = ${(1/r).toFixed(2)} kr)`).join('\n')}
-The user's display currency is currently: ${state.currency || 'SEK'}. When they say "convert to USD" or ask for dollar amounts, use the rate above — do not approximate.
 
 CRITICAL — TWO DIFFERENT "EXPENSES" EXIST IN THIS APP
 The word "expenses" (and the word "baseline") is overloaded in this product. There are TWO completely separate expense figures, stored in two different state slices, controlled from two different tabs. NEVER conflate them:
