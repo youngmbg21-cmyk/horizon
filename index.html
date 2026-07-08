@@ -9660,20 +9660,56 @@ HORIZON_STATS: {"col_household_sek": <int>, "eff_tax_pct": <number>, "median_inc
 function parseDeepDiveStats(reply){
   reply = String(reply||'');
   let stats = null, markdown = reply;
-  const m = reply.match(/HORIZON_STATS:\s*(\{[\s\S]*?\})/i);
+  // Tolerant match: the model may wrap the marker in ** or backticks, put the
+  // JSON on the next line, or omit the marker and just emit a JSON object that
+  // carries our key. Try the marker first, then any object with col_household_sek.
+  let m = reply.match(/HORIZON_STATS\b[^\{]{0,20}(\{[\s\S]*?\})/i)
+       || reply.match(/(\{[^{}]*?"col_household_sek"[\s\S]*?\})/i);
+  // Coerce a value to a number even when the model wrote "62000 SEK", "10%",
+  // "62,000" or a quoted number — strip everything that isn't a digit/dot/sign.
+  const toNum = v => { if(v==null) return null; const n = parseFloat(String(v).replace(/[^0-9.\-]/g,'')); return isFinite(n) ? n : null; };
   if(m){
     try{
       const raw = JSON.parse(m[1]);
+      const col=toNum(raw.col_household_sek), tax=toNum(raw.eff_tax_pct), med=toNum(raw.median_income_usd), q=toNum(raw.qol_score);
       stats = {
-        colHousehold: Number(raw.col_household_sek)>0 ? Math.round(Number(raw.col_household_sek)) : null,
-        effTaxPct:    (raw.eff_tax_pct!=null && isFinite(raw.eff_tax_pct)) ? Number(raw.eff_tax_pct) : null,
-        medianUSD:    Number(raw.median_income_usd)>0 ? Math.round(Number(raw.median_income_usd)) : null,
-        qol:          (raw.qol_score!=null && isFinite(raw.qol_score)) ? Math.max(0,Math.min(10,Number(raw.qol_score))) : null,
+        colHousehold: (col!=null && col>0) ? Math.round(col) : null,
+        effTaxPct:    (tax!=null) ? tax : null,
+        medianUSD:    (med!=null && med>0) ? Math.round(med) : null,
+        qol:          (q!=null) ? Math.max(0,Math.min(10,q)) : null,
         taxNote:      (typeof raw.tax_note==='string') ? raw.tax_note.slice(0,140) : '',
       };
+      // If JSON parsed but yielded no usable numbers, fall through to regex.
+      if(stats.colHousehold==null && stats.effTaxPct==null && stats.medianUSD==null && stats.qol==null) stats = null;
     }catch(_){ stats = null; }
-    markdown = reply.replace(/\n?HORIZON_STATS:\s*\{[\s\S]*?\}[^\n]*/i,'').trim();
+    // Lenient fallback when JSON.parse chokes on the model's formatting
+    // (thousands separators like 62,000, currency suffixes like "62000 SEK",
+    // quoted numbers, trailing commas). Pull each field out by regex.
+    if(!stats){
+      const blob = m[1];
+      const num = re => { const x = blob.match(re); if(!x) return null; const n = parseFloat(String(x[1]).replace(/[,\s]/g,'')); return isFinite(n) ? n : null; };
+      const col = num(/col_household_sek"?\s*:\s*"?\s*([\d.,\s]+)/i);
+      const tax = num(/eff_tax_pct"?\s*:\s*"?\s*([\d.,\s]+)/i);
+      const med = num(/median_income_usd"?\s*:\s*"?\s*([\d.,\s]+)/i);
+      const q   = num(/qol_score"?\s*:\s*"?\s*([\d.,\s]+)/i);
+      const noteM = blob.match(/tax_note"?\s*:\s*"([^"]*)"/i);
+      if(col!=null || tax!=null || med!=null || q!=null){
+        stats = {
+          colHousehold: (col!=null && col>0) ? Math.round(col) : null,
+          effTaxPct:    (tax!=null) ? tax : null,
+          medianUSD:    (med!=null && med>0) ? Math.round(med) : null,
+          qol:          (q!=null) ? Math.max(0,Math.min(10,q)) : null,
+          taxNote:      noteM ? noteM[1].slice(0,140) : '',
+        };
+      }
+    }
   }
+  // Strip the stats block (and any fence / bold label around it) from display.
+  markdown = markdown
+    .replace(/```[a-z]*\s*\n?\s*HORIZON_STATS[\s\S]*?```/i,'')
+    .replace(/\*{0,2}HORIZON_STATS\*{0,2}\s*:?\s*`?\s*\{[\s\S]*?\}\s*`?/i,'')
+    .replace(/```(?:json)?\s*(\{[^{}]*"col_household_sek"[\s\S]*?\})\s*```/i,'')
+    .replace(/\{[^{}]*"col_household_sek"[\s\S]*?\}/i,'');
   // Legacy fallback — median-only line.
   if(!stats || stats.medianUSD==null){
     const mm = reply.match(/MEDIAN_INCOME_USD:\s*(\d+(?:\.\d+)?)/i);
@@ -9685,6 +9721,32 @@ function parseDeepDiveStats(reply){
   }
   markdown = markdown.replace(/\n?MEDIAN_INCOME_USD:\s*[\d.]+[^\n]*/gi,'').trim();
   return { markdown, stats };
+}
+// Guarantee the KPI numbers exist. Depending on a machine-readable line at the
+// end of a long report is unreliable — models drop or malform it. So if the
+// inline stats are missing the essentials (household cost of living OR effective
+// tax), make ONE small focused call that extracts them from the report we just
+// generated. This is a short, single-purpose ask, so it's far more reliable.
+async function ensureDeepDiveStats(reply, key){
+  let parsed = parseDeepDiveStats(reply);
+  const s = parsed.stats;
+  const complete = s && s.colHousehold!=null && s.effTaxPct!=null;
+  if(complete || !key || typeof callClaude!=='function') return parsed;
+  try{
+    const exPrompt = `From the retirement relocation report below, output ONLY a single-line JSON object — no prose, no code fence, nothing else:
+{"col_household_sek": <integer monthly cost of living for the household in SEK (Swedish kronor); convert if the report used another currency>, "eff_tax_pct": <the EFFECTIVE percentage of the retiree's income actually paid in local income tax at their income level — a number, not the headline top band>, "median_income_usd": <integer local median monthly gross personal income in USD>, "qol_score": <quality-of-life 0-10>, "tax_note": "<short note on the tax basis>"}
+If a value is not stated outright, infer the best estimate from the report's content. Report:
+
+${parsed.markdown || reply}`;
+    const ex = await callClaude(exPrompt, 400, key);
+    const exParsed = parseDeepDiveStats('HORIZON_STATS: ' + String(ex||'').trim());
+    if(exParsed.stats){
+      // Keep any value we already parsed; fill the gaps from the extraction.
+      const keep = s ? Object.fromEntries(Object.entries(s).filter(([,v]) => v!=null && v!=='')) : {};
+      parsed = { markdown: parsed.markdown, stats: Object.assign({colHousehold:null,effTaxPct:null,medianUSD:null,qol:null,taxNote:''}, exParsed.stats, keep) };
+    }
+  }catch(_){ /* keep whatever we had */ }
+  return parsed;
 }
 // Write parsed stats onto the place and invalidate the score cache so the
 // couple-aware, AI-derived numbers take effect immediately everywhere.
@@ -16754,11 +16816,11 @@ window.runLocAnalysis = function(id, opts){
   (async () => {
     try {
       const reply = await callClaude(prompt, 3000, key);
-      // Parse the structured HORIZON_STATS block (couple cost of living,
-      // effective tax, median income, quality of life) and write it onto the
-      // place via the shared applier — this is what makes the card's numbers
-      // couple-aware and AI-derived instead of static single-person defaults.
-      const parsed = parseDeepDiveStats(reply);
+      // Parse the KPI stats (household cost of living, effective tax, median
+      // income, quality of life); if the inline line didn't come through,
+      // ensureDeepDiveStats makes one focused follow-up call to extract them
+      // from the report — so the card's KPIs reliably populate.
+      const parsed = await ensureDeepDiveStats(reply, key);
       applyDeepDiveResult(id, parsed);
       const cleanReply = parsed.markdown;
       // Save to Vault automatically so the slide-over, the Vault tab,
@@ -22986,7 +23048,9 @@ class HZMobile {
       // makes the numbers couple-aware everywhere.
       const prompt=buildDeepDivePrompt(loc,{income,cz,hb,household:(typeof raHouseholdSize==='function'?raHouseholdSize():1)});
       const reply=await callClaude(prompt,3000,key);
-      const parsed=(typeof parseDeepDiveStats==='function')?parseDeepDiveStats(reply):{markdown:reply,stats:null};
+      // Reliable KPI extraction — falls back to a focused follow-up call if the
+      // inline stats line didn't come through (see ensureDeepDiveStats).
+      const parsed=(typeof ensureDeepDiveStats==='function')?await ensureDeepDiveStats(reply,key):((typeof parseDeepDiveStats==='function')?parseDeepDiveStats(reply):{markdown:reply,stats:null});
       if(typeof applyDeepDiveResult==='function')applyDeepDiveResult(id,parsed);
       const clean=parsed.markdown;
       const entry={id:'dd-'+Date.now(),type:'deepdive',locationId:id,location:loc.name,country:loc.country,flag:loc.flag||'🌍',date:new Date().toISOString(),lang:state.lang,citizenship:state.citizenship,homeBase:state.homeBase,markdown:clean};
