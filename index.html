@@ -22903,7 +22903,33 @@ class HZMobile {
     h+=`<div style="display:inline-flex;gap:2px;background:var(--bg0);border:1px solid var(--border);border-radius:7px;padding:3px;margin-bottom:12px">${[['today','Today'],['nominal','Nominal']].map(m=>`<button data-act="lens" data-l="${m[0]}" style="border:none;border-radius:5px;padding:5px 11px;font-family:var(--fm);font-size:10px;font-weight:600;cursor:pointer;background:${this.data.retLens===m[0]?'var(--green)':'transparent'};color:${this.data.retLens===m[0]?'var(--bg0)':'var(--text2)'}">${m[1]}</button>`).join('')}</div>`;
     h+=`<div style="background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:15px;margin-bottom:10px"><div style="display:flex;align-items:center;gap:10px;margin-bottom:10px"><span style="font-size:26px">${vIcon}</span><div><div style="font-family:var(--fs);font-size:19px;font-weight:600;color:${vColor}">${vText}</div><div style="font-size:11px;color:var(--text2)">${runout&&runout<this.data.lifeExp?`Portfolio lasts to age ${runout} (plan: ${this.data.lifeExp})`:`Income vs ${this.fmtC(sc(need))}/mo need · ${covPct}% of years funded`}</div></div></div><div style="margin-top:4px">${this.bar(covPct,vColor,8)}</div><div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px">${[['Nest egg',this.fmtC(sc(neRealVal))],['Net income',this.fmtC(sc(dr))],['Monthly need',this.fmtC(sc(need))],[gap>=0?'Headroom':'Shortfall',(gap>=0?'+':'')+this.fmtC(sc(gap))]].map((n,i)=>`<div style="background:var(--bg3);border-radius:8px;padding:9px;text-align:center"><div style="font-size:9px;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:3px">${n[0]}</div><div style="font-family:var(--fm);font-size:14px;font-weight:700;color:${i===3?vColor:'var(--text)'}">${n[1]}</div></div>`).join('')}</div><div style="display:flex;align-items:center;gap:8px;margin-top:10px;padding:9px 11px;background:var(--bg3);border-radius:8px;font-family:var(--fm);font-size:11.5px"><span style="color:var(--text2)">Gross <strong style="color:var(--text)">${this.fmtC(sc(this.grossRet()))}</strong>/mo</span><span style="color:var(--text3)">→</span><span style="color:var(--text2)">Net <strong style="color:var(--green)">${this.fmtC(sc(dr))}</strong>/mo</span><span style="margin-left:auto;color:var(--text3);font-size:10px">after ${taxPctDisp}% tax</span></div></div>`;
     const penMo=nu?this.n(nu.pensionAvgMonthly,0):this.pension();
-    h+=this.grid2([this.kpi('🏛','Pension',this.fmtC(sc(penMo)),'var(--blue)','Avg /mo in retirement'),this.kpi('💵','Portfolio Draw',this.fmtC(sc(this.portfolioDraw())),'var(--green)','Sustainable, after tax'),this.kpi('📅','Years to Retire',ytr+'Y','var(--amber)','Age '+this.data.currentAge+' → '+this.data.retirementAge),this.kpi('⏳','Runway',runout?('Age '+runout):(this.data.lifeExp+'+'),runout&&runout<this.data.lifeExp?'var(--amber)':'var(--violet)',runout&&runout<this.data.lifeExp?'Portfolio runs out':'Lasts past age '+this.data.lifeExp)]);
+    // ── Income Requirements — mirrors the desktop Retirement Plan "Income
+    // Requirements" card: pre-tax income needed, avg portfolio withdrawal +
+    // rate, fund depletion, and the ÷(1−tax) formula. Avg withdrawal/rate are
+    // averaged from the SAME cached drawdown sim (nu._simResult.portWithdrawal)
+    // desktop uses, so the figures match to the krona. Monetary tiles are
+    // lens-aware via sc(); the rate is a ratio, so it's lens-independent.
+    // Replaces the old Pension/Portfolio-draw/Years/Runway grid — those either
+    // duplicated the verdict card or the header, or moved into these tiles.
+    const _sim=nu?nu._simResult:null;
+    const _pw=(_sim&&Array.isArray(_sim.portWithdrawal))?_sim.portWithdrawal:null;
+    const _pwYears=_pw?Math.max(1,_pw.length):1;
+    const avgPortAnnReal=_pw?_pw.reduce((a,b)=>a+this.n(b,0),0)/_pwYears:(nu?this.n(nu.grossNeeded,0)*12:0);
+    const avgPortMoReal=avgPortAnnReal/12;
+    const avgRate=(nu&&this.n(nu.nestEgg,0)>0)?(avgPortAnnReal/this.n(nu.nestEgg,0))*100:0;
+    const grossNeed=nu?this.n(nu.totalGross,0):(need/0.7);
+    const taxFactor=((100-taxPctDisp)/100).toFixed(2);
+    const deplLbl=(nu&&nu.runoutAge)?('Age '+Math.round(nu.runoutAge)):'Never';
+    const deplCol=(nu&&nu.runoutAge)?'var(--amber)':'var(--green)';
+    const irqTile=(lbl,val,col,sub)=>`<div style="background:var(--bg3);border:1px solid var(--border);border-radius:9px;padding:10px;text-align:center"><div style="font-size:8.5px;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:3px">${lbl}</div><div style="font-family:var(--fm);font-size:15px;font-weight:700;color:${col||'var(--text)'}">${val}</div>${sub?`<div style="font-size:8.5px;color:var(--text3);margin-top:2px">${sub}</div>`:''}</div>`;
+    const irqTiles=[
+      irqTile('Total needed · pre-tax',this.fmtC(sc(grossNeed)),'var(--text)',`÷(1−${taxPctDisp}%) tax`),
+      (penMo>0?irqTile('Pension covers',this.fmtC(sc(penMo)),'var(--blue)',`${Math.round(this.n(nu?nu.pensionShareOfNeed:0,0))}% of need`):''),
+      irqTile('Avg withdrawal',this.fmtC(sc(avgPortMoReal)),'var(--amber)','/mo across retirement'),
+      irqTile('Avg rate',avgRate.toFixed(1)+'%',avgRate>4?'var(--red)':'var(--green)',avgRate>4?'above 4% safe':'within 4% safe'),
+      irqTile('Fund depletion',deplLbl,deplCol,(runout&&runout<this.data.lifeExp)?'portfolio runs out':('surplus at '+this.data.lifeExp+'+')),
+    ].filter(Boolean).join('');
+    h+=this.card(this.ct('🧮 Income Requirements')+`<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">${irqTiles}</div><div style="margin-top:10px;padding:9px 11px;background:var(--bg3);border-radius:8px;font-family:var(--fm);font-size:10.5px;color:var(--text2);line-height:1.7">${this.fmtC(sc(need))} <span style="color:var(--text3)">exp</span> ÷ ${taxFactor} = <strong style="color:var(--text)">${this.fmtC(sc(grossNeed))} pre-tax</strong> → <strong style="color:var(--amber)">${this.fmtC(sc(avgPortMoReal))}/mo</strong> portfolio · <strong style="color:${avgRate>4?'var(--red)':'var(--green)'}">${avgRate.toFixed(1)}%</strong> of ${this.fmtC(sc(neRealVal))}</div>`);
     h+=this.card(this.ct('📈 Nest Egg Growth',`<label style="display:flex;align-items:center;gap:5px;font-size:10px;color:var(--text3)">${this.data.retLens==='today'?'Real':'Nominal'}</label>`)+`<div style="height:190px"><canvas id="hzNestChart"></canvas></div>`);
     // Lifestyle scenarios — the desktop's lean/baseline/comfortable model
     // (state.retirementScenario). Tapping a box switches the active scenario on
