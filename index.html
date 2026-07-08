@@ -22911,7 +22911,12 @@ class HZMobile {
     const runout=nu?nu.runoutAge:null;
     const covPct=nu?Math.round(this.n(nu.coveragePct,0)):Math.min(100,Math.round(need?dr/need*100:100));
     let h=this.ph('PERSONAL FINANCES','Are you on track?',`Projected to age ${this.data.retirementAge}, sustained to ${this.data.lifeExp}.`);
-    h+=`<div style="display:inline-flex;gap:2px;background:var(--bg0);border:1px solid var(--border);border-radius:7px;padding:3px;margin-bottom:12px">${[['today','Today'],['nominal','Nominal']].map(m=>`<button data-act="lens" data-l="${m[0]}" style="border:none;border-radius:5px;padding:5px 11px;font-family:var(--fm);font-size:10px;font-weight:600;cursor:pointer;background:${this.data.retLens===m[0]?'var(--green)':'transparent'};color:${this.data.retLens===m[0]?'var(--bg0)':'var(--text2)'}">${m[1]}</button>`).join('')}</div>`;
+    // Verdict flag beside the lens toggle — the plan's live status in its
+    // native colour (green = Well/Fully Funded, amber = Borderline/At Risk,
+    // red = Underfunded), driven by the same nums.verdictClass the desktop uses.
+    const vBg={overfunded:'rgba(0,232,160,.14)',ontarget:'rgba(245,166,35,.14)',underfunded:'rgba(255,77,109,.14)'}[nu?nu.verdictClass:'ontarget']||'rgba(245,166,35,.14)';
+    const verdictFlag=nu?`<span title="Retirement plan status" style="display:inline-flex;align-items:center;gap:5px;padding:6px 11px;border-radius:8px;font-family:var(--fm);font-size:10.5px;font-weight:700;letter-spacing:.03em;text-transform:uppercase;border:1px solid ${vColor};background:${vBg};color:${vColor}">${vIcon} ${this.esc(vText)}</span>`:'';
+    h+=`<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:12px"><div style="display:inline-flex;gap:2px;background:var(--bg0);border:1px solid var(--border);border-radius:7px;padding:3px">${[['today','Today'],['nominal','Nominal']].map(m=>`<button data-act="lens" data-l="${m[0]}" style="border:none;border-radius:5px;padding:5px 11px;font-family:var(--fm);font-size:10px;font-weight:600;cursor:pointer;background:${this.data.retLens===m[0]?'var(--green)':'transparent'};color:${this.data.retLens===m[0]?'var(--bg0)':'var(--text2)'}">${m[1]}</button>`).join('')}</div>${verdictFlag}</div>`;
     // Verdict card removed: its Nest egg / Net income / Monthly need / Headroom
     // tiles were the mobile counterpart of the desktop sustainability strip we
     // dropped. Net income is preserved as a tile in the Income Requirements
