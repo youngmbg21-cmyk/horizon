@@ -22979,12 +22979,19 @@ class HZMobile {
     const rexp=(typeof state!=='undefined'&&Array.isArray(state.retirementExpenses))?state.retirementExpenses:[];
     const rexpBase=active==='baseline';
     const rexpMult=this.n(nu?nu.mult:1,1)||1;
+    // Amounts are stored in native SEK but shown/edited in the display currency,
+    // exactly like the desktop expense card (value = amount×rate, commit =
+    // typed÷rate). Without this the mobile showed raw SEK while desktop showed
+    // converted figures ("numbers don't match"), and edits stored the wrong
+    // magnitude so the plan status barely moved.
+    const _crate=(typeof rate==='function')?rate():1;
+    const _csym=(typeof sym==='function')?sym():'kr';
     const rexpRows=rexp.length?rexp.map((e,idx)=>{
       const nm=this.esc(e.name),ic=e.icon||'💸';
       if(!rexpBase){
         return `<div style="display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid var(--border)"><span style="font-size:14px;width:20px;text-align:center;flex-shrink:0">${ic}</span><span style="flex:1;min-width:0;font-size:12.5px;font-weight:600;color:var(--text2)">${nm}</span><span style="font-family:var(--fm);font-size:12.5px;font-weight:700;color:var(--amber);flex-shrink:0">${this.fmtC(this.n(e.amount,0)*rexpMult)}</span></div>`;
       }
-      return `<div style="display:flex;align-items:center;gap:7px;padding:8px 0;border-bottom:1px solid var(--border)"><span style="font-size:14px;width:18px;text-align:center;flex-shrink:0">${ic}</span><input value="${nm}" data-model="rexpname:${idx}" style="flex:1;min-width:0;background:transparent;border:none;border-bottom:1px solid var(--border);color:var(--text);font-size:12.5px;font-weight:600;padding:2px 0"><span data-act="rexptype" data-i="${idx}" role="button" title="Tap to switch fixed/variable" style="font-size:8px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--text3);background:var(--bg4);border:1px solid var(--border2);border-radius:5px;padding:3px 5px;cursor:pointer;flex-shrink:0">${e.type==='fixed'?'Fix':'Var'}</span><div style="display:flex;align-items:center;background:var(--bg3);border:1px solid var(--border);border-radius:6px;padding:0 7px;flex-shrink:0"><input type="number" value="${Math.round(this.n(e.amount,0))}" data-model="rexpamt:${idx}" style="width:60px;background:transparent;border:none;color:var(--text);font-family:var(--fm);font-size:12px;padding:7px 0;text-align:right"><span style="color:var(--text3);font-size:9px;font-family:var(--fm)">/mo</span></div><button data-act="rexprm" data-i="${idx}" style="background:none;border:none;color:var(--red);font-size:17px;line-height:1;cursor:pointer;opacity:.55;padding:6px 2px;margin:-4px -2px -4px 0;flex-shrink:0" aria-label="Remove">×</button></div>`;
+      return `<div style="display:flex;align-items:center;gap:7px;padding:8px 0;border-bottom:1px solid var(--border)"><span style="font-size:14px;width:18px;text-align:center;flex-shrink:0">${ic}</span><input value="${nm}" data-model="rexpname:${idx}" style="flex:1;min-width:0;background:transparent;border:none;border-bottom:1px solid var(--border);color:var(--text);font-size:12.5px;font-weight:600;padding:2px 0"><span data-act="rexptype" data-i="${idx}" role="button" title="Tap to switch fixed/variable" style="font-size:8px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--text3);background:var(--bg4);border:1px solid var(--border2);border-radius:5px;padding:3px 5px;cursor:pointer;flex-shrink:0">${e.type==='fixed'?'Fix':'Var'}</span><div style="display:flex;align-items:center;background:var(--bg3);border:1px solid var(--border);border-radius:6px;padding:0 7px;flex-shrink:0"><span style="color:var(--text3);font-size:9px;font-family:var(--fm);margin-right:2px">${_csym}</span><input type="number" value="${Math.round(this.n(e.amount,0)*_crate)}" data-model="rexpamt:${idx}" style="width:56px;background:transparent;border:none;color:var(--text);font-family:var(--fm);font-size:12px;padding:7px 0;text-align:right"><span style="color:var(--text3);font-size:9px;font-family:var(--fm)">/mo</span></div><button data-act="rexprm" data-i="${idx}" style="background:none;border:none;color:var(--red);font-size:17px;line-height:1;cursor:pointer;opacity:.55;padding:6px 2px;margin:-4px -2px -4px 0;flex-shrink:0" aria-label="Remove">×</button></div>`;
     }).join(''):`<div style="color:var(--text3);font-size:12px">No retirement expenses yet — tap “+ Add” to plan your monthly costs.</div>`;
     const rexpTotal=rexp.reduce((t,e)=>t+this.n(e.amount,0),0)*(rexpBase?1:rexpMult);
     const rexpBody=(rexpBase?'':`<div style="font-size:9px;color:var(--amber);font-family:var(--fm);font-weight:600;margin-bottom:8px">×${rexpMult} · switch to Baseline to edit line items</div>`)+rexpRows+this.row('Total · '+scName,this.fmtC(rexpTotal)+' /mo','var(--green)',true);
@@ -23454,7 +23461,7 @@ class HZMobile {
     else if(p[0]==='ppay'){const a=this.data.externalAssets.find(x=>x.id===p[1]);if(a)a.monthlyPayout=this.n(num,0);}
     else if(p[0]==='pstart'){const a=this.data.externalAssets.find(x=>x.id===p[1]);if(a)a.startAge=this.n(num,this.data.retirementAge);}
     else if(p[0]==='rexpname'){if(typeof state!=='undefined'&&Array.isArray(state.retirementExpenses)){const it=state.retirementExpenses[+p[1]];if(it)it.name=val;}}
-    else if(p[0]==='rexpamt'){if(typeof state!=='undefined'&&Array.isArray(state.retirementExpenses)){const it=state.retirementExpenses[+p[1]];if(it)it.amount=this.n(num,0);}}
+    else if(p[0]==='rexpamt'){if(typeof state!=='undefined'&&Array.isArray(state.retirementExpenses)){const it=state.retirementExpenses[+p[1]];if(it){const rt=(typeof rate==='function')?(rate()||1):1;it.amount=this.n(num,0)/rt;}}}
     else if(p[0]==='target'){this.data.targetBudget=val;}
     else if(p[0]==='costlevel'){this.data.retCostLevel=val;}
     else if(p[0]==='n'){this.data[p[1]]=this.n(num,0);}
