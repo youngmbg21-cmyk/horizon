@@ -2106,6 +2106,18 @@ body.light .ff-trip-card:hover { box-shadow:0 6px 18px -10px rgba(60,40,10,0.18)
   transition:transform .2s,box-shadow .2s;
 }
 #ai-fab:hover { transform:scale(1.08); box-shadow:0 6px 32px rgba(255,184,0,0.5); }
+/* Unread dot+count on the launcher and the minimized tab — lights up when a
+   reply lands while the chat is closed/minimized, so the user knows to look. */
+.ai-launch-badge {
+  position:absolute; top:-4px; right:-4px; min-width:18px; height:18px;
+  padding:0 5px; border-radius:9px; background:var(--red,#ff4d6d); color:#fff;
+  font-size:11px; font-weight:700; line-height:18px; text-align:center;
+  display:flex; align-items:center; justify-content:center;
+  box-shadow:0 0 0 2px var(--bg0,#0b0f14); pointer-events:none;
+  animation:aiBadgePop .3s cubic-bezier(.2,.9,.3,1.2);
+}
+#ai-min-badge { top:-6px; right:-8px; }
+@keyframes aiBadgePop { from { transform:scale(0); } to { transform:scale(1); } }
 
 /* Main slide-in panel */
 #ai-panel {
@@ -4463,7 +4475,7 @@ body.light .piq-country-menu { box-shadow:0 12px 28px -10px rgba(60,40,10,0.22);
       <button class="hz-nav" data-nav="__more"><span class="hz-nav-ic">⋯</span><span class="hz-nav-lbl">More</span></button>
       <div class="hz-home-ind"></div>
     </nav>
-    <button id="hzFab" class="hz-fab" aria-label="Horizon AI Advisor">✦</button>
+    <button id="hzFab" class="hz-fab" aria-label="Horizon AI Advisor">✦<span id="hz-fab-badge" class="ai-launch-badge" style="display:none"></span></button>
     <div id="hzOverlay" class="hz-overlay"></div>
     <div id="hzToast" class="hz-toast"></div>
   </div>
@@ -4471,7 +4483,7 @@ body.light .piq-country-menu { box-shadow:0 12px 28px -10px rgba(60,40,10,0.22);
 
 <!-- AI Panel minimize tab (shown when minimized) -->
 <div id="ai-min-tab" onclick="aiUnminimize()">
-  <span style="font-size:16px">💬</span>
+  <span style="font-size:16px;position:relative">💬<span id="ai-min-badge" class="ai-launch-badge" style="display:none"></span></span>
   <div>
     <div class="min-title">Horizon AI</div>
     <div class="min-sub" id="ai-min-sub">Click to expand</div>
@@ -4483,7 +4495,7 @@ body.light .piq-country-menu { box-shadow:0 12px 28px -10px rgba(60,40,10,0.22);
 <div id="ai-backdrop" onclick="toggleAIPanel()"></div>
 
 <!-- AI Panel (reference-matched) -->
-<button id="ai-fab" onclick="toggleAIPanel()" title="Horizon AI Advisor">💬</button>
+<button id="ai-fab" onclick="toggleAIPanel()" title="Horizon AI Advisor">💬<span id="ai-fab-badge" class="ai-launch-badge" style="display:none"></span></button>
 <div id="ai-panel">
   <!-- Header -->
   <div class="aip-head">
@@ -18832,6 +18844,58 @@ const aiChatHistory = {
   filter(fn){ return (_activeThread()?.messages || []).filter(fn); },
 };
 let aipTyping=false;
+// Threads with an AI/friend reply currently in flight, and transient
+// per-thread error text. BOTH are in-memory only (keyed by thread id) and
+// deliberately NOT persisted: a full page reload kills the in-flight fetch,
+// so a "thinking" indicator must not survive reload (else it would spin
+// forever with no request behind it). Minimizing/closing the panel or
+// switching tabs does NOT reload the page, so these survive exactly the
+// case the user cares about — leave the chat while it thinks, come back and
+// the indicator is still there.
+const _aiPendingThreads = new Set();
+const _aiThreadError = {};
+// Is the given thread the one currently visible in an open panel?
+function _isThreadVisible(id){
+  const { panel } = _ai();
+  return !!(panel && panel.classList.contains('open') && state.activeChatThreadId === id);
+}
+// Dot+count badge on the floating launcher and the minimized tab, summed
+// across every thread's unread counter. Cleared when a thread is opened
+// (switchChatThread zeroes its unread, then calls this).
+function _updateAiLauncherBadge(){
+  const total = Object.values((typeof state!=='undefined' && state.chatThreads) || {})
+    .reduce((n, t) => n + (t && t.unread || 0), 0);
+  const txt = total > 9 ? '9+' : String(total);
+  // ai-fab-badge / ai-min-badge = desktop launcher + minimized tab;
+  // hz-fab-badge = the mobile floating button. All three are kept in sync so
+  // the unread signal shows on whichever launcher the current layout uses.
+  ['ai-fab-badge','ai-min-badge','hz-fab-badge'].forEach(id => {
+    const b = document.getElementById(id);
+    if(!b) return;
+    if(total > 0){ b.textContent = txt; b.style.display = 'flex'; }
+    else b.style.display = 'none';
+  });
+}
+// A reply (or error) landed while the user was NOT looking at this thread —
+// minimized, panel closed, or reading another thread. Bump its unread count,
+// refresh the in-panel thread rail badge, and light the launcher dot+count.
+function _notifyChatReply(thread){
+  if(!thread) return;
+  thread.unread = (thread.unread||0) + 1;
+  save();
+  if(typeof renderAipThreads === 'function'){ try { renderAipThreads(); } catch(_){} }
+  _updateAiLauncherBadge();
+}
+// Scroll the panel so the top of the most recent bot reply aligns with the
+// top of the scroll area (matches the old per-reply scroll behaviour after a
+// full state-driven re-render, where the original typing node is gone).
+function _scrollToLastResponse(){
+  const msgs = document.getElementById('aip-msgs'); if(!msgs) return;
+  const bots = msgs.querySelectorAll('.ai-msg-wrap.bot');
+  const last = bots[bots.length - 1];
+  if(last && typeof _scrollToMessageTop === 'function') _scrollToMessageTop(last);
+  else msgs.scrollTop = 99999;
+}
 
 // ── CHAT THREADS ─────────────────────────────────────────────────────────
 // One unified surface for both the AI advisor and friend chats. Every
@@ -18990,6 +19054,7 @@ window.switchChatThread = function(id){
   t.unread = 0;
   t.lastReadAt = Date.now();
   save();
+  _updateAiLauncherBadge();
   renderAipThreads();
   aipRenderActiveThread();
   // Chips only make sense for the AI thread; hide them on friend threads
@@ -19092,6 +19157,24 @@ function aipRenderActiveThread(){
     }
     msgs.appendChild(wrap);
   });
+  // Transient (in-memory) error for this thread — shown until the next send.
+  if(_aiThreadError[t.id]){
+    const ew = document.createElement('div');
+    ew.className = 'ai-msg-wrap bot';
+    const lbl = t.kind === 'friend' ? (t.title || 'FRIEND').toUpperCase() : 'HORIZON AI';
+    ew.innerHTML = `<div class="ai-msg-label">${esc2(lbl)}</div><div class="ai-msg bot"><span style="color:var(--red);font-size:12px">${esc(_aiThreadError[t.id])}</span></div>`;
+    msgs.appendChild(ew);
+  }
+  // Pending reply — re-draw the thinking indicator so it survives the panel
+  // being minimized/closed and reopened, or the user switching threads away
+  // and back. Driven by _aiPendingThreads, not a live DOM node.
+  if(_aiPendingThreads.has(t.id)){
+    const tw = document.createElement('div');
+    tw.className = 'ai-msg-wrap bot';
+    const lbl = t.kind === 'friend' ? (t.title || 'FRIEND').toUpperCase() : 'HORIZON AI';
+    tw.innerHTML = `<div class="ai-msg-label">${esc2(lbl)}</div><div class="ai-msg bot"><div class="ai-typing"><span></span><span></span><span></span></div></div>`;
+    msgs.appendChild(tw);
+  }
   msgs.scrollTop = 99999;
 }
 function closePanel(){
@@ -20822,22 +20905,26 @@ async function aipSend() {
 }
 
 async function sendToAI(thread, msg){
-  aipAddMsg('user',msg);
   thread.messages.push({ role:'user', content:msg, at: Date.now() });
   // Remember this query against the panel the user was looking at so the
   // "Recent on <Panel>" row in renderAIPChips can surface it next time.
   pushAIHistory(state.activePanel||'dashboard', msg);
+  // Mark this thread pending. The indicator is now STATE-DRIVEN: any render
+  // of this thread (including a reopen after minimize) redraws it from
+  // _aiPendingThreads, so it can no longer vanish when the panel is closed.
+  delete _aiThreadError[thread.id];
+  _aiPendingThreads.add(thread.id);
   aipTyping=true;
-  document.getElementById('aip-chips').style.display='none';
-  const typWrap=document.createElement('div');
-  typWrap.className='ai-msg-wrap bot';
-  typWrap.innerHTML='<div class="ai-msg-label">HORIZON AI</div><div class="ai-msg bot"><div class="ai-typing"><span></span><span></span><span></span></div></div>';
-  document.getElementById('aip-msgs').appendChild(typWrap);
-  document.getElementById('aip-msgs').scrollTop=99999;
+  save();
+  const chipsEl=document.getElementById('aip-chips'); if(chipsEl) chipsEl.style.display='none';
+  if(_isThreadVisible(thread.id)) aipRenderActiveThread();
   const key=state.aiKeys?.claude;
   if(!key){
-    typWrap.querySelector('.ai-msg').innerHTML='<span style="color:var(--amber);font-size:12px">⚡ Add your Claude API key in <a href="#" onclick="closePanel();nav(\'settings\')" style="color:var(--amber)">Settings → AI Keys</a> to enable the AI advisor.</span>';
-    aipTyping=false; return;
+    _aiPendingThreads.delete(thread.id);
+    _aiThreadError[thread.id]='⚡ Add your Claude API key in Settings → AI Keys to enable the AI advisor.';
+    aipTyping=false;
+    if(_isThreadVisible(thread.id)) aipRenderActiveThread();
+    return;
   }
   try {
     const res=await fetch('https://api.anthropic.com/v1/messages',{
@@ -20856,27 +20943,26 @@ async function sendToAI(thread, msg){
     const d=await res.json();
     const reply=d.content?.map(c=>c.text||'').join('')||'No response';
     thread.messages.push({ role:'assistant', content:reply, at: Date.now() });
-    save();
-    // Pull any ```horizon-chart``` fenced blocks out of the reply, leaving
-    // sentinels behind. Run mdParse() on the sentinel-embedded text (safe
-    // because sentinels are alphanumeric and untouched by markdown), then
-    // swap each sentinel for a real placeholder div and instantiate
-    // Chart.js into it. Every step is fail-safe: a bad block degrades to
-    // an inline error badge and the rest of the reply renders normally.
-    const msgIdx = _aiChartMsgCounter++;
-    const {text: cleanedText, blocks} = _extractAIChartBlocks(reply, msgIdx);
-    const bubble = typWrap.querySelector('.ai-msg');
-    let rendered = mdParse(cleanedText);
-    if(blocks.length) rendered = _inlineAIChartPlaceholders(rendered, blocks);
-    bubble.innerHTML = rendered;
-    _renderAIChartBlocks(bubble, blocks);
-  } catch(e){ typWrap.querySelector('.ai-msg').innerHTML=`<span style="color:var(--red);font-size:12px">Error: ${esc(e.message)}</span>`; }
-  aipTyping=false;
-  // Land the user at the TOP of the new response so long replies can
-  // be read naturally from the first line. Defer to the next frame so
-  // any charts / layout changes inside the bubble have settled before
-  // we measure offsets.
-  _scrollToMessageTop(typWrap);
+    _aiPendingThreads.delete(thread.id);
+    aipTyping=false;
+    // The reply is now in thread.messages. If the user is looking at this
+    // thread, re-render (charts and all) from state. If they left the chat
+    // (minimized/closed, or on another thread), the answer WAITS for them —
+    // flag the thread unread and light up the launcher dot+count badge.
+    if(_isThreadVisible(thread.id)){
+      save();
+      aipRenderActiveThread();
+      _scrollToLastResponse();
+    } else {
+      _notifyChatReply(thread);
+    }
+  } catch(e){
+    _aiPendingThreads.delete(thread.id);
+    _aiThreadError[thread.id] = `Error: ${e.message||String(e)}`;
+    aipTyping=false;
+    if(_isThreadVisible(thread.id)) aipRenderActiveThread();
+    else _notifyChatReply(thread);
+  }
 }
 
 // ── FRIEND CHAT ─────────────────────────────────────────────────────────
@@ -20943,26 +21029,21 @@ function _threadToClaudeMessages(thread){
 }
 
 async function sendToFriend(thread, msg){
-  // Append the user's outgoing message immediately and mirror it to
-  // state so the reply call sees the complete history.
-  aipAddMsg('user', msg);
+  // Mirror the outgoing message to state, then render from state so the
+  // pending indicator (and its survival across minimize/reopen) works the
+  // same way it does for the AI advisor.
   thread.messages.push({ role:'me', content:msg, at: Date.now() });
-  save();
+  delete _aiThreadError[thread.id];
+  _aiPendingThreads.add(thread.id);
   aipTyping = true;
-  // Typing indicator attributed to the friend (uses the existing
-  // .ai-typing three-dot animation for visual consistency with the
-  // AI advisor path).
-  const typWrap = document.createElement('div');
-  typWrap.className = 'ai-msg-wrap bot';
-  typWrap.innerHTML = `<div class="ai-msg-label">${esc2((thread.title||'FRIEND').toUpperCase())}</div><div class="ai-msg bot"><div class="ai-typing"><span></span><span></span><span></span></div></div>`;
-  const msgsEl = document.getElementById('aip-msgs');
-  msgsEl.appendChild(typWrap);
-  msgsEl.scrollTop = 99999;
-  const bubble = typWrap.querySelector('.ai-msg');
+  save();
+  if(_isThreadVisible(thread.id)) aipRenderActiveThread();
   const key = state.aiKeys?.claude;
   if(!key){
-    if(bubble) bubble.innerHTML = `<span style="color:var(--amber);font-size:12px">⚡ Add your Claude API key in <a href="#" onclick="closePanel();nav('settings')" style="color:var(--amber)">Settings → AI Keys</a> to chat with friends.</span>`;
+    _aiPendingThreads.delete(thread.id);
+    _aiThreadError[thread.id] = '⚡ Add your Claude API key in Settings → AI Keys to chat with friends.';
     aipTyping = false;
+    if(_isThreadVisible(thread.id)) aipRenderActiveThread();
     return;
   }
   const contact = (state.contacts || []).find(c => c.id === thread.contactId);
@@ -21014,14 +21095,22 @@ async function sendToFriend(thread, msg){
     reply = reply.replace(/\b(as an? (ai|assistant|language model|bot)|i(?:'m| am) an? (ai|assistant|language model|bot))[^.!?]*[.!?]?/gi, '').trim();
     if(!reply) reply = '…';
     thread.messages.push({ role:'them', content:reply, at: Date.now() });
-    save();
-    if(bubble) bubble.innerHTML = mdParse(reply);
+    _aiPendingThreads.delete(thread.id);
+    aipTyping = false;
+    if(_isThreadVisible(thread.id)){
+      save();
+      aipRenderActiveThread();
+      _scrollToLastResponse();
+    } else {
+      _notifyChatReply(thread);
+    }
   } catch(e){
-    if(bubble) bubble.innerHTML = `<span style="color:var(--red);font-size:12px">Couldn't reach Sara right now — ${esc(e.message || String(e))}</span>`;
+    _aiPendingThreads.delete(thread.id);
+    _aiThreadError[thread.id] = `Couldn't reach ${thread.title||'your friend'} right now — ${e.message || String(e)}`;
+    aipTyping = false;
+    if(_isThreadVisible(thread.id)) aipRenderActiveThread();
+    else _notifyChatReply(thread);
   }
-  aipTyping = false;
-  // Land at the top of Sara's reply so long messages read top-down.
-  _scrollToMessageTop(typWrap);
 }
 // Helper — scroll the chat panel so the top edge of the given
 // message wrap aligns with the top of the .aip-msgs scroll area.
@@ -21159,6 +21248,9 @@ if(typeof onboardingComplete === 'function' && !onboardingComplete()) {
   state.activePanel = 'settings';
 }
 renderAll();
+// Reflect any persisted unread chat replies on the launcher at boot, so a
+// reply that landed in a previous session still shows its dot+count.
+if(typeof _updateAiLauncherBadge === 'function') _updateAiLauncherBadge();
 // Fresh-install welcome flow takes priority over the citizenship
 // gate. If welcome is still pending, show it first; its Finish /
 // Skip handlers will hand off to showOnboardingBlock() if the
