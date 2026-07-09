@@ -13048,7 +13048,12 @@ window.siSetAccountType = function(type, reingest){
 // (fmt applies the rate + symbol) so the AI's numbers always match the KPI
 // cards on screen — the old prompt sent unlabeled base-currency values, and
 // the verdict showed "167,039" while the cards showed "$18,374".
-function _siBuildPrompt(m){
+// Compute the reusable, currency-formatted DATA block that describes an
+// uploaded statement across ALL its transactions (totals, per-month,
+// categories, largest purchases, top merchants, recurring charges, shifts).
+// Shared by the Spend-tab summary prompt AND the general AI-chat context so
+// the chatbot can analyse the same transactions the Spend tab does.
+function _siSpendFacts(m){
   const _mn = monthNames();
   const money = n => fmt(n).replace(/ | /g, ' '); // display currency + symbol
   const isCard = m.accountType === 'credit';
@@ -13123,25 +13128,25 @@ function _siBuildPrompt(m){
       .map(x=>`  ${x.cat}: ${money(x.lastV)} last month vs ${money(x.priorAvg)} prior-month average (${x.deltaPct>0?'+':''}${x.deltaPct}%)`).join('\n');
   })();
 
-  const header = isCard
-    ? `You are a precise personal-finance analyst. Below is a summary of a user's uploaded CREDIT CARD statement (${m.count} transactions, ${_siRangeLabel(m)}, ${m.months.length} months).
-CRITICAL: this is a credit card. "Card payments" are the user's own transfers to pay the card — they are NOT income. Refunds are NOT income. NEVER mention income, salary, or savings rate. Frame everything around spending composition, payment coverage vs spending, fees, and behaviour.
-
-TOTALS
+  const totals = isCard
+    ? `TOTALS
   Total spend (refunds netted): ${money(m.spend)}
   Card payments made: ${money(m.payments)}${m.payments > m.spend ? '  (payments exceed this period’s spend — the user is also paying down an earlier balance)' : ''}
   Refunds received: ${money(m.refunds)}
   Fees & interest: ${money(m.fees)}`
-    : `You are a precise personal-finance analyst. Below is a summary of a user's uploaded bank transactions (${m.count} transactions, ${_siRangeLabel(m)}, ${m.months.length} months).
-
-TOTALS
+    : `TOTALS
   Money in: ${money(m.income)}
   Money out: ${money(m.spend)}
   Net saved: ${money(m.net)} (${Math.round(m.savingsRate*100)}% of income)`;
 
-  return `${header}
+  // Credit-card framing note reused by both callers.
+  const cardNote = isCard
+    ? 'This is a CREDIT CARD statement. "Card payments" are the user\'s own transfers to pay the card — they are NOT income. Refunds are NOT income. NEVER treat card payments/refunds as income, salary, or savings rate. Frame everything around spending composition, payment coverage vs spending, fees, and behaviour.'
+    : '';
 
-Every figure below is already in the user's display currency — quote figures EXACTLY as written, including the currency symbol. Do NOT invent numbers.
+  const block = `${totals}
+
+Every figure below is already in the user's display currency — quote figures EXACTLY as written, including the currency symbol. Do NOT convert them and do NOT invent numbers.
 
 MONTHLY
 ${monthly || '  (single period)'}
@@ -13162,7 +13167,23 @@ LIKELY SUBSCRIPTIONS / RECURRING CHARGES
 ${subs || '  (none detected)'}
 
 BIGGEST CATEGORY SHIFTS (last month vs prior average)
-${movers || '  (not enough months to compare)'}
+${movers || '  (not enough months to compare)'}`;
+
+  return { block, cardNote, isCard, count: m.count };
+}
+
+// Spend-tab summary prompt: wraps the shared data block in the analyst persona
+// and the strict JSON output contract the insights card renders.
+function _siBuildPrompt(m){
+  const facts = _siSpendFacts(m);
+  const header = facts.isCard
+    ? `You are a precise personal-finance analyst. Below is a summary of a user's uploaded CREDIT CARD statement (${m.count} transactions, ${_siRangeLabel(m)}, ${m.months.length} months).
+CRITICAL: ${facts.cardNote}`
+    : `You are a precise personal-finance analyst. Below is a summary of a user's uploaded bank transactions (${m.count} transactions, ${_siRangeLabel(m)}, ${m.months.length} months).`;
+
+  return `${header}
+
+${facts.block}
 
 Produce a spend summary. Be specific and consequential: prefer "so-what" statements with quantified impact (e.g. "halving your 42 Wolt orders frees about X/mo") over restating percentages. Respond with ONE JSON object ONLY — no prose, no code fences, no markdown — matching exactly this shape:
 {
@@ -19272,6 +19293,25 @@ function buildAIContext() {
     ? `RESPONSE STYLE: SIMPLE. Explain like you're talking to a smart friend who is new to personal finance. Avoid jargon (or define it in 4–6 words when unavoidable). Short sentences. No bullet soup; write in plain paragraphs. Skip hedging. Use at most one number per idea and round generously. If the user asks something technical, answer it in everyday language first, then add ONE optional sentence of detail at the end.`
     : `RESPONSE STYLE: EXPERT. The user is financially literate. Use domain vocabulary (sequence-of-returns risk, real vs nominal, withdrawal rate, tax drag, basis points) without over-explaining. Be direct, reference specific numbers from their snapshot, and quote percentages to one decimal. Prefer a short narrative plus a bulleted breakdown. Call out assumptions you're making.`;
   const ctx = buildPersonalContext();
+  // Uploaded Spend-tab statement, if any: hand the chatbot the SAME
+  // all-transactions summary the Spend tab's analysis card is built from,
+  // so the user can ask the chatbot to analyse their credit-card / bank
+  // transactions. Figures here are already in display currency (the block
+  // says so), so the SEK→display conversion rule below does NOT apply to it.
+  let spendContext = '';
+  try {
+    if(Array.isArray(state.transactions) && state.transactions.length){
+      const _sm = _siMetrics();
+      if(_sm.count){
+        const facts = _siSpendFacts(_sm);
+        spendContext = `
+
+UPLOADED SPEND STATEMENT — the user imported a ${facts.isCard ? 'credit-card' : 'bank'} statement into the Spend tab (${_sm.count} transactions, ${_siRangeLabel(_sm)}). You CAN and SHOULD analyse this when asked about their spending, expenses, transactions, merchants, subscriptions, or categories. The block below already aggregates ALL ${_sm.count} transactions.${facts.cardNote ? ' ' + facts.cardNote : ''}
+
+${facts.block}`;
+      }
+    }
+  } catch(_e){}
   // All monetary values below are in TODAY'S MONEY (real, inflation-
   // adjusted) — the nominal equivalent is provided as secondary
   // reference only. Both flavours come from the same projection
@@ -19329,6 +19369,7 @@ ${langDirective()}
 ${ctx}
 
 CURRENT VIEW: The user is looking at the "${viewLabel}" panel${section}. Tailor your answer to what's visible on this screen first, then zoom out if helpful.
+${spendContext}
 
 ${modeInstruction}
 
