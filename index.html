@@ -20212,10 +20212,13 @@ function buildSeriesCatalog(){
   // excluded from spend and refunds are netted out of their category/month.
   // Each series has its OWN x-axis (category / month / merchant), so they are
   // charted one at a time — never combined on a single chart.
+  // Register these only when a statement is loaded. Keep this guard cheap
+  // (no _siMetrics() call at build time — that iterates every transaction);
+  // the get() closures below fetch/aggregate lazily, only when a chart
+  // actually renders. count in _siMetrics is just transactions.length, so
+  // the presence check here is equivalent.
   if(Array.isArray(state.transactions) && state.transactions.length){
-    let _spendOk = false;
-    try { _spendOk = !!(_siMetrics().count); } catch(_e){ _spendOk = false; }
-    if(_spendOk){
+    {
       cat['spend.byCategory'] = {
         label: 'Uploaded spend · by category', unit:'currency', xAxis:'spendCategory',
         get(){
