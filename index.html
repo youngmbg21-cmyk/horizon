@@ -4475,7 +4475,7 @@ body.light .piq-country-menu { box-shadow:0 12px 28px -10px rgba(60,40,10,0.22);
       <button class="hz-nav" data-nav="__more"><span class="hz-nav-ic">⋯</span><span class="hz-nav-lbl">More</span></button>
       <div class="hz-home-ind"></div>
     </nav>
-    <button id="hzFab" class="hz-fab" aria-label="Horizon AI Advisor">✦</button>
+    <button id="hzFab" class="hz-fab" aria-label="Horizon AI Advisor">✦<span id="hz-fab-badge" class="ai-launch-badge" style="display:none"></span></button>
     <div id="hzOverlay" class="hz-overlay"></div>
     <div id="hzToast" class="hz-toast"></div>
   </div>
@@ -18866,7 +18866,10 @@ function _updateAiLauncherBadge(){
   const total = Object.values((typeof state!=='undefined' && state.chatThreads) || {})
     .reduce((n, t) => n + (t && t.unread || 0), 0);
   const txt = total > 9 ? '9+' : String(total);
-  ['ai-fab-badge','ai-min-badge'].forEach(id => {
+  // ai-fab-badge / ai-min-badge = desktop launcher + minimized tab;
+  // hz-fab-badge = the mobile floating button. All three are kept in sync so
+  // the unread signal shows on whichever launcher the current layout uses.
+  ['ai-fab-badge','ai-min-badge','hz-fab-badge'].forEach(id => {
     const b = document.getElementById(id);
     if(!b) return;
     if(total > 0){ b.textContent = txt; b.style.display = 'flex'; }
