@@ -19251,7 +19251,7 @@ function buildPersonalContext(){
 function _catalogDynamicListing(){
   let catalog;
   try { catalog = buildSeriesCatalog(); } catch(e) { return ''; }
-  const groups = { investment:[], pension:[], expense:[] };
+  const groups = { investment:[], pension:[], expense:[], spend:[] };
   Object.entries(catalog).forEach(([key, entry]) => {
     const prefix = key.split('.')[0];
     if(groups[prefix] !== undefined && !['portfolio.investments','portfolio.pensions'].includes(key)){
@@ -19267,6 +19267,9 @@ function _catalogDynamicListing(){
   }
   if(groups.expense.length){
     sections.push('Per-expense category (x-axis = month, next 12 months):\n' + groups.expense.join('\n'));
+  }
+  if(groups.spend.length){
+    sections.push('Uploaded Spend statement — from the imported transactions the user loaded in the Spend tab. Chart each of these ALONE (each has its own x-axis; never combine them with each other or with any other series):\n' + groups.spend.join('\n'));
   }
   return sections.length ? (sections.join('\n\n') + '\n\n') : '';
 }
@@ -19306,7 +19309,7 @@ function buildAIContext() {
         const facts = _siSpendFacts(_sm);
         spendContext = `
 
-UPLOADED SPEND STATEMENT — the user imported a ${facts.isCard ? 'credit-card' : 'bank'} statement into the Spend tab (${_sm.count} transactions, ${_siRangeLabel(_sm)}). You CAN and SHOULD analyse this when asked about their spending, expenses, transactions, merchants, subscriptions, or categories. The block below already aggregates ALL ${_sm.count} transactions.${facts.cardNote ? ' ' + facts.cardNote : ''}
+UPLOADED SPEND STATEMENT — the user imported a ${facts.isCard ? 'credit-card' : 'bank'} statement into the Spend tab (${_sm.count} transactions, ${_siRangeLabel(_sm)}). You CAN and SHOULD analyse this when asked about their spending, expenses, transactions, merchants, subscriptions, or categories. The block below already aggregates ALL ${_sm.count} transactions.${facts.cardNote ? ' ' + facts.cardNote : ''} To VISUALISE this spending, emit a custom horizon-chart using the spend.byCategory / spend.byMonth / spend.topMerchants series (listed in the SERIES CATALOG below), charting one of them on its own — prefer that over a "quoted" chart so the bars are drawn from live data.
 
 ${facts.block}`;
       }
@@ -19532,7 +19535,7 @@ Hard rules for "custom":
 - Do NOT include any "data" / "values" / "labels" / numeric arrays in the block. The client fetches data from live app state via the series key.
 
 SERIES CATALOG
-Each entry is "series-key — label (unit, x-axis)". The "Per-investment account", "Per-pension plan" and "Per-expense category" sections below are DYNAMIC — they list the user's actual accounts, pensions and expense line items as they exist right now in state. Use only the keys that appear in this list; do not invent account / pension / category names.
+Each entry is "series-key — label (unit, x-axis)". The "Per-investment account", "Per-pension plan", "Per-expense category" and "Uploaded Spend statement" sections below are DYNAMIC — they list the user's actual accounts, pensions, expense line items, and (only when a statement has been imported into the Spend tab) their real uploaded-spending series as they exist right now in state. Use only the keys that appear in this list; do not invent account / pension / category / spend keys. To chart the user's actual uploaded credit-card or bank spending (e.g. "chart my spending by category", "graph my monthly card spend", "which merchants did I spend most at"), use the spend.* series if they are listed — they are the drift-proof, client-owned counterpart to a "quoted" chart.
 
 Retirement & nest egg (x-axis = age, currentAge → retirementAge):
 - nestEgg.real — Nest egg · today's money (currency, age)
@@ -19641,6 +19644,13 @@ ${_catalogDynamicListing()}Worked examples:
 \`\`\`horizon-chart
 {"kind":"custom","title":"Rental yields · past searches","datasets":[
   {"series":"property.rentalYield","display":"bar"}
+]}
+\`\`\`
+
+9) User: "Chart my spending by category from my statement" (only if the spend.* keys are listed above — i.e. a statement is loaded; chart ONE spend series alone)
+\`\`\`horizon-chart
+{"kind":"custom","title":"Uploaded spend by category","datasets":[
+  {"series":"spend.byCategory","display":"bar"}
 ]}
 \`\`\`
 
@@ -20190,6 +20200,63 @@ function buildSeriesCatalog(){
       },
     };
   });
+
+  // ── DYNAMIC: UPLOADED SPEND STATEMENT (Spend tab) ────────────────────
+  // Only present when the user has imported transactions. These read the
+  // SAME _siMetrics() aggregation the Spend-tab analysis card and the AI-chat
+  // context use, so a chatbot-emitted chart of the uploaded statement can
+  // never disagree with the figures the chatbot quotes. Values are base
+  // currency (SEK); the custom-chart builder converts to display currency at
+  // render, exactly like every other currency series. Credit-card semantics
+  // are already applied inside _siMetrics()/_siClassify: card payments are
+  // excluded from spend and refunds are netted out of their category/month.
+  // Each series has its OWN x-axis (category / month / merchant), so they are
+  // charted one at a time — never combined on a single chart.
+  if(Array.isArray(state.transactions) && state.transactions.length){
+    let _spendOk = false;
+    try { _spendOk = !!(_siMetrics().count); } catch(_e){ _spendOk = false; }
+    if(_spendOk){
+      cat['spend.byCategory'] = {
+        label: 'Uploaded spend · by category', unit:'currency', xAxis:'spendCategory',
+        get(){
+          const m = _siMetrics();
+          const top = (m.cats || []).slice(0, 12);
+          return { xValues: top.map(c => c[0]), values: top.map(c => c[1] || 0) };
+        },
+      };
+      cat['spend.byMonth'] = {
+        label: 'Uploaded spend · by month', unit:'currency', xAxis:'spendMonth',
+        get(){
+          const m = _siMetrics();
+          const _mn = monthNames();
+          const lbl = ym => { const [y,mo] = String(ym).split('-'); return `${_mn[(+mo)-1] || mo} ${y}`; };
+          return {
+            xValues: (m.months || []).map(lbl),
+            values:  (m.months || []).map(ym => (m.byMonth[ym] && m.byMonth[ym].spend) || 0),
+          };
+        },
+      };
+      cat['spend.topMerchants'] = {
+        label: 'Uploaded spend · top merchants', unit:'currency', xAxis:'spendMerchant',
+        get(){
+          const m = _siMetrics();
+          const isCard = m.accountType === 'credit';
+          const isSpendTx = t => isCard ? (_siClassify(t) === 'purchase' || _siClassify(t) === 'fee')
+                                        : (t.type==='debit' || (Number(t.amount)||0) < 0);
+          const norm = s => String(s||'').toLowerCase().replace(/[0-9]+|[*#]/g,'').replace(/\s+/g,' ').trim();
+          const groups = {};
+          (m.txs || []).forEach(t => {
+            if(!isSpendTx(t)) return;
+            const k = norm(t.name); if(!k) return;
+            const g = (groups[k] = groups[k] || { label: t.name || '?', sum: 0 });
+            g.sum += Math.abs(Number(t.amount) || 0);
+          });
+          const top = Object.values(groups).sort((a,b) => b.sum - a.sum).slice(0, 10);
+          return { xValues: top.map(g => g.label), values: top.map(g => g.sum) };
+        },
+      };
+    }
+  }
 
   // ── PORTFOLIO SPLIT (x = age, full lifetime: currentAge → lifeExp) ────
   // Two composite series covering the whole lifetime, stitched from
