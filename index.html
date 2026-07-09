@@ -21124,10 +21124,16 @@ function _scrollToMessageTop(wrap){
   const msgs = document.getElementById('aip-msgs');
   if(!msgs) return;
   const go = () => {
-    // Target offset = element's position inside the scroll container.
-    // Subtract a tiny amount of breathing room so the label isn't
-    // flush against the top border.
-    const target = Math.max(0, wrap.offsetTop - 8);
+    // Bring the element's top to the container's top. We must NOT use
+    // wrap.offsetTop here: .aip-msgs is position:static, so it isn't the
+    // offsetParent and offsetTop is measured against a different ancestor —
+    // which put the scroll at the wrong place (dumping the user at the bottom
+    // of the reply). Instead add the live top-delta between the element and
+    // the container to the current scrollTop; this is correct regardless of
+    // positioning and of where we're currently scrolled. Minus a little
+    // breathing room so the label isn't flush against the top border.
+    const delta = wrap.getBoundingClientRect().top - msgs.getBoundingClientRect().top;
+    const target = Math.max(0, msgs.scrollTop + delta - 8);
     msgs.scrollTo ? msgs.scrollTo({ top: target, behavior: 'smooth' }) : (msgs.scrollTop = target);
   };
   // Two RAFs: first lets the browser apply any pending layout after
