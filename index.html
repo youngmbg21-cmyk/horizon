@@ -6268,8 +6268,8 @@ const STRINGS = {
   'slice.journal.sub':      { en:'Dated events, decisions, and reflections',
                               sv:'Daterade händelser, beslut och reflektioner' },
   'slice.settings.label':   { en:'Preferences',       sv:'Inställningar' },
-  'slice.settings.sub':     { en:'Theme, currency, exchange rates, AI keys',
-                              sv:'Tema, valuta, växelkurser, AI-nycklar' },
+  'slice.settings.sub':     { en:'Theme, currency, exchange rates, profile (AI keys are never exported)',
+                              sv:'Tema, valuta, växelkurser, profil (AI-nycklar exporteras aldrig)' },
   'slice.all.label':        { en:'Everything',        sv:'Allt' },
   'slice.all.sub':          { en:'Full state backup (overwrites on import)',
                               sv:'Fullständig säkerhetskopia (skriver över vid import)' },
@@ -18851,9 +18851,23 @@ const EXPORT_SLICES = [
   { key:'trips',      icon:'✈️', label:'Trips & Fun Fund', sub:'Planned travel and lifestyle budget', fields:['trips'] },
   { key:'overrides',  icon:'📆', label:'Overrides',       sub:'Monthly overrides + yearly bases', fields:['monthlyOverrides','yearlyBases','cascadeEnabled'] },
   { key:'journal',    icon:'📓', label:'Journal',         sub:'Dated events, decisions, and reflections', fields:['journal'] },
-  { key:'settings',   icon:'⚙', label:'Preferences',     sub:'Theme, currency, exchange rates, AI keys, personal profile', fields:['currency','exchangeRates','ratesUpdatedAt','ratesSource','darkMode','tickerQuote','aiKeys','aiProvider','categoryMap','profile','displayMode'] },
+  { key:'settings',   icon:'⚙', label:'Preferences',     sub:'Theme, currency, exchange rates, personal profile', fields:['currency','exchangeRates','ratesUpdatedAt','ratesSource','darkMode','tickerQuote','aiProvider','categoryMap','profile','displayMode'] },
   { key:'all',        icon:'📦', label:'Everything',      sub:'Full state backup (overwrites on import)', fields:null },
 ];
+// AI API keys never leave the device in a backup file (same stance as cloud
+// sync, see _syncBuildPayload). On import, a key only replaces the current one
+// when the file actually carries a non-empty value for that provider, so
+// restoring a backup never wipes the keys already set on this device.
+function _mergeImportedAiKeys(current, incoming){
+  const out = Object.assign({ claude:'', openai:'' }, current || {});
+  if(incoming && typeof incoming === 'object'){
+    Object.keys(incoming).forEach(k => {
+      const v = incoming[k];
+      if(typeof v === 'string' && v.trim()) out[k] = v;
+    });
+  }
+  return out;
+}
 function downloadJSON(filename, data){
   const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});
   const url=URL.createObjectURL(blob);
@@ -18865,7 +18879,8 @@ window.exportSlice=function(sliceKey){
   if(!slice) return;
   let payload;
   if(slice.fields === null) {
-    payload = state; // full export
+    const { aiKeys, ...rest } = state; // full export, minus API keys
+    payload = rest;
   } else {
     payload = {version: STATE_VERSION, _slice: slice.key};
     slice.fields.forEach(f => { if(state[f] !== undefined) payload[f] = state[f]; });
@@ -18884,7 +18899,9 @@ window.importSlice=function(input, sliceKey){
         // Full import — migrate the blob first (see loadState for why the
         // order matters), then replace wholesale.
         migrate(d);
+        const keepKeys = state.aiKeys;
         Object.assign(state, d);
+        state.aiKeys = _mergeImportedAiKeys(keepKeys, d.aiKeys);
         // The vault has its own storage key and save() deliberately strips
         // it from the main blob — without an explicit saveVault() here the
         // imported reports evaporated on the next reload (loadState pulled
@@ -18899,6 +18916,8 @@ window.importSlice=function(input, sliceKey){
           }
         }
         slice.fields.forEach(f => { if(d[f] !== undefined) state[f] = d[f]; });
+        // Older Preferences backups still carry aiKeys — take only non-empty ones.
+        if(slice.key === 'settings' && d.aiKeys) state.aiKeys = _mergeImportedAiKeys(state.aiKeys, d.aiKeys);
       }
       invalidateSelectors();
       save();
@@ -18919,7 +18938,10 @@ window.importData=function(input){
   reader.onload=e=>{
     try{
       const d=JSON.parse(e.target.result);
-      Object.assign(state,d); migrate(state); invalidateSelectors();
+      const keepKeys=state.aiKeys;
+      Object.assign(state,d); migrate(state);
+      state.aiKeys=_mergeImportedAiKeys(keepKeys, d.aiKeys);
+      invalidateSelectors();
       // Imported backups may embed the vault inline — persist it to
       // its own key so subsequent saves don't rewrite it on every
       // keystroke. saveVault() reads from state.vault which is
@@ -23830,7 +23852,7 @@ class HZMobile {
     else if(p[0]==='fx'){this.data.exchangeRates[p[1]]=this.n(num,0);}
     else if(p[0]==='prop'){this.data.property[p[1]]=this.n(num,0);if(p[1]==='value')this.data.netWorth.property=this.n(num,0);if(p[1]==='mortgage')this.data.netWorth.mortgage=this.n(num,0);}
   }
-  doExport(){try{const blob=new Blob([JSON.stringify(state,null,2)],{type:'application/json'});const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download='horizon-backup.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);this.toast('Exported horizon-backup.json');}catch(_){this.toast('Export failed');}}
+  doExport(){try{const {aiKeys,...rest}=state;/* API keys never go into a backup file */const blob=new Blob([JSON.stringify(rest,null,2)],{type:'application/json'});const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download='horizon-backup.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);this.toast('Exported horizon-backup.json');}catch(_){this.toast('Export failed');}}
 
   // ══════ OVERLAYS / SHEETS ══════
   closeOverlay(){this.overlay.style.display='none';this.overlay.innerHTML='';}
