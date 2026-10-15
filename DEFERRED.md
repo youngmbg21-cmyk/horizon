@@ -42,7 +42,6 @@ environment-specific. Logged with reasoning per the run's rules.
    - Why deferred: auditing the full desktop app is a separate, much larger effort;
      doing it opportunistically here would risk unreviewed changes to stable code.
 
-7. **A few now-dead event handlers** (`dream`, `pulse`, `costlevel`) remain after
-   the cards that used them were removed.
-   - Why deferred: harmless (no markup triggers them); removing is cleanup churn
-     with no user-visible effect.
+7. ~~**A few now-dead event handlers** (`dream`, `pulse`, `costlevel`) remain after
+   the cards that used them were removed.~~
+   - Resolved: removed once a grep confirmed no markup or code still emits them.
