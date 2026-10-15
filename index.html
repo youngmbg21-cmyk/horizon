@@ -972,6 +972,9 @@ body.light .loc-card:hover { box-shadow:0 5px 14px -8px rgba(60,40,10,0.18); }
 .loc-card.feasible { border-color:var(--green); }
 .loc-card.conditional { border-color:var(--amber); }
 .loc-card.infeasible { border-color:var(--red); }
+/* Quick local estimate (no Deep Dive yet): verdict colour, dashed border. */
+.loc-card.estimate { border-style:dashed; }
+.loc-est-badge { display:inline-flex; align-items:center; font-size:9px; font-weight:600; letter-spacing:.05em; text-transform:uppercase; padding:2px 7px; border-radius:999px; border:1px dashed var(--border2); color:var(--text3); margin-left:6px; white-space:nowrap; cursor:help; }
 /* Explicit call-to-action row on every card (discoverability fix) */
 .loc-card-actions { display:flex; align-items:center; gap:6px; margin-top:12px; padding-top:10px; border-top:1px dashed var(--border); }
 .loc-card-cta { flex:1; justify-content:center; width:100%; font-size:12px; font-weight:700; padding:8px 12px; }
@@ -5277,6 +5280,16 @@ const STRINGS = {
                               sv:'Månatligt överskott · dagens penningvärde' },
   'ra.card.tax':            { en:'Local tax rate',        sv:'Lokal skattesats' },
   'ra.card.climate':        { en:'Climate',               sv:'Klimat' },
+  'ra.card.estimate':       { en:'Estimate',              sv:'Uppskattning' },
+  'ra.card.estimateTitle':  { en:'Quick estimate from curated cost-of-living and headline tax data. Run a Deep Dive for city-specific figures.',
+                              sv:'Snabb uppskattning utifrån sammanställda levnadskostnader och schablonskatt. Kör en djupanalys för siffror för just den här staden.' },
+  'ra.card.estimateHint':   { en:'Affordability is a quick estimate — run the analysis for city-specific figures for {who}.',
+                              sv:'Överkomligheten är en snabb uppskattning — kör analysen för att få siffror för just den här staden för {who}.' },
+  'ra.who.single':          { en:'you',                   sv:'dig' },
+  'ra.who.couple':          { en:'you and your partner',  sv:'dig och din partner' },
+  'ra.kpi.inclEstimates':   { en:'incl. {n} estimated',   sv:'uppskattning för {n}' },
+  'ra.map.estimate':        { en:'Quick estimate — run a Deep Dive for city figures',
+                              sv:'Snabb uppskattning — kör en djupanalys för stadens siffror' },
   'ra.card.cta.view':       { en:'📄 View Report',        sv:'📄 Visa rapport' },
   'ra.card.cta.run':        { en:'🔬 Run AI Analysis',    sv:'🔬 Kör AI-analys' },
   'ra.card.rerunTitle':     { en:'Re-run analysis',       sv:'Kör analysen igen' },
@@ -16561,6 +16574,12 @@ function renderRetireAnywhere() {
   const raD = (v)=>Math.round(FE.display.scaleReal(v||0, nums.ytr));
   const lensLbl = isNom ? t('ra.lens.nominal') : t('ra.lens.today');
   const monthlyIncome = raD(nums.totalGross);
+  // KPI counts include not-yet-analysed destinations at their quick
+  // estimate; the sub-line says how many of the count are estimates.
+  const raKpiSub = (v) => {
+    const est = scored.filter(l => !l.analysed && l.verdict===v).length;
+    return t('ra.kpi.'+v+'.sub') + (est ? ' · ' + t('ra.kpi.inclEstimates', { n: est }) : '');
+  };
 
   const locCards=scored.map(loc=>{
     // Is there a cached Deep Dive report for this location in the Vault?
@@ -16584,13 +16603,15 @@ function renderRetireAnywhere() {
     const analysed = !!loc.analysed;
     const staleReport = !analysed && !!cached;
     const affordColor  = loc.verdict==='feasible' ? 'var(--green)' : loc.verdict==='conditional' ? 'var(--amber)' : 'var(--red)';
+    // Before a Deep Dive, scoreLocation()'s local verdict (curated cost of
+    // living + headline tax) is shown, flagged as a quick estimate. Once AI
+    // stats exist, scoreLocation() scores from them instead.
+    const estBadge = `<span class="loc-est-badge" title="${esc2(t('ra.card.estimateTitle'))}">${esc2(t('ra.card.estimate'))}</span>`;
     const verdictBadge = running
       ? `<span class="loc-verdict conditional">Analysing…</span>`
       : analysed
         ? `<span class="loc-verdict ${loc.verdict}">${esc2(verdictText)}</span>`
-        : staleReport
-          ? `<span class="loc-verdict" style="background:var(--bg4);color:var(--text3)">Refresh KPIs</span>`
-          : `<span class="loc-verdict" style="background:var(--bg4);color:var(--text3)">Not analysed</span>`;
+        : `<span style="display:inline-flex;align-items:center"><span class="loc-verdict ${loc.verdict}">${esc2(verdictText)}</span>${estBadge}</span>`;
     // KPI grid — the four headline KPIs are ALWAYS shown as labelled slots.
     // Their values fill in once a Deep Dive has produced them; before that
     // (or for an older report predating them) each value reads "—".
@@ -16598,7 +16619,7 @@ function renderRetireAnywhere() {
     const affordShort = loc.verdict==='feasible' ? 'Feasible' : loc.verdict==='conditional' ? 'Conditional' : 'Infeasible';
     const kpiTile = (lbl,val,color)=>`<div style="background:var(--bg3);border:1px solid var(--border);border-radius:9px;padding:8px 10px"><div style="font-size:9px;font-family:var(--fm);letter-spacing:.05em;text-transform:uppercase;color:var(--text3)">${lbl}</div><div style="font-size:15px;font-weight:700;font-family:var(--fm);margin-top:3px;color:${val==='—'?'var(--text3)':color}">${val}</div></div>`;
     const kpiGrid = `<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:10px 0">
-      ${kpiTile('Affordable?', analysed?affordShort:'—', affordColor)}
+      ${kpiTile('Affordable?', affordShort, affordColor)}
       ${kpiTile('Discretionary', discPct!=null?discPct+'%':'—', (discPct!=null&&discPct<0)?'var(--red)':'var(--green)')}
       ${kpiTile('Effective tax', analysed?Math.round(loc.effTaxPct)+'%':'—', 'var(--text)')}
       ${kpiTile('Income rank', (analysed&&loc.incomePercentile!=null)?'Top '+loc.incomePercentile+'%':'—', 'var(--text2)')}
@@ -16610,8 +16631,8 @@ function renderRetireAnywhere() {
       ${loc.taxNote ? `<div style="font-size:10px;color:var(--text3);font-style:italic;margin:2px 0 4px;line-height:1.4">⚑ ${esc(loc.taxNote)}</div>` : ''}`
       : staleReport
         ? `<div style="font-size:11px;color:var(--text3);line-height:1.5;margin:0 0 8px">This report predates these KPIs — <strong style="color:var(--text2)">re-run</strong> to fill them in.</div>`
-        : `<div style="font-size:11px;color:var(--text3);line-height:1.5;margin:0 0 8px">Run the analysis to fill these in for ${raHouseholdSize()===2?'you and your partner':'you'}.</div>`);
-    return `<div class="loc-card ${analysed?loc.verdict:'pending'}">
+        : `<div style="font-size:11px;color:var(--text3);line-height:1.5;margin:0 0 8px">${esc2(t('ra.card.estimateHint', { who: t(raHouseholdSize()===2 ? 'ra.who.couple' : 'ra.who.single') }))}</div>`);
+    return `<div class="loc-card ${loc.verdict}${analysed?'':' estimate'}">
       <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:6px">
         <div>
           <div class="loc-name">${loc.flag} ${esc(loc.name)}</div>
@@ -16640,8 +16661,8 @@ function renderRetireAnywhere() {
     ${raHouseholdControl()}
 
     ${ui.kpiRow([
-      {icon:'✅', label:t('ra.kpi.feasible'),    value:scored.filter(l=>l.analysed && l.verdict==='feasible').length, tone:'pos', sub:t('ra.kpi.feasible.sub')},
-      {icon:'🎯', label:t('ra.kpi.conditional'), value:`<span class="amb">${scored.filter(l=>l.analysed && l.verdict==='conditional').length}</span>`, sub:t('ra.kpi.conditional.sub')},
+      {icon:'✅', label:t('ra.kpi.feasible'),    value:scored.filter(l=>l.verdict==='feasible').length, tone:'pos', sub:raKpiSub('feasible')},
+      {icon:'🎯', label:t('ra.kpi.conditional'), value:`<span class="amb">${scored.filter(l=>l.verdict==='conditional').length}</span>`, sub:raKpiSub('conditional')},
       {icon:'💰', label:t('ra.kpi.income'),      value:fmt(monthlyIncome), sub:t('ra.kpi.income.sub', { age: state.retirementAge, lens: lensLbl }), link:'retirement', section:'runway'},
     ])}
 
@@ -16666,16 +16687,17 @@ function renderRetireAnywhere() {
   setTimeout(()=>{
     if(retireMap) { try{retireMap.remove();}catch(e){} retireMap=null; }
     const points = scored.map(loc => {
-      // Unanalysed destinations show as neutral markers with no figures —
-      // colour + numbers only appear once a Deep Dive has produced them.
-      const color = !loc.analysed ? '#7a8fb0'
-                  : loc.verdict==='feasible' ? '#00e8a0'
+      // Pins take the verdict colour either way; destinations without a
+      // Deep Dive show their quick local estimate as a fainter pin, with
+      // no figures in the popup.
+      const color = loc.verdict==='feasible' ? '#00e8a0'
                   : loc.verdict==='conditional' ? '#f5a623'
                   : '#ff4d6d';
+      const vText = STRINGS['ra.verdict.'+loc.verdict] ? t('ra.verdict.'+loc.verdict) : loc.label;
       const popup = loc.analysed
-        ? `<strong>${loc.flag} ${esc(loc.name)}</strong><br><span style="color:${color};font-weight:700">${esc(loc.label)}</span><br>Cost${loc.householdSize===2?' · couple':''}: ${fmt(raD(loc.effCostOfLiving))}/mo<br>Discretionary: ${fmt(raD(loc.surplus))}/mo`
-        : `<strong>${loc.flag} ${esc(loc.name)}</strong><br><span style="color:${color}">Not analysed — run a Deep Dive</span>`;
-      return { lat: loc.lat, lng: loc.lng, color, popup };
+        ? `<strong>${loc.flag} ${esc(loc.name)}</strong><br><span style="color:${color};font-weight:700">${esc(vText)}</span><br>Cost${loc.householdSize===2?' · couple':''}: ${fmt(raD(loc.effCostOfLiving))}/mo<br>Discretionary: ${fmt(raD(loc.surplus))}/mo`
+        : `<strong>${loc.flag} ${esc(loc.name)}</strong><br><span style="color:${color};font-weight:700">${esc(vText)}</span> · ${esc(t('ra.card.estimate'))}<br><span style="color:var(--text3)">${esc(t('ra.map.estimate'))}</span>`;
+      return { lat: loc.lat, lng: loc.lng, color, popup, fillOpacity: loc.analysed ? 0.7 : 0.3 };
     });
     retireMap = createWorldMap('retire-map', points, {center:[20,20], zoom:2});
   }, 100);
@@ -23410,9 +23432,7 @@ class HZMobile {
       ? this.chip('honey','ANALYZING…')
       : analysed
         ? this.chip(({feasible:'sage',conditional:'honey',infeasible:'rose'}[loc.verdict]||'info'),String(loc.label||loc.verdict||'').toUpperCase())
-        : staleReport
-          ? this.chip('info','REFRESH KPIS')
-          : this.chip('info','NOT ANALYSED');
+        : this.chip(({feasible:'sage',conditional:'honey',infeasible:'rose'}[loc.verdict]||'info'),String(loc.label||loc.verdict||'').toUpperCase()+' · EST');
     // KPI grid — the four headline KPIs are ALWAYS shown as labelled slots;
     // values fill once a Deep Dive has produced them, otherwise read "—".
     const vc={feasible:'var(--green)',conditional:'var(--amber)',infeasible:'var(--red)'}[loc.verdict]||'var(--text3)';
@@ -23420,7 +23440,7 @@ class HZMobile {
     const discPct=(analysed&&this.n(loc.netIncome,0)>0)?Math.round(this.n(loc.surplus,0)/this.n(loc.netIncome,1)*100):null;
     const tile=(lbl,val,color)=>`<div style="background:var(--bg3);border:1px solid var(--border);border-radius:9px;padding:8px 10px"><div style="font-size:8.5px;font-family:var(--fm);letter-spacing:.04em;text-transform:uppercase;color:var(--text3)">${lbl}</div><div style="font-size:14px;font-weight:700;font-family:var(--fm);margin-top:2px;color:${val==='—'?'var(--text3)':color}">${val}</div></div>`;
     const kpiGrid=`<div style="display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-top:10px">
-      ${tile('Affordable?',analysed?affordShort:'—',vc)}
+      ${tile('Affordable?',affordShort,vc)}
       ${tile('Discretionary',discPct!=null?discPct+'%':'—',(discPct!=null&&discPct<0)?'var(--red)':'var(--green)')}
       ${tile('Effective tax',analysed?Math.round(this.n(loc.effTaxPct,0))+'%':'—','var(--text)')}
       ${tile('Income rank',(analysed&&loc.incomePercentile!=null)?'Top '+loc.incomePercentile+'%':'—','var(--text2)')}
@@ -23435,7 +23455,7 @@ class HZMobile {
     } else if(staleReport){
       detail=`<div style="margin-top:8px;font-size:11px;color:var(--text3);line-height:1.5">This report predates these KPIs — <strong style="color:var(--text2)">re-run</strong> to fill them in.</div>`;
     } else {
-      detail=`<div style="margin-top:8px;font-size:11px;color:var(--text3);line-height:1.5">Run the analysis to fill these in for ${(typeof raHouseholdSize==='function'&&raHouseholdSize()===2)?'you and your partner':'you'}.</div>`;
+      detail=`<div style="margin-top:8px;font-size:11px;color:var(--text3);line-height:1.5">Affordability is a quick estimate — run the analysis for city-specific figures for ${(typeof raHouseholdSize==='function'&&raHouseholdSize()===2)?'you and your partner':'you'}.</div>`;
     }
     const body=kpiGrid+detail;
     return `<div data-act="editdest" data-id="${loc.id}" style="padding:12px 0;border-bottom:1px solid var(--border);cursor:pointer">
@@ -23496,8 +23516,9 @@ class HZMobile {
     const nums=this.raNums();
     const income=nums?this.n(nums.totalGross,0):this.retIncome();
     const scored=this.raScored();
-    const feas=scored.filter(l=>l.analysed && l.verdict==='feasible').length;
-    const cond=scored.filter(l=>l.analysed && l.verdict==='conditional').length;
+    // Counts include not-yet-analysed destinations at their quick local estimate.
+    const feas=scored.filter(l=>l.verdict==='feasible').length;
+    const cond=scored.filter(l=>l.verdict==='conditional').length;
     const ytr=this.data.retirementAge-this.data.currentAge;
     let h=this.ph('PLANNING','Retire anywhere',`Every destination scored against your ${this.fmtC(income)}/mo target retirement income (pre-tax) — net of each country's local tax.`);
     if(nums)h+=this.banner('info',`Target retirement income <b>${this.fmt(income)}/mo</b> (pre-tax) — the same "income needed" figure as your Retirement Plan. Each destination applies its own local tax before comparing to cost of living.`);
