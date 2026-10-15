@@ -6427,6 +6427,18 @@ function parseNum(v){
   return isFinite(n) ? n : 0;
 }
 window.parseNum = parseNum;
+// True when an input's text holds a number. Inline oninput handlers use it
+// to skip writes while a box is empty / mid-edit, so clearing a field to
+// retype never persists parseNum('') = 0; the onchange re-render then
+// shows the stored value again if the user leaves the box empty.
+function hasNum(v){ return /\d/.test(String(v == null ? '' : v)); }
+// oninput helper: obj[key] = parsed value / div, then save() — skipped when
+// the box holds no number (see hasNum).
+function setNumInput(el, obj, key, div){
+  if(!obj || !hasNum(el.value)) return;
+  obj[key] = parseNum(el.value) / (div || 1);
+  save();
+}
 
 // One document-level listener that makes any input marked
 // inputmode="decimal" or data-lang-num tolerant of a typed comma.
@@ -13702,7 +13714,7 @@ function renderMonthly() {
         <div class="card-title">${esc2(t('monthly.card.savingsTarget'))}</div>
         <div style="display:flex;align-items:center;gap:8px;background:var(--bg3);border-radius:8px;padding:4px 14px;max-width:280px">
           <span style="color:var(--text3);font-size:12px;font-family:var(--fm)">${s}</span>
-          <input type="text" inputmode="decimal" data-lang-num="1" value="${Math.round(sel.savings*r)}" style="background:transparent;border:none;color:var(--text);font-family:var(--fm);font-size:20px;font-weight:700;padding:10px 0;outline:none;width:200px" oninput="setMonthSavings('${selKey}',parseNum(this.value)/${r})" onchange="commitRender('renderMonthly')">
+          <input type="text" inputmode="decimal" data-lang-num="1" value="${Math.round(sel.savings*r)}" style="background:transparent;border:none;color:var(--text);font-family:var(--fm);font-size:20px;font-weight:700;padding:10px 0;outline:none;width:200px" oninput="if(hasNum(this.value))setMonthSavings('${selKey}',parseNum(this.value)/${r})" onchange="commitRender('renderMonthly')">
         </div>
       </div>
     </div>`;
@@ -14208,6 +14220,27 @@ window.copyBaselineToRetirementExpenses = function(){
   renderRetirement();
 };
 
+// onchange normaliser for the Retirement inputs: clamps each param to a
+// sane range (ages 18–100 as in welcomeFinish, rates 0–30%, tax 0–100%)
+// and keeps currentAge < retirementAge < lifeExp. Idempotent.
+function clampRetirementInputs(){
+  const cl = (v, lo, hi, d) => { v = Number(v); if(!isFinite(v)) v = d; return Math.max(lo, Math.min(hi, v)); };
+  state.currentAge           = cl(state.currentAge, 18, 99, 30);
+  state.retirementAge        = cl(state.retirementAge, state.currentAge + 1, 100, 65);
+  state.lifeExp              = cl(state.lifeExp, state.retirementAge + 1, 120, 90);
+  state.growthRate           = cl(state.growthRate, 0, 30, 7);
+  state.inflationRate        = cl(state.inflationRate, 0, 30, 2);
+  state.retirementPostGrowth = cl(state.retirementPostGrowth, 0, 30, 4);
+  if(state.savingsTaxRate != null) state.savingsTaxRate = cl(state.savingsTaxRate, 0, 100, 30);
+  (state.externalAssets || []).forEach(a => {
+    if(!a) return;
+    ['balance','monthlyContribution','monthlyPayout'].forEach(k => { if(a[k] != null) a[k] = cl(a[k], 0, Infinity, 0); });
+    if(a.growthRate != null) a.growthRate = cl(a.growthRate, 0, 30, 7);
+    if(a.taxRate    != null) a.taxRate    = cl(a.taxRate, 0, 100, 30);
+    if(a.startAge   != null) a.startAge   = cl(a.startAge, 18, 120, state.retirementAge);
+  });
+  save();
+}
 function renderRetirement() {
   const nums=getRetirementNumbers();
   const retExp=state.retirementExpenses||[];
@@ -14484,7 +14517,7 @@ function renderRetirement() {
         </select></label>
         ${savAccType !== 'notax' ? `<div class="rac-input-wrap">
           <span class="rac-prefix" style="font-size:8px;color:var(--text3)">${savRateLabel[savAccType]||''}</span>
-          <input type="text" inputmode="decimal" data-lang-num="1" value="${savTaxRate}" oninput="state.savingsTaxRate=parseNum(this.value);save()" onchange="commitRender('renderRetirement')">
+          <input type="text" inputmode="decimal" data-lang-num="1" value="${savTaxRate}" oninput="setNumInput(this,state,'savingsTaxRate')" onchange="clampRetirementInputs();commitRender('renderRetirement')">
           <span class="rac-suffix">%</span>
         </div>` : `<div class="rac-input-wrap" style="opacity:.4"><span style="flex:1;text-align:right;font-family:var(--fm);font-size:12px">—</span></div>`}
       </div>
@@ -14517,7 +14550,7 @@ function renderRetirement() {
         <label>${label}</label>
         <div class="rac-input-wrap">
           ${prefix?`<span class="rac-prefix">${prefix}</span>`:''}
-          <input type="text" inputmode="decimal" data-lang-num="1" value="${val}" oninput="${handler}" onchange="commitRender('renderRetirement')">
+          <input type="text" inputmode="decimal" data-lang-num="1" value="${val}" oninput="${handler}" onchange="clampRetirementInputs();commitRender('renderRetirement')">
           ${suffix?`<span class="rac-suffix">${suffix}</span>`:''}
         </div>
       </div>`;
@@ -14551,18 +14584,18 @@ function renderRetirement() {
         </select></label>
         ${accountType !== 'notax' ? `<div class="rac-input-wrap">
           <span class="rac-prefix" style="font-size:8px;color:var(--text3)">${rateLabel[accountType]||''}</span>
-          <input type="text" inputmode="decimal" data-lang-num="1" value="${tr4}" oninput="state.externalAssets[${idx}].taxRate=parseNum(this.value);save()" onchange="commitRender('renderRetirement')">
+          <input type="text" inputmode="decimal" data-lang-num="1" value="${tr4}" oninput="setNumInput(this,state.externalAssets[${idx}],'taxRate')" onchange="clampRetirementInputs();commitRender('renderRetirement')">
           <span class="rac-suffix">%</span>
         </div>` : `<div class="rac-input-wrap" style="opacity:.4"><span style="flex:1;text-align:right;font-family:var(--fm);font-size:12px">—</span></div>`}
       </div>`;
     const fields = isInv ? `
-      ${numCell(t('s2.card.field.balance'),      Math.round(a.balance*r),             `state.externalAssets[${idx}].balance=parseNum(this.value)/${r};save()`, s)}
-      ${numCell(t('s2.card.field.contribution'), Math.round(a.monthlyContribution*r), `state.externalAssets[${idx}].monthlyContribution=parseNum(this.value)/${r};save()`, s, '/mo')}
-      ${numCell(t('s2.card.field.growthRate'),   gr,                                  `state.externalAssets[${idx}].growthRate=parseNum(this.value);save()`, '', '%')}
+      ${numCell(t('s2.card.field.balance'),      Math.round(a.balance*r),             `setNumInput(this,state.externalAssets[${idx}],'balance',${r})`, s)}
+      ${numCell(t('s2.card.field.contribution'), Math.round(a.monthlyContribution*r), `setNumInput(this,state.externalAssets[${idx}],'monthlyContribution',${r})`, s, '/mo')}
+      ${numCell(t('s2.card.field.growthRate'),   gr,                                  `setNumInput(this,state.externalAssets[${idx}],'growthRate')`, '', '%')}
       ${taxCell}
     ` : `
-      ${numCell(t('s2.card.field.payout'),  Math.round((a.monthlyPayout||0)*r), `state.externalAssets[${idx}].monthlyPayout=parseNum(this.value)/${r};save()`, s, '/mo')}
-      ${numCell(t('s2.card.field.fromAge'), a.startAge||state.retirementAge,    `state.externalAssets[${idx}].startAge=parseNum(this.value);save()`)}
+      ${numCell(t('s2.card.field.payout'),  Math.round((a.monthlyPayout||0)*r), `setNumInput(this,state.externalAssets[${idx}],'monthlyPayout',${r})`, s, '/mo')}
+      ${numCell(t('s2.card.field.fromAge'), a.startAge||state.retirementAge,    `setNumInput(this,state.externalAssets[${idx}],'startAge')`)}
     `;
     const projPostLabel = accountType === 'isk'
       ? 'after annual drag'
@@ -14740,12 +14773,12 @@ function renderRetirement() {
           <div class="card">
             <div class="card-title">${esc2(t('s3.params.title'))}</div>
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:7px">
-              <div class="field"><label>${esc2(t('s3.params.currentAge'))}</label><input type="text" inputmode="decimal" data-lang-num="1" value="${state.currentAge}" oninput="state.currentAge=parseNum(this.value);save()" onchange="commitRender('renderRetirement')"></div>
-              <div class="field"><label>${esc2(t('s3.params.retirementAge'))}</label><input type="text" inputmode="decimal" data-lang-num="1" value="${state.retirementAge}" oninput="state.retirementAge=parseNum(this.value);save()" onchange="commitRender('renderRetirement')"></div>
-              <div class="field"><label class="field-label-row">${esc2(t('s3.params.growthRate'))}<button type="button" class="field-help-btn" onclick="askRetirementParamHelp('growthRate')" title="${esc2(t('s3.params.helpTitle'))}">?</button></label><input type="text" inputmode="decimal" data-lang-num="1" value="${state.growthRate}" oninput="state.growthRate=parseNum(this.value);save()" onchange="commitRender('renderRetirement')"></div>
-              <div class="field"><label class="field-label-row">${esc2(t('s3.params.inflation'))}<button type="button" class="field-help-btn" onclick="askRetirementParamHelp('inflation')" title="${esc2(t('s3.params.helpTitle'))}">?</button></label><input type="text" inputmode="decimal" data-lang-num="1" value="${state.inflationRate}" oninput="state.inflationRate=parseNum(this.value);save()" onchange="commitRender('renderRetirement')"></div>
-              <div class="field"><label class="field-label-row">${esc2(t('s3.params.postRetGrowth'))}<button type="button" class="field-help-btn" onclick="askRetirementParamHelp('postGrowth')" title="${esc2(t('s3.params.helpTitle'))}">?</button></label><input type="text" inputmode="decimal" data-lang-num="1" value="${state.retirementPostGrowth||4}" oninput="state.retirementPostGrowth=parseNum(this.value);save()" onchange="commitRender('renderRetirement')"></div>
-              <div class="field" style="grid-column:1/-1"><label>${esc2(t('s3.params.lifeExp'))}</label><input type="text" inputmode="decimal" data-lang-num="1" value="${state.lifeExp||90}" oninput="state.lifeExp=parseNum(this.value);save()" onchange="commitRender('renderRetirement')"></div>
+              <div class="field"><label>${esc2(t('s3.params.currentAge'))}</label><input type="text" inputmode="decimal" data-lang-num="1" value="${state.currentAge}" oninput="setNumInput(this,state,'currentAge')" onchange="clampRetirementInputs();commitRender('renderRetirement')"></div>
+              <div class="field"><label>${esc2(t('s3.params.retirementAge'))}</label><input type="text" inputmode="decimal" data-lang-num="1" value="${state.retirementAge}" oninput="setNumInput(this,state,'retirementAge')" onchange="clampRetirementInputs();commitRender('renderRetirement')"></div>
+              <div class="field"><label class="field-label-row">${esc2(t('s3.params.growthRate'))}<button type="button" class="field-help-btn" onclick="askRetirementParamHelp('growthRate')" title="${esc2(t('s3.params.helpTitle'))}">?</button></label><input type="text" inputmode="decimal" data-lang-num="1" value="${state.growthRate}" oninput="setNumInput(this,state,'growthRate')" onchange="clampRetirementInputs();commitRender('renderRetirement')"></div>
+              <div class="field"><label class="field-label-row">${esc2(t('s3.params.inflation'))}<button type="button" class="field-help-btn" onclick="askRetirementParamHelp('inflation')" title="${esc2(t('s3.params.helpTitle'))}">?</button></label><input type="text" inputmode="decimal" data-lang-num="1" value="${state.inflationRate}" oninput="setNumInput(this,state,'inflationRate')" onchange="clampRetirementInputs();commitRender('renderRetirement')"></div>
+              <div class="field"><label class="field-label-row">${esc2(t('s3.params.postRetGrowth'))}<button type="button" class="field-help-btn" onclick="askRetirementParamHelp('postGrowth')" title="${esc2(t('s3.params.helpTitle'))}">?</button></label><input type="text" inputmode="decimal" data-lang-num="1" value="${state.retirementPostGrowth||4}" oninput="setNumInput(this,state,'retirementPostGrowth')" onchange="clampRetirementInputs();commitRender('renderRetirement')"></div>
+              <div class="field" style="grid-column:1/-1"><label>${esc2(t('s3.params.lifeExp'))}</label><input type="text" inputmode="decimal" data-lang-num="1" value="${state.lifeExp||90}" oninput="setNumInput(this,state,'lifeExp')" onchange="clampRetirementInputs();commitRender('renderRetirement')"></div>
             </div>
           </div>
           <div class="card">
