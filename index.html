@@ -4774,6 +4774,16 @@ const STRINGS = {
   'sb.group.system':        { en:'SYSTEM',            sv:'SYSTEM' },
   'sb.monthlySurplus':      { en:'MONTHLY SURPLUS',   sv:'MÅNADENS ÖVERSKOTT' },
   'sb.funFundPrefix':       { en:'Fun Fund:',         sv:'Fun Fund:' },
+  // Topbar ticker symbols
+  'tk.income':              { en:'INCOME',            sv:'INKOMST' },
+  'tk.expenses':            { en:'EXPENSES',          sv:'UTGIFTER' },
+  'tk.savings':             { en:'SAVINGS',           sv:'SPARANDE' },
+  'tk.surplus':             { en:'SURPLUS',           sv:'ÖVERSKOTT' },
+  'tk.funFund':             { en:'FUN FUND',          sv:'FUN FUND' },
+  'tk.portfolio':           { en:'PORTFOLIO',         sv:'PORTFÖLJ' },
+  'tk.nestEgg':             { en:'NEST EGG',          sv:'PENSIONSKAPITAL' },
+  'tk.retireIn':            { en:'RETIRE IN',         sv:'PENSION OM' },
+  'tk.growth':              { en:'GROWTH',            sv:'TILLVÄXT' },
 
   // ── Panel labels (used by sidebar, breadcrumb, cmd palette,
   //     related row, dashboard KPI links, …). Mirrors PANEL_META. ──
@@ -10888,17 +10898,21 @@ function renderTicker() {
   const nestEgg = FE.projection.totalNominal();
   const ytr = FE.retirement.yearsToRetirement();
   const extBal=state.externalAssets.filter(a=>(a.assetType||'investment')==='investment').reduce((s,a)=>s+a.balance,0);
+  // SURPLUS is income − expenses (same figure as the sidebar's MONTHLY
+  // SURPLUS); the Fun Fund (surplus − savings) gets its own item.
+  const surplus=ti-te;
   const items=[
-    {sym:'INCOME',val:fmtC(ti),chg:'+'+savRate+'%',up:true},
-    {sym:'EXPENSES',val:fmtC(te),chg:ti>0?(te/ti*100).toFixed(0)+'%':'-',up:false},
-    {sym:'SAVINGS',val:fmtC(curSavings),chg:'+'+fmtC(curSavings*12)+'/yr',up:true},
-    {sym:'SURPLUS',val:fmtC(cm.pureFunFund),chg:ti>0?(cm.pureFunFund/ti*100).toFixed(0)+'%':'-',up:cm.pureFunFund>=0},
-    {sym:'PORTFOLIO',val:fmtC(extBal),chg:'excl ITP',up:true},
-    {sym:'NEST EGG',val:fmtC(nestEgg),chg:'at '+state.retirementAge,up:true},
-    {sym:'RETIRE IN',val:ytr+'Y',chg:'age '+state.retirementAge,up:true},
-    {sym:'GROWTH',val:state.growthRate+'%',chg:'−'+state.inflationRate+'% inf',up:state.growthRate>state.inflationRate},
+    {sym:t('tk.income'),val:fmtC(ti),chg:'+'+savRate+'%',up:true},
+    {sym:t('tk.expenses'),val:fmtC(te),chg:ti>0?(te/ti*100).toFixed(0)+'%':'-',up:false},
+    {sym:t('tk.savings'),val:fmtC(curSavings),chg:'+'+fmtC(curSavings*12)+'/yr',up:true},
+    {sym:t('tk.surplus'),val:fmtC(surplus),chg:ti>0?(surplus/ti*100).toFixed(0)+'%':'-',up:surplus>=0},
+    {sym:t('tk.funFund'),val:fmtC(cm.pureFunFund),chg:ti>0?(cm.pureFunFund/ti*100).toFixed(0)+'%':'-',up:cm.pureFunFund>=0},
+    {sym:t('tk.portfolio'),val:fmtC(extBal),chg:'excl ITP',up:true},
+    {sym:t('tk.nestEgg'),val:fmtC(nestEgg),chg:'at '+state.retirementAge,up:true},
+    {sym:t('tk.retireIn'),val:ytr+'Y',chg:'age '+state.retirementAge,up:true},
+    {sym:t('tk.growth'),val:state.growthRate+'%',chg:'−'+state.inflationRate+'% inf',up:state.growthRate>state.inflationRate},
   ];
-  const block = items.map(t=>`<span class="tk"><span class="tks">${t.sym}</span><span class="tkv">${t.val}</span><span class="tkc ${t.up?'up':'dn'}">${t.chg}</span></span>`).join('');
+  const block = items.map(it=>`<span class="tk"><span class="tks">${it.sym}</span><span class="tkv">${it.val}</span><span class="tkc ${it.up?'up':'dn'}">${it.chg}</span></span>`).join('');
   if(state.tickerQuote) {
     const q=`<span class="tk" style="border-right:none;color:var(--amber);font-style:italic;padding:0 20px">✦ ${esc(state.tickerQuote)}</span>`;
     el.innerHTML=(block+q).repeat(2);
