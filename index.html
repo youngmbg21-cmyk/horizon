@@ -17126,7 +17126,9 @@ function createCountryDropdown({host, currentCode, placeholder, onPick}){
       results.innerHTML = `<div class="cd-empty">${esc2(t('cd.noMatches'))}</div>`;
       return;
     }
-    results.innerHTML = filtered.slice(0, 100).map((c, i) => `
+    // Render the full list (~200 countries) — a 100-row cap used to hide
+    // everything after ~'M' (Spain, Sweden, UK, US…) from scrolling.
+    results.innerHTML = filtered.map((c, i) => `
       <div class="cd-item ${i===activeIdx?'active':''} ${c.code===selectedCode?'selected':''}" data-code="${c.code}">
         <span class="cd-item-flag">${c.flag}</span>
         <span class="cd-item-name">${esc2(c.name)}</span>
@@ -17137,11 +17139,13 @@ function createCountryDropdown({host, currentCode, placeholder, onPick}){
   function open(){
     picker.classList.add('open');
     search.value = '';
-    // Start with the currently selected country highlighted.
+    // Start with the currently selected country highlighted. render('')
+    // resets `filtered` to the full list, so a full-list index is also
+    // the rendered row index.
     const idx = list.findIndex(c => c.code === selectedCode);
     activeIdx = idx >= 0 ? idx : 0;
     render('');
-    setTimeout(() => { search.focus(); const el = results.querySelector('.cd-item.selected'); if(el) el.scrollIntoView({block:'nearest'}); }, 20);
+    setTimeout(() => { search.focus(); const el = results.querySelector('.cd-item.active'); if(el) el.scrollIntoView({block:'nearest'}); }, 20);
   }
   function close(){ picker.classList.remove('open'); }
   function pick(c){
