@@ -5784,6 +5784,16 @@ const STRINGS = {
                               sv:'Motsvarar {mo}/mån som tillämpas på varje månad i {year}.' },
   'yearly.btn.addIncome':   { en:'+ Add Income',          sv:'+ Lägg till inkomst' },
   'yearly.btn.addExpense':  { en:'+ Add Expense',         sv:'+ Lägg till utgift' },
+  // Where each of the year's figures comes from (resolveYearBase)
+  'yearly.src.title':       { en:'This year uses →',      sv:'Det här året använder →' },
+  'yearly.src.lbl.income':  { en:'Income:',               sv:'Inkomst:' },
+  'yearly.src.lbl.expenses':{ en:'Expenses:',             sv:'Utgifter:' },
+  'yearly.src.lbl.savings': { en:'Savings:',              sv:'Sparande:' },
+  'yearly.src.own':         { en:'set for {year}',        sv:'satt för {year}' },
+  'yearly.src.cascade':     { en:'cascaded from {year}',  sv:'kaskad från {year}' },
+  'yearly.src.base':        { en:'baseline',              sv:'baslinje' },
+  'yearly.projection.note': { en:'Your income is higher this year, but your savings target is unchanged. The retirement projection grows from the savings target, so the extra income goes to your Fun Fund. Raise the savings target below if you want it invested.',
+                              sv:'Din inkomst är högre i år, men ditt sparmål är oförändrat. Pensionsprognosen växer utifrån sparmålet, så den extra inkomsten hamnar i din Fun Fund. Höj sparmålet nedan om du vill att den investeras.' },
 
   // ── Shared line-item branches (trip / carry-forward / paid / variance) ──
   // Trip rows (read-only, linked from the Fun Fund tab)
@@ -7830,23 +7840,99 @@ function fxWhen(iso) {
 // ─── CORE CALCULATIONS ───────────────────────────────────────────────────────
 function sumArr(arr, key) { return arr.reduce((s,i) => s+(i[key]||0), 0); }
 
+// The one rule for which Yearly Forecast plan governs `year`, resolved
+// FIELD BY FIELD. A year's own base always applies to itself. Otherwise
+// income, expenses and savings each come from the most recent EARLIER
+// cascade source that defines that field, so a later source that only
+// sets a savings target can no longer hide an earlier cascaded income.
+// A `stopAfter` marker ends every cascade after its year. Anything no
+// plan defines falls back to the Monthly Review baseline. `source[f]` is
+// the year a field came from (null = baseline). The engine, the Yearly
+// panel and the AI advisor all read this, so they can't disagree.
+const YEAR_FIELDS = ['income','expenses','savings'];
+function resolveYearBase(year) {
+  const bases = state.yearlyBases || {};
+  const own = bases[String(year)];
+  const earlier = Object.keys(bases).map(Number).filter(y => y < year).sort((a,b)=>b-a);
+  const out = { source:{} };
+  for (const f of YEAR_FIELDS) {
+    if (own && own[f] != null) { out[f] = own[f]; out.source[f] = year; continue; }
+    for (const y of earlier) {
+      const b = bases[String(y)];
+      if (!b) continue;
+      if (b.stopAfter) break;
+      if (b.cascade && b[f] != null) { out[f] = b[f]; out.source[f] = y; break; }
+    }
+    if (out[f] == null) {
+      out[f] = f==='income' ? state.baseIncome : f==='expenses' ? state.baseExpenses : state.baseSavings;
+      out.source[f] = null;
+    }
+  }
+  return out;
+}
+// Whether values flow on past `year` — what the Yearly "Cascade" switch
+// shows for that year. A year with no plan of its own and nothing
+// inherited shows the user's last chosen default.
+function yearCascadeOn(year) {
+  const b = state.yearlyBases[String(year)];
+  if (b?.stopAfter) return false;
+  if (b?.cascade && YEAR_FIELDS.some(f => b[f] != null)) return true;
+  const src = resolveYearBase(year).source;
+  if (YEAR_FIELDS.some(f => src[f] != null && src[f] !== year)) return true;
+  if (b && 'cascade' in b) return !!b.cascade;
+  return state.cascadeEnabled !== false;
+}
+// First year the Yearly Forecast can show. Normally next year, but if a
+// plan exists for this year (or an older one still cascading into it,
+// e.g. after New Year) the current year opens up so it stays editable.
+function yearlyMinYear() {
+  return Object.keys(state.yearlyBases || {}).some(k => +k <= CY) ? CY : CY+1;
+}
+
 function getEffective(year, month) {
   const key = `${year}-${String(month+1).padStart(2,'0')}`;
   const ov = state.monthlyOverrides[key];
-  const sorted = Object.keys(state.yearlyBases).map(Number).sort((a,b)=>a-b);
-  let cascBase = null;
-  for (const y of sorted) {
-    if (y<=year && state.yearlyBases[String(y)]?.cascade) cascBase = state.yearlyBases[String(y)];
-  }
-  const dy = state.yearlyBases[String(year)];
+  const base = resolveYearBase(year);
   return {
-    incomeItems: ov?.income || dy?.income || cascBase?.income || state.baseIncome,
-    expenseItems: ov?.expenses || dy?.expenses || cascBase?.expenses || state.baseExpenses,
-    savings: ov?.savings ?? dy?.savings ?? cascBase?.savings ?? state.baseSavings,
+    incomeItems: ov?.income || base.income,
+    expenseItems: ov?.expenses || base.expenses,
+    savings: ov?.savings ?? base.savings,
     get income() { return sumArr(this.incomeItems,'amount'); },
     get expenses() { return sumArr(this.expenseItems,'amount'); },
     hasOverride: !!ov,
   };
+}
+
+// Calendar-year totals (SEK) from this year to the retirement year,
+// built from getEffective() month by month, so cascades, yearly plans
+// and monthly overrides are all included exactly as the engine sees
+// them. Trip spend is listed separately. Shared by the AI advisor's
+// prompt, its lookup tools and the yearly.* chart series.
+function getYearlyPlan() {
+  return memoSelect('yearPlan', () => {
+    const retireYear = CY + Math.max(0, (state.retirementAge||65) - (state.currentAge||30));
+    const rows = [];
+    for (let y = CY; y <= Math.max(CY, retireYear); y++) {
+      let income = 0, expenses = 0, savings = 0, overrideMonths = 0, trips = 0;
+      for (let m = 0; m < 12; m++) {
+        const e = getEffective(y, m);
+        income += e.income; expenses += e.expenses; savings += e.savings;
+        if (e.hasOverride) overrideMonths++;
+      }
+      (state.trips || []).forEach(t => (t.expenses || []).forEach(ex => {
+        if (String(ex.date || '').slice(0, 4) === String(y)) trips += Number(ex.amount) || 0;
+      }));
+      rows.push({
+        year: y, age: (state.currentAge||30) + (y - CY),
+        income, expenses, savings, trips,
+        net: income - expenses - savings - trips,
+        source: resolveYearBase(y).source,
+        cascadesOn: yearCascadeOn(y),
+        overrideMonths,
+      });
+    }
+    return rows;
+  });
 }
 
 // Internal 13-entry window used ONLY as the raw chain computation.
@@ -10590,8 +10676,9 @@ function scopeShift(dir){
     // because the Retirement Plan tab's retirement expenses take
     // over as the active expense set.
     const retireYear = CY + Math.max(0, (state.retirementAge||65) - (state.currentAge||30));
-    const next = (state.selectedYear||CY+1) + dir;
-    state.selectedYear = Math.min(Math.max(CY+1, next), retireYear);
+    const minYear = yearlyMinYear();
+    const next = (state.selectedYear||minYear) + dir;
+    state.selectedYear = Math.min(Math.max(minYear, next), Math.max(minYear, retireYear));
     save(); renderAll();
   } else {
     // advance selectedMonth; clamp into the review window (prev month + 12 forward)
@@ -10662,7 +10749,7 @@ function buildCmdpItems(){
   items.push(
     {group:ACT, icon:'🌙', label:t('cmdp.action.theme'),       hint:'⌘⇧L', keywords:'theme dark light toggle tema mörkt ljust', action:()=>toggleTheme()},
     {group:ACT, icon:'✦',  label:t('cmdp.action.openAi'),      hint:'',    keywords:'ai advisor chat assistant rådgivare', action:()=>openAIPanel()},
-    {group:ACT, icon:'⚡', label:t('cmdp.action.cascade'),     hint:'',    keywords:'cascade yearly forecast toggle kaskad årlig prognos', action:()=>{state.cascadeEnabled=!state.cascadeEnabled;syncYearCascade();renderAll();}},
+    {group:ACT, icon:'⚡', label:t('cmdp.action.cascade'),     hint:'',    keywords:'cascade yearly forecast toggle kaskad årlig prognos', action:()=>{state.cascadeEnabled=!yearCascadeOn(state.selectedYear||yearlyMinYear());syncYearCascade();renderAll();}},
     {group:ACT, icon:'✈️', label:t('cmdp.action.addTrip'),     hint:panelLabel('funfund'), keywords:'trip travel add new resa', action:()=>{state.trips.push({id:genId(),name:'New Trip',country:'',budget:50000,spent:0,date:`${CY}-06`,status:'planning',icon:'✈️'});save();nav('funfund');}},
     {group:ACT, icon:'📍', label:t('cmdp.action.addLoc'),      hint:panelLabel('retireanywhere'), keywords:'location destination city retire add plats destination stad', action:()=>{nav('retireanywhere');setTimeout(()=>{if(typeof addLocation==='function')addLocation();},300);}},
     {group:ACT, icon:'🏦', label:t('cmdp.action.connectBank'), hint:'',    keywords:'bank connect transactions demo anslut', action:()=>{if(typeof connectBankDemo==='function')connectBankDemo();}},
@@ -13620,7 +13707,7 @@ function renderMonthly() {
       <div class="card"><div class="card-title">${t('monthly.chart.nf')}</div><div class="chart-wrap lg"><canvas id="mo-chart-nf"></canvas></div></div>
     </div>
 
-    <div class="month-pills">${months.map(m=>`<button class="month-pill ${m.key===selKey?'active':''} ${m.isCurrent?'current':''} ${m.hasOverride?'has-override':''}" onclick="state.selectedMonth='${m.key}';renderMonthly()">${m.short}${m.hasOverride?' ✎':''}</button>`).join('')}</div>
+    <div class="month-pills">${months.map(m=>`<button class="month-pill ${m.key===selKey?'active':''} ${m.isCurrent?'current':''} ${m.hasOverride?'has-override':''}" onclick="state.selectedMonth='${m.key}';save();renderMonthly()">${m.short}${m.hasOverride?' ✎':''}</button>`).join('')}</div>
     ${sel.hasOverride?`<div style="display:inline-flex;align-items:center;gap:8px;margin-bottom:12px"><span style="background:var(--violet-dim);color:var(--violet);padding:3px 9px;border-radius:5px;font-size:11px;font-weight:700;font-family:var(--fm)">${esc2(t('monthly.override.active'))}</span><button style="background:none;border:1px solid var(--border);color:var(--text2);padding:3px 9px;border-radius:5px;font-size:11px;cursor:pointer" onclick="delete state.monthlyOverrides['${selKey}'];save();renderMonthly()">${esc2(t('monthly.override.reset'))}</button></div>`:`<div style="margin-bottom:12px;font-size:12px;color:var(--text3)">${esc2(t('monthly.baseline.hint'))}</div>`}
 
     <!-- Summary bar. Every live-updating element carries a data-mo-* hook
@@ -13844,44 +13931,38 @@ function liveSyncMonthlyReview(selKey){
 // displayed number IS the annual total, and the stored amount is
 // always the per-month slice that downstream calculations expect.
 function renderYearly() {
-  const yr=state.selectedYear;
-  const yb=state.yearlyBases[String(yr)];
-
-  const sorted=Object.keys(state.yearlyBases).map(Number).sort((a,b)=>a-b);
-  let cascBase=null;
-  for(const y of sorted){ if(y<yr&&state.yearlyBases[String(y)]?.cascade) cascBase=state.yearlyBases[String(y)]; }
-  // The toggle reflects whether the VIEWED year is actually governed by a
-  // cascade — i.e. this year or any earlier year is a live cascade source.
-  // Deriving it (instead of trusting a leftover global flag that the old
-  // code rewrote on every render) means browsing years with ◀/▶ can't leave
-  // the switch showing the wrong position, and a year that is merely
-  // INHERITING a cascade correctly shows the switch as ON. When no year at or
-  // before this one has any cascade flag set yet, we leave the global default
-  // untouched so a fresh edit still cascades forward out of the box.
-  const _cascOn      = sorted.some(y => y<=yr && state.yearlyBases[String(y)]?.cascade===true);
-  const _cascDefined = sorted.some(y => { const b=state.yearlyBases[String(y)]; return y<=yr && b && ('cascade' in b); });
-  if(_cascOn) state.cascadeEnabled = true;
-  else if(_cascDefined) state.cascadeEnabled = false;
-  const incItems=yb?.income||cascBase?.income||state.baseIncome;
-  const expItems=yb?.expenses||cascBase?.expenses||state.baseExpenses;
-  const sav=yb?.savings??cascBase?.savings??state.baseSavings;
-  const r=rate(); const s=sym();
-
   // The Yearly Forecast stops at the user's retirement year. Past
   // that point, retirement expenses from the Retire tab take over
   // so there's no useful "working life" projection to edit. We cap
   // the ▶ arrow + show a cut-off card at the retirement year and
-  // clamp state.selectedYear on render so the UI can never land in
-  // a year beyond retirement via legacy state.
-  const retireYear = CY + Math.max(0, (state.retirementAge||65) - (state.currentAge||30));
-  const clampedYr = Math.min(Math.max(yr, CY+1), retireYear);
-  if(clampedYr !== yr) {
+  // clamp state.selectedYear BEFORE reading any year data, so the
+  // page can never show one year's numbers under another's heading.
+  const minYear = yearlyMinYear();
+  const retireYear = Math.max(minYear, CY + Math.max(0, (state.retirementAge||65) - (state.currentAge||30)));
+  const clampedYr = Math.min(Math.max(state.selectedYear||minYear, minYear), retireYear);
+  if(clampedYr !== state.selectedYear) {
     state.selectedYear = clampedYr;
     save();
   }
   const isRetireYear = clampedYr >= retireYear;
   const canGoFwd = clampedYr < retireYear;
-  const canGoBwd = clampedYr > CY+1;
+  const canGoBwd = clampedYr > minYear;
+
+  const resolved = resolveYearBase(clampedYr);
+  const cascOn = yearCascadeOn(clampedYr);
+  const incItems=resolved.income;
+  const expItems=resolved.expenses;
+  const sav=resolved.savings;
+  const r=rate(); const s=sym();
+  const srcLabel = f => {
+    const y = resolved.source[f];
+    return y == null ? t('yearly.src.base') : y === clampedYr ? t('yearly.src.own', { year: y }) : t('yearly.src.cascade', { year: y });
+  };
+  // The nest-egg projection grows from the savings target only; extra
+  // income lands in the Fun Fund. Say so when this year's income is up
+  // but its savings target isn't, so a raise doesn't look "ignored".
+  const incomeUp = sumArr(incItems,'amount') > sumArr(state.baseIncome||[],'amount') + 0.5;
+  const savingsFlat = Math.abs(sav - (state.baseSavings||0)) < 0.5;
 
   // Headline totals (annual rollup of the items shown below) so the
   // user sees the sum at a glance — matches what's typed in each row.
@@ -13895,18 +13976,30 @@ function renderYearly() {
   panelYearly.innerHTML=`
     <div style="display:flex;align-items:center;gap:16px;margin-bottom:14px;flex-wrap:wrap">
       <div style="display:flex;align-items:center;gap:10px">
-        <button style="background:var(--bg3);border:1px solid var(--border);color:${canGoBwd?'var(--text2)':'var(--text3)'};width:32px;height:32px;border-radius:7px;cursor:${canGoBwd?'pointer':'not-allowed'};font-size:13px;opacity:${canGoBwd?1:.4}" ${canGoBwd?'':'disabled'} onclick="state.selectedYear=Math.max(${CY+1},state.selectedYear-1);renderYearly()">◀</button>
+        <button style="background:var(--bg3);border:1px solid var(--border);color:${canGoBwd?'var(--text2)':'var(--text3)'};width:32px;height:32px;border-radius:7px;cursor:${canGoBwd?'pointer':'not-allowed'};font-size:13px;opacity:${canGoBwd?1:.4}" ${canGoBwd?'':'disabled'} onclick="state.selectedYear=Math.max(${minYear},state.selectedYear-1);save();renderYearly()">◀</button>
         <span style="font-family:var(--ff);font-size:26px;font-weight:800;min-width:90px;text-align:center">${clampedYr}</span>
-        <button style="background:var(--bg3);border:1px solid var(--border);color:${canGoFwd?'var(--text2)':'var(--text3)'};width:32px;height:32px;border-radius:7px;cursor:${canGoFwd?'pointer':'not-allowed'};font-size:13px;opacity:${canGoFwd?1:.4}" ${canGoFwd?'':'disabled'} onclick="if(state.selectedYear<${retireYear}){state.selectedYear++;renderYearly()}">▶</button>
-        <span style="font-family:var(--fm);font-size:10px;color:var(--text3);margin-left:6px;letter-spacing:.06em">${esc2(t('yearly.window', { start: CY+1, end: retireYear, cur: state.currentAge, ret: state.retirementAge }))}</span>
+        <button style="background:var(--bg3);border:1px solid var(--border);color:${canGoFwd?'var(--text2)':'var(--text3)'};width:32px;height:32px;border-radius:7px;cursor:${canGoFwd?'pointer':'not-allowed'};font-size:13px;opacity:${canGoFwd?1:.4}" ${canGoFwd?'':'disabled'} onclick="if(state.selectedYear<${retireYear}){state.selectedYear++;save();renderYearly()}">▶</button>
+        <span style="font-family:var(--fm);font-size:10px;color:var(--text3);margin-left:6px;letter-spacing:.06em">${esc2(t('yearly.window', { start: minYear, end: retireYear, cur: state.currentAge, ret: state.retirementAge }))}</span>
       </div>
       <label class="toggle-wrap">
-        <input type="checkbox" ${state.cascadeEnabled?'checked':''} onchange="state.cascadeEnabled=this.checked;syncYearCascade();save()">
+        <input type="checkbox" ${cascOn?'checked':''} onchange="state.cascadeEnabled=this.checked;syncYearCascade()">
         <div class="toggle-slider"></div>
         ${esc2(t('yearly.cascade.toggle'))}
       </label>
-      ${state.cascadeEnabled?`<span style="background:var(--violet-dim);color:var(--violet);padding:4px 10px;border-radius:6px;font-size:11px;font-weight:700;font-family:var(--fm)">${esc2(t('yearly.cascade.active'))}</span>`:''}
+      ${cascOn?`<span style="background:var(--violet-dim);color:var(--violet);padding:4px 10px;border-radius:6px;font-size:11px;font-weight:700;font-family:var(--fm)">${esc2(t('yearly.cascade.active'))}</span>`:''}
     </div>
+    <div style="font-size:11px;color:var(--text3);font-family:var(--fm);margin:-4px 0 14px">
+      ${esc2(t('yearly.src.title'))}
+      <strong style="color:var(--text2)">${esc2(t('yearly.src.lbl.income'))}</strong> ${esc2(srcLabel('income'))} ·
+      <strong style="color:var(--text2)">${esc2(t('yearly.src.lbl.expenses'))}</strong> ${esc2(srcLabel('expenses'))} ·
+      <strong style="color:var(--text2)">${esc2(t('yearly.src.lbl.savings'))}</strong> ${esc2(srcLabel('savings'))}
+    </div>
+    ${incomeUp && savingsFlat ? `
+      <div class="callout" style="margin-bottom:14px">
+        <span>💡</span>
+        <div>${esc2(t('yearly.projection.note'))}</div>
+      </div>
+    ` : ''}
 
     ${isRetireYear ? `
       <div class="callout" style="margin-bottom:14px">
@@ -13935,7 +14028,7 @@ function renderYearly() {
         <div class="card-title">${esc2(t('yearly.card.savingsTarget', { year: clampedYr }))}</div>
         <div style="display:flex;align-items:center;gap:8px;background:var(--bg3);border-radius:8px;padding:4px 14px;max-width:320px">
           <span style="color:var(--text3);font-size:12px;font-family:var(--fm)">${s}</span>
-          <input type="text" inputmode="decimal" data-lang-num="1" value="${Math.round(savAnnual*r)}" style="background:transparent;border:none;color:var(--text);font-family:var(--fm);font-size:20px;font-weight:700;padding:10px 0;outline:none;width:200px" oninput="setYearlySavings(parseNum(this.value)/${r}/12)">
+          <input type="text" inputmode="decimal" data-lang-num="1" value="${Math.round(savAnnual*r)}" style="background:transparent;border:none;color:var(--text);font-family:var(--fm);font-size:20px;font-weight:700;padding:10px 0;outline:none;width:200px" oninput="if(this.value.trim()!=='')setYearlySavings(parseNum(this.value)/${r}/12)">
           <span style="font-size:11px;color:var(--text3);font-family:var(--fm)">/yr</span>
         </div>
         <div style="font-size:10px;color:var(--text3);margin-top:4px;font-family:var(--fm)">${esc2(t('yearly.card.savingsHint', { mo: fmt(sav), year: clampedYr }))}</div>
@@ -13964,13 +14057,18 @@ function renderYearlyLineItems(cid,items,field){
     <button class="line-rm" onclick="removeYrItem('${field}','${it.id}')">×</button>
   </div>`).join('');
 }
+// First edit of a field in a year copies that year's resolved values
+// (own / cascaded / baseline) — never a single month's override — and a
+// brand-new plan cascades exactly when the switch for that year shows ON.
+function _ensureYearField(y, field){
+  if(!state.yearlyBases[y]) state.yearlyBases[y]={cascade:yearCascadeOn(+y)};
+  if(state.yearlyBases[y][field]==null){
+    state.yearlyBases[y][field]=JSON.parse(JSON.stringify(resolveYearBase(+y)[field]));
+  }
+}
 window.updateYrItem=function(field,id,prop,val){
   const y=String(state.selectedYear);
-  if(!state.yearlyBases[y]) state.yearlyBases[y]={cascade:state.cascadeEnabled};
-  if(!state.yearlyBases[y][field]){
-    const eff=getEffective(+y,0);
-    state.yearlyBases[y][field]=JSON.parse(JSON.stringify(field==='income'?eff.incomeItems:eff.expenseItems));
-  }
+  _ensureYearField(y, field);
   const item=state.yearlyBases[y][field].find(i=>i.id===id);
   if(item){item[prop]=prop==='amount'?+val:val; save();}
 };
@@ -13982,42 +14080,37 @@ window.removeYrItem=function(field,id){
 };
 window.addYearlyItem=function(field){
   const y=String(state.selectedYear);
-  if(!state.yearlyBases[y]) state.yearlyBases[y]={cascade:state.cascadeEnabled};
-  if(!state.yearlyBases[y][field]){
-    const eff=getEffective(+y,0);
-    state.yearlyBases[y][field]=JSON.parse(JSON.stringify(field==='income'?eff.incomeItems:eff.expenseItems));
-  }
+  _ensureYearField(y, field);
   state.yearlyBases[y][field].push({id:genId(),name:'',amount:0,type:field==='income'?'fixed':'variable'});
   save();renderYearly();
 };
 // Accepts a monthly value (already divided by 12 by the caller) so
 // downstream storage stays in per-month units.
 window.setYearlySavings=function(val){
+  if(!Number.isFinite(val)) return;
   const y=String(state.selectedYear);
-  if(!state.yearlyBases[y]) state.yearlyBases[y]={};
+  if(!state.yearlyBases[y]) state.yearlyBases[y]={cascade:yearCascadeOn(+y)};
   state.yearlyBases[y].savings=+val;
-  state.yearlyBases[y].cascade=state.cascadeEnabled;
   save();
 };
+// The switch is about what flows PAST the viewed year, and it is fully
+// reversible: OFF marks the year `stopAfter` (nothing — its own values or
+// anything it inherits — flows into later years); ON removes that marker
+// and makes the year's own values cascade again. Other years' plans are
+// never touched, so flipping it off and on restores exactly what was there.
 window.syncYearCascade=function(){
-  const yr=state.selectedYear;
-  const y=String(yr);
+  const y=String(state.selectedYear);
+  const b=state.yearlyBases[y];
   if(state.cascadeEnabled){
-    // Turn ON: make the viewed year a cascade source so its values flow to
-    // all future years. Seed a base if this year doesn't have one yet.
-    if(!state.yearlyBases[y]) state.yearlyBases[y]={};
-    state.yearlyBases[y].cascade=true;
-  } else {
-    // Turn OFF: clear the cascade flag on every source year AT OR BEFORE the
-    // viewed year, so this year and all future years stop inheriting. This is
-    // the fix — previously "off" only wrote a value when the viewed year had
-    // its own base, so switching off from a downstream (inheriting) year was
-    // a silent no-op that left the earlier source still cascading.
-    for(const k of Object.keys(state.yearlyBases)){
-      if(Number(k)<=yr && state.yearlyBases[k] && state.yearlyBases[k].cascade){
-        state.yearlyBases[k].cascade=false;
-      }
+    if(b){
+      delete b.stopAfter;
+      b.cascade=true;
+      if(!YEAR_FIELDS.some(f=>b[f]!=null)) delete state.yearlyBases[y];
     }
+  } else {
+    if(!b) state.yearlyBases[y]={};
+    state.yearlyBases[y].cascade=false;
+    state.yearlyBases[y].stopAfter=true;
   }
   save();
   renderYearly();
@@ -18854,6 +18947,8 @@ let aipTyping=false;
 // the indicator is still there.
 const _aiPendingThreads = new Set();
 const _aiThreadError = {};
+// Progress label for a pending reply ("Reading your 2029 plan…").
+const _aiThreadStatus = {};
 // Is the given thread the one currently visible in an open panel?
 function _isThreadVisible(id){
   const { panel } = _ai();
@@ -19172,7 +19267,8 @@ function aipRenderActiveThread(){
     const tw = document.createElement('div');
     tw.className = 'ai-msg-wrap bot';
     const lbl = t.kind === 'friend' ? (t.title || 'FRIEND').toUpperCase() : 'HORIZON AI';
-    tw.innerHTML = `<div class="ai-msg-label">${esc2(lbl)}</div><div class="ai-msg bot"><div class="ai-typing"><span></span><span></span><span></span></div></div>`;
+    const status = _aiThreadStatus[t.id] || '';
+    tw.innerHTML = `<div class="ai-msg-label">${esc2(lbl)}</div><div class="ai-msg bot"><div class="ai-typing"><span></span><span></span><span></span></div>${status ? `<div style="font-size:11px;color:var(--text3);margin-top:6px">${esc2(status)}</div>` : ''}</div>`;
     msgs.appendChild(tw);
   }
   msgs.scrollTop = 99999;
@@ -19319,7 +19415,7 @@ function buildPersonalContext(){
       const body = String(e.content || '').replace(/\s+/g,' ').trim().slice(0, 280);
       return `- ${e.date || '(undated)'}${tag}: ${body}`;
     });
-    ctx += `\n\nRECENT JOURNAL (${journal.length} total, 5 latest shown — reference these when the user asks about recent decisions or events; never fabricate ones not listed):\n` + recent.join('\n');
+    ctx += `\n\nRECENT JOURNAL (${journal.length} total, 5 latest shown — reference these when the user asks about recent decisions or events; if you have the get_journal tool, use it for older entries; never fabricate entries):\n` + recent.join('\n');
   }
   return ctx;
 }
@@ -19357,7 +19453,8 @@ function _catalogDynamicListing(){
   return sections.length ? (sections.join('\n\n') + '\n\n') : '';
 }
 
-function buildAIContext() {
+function buildAIContext(opts) {
+  const withTools = !!(opts && opts.tools);
   // Every number in this prompt is routed through FinancialEngine
   // so what the model sees is byte-identical to what the user sees
   // on-screen. Any drift between the AI's quoted figures and the
@@ -19448,6 +19545,21 @@ ${facts.block}`;
     .map(e => `    · ${e.name}: ${Math.round(e.amount).toLocaleString()} kr/mo [${e.type || 'variable'}]`)
     .join('\n');
   // [fixed] = committed cost, won't scale with lifestyle; [variable] = discretionary, can be trimmed in Lean scenarios
+  // Year-by-year plan (Yearly Forecast + cascades + monthly overrides),
+  // straight from getYearlyPlan() so it matches the engine exactly.
+  const _k = v => Math.round(v).toLocaleString();
+  const _srcTxt = (src, y) => YEAR_FIELDS.map(f => src[f] == null ? 'baseline' : src[f] === y ? 'own' : 'from ' + src[f]).join(' / ');
+  const yearlyPlanLines = getYearlyPlan().map(r =>
+    `  ${r.year} (age ${r.age}): income ${_k(r.income)} | expenses ${_k(r.expenses)} | savings target ${_k(r.savings)} | trips ${_k(r.trips)} | left over ${_k(r.net)} | source (income / expenses / savings): ${_srcTxt(r.source, r.year)}${r.overrideMonths ? ` | ${r.overrideMonths} month(s) overridden` : ''}${state.yearlyBases[String(r.year)]?.stopAfter ? ' | cascade STOPS after this year' : ''}`
+  ).join('\n');
+  const toolsSection = withTools ? `
+LOOKUP TOOLS — USE THEM
+The snapshot in this prompt is a SUMMARY. You also have tools that return the full detail from the app's live data: get_year_plan (any year's line items, sources and month-by-month figures), get_month, get_budget_lines, search_transactions (every uploaded transaction), get_journal (every journal entry), get_trips, get_nest_egg_by_year, get_retirement_runway, get_destinations.
+- Whenever a question needs detail that is not written in this prompt, call the relevant tool first. Never say you don't have some data without checking the tools.
+- You may call several tools in one step. Tool amounts are in SEK — apply the currency rule below before quoting them.
+- If a tool result says it was truncated or shows "total" larger than what was returned, say you looked at part of the list (or page with offset).
+- Quote figures exactly as the tools or this snapshot give them; don't recompute totals the tools already provide.
+` : '';
   return `You are HORIZON AI — a personal finance and life planning assistant embedded in Horizon Finance OS.
 
 ${langDirective()}
@@ -19456,7 +19568,7 @@ ${ctx}
 
 CURRENT VIEW: The user is looking at the "${viewLabel}" panel${section}. Tailor your answer to what's visible on this screen first, then zoom out if helpful.
 ${spendContext}
-
+${toolsSection}
 ${modeInstruction}
 
 VALUE BASIS — IMPORTANT
@@ -19495,6 +19607,12 @@ User's financial snapshot (SEK):
 - Current monthly expenses: ${Math.round(te).toLocaleString()} kr  ← household budget total, NOT a retirement figure
 - Current monthly savings rate: ${Math.round(cm.savings).toLocaleString()} kr
 - Fun Fund (discretionary leftover after expenses AND savings are both deducted): ${Math.round(cm.pureFunFund).toLocaleString()} kr/mo. NOTE: a negative Fun Fund does NOT mean the user is in deficit — the user is still saving (see savings rate above). Do NOT say they are "in the red". However, if the Fun Fund is significantly negative, it does mean the current allocation of expenses + savings exceeds income, which is only sustainable if the shortfall is covered by drawing down cash reserves or a separate float. If asked about budget health, acknowledge the savings are on track but flag that the discretionary bucket is over-committed and ask whether the user has a cash buffer covering the gap, or whether trips or other planned spending are driving it.
+
+YEAR-BY-YEAR PLAN — Yearly Forecast, calendar-year totals in SEK (${CY} → retirement year)
+How the app decides each year's figures: a year uses its OWN Yearly Forecast plan for any of income / expenses / savings it sets; otherwise each of those three is CASCADED from the most recent earlier year whose plan cascades it; otherwise it uses the Monthly Review baseline (A). A monthly override replaces a single month. "Left over" = income − expenses − savings target − trip spend, and flows to the Fun Fund.
+The nest-egg projection grows from the SAVINGS TARGET only — a higher income in a future year raises "left over", not the nest egg, unless that year's savings target is raised too. Point this out when the user asks why an income change didn't move their retirement numbers.
+Use this table for any question about income, expenses or savings in a particular year or across years ("what's my income in 2029?", "how does my income change over time?"):
+${yearlyPlanLines || '  (no years to show)'}
 
 (B) RETIREMENT EXPENSES — Retire tab · today's money · ${state.retirementExpenses?.length || 0} line items
   Raw line-item total (no scenario applied): ${Math.round(retExpRaw).toLocaleString()} kr/mo
@@ -19642,6 +19760,13 @@ Cashflow (x-axis = month, next 12 months):
 - cashflow.gap — Monthly gap (same as surplus, framed as gap) (currency, month)
 - cashflow.funFund — Fun Fund · monthly (currency, month)
 
+Yearly plan (x-axis = calendarYear, this year → retirement year; the same figures as the YEAR-BY-YEAR PLAN table):
+- yearly.income — Income · annual (currency, calendarYear)
+- yearly.expenses — Expenses · annual (currency, calendarYear)
+- yearly.savings — Savings target · annual (currency, calendarYear)
+- yearly.trips — Trip spend · annual (currency, calendarYear)
+- yearly.net — Left over · annual (currency, calendarYear)
+
 Retire Anywhere destinations (x-axis = destination name):
 - destinations.income — Monthly retirement income (currency, destination)
 - destinations.costOfLiving — Cost of living · monthly (currency, destination)
@@ -19737,7 +19862,15 @@ ${_catalogDynamicListing()}Worked examples:
 ]}
 \`\`\`
 
-Be concise, direct, insightful. Reference specific numbers from THIS snapshot — never recompute independently. Give actionable advice.`;
+10) User: "How does my income change over the years?"
+\`\`\`horizon-chart
+{"kind":"custom","title":"Income vs expenses by year","datasets":[
+  {"series":"yearly.income","display":"bar","label":"Income"},
+  {"series":"yearly.expenses","display":"line","label":"Expenses"}
+]}
+\`\`\`
+
+Be concise, direct, insightful. Reference specific numbers from THIS snapshot${withTools ? ' or from your tool results' : ''} — never recompute independently. Give actionable advice.`;
 }
 
 // ─── CHAT MODE + EXPAND (Simple / Expert, widen leftwards) ──────────────────
@@ -20176,6 +20309,25 @@ function buildSeriesCatalog(){
   // labelled "gap" so a chart framed around shortfall reads correctly.
   addMonthSeries('cashflow.gap',      'Monthly gap (surplus or shortfall)', m => m.surplus);
   addMonthSeries('cashflow.funFund',  'Fun Fund · monthly', m => m.funFund);
+
+  // ── YEARLY PLAN (x = calendar year, this year → retirement year) ──────
+  const addYearSeries = (key, label, pick) => {
+    cat[key] = {
+      label, unit:'currency', xAxis:'calendarYear',
+      get(){
+        const rows = getYearlyPlan();
+        return {
+          xValues: rows.map(r => String(r.year)),
+          values:  rows.map(r => pick(r) || 0),
+        };
+      },
+    };
+  };
+  addYearSeries('yearly.income',   'Income · annual',          r => r.income);
+  addYearSeries('yearly.expenses', 'Expenses · annual',        r => r.expenses);
+  addYearSeries('yearly.savings',  'Savings target · annual',  r => r.savings);
+  addYearSeries('yearly.trips',    'Trip spend · annual',      r => r.trips);
+  addYearSeries('yearly.net',      'Left over · annual',       r => r.net);
 
   // ── DESTINATIONS (x = destination name) ───────────────────────────────
   const addDestSeries = (key, label, unit, pick) => {
@@ -20679,7 +20831,7 @@ function _buildCustomChartConfig(validated, catalog, rawSpec){
   const topType = datasets.some(d => d.type === 'bar') ? 'bar' : 'line';
   return {
     _title: (rawSpec && typeof rawSpec.title === 'string' && rawSpec.title) || 'Custom chart',
-    _subtitle: (rawSpec && typeof rawSpec.subtitle === 'string' && rawSpec.subtitle) || `${validated.datasets.length} series · ${validated.xAxis}`,
+    _subtitle: (rawSpec && typeof rawSpec.subtitle === 'string' && rawSpec.subtitle) || `${validated.datasets.length} series · ${validated.xAxis === 'calendarYear' ? 'year' : validated.xAxis}`,
     type: topType,
     data: {
       labels: unionX.map(String),
@@ -20904,6 +21056,207 @@ async function aipSend() {
   return sendToAI(thread, msg);
 }
 
+// ── AI ADVISOR LOOKUP TOOLS ─────────────────────────────────────────────
+// The system prompt carries a summary; these let the model fetch any
+// detail on demand (a year's line items, a month, every transaction,
+// every journal entry…) instead of guessing. Every result comes from the
+// same engine functions the screens use, and every capped list states
+// its true total so the model can say when it saw only part of it.
+const AI_CHAT_MODEL = 'claude-opus-5-5';
+const AI_CHAT_MAX_STEPS = 8;
+const AI_CHAT_HISTORY = 14;
+const AI_TOOL_RESULT_CAP = 60000;
+const AI_CHAT_TOOLS = [
+  { name:'get_year_plan',
+    description:'Full Yearly Forecast detail for one calendar year: every income and expense line item (monthly and annual, SEK), the savings target, where each figure comes from (own plan / cascaded from an earlier year / baseline), whether it cascades onward, a month-by-month breakdown including monthly overrides, and planned trip spend. Use for any question about income, expenses or savings in a specific year.',
+    input_schema:{ type:'object', properties:{ year:{ type:'integer', description:'Calendar year, e.g. 2029' } }, required:['year'], additionalProperties:false } },
+  { name:'get_month',
+    description:'Everything the engine uses for one month: income and expense line items (with any monthly override), trip expenses landing that month, savings target, and the Fun Fund left over. Amounts in SEK per month.',
+    input_schema:{ type:'object', properties:{ month:{ type:'string', description:'Month as YYYY-MM' } }, required:['month'], additionalProperties:false } },
+  { name:'get_budget_lines',
+    description:'The line items of either today\'s household budget baseline (Monthly Review: income, expenses, savings target) or the retirement expense plan (Retire tab, with Lean/Baseline/Comfortable multipliers). Amounts in SEK per month.',
+    input_schema:{ type:'object', properties:{ which:{ type:'string', enum:['baseline','retirement'] } }, required:['which'], additionalProperties:false } },
+  { name:'search_transactions',
+    description:'Search the transactions the user uploaded in the Spend tab. Filter by text (merchant/description), category and/or month. Returns matching rows (amounts in SEK, negative = money out for bank statements), the true number of matches, and the totals of all matches.',
+    input_schema:{ type:'object', properties:{
+      query:{ type:'string', description:'Text to match in the merchant/description' },
+      category:{ type:'string' },
+      month:{ type:'string', description:'YYYY-MM' },
+      limit:{ type:'integer', description:'Max rows to return (default 50, max 200)' },
+      offset:{ type:'integer', description:'Rows to skip, for paging' } }, additionalProperties:false } },
+  { name:'get_journal',
+    description:'The user\'s journal entries, newest first, with full text. Optional text filter.',
+    input_schema:{ type:'object', properties:{ query:{ type:'string' }, limit:{ type:'integer', description:'Default 20, max 100' }, offset:{ type:'integer' } }, additionalProperties:false } },
+  { name:'get_trips',
+    description:'Every planned trip with its status, amount spent, and each expense line (name, amount in SEK, month).',
+    input_schema:{ type:'object', properties:{}, additionalProperties:false } },
+  { name:'get_nest_egg_by_year',
+    description:'Year-by-year nest-egg projection from now to retirement: age, savings contributions, balance per investment account, total (nominal) and total in today\'s money. SEK.',
+    input_schema:{ type:'object', properties:{}, additionalProperties:false } },
+  { name:'get_retirement_runway',
+    description:'Year-by-year retirement simulation by age under the active expense scenario: portfolio balance, portfolio withdrawal, pension income, income needed (pre-tax) and shortfall. SEK per year, today\'s money.',
+    input_schema:{ type:'object', properties:{}, additionalProperties:false } },
+  { name:'get_destinations',
+    description:'Every saved Retire Anywhere destination with its affordability verdict, monthly cost of living, effective tax, surplus, and whether an AI Deep Dive has analysed it. SEK per month.',
+    input_schema:{ type:'object', properties:{}, additionalProperties:false } },
+];
+const _aiR = v => Math.round(Number(v) || 0);
+const _aiLines = items => (items || []).map(i => ({ name: i.name || '(unnamed)', monthly: _aiR(i.amount), annual: _aiR((Number(i.amount)||0) * 12), type: i.type || '' }));
+const _aiSrc = (src, year) => Object.fromEntries(YEAR_FIELDS.map(f => [f, src[f] == null ? 'baseline' : src[f] === year ? 'own plan for this year' : `cascaded from ${src[f]}`]));
+function _aiTripLinesIn(prefix){
+  const out = [];
+  (state.trips || []).forEach(t => (t.expenses || []).forEach(ex => {
+    if(String(ex.date || '').startsWith(prefix)) out.push({ trip: t.name || 'Trip', item: ex.name || 'Expense', month: String(ex.date).slice(0,7), amount: _aiR(ex.amount) });
+  }));
+  return out;
+}
+function _aiRunTool(name, input){
+  input = input || {};
+  switch(name){
+    case 'get_year_plan': {
+      const year = Math.round(Number(input.year));
+      if(!Number.isFinite(year) || year < 1990 || year > 2200) return { error:'year must be a calendar year like 2029' };
+      const res = resolveYearBase(year);
+      const months = [];
+      for(let m = 0; m < 12; m++){
+        const e = getEffective(year, m);
+        months.push({ month:`${year}-${String(m+1).padStart(2,'0')}`, income:_aiR(e.income), expenses:_aiR(e.expenses), savings:_aiR(e.savings), monthlyOverride:e.hasOverride });
+      }
+      const sum = k => months.reduce((s, m) => s + m[k], 0);
+      const trips = _aiTripLinesIn(String(year));
+      const tripTotal = trips.reduce((s, t) => s + t.amount, 0);
+      return {
+        year, age: (state.currentAge||30) + (year - CY),
+        sources: _aiSrc(res.source, year),
+        cascadesToLaterYears: yearCascadeOn(year),
+        planIncomeLines: _aiLines(res.income),
+        planExpenseLines: _aiLines(res.expenses),
+        planSavingsTargetMonthly: _aiR(res.savings),
+        annualTotalsIncludingOverrides: { income: sum('income'), expenses: sum('expenses'), savings: sum('savings'), trips: tripTotal, leftOver: sum('income') - sum('expenses') - sum('savings') - tripTotal },
+        months, trips,
+        note: 'plan*Lines are the year plan before monthly overrides; months[] and annualTotals include overrides. Nest-egg growth uses the savings target only.',
+      };
+    }
+    case 'get_month': {
+      const mm = /^(\d{4})-(\d{2})$/.exec(String(input.month || ''));
+      if(!mm || +mm[2] < 1 || +mm[2] > 12) return { error:'month must be YYYY-MM' };
+      const year = +mm[1], m = +mm[2] - 1;
+      const e = getEffective(year, m);
+      const trips = _aiTripLinesIn(input.month);
+      const tripTotal = trips.reduce((s, t) => s + t.amount, 0);
+      return { month: input.month, monthlyOverride: e.hasOverride, sources: _aiSrc(resolveYearBase(year).source, year),
+        incomeLines: _aiLines(e.incomeItems), expenseLines: _aiLines(e.expenseItems), trips, savingsTarget: _aiR(e.savings),
+        totals: { income:_aiR(e.income), expenses:_aiR(e.expenses), trips:tripTotal, savings:_aiR(e.savings), funFundLeftOver:_aiR(e.income - e.expenses - tripTotal - e.savings) } };
+    }
+    case 'get_budget_lines': {
+      if(input.which === 'retirement'){
+        const raw = sumArr(state.retirementExpenses || [], 'amount');
+        return { which:'retirement', activeScenario: state.retirementScenario || 'baseline',
+          lines: _aiLines(state.retirementExpenses), rawMonthlyTotal: _aiR(raw),
+          scenarios: Object.fromEntries(Object.entries(RET_SCENARIOS).map(([k, mult]) => [k, { multiplier: mult, monthly: _aiR(raw * mult) }])) };
+      }
+      return { which:'baseline', incomeLines: _aiLines(state.baseIncome), expenseLines: _aiLines(state.baseExpenses), savingsTargetMonthly: _aiR(state.baseSavings) };
+    }
+    case 'search_transactions': {
+      const txs = Array.isArray(state.transactions) ? state.transactions : [];
+      if(!txs.length) return { total:0, rows:[], note:'No statement has been uploaded in the Spend tab.' };
+      const q = String(input.query || '').toLowerCase().trim();
+      const cat = String(input.category || '').toLowerCase().trim();
+      const month = String(input.month || '').trim();
+      const hits = txs.filter(t =>
+        (!q || String(t.name || t.description || '').toLowerCase().includes(q)) &&
+        (!cat || String(t.category || 'Other').toLowerCase() === cat) &&
+        (!month || String(t.date || '').startsWith(month)));
+      const limit = Math.min(200, Math.max(1, Math.round(input.limit || 50)));
+      const offset = Math.max(0, Math.round(input.offset || 0));
+      const rows = hits.slice(offset, offset + limit).map(t => ({ date: t.date, name: t.name || t.description || '', category: t.category || 'Other', amount: Number(t.amount) || 0, type: t.type || '' }));
+      return { total: hits.length, returned: rows.length, offset, truncated: offset + rows.length < hits.length,
+        sumOfAllMatches: Math.round(hits.reduce((s, t) => s + (Number(t.amount) || 0), 0)),
+        accountType: (state.spendMeta && state.spendMeta.accountType) || 'bank',
+        categories: [...new Set(txs.map(t => t.category || 'Other'))].sort(), rows };
+    }
+    case 'get_journal': {
+      const all = (Array.isArray(state.journal) ? state.journal.slice() : [])
+        .sort((a, b) => (b.date || '').localeCompare(a.date || '') || (b.updatedAt || 0) - (a.updatedAt || 0));
+      const q = String(input.query || '').toLowerCase().trim();
+      const hits = q ? all.filter(e => (String(e.title || '') + ' ' + String(e.content || e.body || '')).toLowerCase().includes(q)) : all;
+      const limit = Math.min(100, Math.max(1, Math.round(input.limit || 20)));
+      const offset = Math.max(0, Math.round(input.offset || 0));
+      const rows = hits.slice(offset, offset + limit).map(e => ({ date: e.date || '', tag: e.tag || '', title: e.title || '', text: String(e.content || e.body || '') }));
+      return { total: hits.length, returned: rows.length, truncated: offset + rows.length < hits.length, entries: rows };
+    }
+    case 'get_trips':
+      return { trips: (state.trips || []).map(t => {
+        const lines = (t.expenses || []).map(ex => ({ name: ex.name || 'Expense', amount: _aiR(ex.amount), month: String(ex.date || '').slice(0,7) || 'no date' }));
+        const budget = lines.reduce((s, l) => s + l.amount, 0);
+        return { name: t.name || 'Trip', status: t.status || 'planning', budget, spent: _aiR(t.spent), remaining: budget - _aiR(t.spent), expenses: lines };
+      }) };
+    case 'get_nest_egg_by_year': {
+      const inv = (state.externalAssets || []).filter(a => (a.assetType || 'investment') === 'investment');
+      return { rows: getProjection().map(p => ({ year: p.year, age: p.age, savingsContribution: p.appYearlyContrib, totalContribution: p.yearlyContrib,
+        savingsAccountBalance: p.appSavings, accounts: Object.fromEntries(inv.map(a => [a.name, p.perAccount?.[a.id] ?? 0])),
+        totalNominal: p.total, totalTodaysMoney: p.realTotal })) };
+    }
+    case 'get_retirement_runway': {
+      const sim = FE.retirement.numbers()._simResult;
+      if(!sim || !sim.labels) return { rows: [], note:'No retirement simulation available.' };
+      return { scenario: state.retirementScenario || 'baseline', runoutAge: sim.runoutAge, rows: sim.labels.map((age, i) => ({ age,
+        portfolioBalance: _aiR(sim.balData[i]), portfolioWithdrawal: _aiR(sim.portWithdrawal[i]), pensionIncome: _aiR(sim.pensionData[i]),
+        incomeNeededPreTax: _aiR(sim.needed?.[i]), shortfall: _aiR(sim.shortfall?.[i]) })) };
+    }
+    case 'get_destinations':
+      return { destinations: retirePlaces().map(scoreLocation).map(l => ({ name: l.name, country: l.country || '', verdict: l.verdict,
+        aiDeepDiveDone: !!l.analysed, monthlyIncomePreTax: _aiR(l.monthlyIncome), netIncome: _aiR(l.netIncome), costOfLiving: _aiR(l.effCostOfLiving),
+        effectiveTaxPct: l.effTaxPct, monthlySurplus: _aiR(l.surplus), taxNote: l.taxNote || '' })) };
+    default:
+      return { error: `unknown tool ${name}` };
+  }
+}
+function _aiToolLabel(name, input){
+  switch(name){
+    case 'get_year_plan': return `Reading your ${input?.year || ''} plan…`;
+    case 'get_month': return `Reading ${input?.month || 'that month'}…`;
+    case 'get_budget_lines': return input?.which === 'retirement' ? 'Reading your retirement expenses…' : 'Reading your budget…';
+    case 'search_transactions': return 'Searching your transactions…';
+    case 'get_journal': return 'Reading your journal…';
+    case 'get_trips': return 'Reading your trips…';
+    case 'get_nest_egg_by_year': return 'Reading your nest-egg projection…';
+    case 'get_retirement_runway': return 'Reading your retirement runway…';
+    case 'get_destinations': return 'Reading your destinations…';
+    default: return 'Looking that up…';
+  }
+}
+function _aiToolResultText(name, input){
+  let out;
+  try { out = JSON.stringify(_aiRunTool(name, input)); }
+  catch(e){ return { text: JSON.stringify({ error: e.message || String(e) }), isError: true }; }
+  if(out.length > AI_TOOL_RESULT_CAP){
+    out = out.slice(0, AI_TOOL_RESULT_CAP) + `… [TRUNCATED: result was ${out.length} characters; narrow the request, e.g. use limit/offset or a filter]`;
+  }
+  return { text: out, isError: false };
+}
+// Past turns go back as plain text (no thinking blocks), the history
+// starts on a user turn, and same-role neighbours (e.g. a question whose
+// reply failed) are merged so roles always alternate.
+function _aiHistoryForApi(messages){
+  const turns = messages.filter(m => (m.role === 'user' || m.role === 'assistant') && m.kind !== 'snapshot' && typeof m.content === 'string' && m.content.trim())
+    .slice(-AI_CHAT_HISTORY);
+  while(turns.length && turns[0].role !== 'user') turns.shift();
+  const out = [];
+  turns.forEach(m => {
+    const last = out[out.length - 1];
+    if(last && last.role === m.role) last.content += '\n\n' + m.content;
+    else out.push({ role: m.role, content: m.content });
+  });
+  return out;
+}
+async function _aiChatRequest(key, body, withFallback){
+  const headers = {'Content-Type':'application/json','x-api-key':key,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'};
+  if(withFallback) headers['anthropic-beta'] = 'server-side-fallback-2026-07-01';
+  return fetch('https://api.anthropic.com/v1/messages', { method:'POST', headers,
+    body: JSON.stringify(withFallback ? { ...body, fallbacks:'default' } : body) });
+}
+
 async function sendToAI(thread, msg){
   thread.messages.push({ role:'user', content:msg, at: Date.now() });
   // Remember this query against the panel the user was looking at so the
@@ -20927,21 +21280,58 @@ async function sendToAI(thread, msg){
     return;
   }
   try {
-    const res=await fetch('https://api.anthropic.com/v1/messages',{
-      method:'POST',
-      headers:{'Content-Type':'application/json','x-api-key':key,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
-      // Bumped from 600 → 900 to leave headroom for an optional fenced
-      // `horizon-chart` block without squeezing the narrative response.
-      body:JSON.stringify({model:'claude-opus-4-6',max_tokens:900,system:buildAIContext(),messages:thread.messages.slice(-8).map(m=>({role:m.role,content:m.content}))})
-    });
-    // Status check BEFORE parsing — an unchecked 401/429/400 used to be
-    // swallowed into a literal "No response" that was persisted as a real
-    // assistant turn and re-sent as context on every later message.
-    if(res.status===401) throw new Error('Invalid API key — check Settings → AI Keys.');
-    if(res.status===429) throw new Error('Rate limited by the API — wait a moment and try again.');
-    if(!res.ok) throw new Error('API error '+res.status);
-    const d=await res.json();
-    const reply=d.content?.map(c=>c.text||'').join('')||'No response';
+    // One system prompt for the whole turn: the live snapshot is frozen
+    // when the question is asked, so every step of the lookup loop below
+    // sees the same prefix. Within the turn each response (thinking blocks
+    // included) is appended verbatim before the tool results.
+    const system = buildAIContext({ tools:true });
+    const convo = _aiHistoryForApi(thread.messages);
+    let withFallback = true, reply = '', note = '';
+    for(let step = 0; step < AI_CHAT_MAX_STEPS; step++){
+      const body = { model:AI_CHAT_MODEL, max_tokens:16000, output_config:{ effort:'medium' }, system, tools:AI_CHAT_TOOLS, messages:convo };
+      let res;
+      try { res = await _aiChatRequest(key, body, withFallback); }
+      catch(netErr){
+        if(!withFallback) throw netErr;
+        withFallback = false; res = await _aiChatRequest(key, body, false);
+      }
+      // Status check BEFORE parsing — an unchecked 401/429/400 used to be
+      // swallowed into a literal "No response" that was persisted as a real
+      // assistant turn and re-sent as context on every later message.
+      if(res.status===401) throw new Error('Invalid API key — check Settings → AI Keys.');
+      if(res.status===429) throw new Error('Rate limited by the API — wait a moment and try again.');
+      if(res.status===400 && withFallback){
+        const errText = await res.text();
+        if(/fallback|beta/i.test(errText)){ withFallback = false; step--; continue; }
+        throw new Error('API error 400: ' + errText.slice(0, 200));
+      }
+      if(!res.ok) throw new Error('API error '+res.status);
+      const d = await res.json();
+      if(d.stop_reason === 'refusal'){
+        reply = 'Sorry — I can\'t help with that request. Try rephrasing your question about your finances.';
+        break;
+      }
+      const blocks = Array.isArray(d.content) ? d.content : [];
+      const text = blocks.filter(b => b.type === 'text').map(b => b.text || '').join('');
+      const calls = blocks.filter(b => b.type === 'tool_use');
+      if(d.stop_reason !== 'tool_use' || !calls.length){
+        reply = text;
+        if(d.stop_reason === 'max_tokens') note = '\n\n_(This answer was cut short — ask me to continue.)_';
+        break;
+      }
+      convo.push({ role:'assistant', content: blocks });
+      const lastStep = step === AI_CHAT_MAX_STEPS - 2;
+      const results = calls.map(c => {
+        _aiThreadStatus[thread.id] = _aiToolLabel(c.name, c.input);
+        const r = _aiToolResultText(c.name, c.input);
+        return { type:'tool_result', tool_use_id:c.id, content: lastStep ? r.text + '\n[Lookup limit reached — answer now with what you have.]' : r.text, ...(r.isError ? { is_error:true } : {}) };
+      });
+      if(_isThreadVisible(thread.id)) aipRenderActiveThread();
+      convo.push({ role:'user', content: results });
+      if(step === AI_CHAT_MAX_STEPS - 1) reply = text;
+    }
+    delete _aiThreadStatus[thread.id];
+    reply = (reply || '').trim() ? reply + note : 'I couldn\'t put an answer together that time — please try asking again.';
     thread.messages.push({ role:'assistant', content:reply, at: Date.now() });
     _aiPendingThreads.delete(thread.id);
     aipTyping=false;
@@ -20957,6 +21347,7 @@ async function sendToAI(thread, msg){
       _notifyChatReply(thread);
     }
   } catch(e){
+    delete _aiThreadStatus[thread.id];
     _aiPendingThreads.delete(thread.id);
     _aiThreadError[thread.id] = `Error: ${e.message||String(e)}`;
     aipTyping=false;
