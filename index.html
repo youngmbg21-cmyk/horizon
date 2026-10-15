@@ -19,6 +19,19 @@
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"/>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<!-- CDN fallback: if cdnjs is unreachable, pull the SAME pinned versions from
+     jsdelivr, then unpkg. document.write keeps them parser-blocking so app
+     code below still sees window.Chart / window.L on first run. If every CDN
+     fails, chart/map code no-ops (newChart / createWorldMap) instead of
+     throwing, and renderAll() re-runs if a library shows up late. -->
+<script>
+if(!window.L){document.write('<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css"/><script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js"><\/script>');}
+if(!window.Chart){document.write('<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.js"><\/script>');}
+</script>
+<script>
+if(!window.L){document.write('<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/><script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"><\/script>');}
+if(!window.Chart){document.write('<script src="https://unpkg.com/chart.js@4.4.1/dist/chart.umd.js"><\/script>');}
+</script>
 <style>
 /* ═══════════════════════════════════════════════════════════════
    HORIZON FINANCE OS — Design System
@@ -10484,7 +10497,8 @@ const ui = {
 // more behavior if they need to.
 function createWorldMap(containerId, points, opts){
   const el = document.getElementById(containerId);
-  if(!el || typeof L === 'undefined') return null;
+  if(!el) return null;
+  if(typeof L === 'undefined'){ whenChartLibs(); return null; }
   const o = {
     center: [20, 20], zoom: 2, zoomControl: true, scrollWheelZoom: false,
     ...(opts||{})
@@ -11099,6 +11113,31 @@ function chartPreset(overrides){
   return base;
 }
 function destroyChart(key) { if(charts[key]){charts[key].destroy();delete charts[key];} }
+// Desktop chart sites call newChart() instead of `new Chart()` so a missing
+// Chart.js (every CDN unreachable, or still loading) leaves the canvas blank
+// instead of throwing and killing the rest of the panel render. Returns null
+// in that case; whenChartLibs() re-renders once the library arrives.
+function newChart(ctx, cfg) {
+  if(typeof window.Chart !== 'function'){ whenChartLibs(); return null; }
+  return new Chart(ctx, cfg);
+}
+// Polls for late-arriving Chart.js / Leaflet (same idea as HZMobile.whenLib)
+// and repaints the desktop panels once, when the missing one shows up.
+let _libWaitTimer = null;
+function whenChartLibs() {
+  if(_libWaitTimer) return;
+  const missing = () => typeof window.Chart !== 'function' || typeof window.L === 'undefined';
+  const had = { chart: typeof window.Chart === 'function', map: typeof window.L !== 'undefined' };
+  let n = 0;
+  _libWaitTimer = setInterval(() => {
+    const now = { chart: typeof window.Chart === 'function', map: typeof window.L !== 'undefined' };
+    const arrived = (now.chart && !had.chart) || (now.map && !had.map);
+    if(arrived || !missing() || n++ > 120){
+      clearInterval(_libWaitTimer); _libWaitTimer = null;
+      if(arrived){ try { renderAll(); } catch(e){ console.warn('re-render after lib load failed:', e); } }
+    }
+  }, 250);
+}
 
 // External HTML tooltip renderer for Chart.js — builds the same
 // .chart-tooltip DOM used by the runway SVG chart so every chart in
@@ -12185,7 +12224,7 @@ function _syncDashAIMiniCharts(){
     if(pCv){
       destroyChart('dash-ai-mini-position');
       const vals = proj.map(p => FE.display.isNominal() ? (p.total || 0) : (p.realTotal || 0));
-      charts['dash-ai-mini-position'] = new Chart(pCv.getContext('2d'), {
+      charts['dash-ai-mini-position'] = newChart(pCv.getContext('2d'), {
         type:'line',
         data:{
           labels: proj.map(p => p.age),
@@ -12208,7 +12247,7 @@ function _syncDashAIMiniCharts(){
     if(cCv){
       destroyChart('dash-ai-mini-concern');
       const months = FE.months.next12();
-      charts['dash-ai-mini-concern'] = new Chart(cCv.getContext('2d'), {
+      charts['dash-ai-mini-concern'] = newChart(cCv.getContext('2d'), {
         type:'bar',
         data:{
           labels: months.map(m => m.short || ''),
@@ -12628,7 +12667,7 @@ function renderDashboard() {
       // growth curve rather than a flat per-month value. Matches the
       // running net-flow line on the Monthly Review chart.
       const savingsCumulative = FE.months.runningSavings();
-      charts['dash-cf']=new Chart(cf.getContext('2d'),{
+      charts['dash-cf']=newChart(cf.getContext('2d'),{
         type:'bar',
         data:{
           labels:months.map(m=>m.short),
@@ -12675,7 +12714,7 @@ function renderDashboard() {
       const savings    = proj.map(p => mode === 'real' ? toReal(p.appSavings || 0, p.age - state.currentAge) : (p.appSavings || 0));
       const investment = proj.map(p => mode === 'real' ? toReal(p.external   || 0, p.age - state.currentAge) : (p.external   || 0));
       const total      = proj.map(p => mode === 'real' ? p.realTotal : p.total);
-      charts['dash-ne']=new Chart(ne.getContext('2d'),{
+      charts['dash-ne']=newChart(ne.getContext('2d'),{
         type:'line',
         data:{
           labels:proj.map(p=>t('dash.axis.age', { n: p.age })),
@@ -13496,7 +13535,7 @@ function renderTransactions() {
     const lineData  = m.months.map(ym => Math.round(isCard ? (m.byMonth[ym].payments||0) : m.byMonth[ym].income));
     const lineLabel = isCard ? 'Card payments' : 'Income';
     const lineColor = isCard ? '#4d9fff' : '#00e8a0';
-    charts['si-trend'] = new Chart(ctx.getContext('2d'), {
+    charts['si-trend'] = newChart(ctx.getContext('2d'), {
       type:'bar',
       data:{ labels, datasets:[
         {label:'Spend',    data:spend,    backgroundColor:'#ff4d6d22', borderColor:'#ff4d6d', borderWidth:1.75, borderRadius:4, order:2, categoryPercentage:0.7, barPercentage:0.85},
@@ -13706,7 +13745,7 @@ function renderMonthly() {
     const _lblFunRun   = t('monthly.series.funFundRunning');
     const ctxIE = document.getElementById('mo-chart-ie');
     if(ctxIE){
-      charts['mo-ie'] = new Chart(ctxIE.getContext('2d'), {
+      charts['mo-ie'] = newChart(ctxIE.getContext('2d'), {
         type:'bar',
         data:{
           labels,
@@ -13721,7 +13760,7 @@ function renderMonthly() {
 
     const ctxNF = document.getElementById('mo-chart-nf');
     if(ctxNF){
-      charts['mo-nf'] = new Chart(ctxNF.getContext('2d'), {
+      charts['mo-nf'] = newChart(ctxNF.getContext('2d'), {
         type:'line',
         data:{
           labels,
@@ -15722,7 +15761,7 @@ function renderFunFund() {
       );
       const allocFill = allocations.map(v => v >= 0 ? '#22c55e33' : '#ef444433');
       const allocLine = allocations.map(v => v >= 0 ? '#22c55e'   : '#ef4444');
-      charts['ff'] = new Chart(ctx.getContext('2d'), {
+      charts['ff'] = newChart(ctx.getContext('2d'), {
         type:'bar',
         data:{
           labels: windowMonths.map(m => m.short),
@@ -15757,7 +15796,7 @@ function renderFunFund() {
       const red   = '#ef4444';
       const bgFill= v => v >= 0 ? '#22c55e33' : '#ef444433';
       const bgLine= v => v >= 0 ? green : red;
-      charts['ff-balance'] = new Chart(balCtx.getContext('2d'), {
+      charts['ff-balance'] = newChart(balCtx.getContext('2d'), {
         type:'bar',
         data:{
           labels: windowMonths.map(m => m.short),
