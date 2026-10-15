@@ -7723,17 +7723,21 @@ window.syncPullClick = async function(){
 // ─── CURRENCY / FORMAT ───────────────────────────────────────────────────────
 function rate(cur) { cur=cur||state.currency; return (state.exchangeRates&&state.exchangeRates[cur])||DEFAULT_RATES[cur]||1; }
 function sym(cur) { return CURRENCY_SYMBOLS[cur||state.currency]||'kr'; }
+// Negatives put the minus sign (U+2212, as sv-SE's toLocaleString does
+// for SEK) before the currency symbol: "−$1,234", "−KSh 306,020".
 function fmt(v, cur) {
   cur=cur||state.currency; const c=v*rate(cur); const s=sym(cur);
-  if(cur==='SEK') return `${Math.round(c).toLocaleString('sv-SE')} ${s}`;
-  if(cur==='KES') return `${s} ${Math.round(c).toLocaleString()}`;
-  return `${s}${Math.round(c).toLocaleString()}`;
+  if(cur==='SEK') return `${(Math.round(c)||0).toLocaleString('sv-SE')} ${s}`;
+  const a=Math.round(Math.abs(c)), m=(c<0&&a>0)?'−':'';
+  if(cur==='KES') return `${m}${s} ${a.toLocaleString()}`;
+  return `${m}${s}${a.toLocaleString()}`;
 }
+// Compact by magnitude so negatives get K/M too ("−kr21K", not "kr-21445").
 function fmtC(v, cur) {
   cur=cur||state.currency; const c=v*rate(cur); const s=sym(cur);
-  if(c>=1e6) return `${s}${(c/1e6).toFixed(1)}M`;
-  if(c>=1e3) return `${s}${(c/1e3).toFixed(0)}K`;
-  return `${s}${Math.round(c)}`;
+  const a=Math.abs(c);
+  const n = a>=1e6 ? `${(a/1e6).toFixed(1)}M` : a>=1e3 ? `${(a/1e3).toFixed(0)}K` : `${Math.round(a)}`;
+  return `${(c<0&&n!=='0')?'−':''}${s}${n}`;
 }
 function inSEK(displayVal) { return +displayVal / rate(); }
 
@@ -22972,8 +22976,9 @@ class HZMobile {
   nwTotal(){return (this.data.externalAssets||[]).reduce((s,a)=>s+this.n(a.balance,0),0);}
   // Formatters are the last line of defence: a non-finite value renders as 0,
   // never as "NaN" in the ticker/KPIs.
-  fmt(v,cur){v=this.n(v,0);cur=cur||this.data.currency;const r=Object.assign({SEK:1},this.data.exchangeRates);const c=v*(this.n(r[cur],1)||1);const sym={SEK:'kr',USD:'$',EUR:'€',KES:'KSh'}[cur]||'kr';if(cur==='SEK')return `${Math.round(c).toLocaleString('sv-SE')} ${sym}`;if(cur==='KES')return `${sym} ${Math.round(c).toLocaleString()}`;return `${sym}${Math.round(c).toLocaleString()}`;}
-  fmtC(v){v=this.n(v,0);const r=Object.assign({SEK:1},this.data.exchangeRates);const cur=this.data.currency;const sym={SEK:'SEK',USD:'$',EUR:'€',KES:'KSh'}[cur]||'SEK';const c=v*(this.n(r[cur],1)||1);if(Math.abs(c)>=1e6)return cur==='SEK'?`${(c/1e6).toFixed(1)}M SEK`:`${sym}${(c/1e6).toFixed(1)}M`;if(Math.abs(c)>=1e3)return cur==='SEK'?`${Math.round(c/1e3)}K SEK`:`${sym}${Math.round(c/1e3)}K`;return cur==='SEK'?`${Math.round(c).toLocaleString()} SEK`:`${sym}${Math.round(c).toLocaleString()}`;}
+  // Sign goes before the currency symbol ("−$1,234"), matching desktop fmt/fmtC.
+  fmt(v,cur){v=this.n(v,0);cur=cur||this.data.currency;const r=Object.assign({SEK:1},this.data.exchangeRates);const c=v*(this.n(r[cur],1)||1);const sym={SEK:'kr',USD:'$',EUR:'€',KES:'KSh'}[cur]||'kr';if(cur==='SEK')return `${Math.round(c).toLocaleString('sv-SE')} ${sym}`;const a=Math.round(Math.abs(c)),m=(c<0&&a>0)?'−':'';if(cur==='KES')return `${m}${sym} ${a.toLocaleString()}`;return `${m}${sym}${a.toLocaleString()}`;}
+  fmtC(v){v=this.n(v,0);const r=Object.assign({SEK:1},this.data.exchangeRates);const cur=this.data.currency;const sym={SEK:'SEK',USD:'$',EUR:'€',KES:'KSh'}[cur]||'SEK';const c=v*(this.n(r[cur],1)||1);const a=Math.abs(c);const n=a>=1e6?`${(a/1e6).toFixed(1)}M`:a>=1e3?`${Math.round(a/1e3)}K`:Math.round(a).toLocaleString();const m=(c<0&&n!=='0')?'−':'';return cur==='SEK'?`${m}${n} SEK`:`${m}${sym}${n}`;}
   esc(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
   addMonths(b,n){return new Date(b.getFullYear(),b.getMonth()+n,1);}
   whenLib(check,cb){if(check()){cb();return;}let n=0;const t=setInterval(()=>{if(check()||n++>50){clearInterval(t);if(check())cb();}},100);}
