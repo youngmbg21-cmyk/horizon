@@ -6815,8 +6815,28 @@ window.dr = function(name){ return window.commitRender(name); };
 // State schema version. Bump this and add a branch to migrate() whenever the
 // shape of `state` changes in a backwards-incompatible way.
 const STATE_VERSION = 24;
+// Legacy trips had a single `budget` + `date` pair; collapse that into a
+// one-item `expenses` array so every reader (all use t.expenses) sees a
+// uniform shape. Idempotent — trips that already have expenses[] are left
+// alone.
+function normalizeTrips(s) {
+  (s.trips || []).forEach(t => {
+    if(!t || Array.isArray(t.expenses)) return;
+    const amount = Number(t.budget) || 0;
+    const date = t.date || `${CY}-06`;
+    t.expenses = amount > 0 || t.budget != null
+      ? [{ id: genId(), name: 'Budget', date, amount }]
+      : [];
+    delete t.budget;
+    delete t.date;
+  });
+}
 function migrate(s) {
   const from = s.version || 1;
+  // Version-independent repair: the ⌘K "Add a new trip" action used to
+  // push old-shape trips (budget/date, no expenses[]) into current-version
+  // state, which the v9 step below never revisits.
+  normalizeTrips(s);
   if(from >= STATE_VERSION) { s.version = STATE_VERSION; return s; }
   // v1 → v2: ensure every location has a lat/lng, and external assets have
   //          an assetType. These fields were added mid-flight; old saves
@@ -6880,18 +6900,7 @@ function migrate(s) {
   // v8 → v9: trips carry multiple expense entries. Legacy trips had a
   // single `budget` + `date` pair; collapse that into a one-item
   // `expenses` array so the new code has a uniform shape to read.
-  if(from < 9) {
-    (s.trips || []).forEach(t => {
-      if(Array.isArray(t.expenses)) return;
-      const amount = Number(t.budget) || 0;
-      const date = t.date || `${CY}-06`;
-      t.expenses = amount > 0 || t.budget != null
-        ? [{ id: genId(), name: 'Budget', date, amount }]
-        : [];
-      delete t.budget;
-      delete t.date;
-    });
-  }
+  if(from < 9) normalizeTrips(s);
   // v9 → v10: introduce state.chatThreads + state.contacts. Any
   // existing in-memory aiChatHistory is not persisted, so nothing
   // to migrate — we just seed the defaults if they're missing.
@@ -10691,7 +10700,7 @@ function buildCmdpItems(){
     {group:ACT, icon:'🌙', label:t('cmdp.action.theme'),       hint:'⌘⇧L', keywords:'theme dark light toggle tema mörkt ljust', action:()=>toggleTheme()},
     {group:ACT, icon:'✦',  label:t('cmdp.action.openAi'),      hint:'',    keywords:'ai advisor chat assistant rådgivare', action:()=>openAIPanel()},
     {group:ACT, icon:'⚡', label:t('cmdp.action.cascade'),     hint:'',    keywords:'cascade yearly forecast toggle kaskad årlig prognos', action:()=>{state.cascadeEnabled=!state.cascadeEnabled;syncYearCascade();renderAll();}},
-    {group:ACT, icon:'✈️', label:t('cmdp.action.addTrip'),     hint:panelLabel('funfund'), keywords:'trip travel add new resa', action:()=>{state.trips.push({id:genId(),name:'New Trip',country:'',budget:50000,spent:0,date:`${CY}-06`,status:'planning',icon:'✈️'});save();nav('funfund');}},
+    {group:ACT, icon:'✈️', label:t('cmdp.action.addTrip'),     hint:panelLabel('funfund'), keywords:'trip travel add new resa', action:()=>{addTrip();nav('funfund');}},
     {group:ACT, icon:'📍', label:t('cmdp.action.addLoc'),      hint:panelLabel('retireanywhere'), keywords:'location destination city retire add plats destination stad', action:()=>{nav('retireanywhere');setTimeout(()=>{if(typeof addLocation==='function')addLocation();},300);}},
     {group:ACT, icon:'🏦', label:t('cmdp.action.connectBank'), hint:'',    keywords:'bank connect transactions demo anslut', action:()=>{if(typeof connectBankDemo==='function')connectBankDemo();}},
     {group:ACT, icon:'🧹', label:t('cmdp.action.clearAi'),     hint:'',    keywords:'clear reset ai chat history rensa chatthistorik', action:()=>{if(typeof clearAIChat==='function'){clearAIChat();openAIPanel();}}},
