@@ -10119,7 +10119,6 @@ function nav(panel, opts) {
   if(p) p.classList.add('active');
   const n=document.querySelector(`.nav-item[data-panel="${panel}"]`);
   if(n) n.classList.add('active');
-  if(typeof mobileNavSync==='function') mobileNavSync();
   renderPanel(panel);
   // Post-render chrome (breadcrumb + related-row)
   if(typeof decoratePanel==='function') decoratePanel(panel);
@@ -10149,43 +10148,6 @@ function pulseSection(section){
   setTimeout(()=>el.classList.remove('section-pulse'), 1400);
 }
 
-// ─── MOBILE SHELL (bottom tab bar + More sheet) ─────────────────────────────
-// Phone-only chrome. The 5 primary tabs map to existing panels; every other
-// panel lives behind "More". Nothing here runs on desktop (the elements are
-// display:none above 640px), and it drives the same nav() as the sidebar so
-// routing, hashes, and rendering stay identical across form factors.
-const MTAB_PANELS = ['dashboard','transactions','review','retirement'];
-window.mobileTab = function(panel){ mobileMore(false); nav(panel); };
-window.mobileGo  = function(panel){ mobileMore(false); nav(panel); };
-window.mobileMore = function(open){
-  const sh = document.getElementById('m-sheet');
-  const bd = document.getElementById('m-sheet-backdrop');
-  if(!sh || !bd) return;
-  const willOpen = (typeof open === 'boolean') ? open : !sh.classList.contains('open');
-  sh.classList.toggle('open', willOpen);
-  bd.classList.toggle('open', willOpen);
-  // Lock the underlying page from scrolling while the sheet is up.
-  document.body.style.overflow = willOpen ? 'hidden' : '';
-};
-// Reflect the active panel in the tab bar + More list. Called from nav().
-function mobileNavSync(){
-  const p = (state && state.activePanel) || 'dashboard';
-  document.querySelectorAll('.mtab-item').forEach(el => {
-    const t = el.getAttribute('data-mtab');
-    const on = (t === '__more') ? !MTAB_PANELS.includes(p) : (t === p);
-    el.classList.toggle('active', on);
-  });
-  document.querySelectorAll('.m-link').forEach(el => {
-    el.classList.toggle('active', el.getAttribute('data-mlink') === p);
-  });
-}
-// Esc closes the More sheet (hardware keyboards / accessibility).
-document.addEventListener('keydown', (e) => {
-  if(e.key === 'Escape'){
-    const sh = document.getElementById('m-sheet');
-    if(sh && sh.classList.contains('open')) mobileMore(false);
-  }
-});
 // ─── DIRTY TRACKING (sidebar nav dots) ──────────────────────────────────────
 // When state changes while the user is on panel X, mark every other panel
 // as "dirty" so the sidebar surfaces that something downstream has shifted.
@@ -10865,7 +10827,6 @@ function renderAll() {
   document.querySelectorAll('.nav-item').forEach(n => {
     n.classList.toggle('active', n.getAttribute('data-panel') === panel);
   });
-  if(typeof mobileNavSync==='function') mobileNavSync();
   renderPanel(panel);
   // Decorate the panel with breadcrumb + related-row, and refresh the
   // topbar scope chip + AI chips so they always reflect the active panel.
@@ -11371,18 +11332,6 @@ window.resetCarryOverride = function(monthKey){
     delete state.carryOverrides[monthKey];
     save();
   }
-};
-// Editing the amount on a linked trip row (rendered by
-// renderLineItems) writes straight through to the matching entry in
-// state.trips[].expenses. We call renderAll() so the Fun Fund tab's
-// KPIs, trip card, and every other chart/table reflect the change live.
-window.updateLinkedTripAmount = function(tripId, expenseId, val){
-  const t = (state.trips || []).find(x => x.id === tripId);
-  if(!t) return;
-  const ex = (t.expenses || []).find(e => e.id === expenseId);
-  if(!ex) return;
-  ex.amount = +val || 0;
-  save();
 };
 function removeLineItem(key,id) {
   const arr=resolveKey(key); if(!arr) return;
@@ -23777,8 +23726,6 @@ class HZMobile {
     if(a==='rexprm'){if(typeof state!=='undefined'&&Array.isArray(state.retirementExpenses)){state.retirementExpenses=state.retirementExpenses.filter(x=>x.id!==d.id);this.mSave();}return this.paint();}
     if(a==='rexptype'){if(typeof state!=='undefined'&&Array.isArray(state.retirementExpenses)){const it=state.retirementExpenses.find(x=>x.id===d.id);if(it)it.type=(it.type==='fixed')?'variable':'fixed';this.mSave();}return this.paint();}
     if(a==='lens'){this.data.retLens=d.l;this.persist();return this.paint();}
-    if(a==='dream'){const i=this.data.dreams.indexOf(d.id);if(i>-1)this.data.dreams.splice(i,1);else this.data.dreams.push(d.id);this.persist();return this.paint();}
-    if(a==='pulse'&&this.vacMap){this.vacMap.setView([+d.lat,+d.lng],4);return;}
     if(a==='pickdest'){const db=(typeof CITY_DB!=='undefined')?CITY_DB:[];const c=db[+d.i];if(c&&typeof state!=='undefined'){if(!Array.isArray(state.places))state.places=[];const key=(c.name||'').toLowerCase()+'|'+(c.country||'').toLowerCase();if(!state.places.some(p=>(p.kind||'retirement')==='retirement'&&((p.name||'').toLowerCase()+'|'+(p.country||'').toLowerCase())===key)){state.places.push({id:this.newId(),kind:'retirement',name:c.name,country:c.country||'',flag:c.flag||'🌍',costOfLiving:this.n(c.costOfLiving,40000),taxRate:this.n(c.taxRate,15),climate:c.climate||'Temperate',healthcare:c.healthcare||'Good',infrastructure:c.infrastructure||'Good',medianMonthlyIncome:c.medianMonthlyIncome||null,notes:'',lat:this.n(c.lat,0),lng:this.n(c.lng,0)});if(typeof save==='function')save();}}this.closeOverlay();this.paint();return this.toast('Destination added ✓');}
     if(a==='editdest')return this.openEditDest(d.id);
     if(a==='rahh')return this.setHousehold(+d.n);
@@ -23846,7 +23793,6 @@ class HZMobile {
     else if(p[0]==='rexpname'){if(typeof state!=='undefined'&&Array.isArray(state.retirementExpenses)){const it=state.retirementExpenses.find(x=>x.id===p[1]);if(it)it.name=val;}}
     else if(p[0]==='rexpamt'){if(typeof state!=='undefined'&&Array.isArray(state.retirementExpenses)){const it=state.retirementExpenses.find(x=>x.id===p[1]);if(it)it.amount=this.n(num,0)/this.crate();}}
     else if(p[0]==='target'){this.data.targetBudget=val;}
-    else if(p[0]==='costlevel'){this.data.retCostLevel=val;}
     else if(p[0]==='n'){this.data[p[1]]=this.n(num,0);}
     else if(p[0]==='s'){this.data[p[1]]=val;}
     else if(p[0]==='fx'){this.data.exchangeRates[p[1]]=this.n(num,0);}
