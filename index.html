@@ -6130,6 +6130,9 @@ const STRINGS = {
                               sv:'Visar ärvd grunddata — redigera ett fält för att skapa en överskrift' },
   'monthly.summary.label':  { en:'MONTH SUMMARY — {month}',
                               sv:'MÅNADSSAMMANFATTNING — {month}' },
+  'monthly.summary.rolling':{ en:'12 mo: {amt}',           sv:'12 mån: {amt}' },
+  'monthly.summary.rolling.title':{ en:'Total for the 12 months {from} – {to}',
+                              sv:'Summa för de 12 månaderna {from} – {to}' },
   'monthly.summary.bar.exp':{ en:'Exp {pct}%',             sv:'Utg {pct}%' },
   'monthly.summary.bar.sav':{ en:'Sav {pct}%',             sv:'Spa {pct}%' },
   'monthly.summary.bar.fun':{ en:'Fun {pct}%',             sv:'Fun {pct}%' },
@@ -8466,6 +8469,27 @@ function getPrevMonthEntry() {
       hasOverride: v.hasOverride,
     };
   });
+}
+
+// Rolling 12-month totals shown under each Monthly Review summary
+// figure: the sum of the 12 months starting at the selected month. Uses
+// the PURE per-month values (no carry-forward rows) — summing chained
+// totals would count every surplus twice (once as Fun Fund, again as
+// next month's carry-in income), and summing running Fun Fund balances
+// is meaningless. So Fun Fund here = total Income − Expenses − Savings
+// over the 12 months.
+function getRolling12Totals(selKey){
+  const all = [getPrevMonthEntry(), ..._get13MonthChain()];
+  const idx = Math.max(0, all.findIndex(m => m.key === selKey));
+  const win = all.slice(idx, idx + 12);
+  const out = { from: win[0].label, to: win[win.length-1].label, income:0, expenses:0, savings:0, funFund:0 };
+  win.forEach(m => {
+    out.income   += m.pureIncome;
+    out.expenses += m.pureExpenses;
+    out.savings  += m.savings;
+    out.funFund  += m.pureFunFund;
+  });
+  return out;
 }
 
 // 13-month window for the Monthly Review tab: previous month + current + 11 forward.
@@ -13979,6 +14003,8 @@ function renderMonthly() {
   const el=document.getElementById('panel-monthly');
   if(!el) return;
   const r=rate(); const s=sym();
+  const r12=getRolling12Totals(sel.key);
+  const r12Title=esc2(t('monthly.summary.rolling.title', { from: r12.from, to: r12.to }));
 
   // The page header is rendered once by renderReview() above this
   // panel, so the per-view ph block has been removed to avoid a
@@ -14025,10 +14051,10 @@ function renderMonthly() {
           <div class="cf-bar-labels" data-mo-bar-labels><span>${t('monthly.summary.bar.exp', { pct: sel.income>0?Math.round(sel.expenses/sel.income*100):0 })}</span><span>${t('monthly.summary.bar.sav', { pct: sel.income>0?Math.round(sel.savings/sel.income*100):0 })}</span><span>${t('monthly.summary.bar.fun', { pct: sel.income>0?Math.max(Math.round(sel.funFund/sel.income*100),0):0 })}</span></div>
         </div>
         <div style="display:flex;gap:20px;flex-wrap:wrap">
-          <div style="text-align:center"><div style="font-size:9px;color:var(--text3);font-family:var(--fm);letter-spacing:.08em">${esc2(t('monthly.summary.income'))}</div><div data-mo-num="income" style="font-family:var(--fm);font-size:16px;font-weight:700;color:var(--green)">${fmt(sel.income)}</div></div>
-          <div style="text-align:center"><div style="font-size:9px;color:var(--text3);font-family:var(--fm);letter-spacing:.08em">${esc2(t('monthly.summary.expenses'))}</div><div data-mo-num="expenses" style="font-family:var(--fm);font-size:16px;font-weight:700;color:var(--red)">${fmt(sel.expenses)}</div></div>
-          <div style="text-align:center"><div style="font-size:9px;color:var(--text3);font-family:var(--fm);letter-spacing:.08em">${esc2(t('monthly.summary.savings'))}</div><div data-mo-num="savings" style="font-family:var(--fm);font-size:16px;font-weight:700;color:var(--amber)">${fmt(sel.savings)}</div></div>
-          <div style="text-align:center"><div style="font-size:9px;color:var(--text3);font-family:var(--fm);letter-spacing:.08em">${esc2(t('monthly.summary.funFund'))}</div><div data-mo-num="funFund" style="font-family:var(--fm);font-size:16px;font-weight:700;color:var(--cyan)">${fmt(sel.funFund)}</div></div>
+          <div style="text-align:center"><div style="font-size:9px;color:var(--text3);font-family:var(--fm);letter-spacing:.08em">${esc2(t('monthly.summary.income'))}</div><div data-mo-num="income" style="font-family:var(--fm);font-size:16px;font-weight:700;color:var(--green)">${fmt(sel.income)}</div><div data-mo-r12="income" title="${r12Title}" style="font-family:var(--fm);font-size:10px;color:var(--text3);margin-top:2px">${esc2(t('monthly.summary.rolling', { amt: fmt(r12.income) }))}</div></div>
+          <div style="text-align:center"><div style="font-size:9px;color:var(--text3);font-family:var(--fm);letter-spacing:.08em">${esc2(t('monthly.summary.expenses'))}</div><div data-mo-num="expenses" style="font-family:var(--fm);font-size:16px;font-weight:700;color:var(--red)">${fmt(sel.expenses)}</div><div data-mo-r12="expenses" title="${r12Title}" style="font-family:var(--fm);font-size:10px;color:var(--text3);margin-top:2px">${esc2(t('monthly.summary.rolling', { amt: fmt(r12.expenses) }))}</div></div>
+          <div style="text-align:center"><div style="font-size:9px;color:var(--text3);font-family:var(--fm);letter-spacing:.08em">${esc2(t('monthly.summary.savings'))}</div><div data-mo-num="savings" style="font-family:var(--fm);font-size:16px;font-weight:700;color:var(--amber)">${fmt(sel.savings)}</div><div data-mo-r12="savings" title="${r12Title}" style="font-family:var(--fm);font-size:10px;color:var(--text3);margin-top:2px">${esc2(t('monthly.summary.rolling', { amt: fmt(r12.savings) }))}</div></div>
+          <div style="text-align:center"><div style="font-size:9px;color:var(--text3);font-family:var(--fm);letter-spacing:.08em">${esc2(t('monthly.summary.funFund'))}</div><div data-mo-num="funFund" style="font-family:var(--fm);font-size:16px;font-weight:700;color:var(--cyan)">${fmt(sel.funFund)}</div><div data-mo-r12="funFund" title="${r12Title}" style="font-family:var(--fm);font-size:10px;color:var(--text3);margin-top:2px">${esc2(t('monthly.summary.rolling', { amt: fmt(r12.funFund) }))}</div></div>
         </div>
       </div>
     </div>
@@ -14185,6 +14211,12 @@ function liveSyncMonthlyReview(selKey){
   if(numExp)     numExp.textContent     = fmt(sel.expenses);
   if(numSavings) numSavings.textContent = fmt(sel.savings);
   if(numFunFund) numFunFund.textContent = fmt(sel.funFund);
+  // Rolling 12-month totals under each readout.
+  const r12 = getRolling12Totals(sel.key);
+  ['income','expenses','savings','funFund'].forEach(f => {
+    const el = host.querySelector(`[data-mo-r12="${f}"]`);
+    if(el) el.textContent = t('monthly.summary.rolling', { amt: fmt(r12[f]) });
+  });
   // Chart datasets — mutate each Chart.js instance's data arrays
   // and call update('none') for a zero-animation live refresh. No
   // canvas teardown, no destroyChart, no focus loss.
