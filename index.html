@@ -8521,6 +8521,26 @@ function getRolling12Totals(selKey){
   return out;
 }
 
+// Chart series for the Monthly Review charts: the 12 months starting at
+// the selected month, so picking a later month slides both charts forward.
+// The chain holds 23 entries, so even the last pickable month (CM+11) has
+// a full 12-month window. Savings run cumulatively from the window's first
+// month; Fun Fund uses the chained running balance, as before.
+function getReviewChartWindow(selKey){
+  const all = [getPrevMonthEntry(), ..._get13MonthChain()];
+  let idx = all.findIndex(m => m.key === selKey);
+  if(idx < 0) idx = 1; // default: current month
+  const win = all.slice(idx, idx + 12);
+  let run = 0;
+  return {
+    labels:   win.map(m => m.short),
+    income:   win.map(m => m.pureIncome),
+    expenses: win.map(m => m.pureExpenses),
+    savingsRunning: win.map(m => (run += (m.savings || 0))),
+    funFundRunning: win.map(m => m.funFund || 0),
+  };
+}
+
 // 13-month window for the Monthly Review tab: previous month + current + 11 forward.
 // Only used in renderMonthly(), liveSyncMonthlyReview(), and scopeShift().
 function getMonthlyReviewMonths() {
@@ -10616,16 +10636,8 @@ function _liveSyncCharts(){
     [t('dash.series.savings')]:  () => FE.months.runningSavings(),
     [t('dash.series.funFund')]:  () => FE.months.runningFunFund(),
   });
-  // Monthly Review — Income vs Expenses (left chart)
-  patch('mo-ie', {
-    [t('monthly.series.income')]:   () => months.map(m => m.pureIncome),
-    [t('monthly.series.expenses')]: () => months.map(m => m.pureExpenses),
-  });
-  // Monthly Review — Savings & Fun Fund running net flow (right chart)
-  patch('mo-nf', {
-    [t('monthly.series.savingsRunning')]: () => FE.months.runningSavings(),
-    [t('monthly.series.funFundRunning')]: () => FE.months.runningFunFund(),
-  });
+  // Monthly Review — both charts follow the selected month's window.
+  if(typeof _patchReviewCharts === 'function') _patchReviewCharts();
   // (The former tx-next patch was removed with the old Transactions tab —
   // Spend Insights owns its own chart and re-renders in full.)
   // Monthly allocation & running balance chart (ff-chart) —
@@ -10700,12 +10712,46 @@ if(typeof bus !== 'undefined'){
 //       destroy the DOM the user is typing into.
 let _liveRenderTimer = null;
 let _pendingFullRender = false;
+// Render de-dup. Most click handlers do `save(); renderX();` — the panel
+// is already fresh, yet the step-2 rebuild below re-rendered it ~200 ms
+// later, rebuilding every chart and resetting inputs a second time (the
+// visible "double flash" after each press). Every state change bumps
+// _changeSeq; every panel render stamps the seq it reflects. Step 2 is
+// skipped when the active panel was rendered after the latest change.
+let _changeSeq = 0;
+const _panelRenderSeq = {};
+function _activePanelFresh(){
+  return _panelRenderSeq[state.activePanel || 'dashboard'] === _changeSeq;
+}
+(function wrapPanelRenderers(){
+  const map = {
+    renderDashboard:'dashboard', renderTransactions:'transactions', renderReview:'review',
+    renderRetirement:'retirement', renderFunFund:'funfund', renderRetireAnywhere:'retireanywhere',
+    renderLifeWall:'lifewall', renderPropIQ:'propiq', renderJournal:'journal',
+    renderVault:'vault', renderSettings:'settings',
+    // Sub-renderers of the review tab only count for the visible scope.
+    renderMonthly:'review:monthly', renderYearly:'review:yearly',
+  };
+  Object.keys(map).forEach(name => {
+    const orig = window[name];
+    if(typeof orig !== 'function') return;
+    const [panel, scope] = map[name].split(':');
+    window[name] = function(){
+      const out = orig.apply(this, arguments);
+      if(!scope || (state.reviewScope === 'yearly' ? 'yearly' : 'monthly') === scope){
+        _panelRenderSeq[panel] = _changeSeq;
+      }
+      return out;
+    };
+  });
+})();
 function _isEditingNow(){
   const ae = document.activeElement;
   return !!(ae && (ae.tagName === 'INPUT' || ae.tagName === 'TEXTAREA' || ae.tagName === 'SELECT') && !ae.disabled);
 }
 function _flushFullRender(){
   if(!_pendingFullRender) return;
+  if(_activePanelFresh()){ _pendingFullRender = false; return; }
   if(_isEditingNow()) return;
   _pendingFullRender = false;
   try {
@@ -10716,6 +10762,7 @@ function _flushFullRender(){
   } catch(e){ console.warn('live render failed', e); }
 }
 bus.on('state:changed', () => {
+  _changeSeq++;
   clearTimeout(_liveRenderTimer);
   _liveRenderTimer = setTimeout(() => {
     try {
@@ -11017,7 +11064,7 @@ function scopeShift(dir){
     const minYear = yearlyMinYear();
     const next = (state.selectedYear||minYear) + dir;
     state.selectedYear = Math.min(Math.max(minYear, next), Math.max(minYear, retireYear));
-    save(); renderAll();
+    save(); renderPanel(panel); if(typeof decoratePanel==='function') decoratePanel(panel); updateScopeChip();
   } else {
     // advance selectedMonth; clamp into the review window (prev month + 12 forward)
     const months = getMonthlyReviewMonths();
@@ -11028,8 +11075,8 @@ function scopeShift(dir){
     state.selectedMonth = months[idx].key;
     save();
     // Re-render only if we're on a panel that cares about the month.
-    if(panel==='review'||panel==='dashboard'||panel==='funfund') renderAll();
-    else updateScopeChip();
+    if(panel==='review'||panel==='dashboard'||panel==='funfund'){ renderPanel(panel); if(typeof decoratePanel==='function') decoratePanel(panel); }
+    updateScopeChip();
   }
 }
 function scopeChipClick(){
@@ -11526,13 +11573,20 @@ function chartPreset(overrides){
   }
   return base;
 }
-function destroyChart(key) { if(charts[key]){charts[key].destroy();delete charts[key];} }
+// A chart rebuilt right after its predecessor was destroyed (re-render
+// after a click/edit) skips the grow-from-zero intro animation — replaying
+// it on every press made the charts visibly jump. First paints still animate.
+let _lastChartDestroyAt = 0;
+function destroyChart(key) { if(charts[key]){charts[key].destroy();delete charts[key];_lastChartDestroyAt=performance.now();} }
 // Desktop chart sites call newChart() instead of `new Chart()` so a missing
 // Chart.js (every CDN unreachable, or still loading) leaves the canvas blank
 // instead of throwing and killing the rest of the panel render. Returns null
 // in that case; whenChartLibs() re-renders once the library arrives.
 function newChart(ctx, cfg) {
   if(typeof window.Chart !== 'function'){ whenChartLibs(); return null; }
+  if(cfg && performance.now() - _lastChartDestroyAt < 1500){
+    cfg.options = { ...(cfg.options || {}), animation:false };
+  }
   return new Chart(ctx, cfg);
 }
 // Polls for late-arriving Chart.js / Leaflet (same idea as HZMobile.whenLib)
@@ -14123,23 +14177,19 @@ function renderMonthly() {
   // the renderer where to read/write state.paidFlags.
   renderLineItems('mo-exp',sel.expenseItems,expKey,false,sel.isCurrent?selKey:false);
 
-  setTimeout(()=>{
-    // Two charts. Both are driven by the same get12Months() result so
-    // they never disagree. The left chart is a simple bar-vs-bar read
-    // of money in vs money out for each month; the right chart is the
-    // running cumulative balance of the savings and fun-fund streams,
-    // which is what the user actually wants to see when they ask
-    // "how much am I stacking up?".
+  // requestAnimationFrame (not a 50 ms timeout) so the new charts are
+  // drawn before the next paint — no blank-canvas flash between renders.
+  requestAnimationFrame(()=>{
+    // Two charts, both covering the 12 months from the selected month
+    // (see getReviewChartWindow). The left chart is money in vs money
+    // out per month; the right chart is the running cumulative balance
+    // of the savings and fun-fund streams.
     destroyChart('mo-ie');
     destroyChart('mo-nf');
-    const all = get12Months();
-    const labels = all.map(m => m.short);
-    // Running cumulative series — savings cumulate across the window
-    // while Fun Fund reads the already-chained m.funFund. Both come
-    // from FinancialEngine so the left chart matches the Monthly
-    // Summary bar + the Fun Fund tab byte-for-byte.
-    const savingsRunning = FE.months.runningSavings();
-    const funFundRunning = FE.months.runningFunFund();
+    const win = getReviewChartWindow(selKey);
+    const labels = win.labels;
+    const savingsRunning = win.savingsRunning;
+    const funFundRunning = win.funFundRunning;
 
     // Cache resolved labels so liveSyncMonthlyReview can match
     // against the same translated strings when patching datasets.
@@ -14154,8 +14204,8 @@ function renderMonthly() {
         data:{
           labels,
           datasets:[
-            {label:_lblIncome,   data: all.map(m => m.pureIncome),   backgroundColor:'#00e8a028', borderColor:'#00e8a0', borderWidth:1.75, borderRadius:4, categoryPercentage:0.7, barPercentage:0.85},
-            {label:_lblExpenses, data: all.map(m => m.pureExpenses), backgroundColor:'#ff4d6d22', borderColor:'#ff4d6d', borderWidth:1.75, borderRadius:4, categoryPercentage:0.7, barPercentage:0.85},
+            {label:_lblIncome,   data: win.income,   backgroundColor:'#00e8a028', borderColor:'#00e8a0', borderWidth:1.75, borderRadius:4, categoryPercentage:0.7, barPercentage:0.85},
+            {label:_lblExpenses, data: win.expenses, backgroundColor:'#ff4d6d22', borderColor:'#ff4d6d', borderWidth:1.75, borderRadius:4, categoryPercentage:0.7, barPercentage:0.85},
           ]
         },
         options:chartPreset()
@@ -14183,7 +14233,7 @@ function renderMonthly() {
         options:chartPreset()
       });
     }
-  },50);
+  });
   if(typeof updateScopeChip==='function') updateScopeChip();
 }
 window.addMonthlyItem=function(key,field){
@@ -14266,20 +14316,25 @@ function liveSyncMonthlyReview(selKey){
   // labels), while `months` above is getMonthlyReviewMonths() (13 entries:
   // prev month + rolling 12, needed for the review picker). Patching with
   // the 13-entry array shifted every bar one month left on each keystroke.
-  const chartMonths = get12Months();
+  _patchReviewCharts(key);
+}
+// Patch the two Monthly Review charts in place from the selected month's
+// 12-month window (same series renderMonthly builds them with).
+function _patchReviewCharts(selKey){
+  const win = getReviewChartWindow(selKey || state.selectedMonth);
   const ieChart = charts['mo-ie'];
   if(ieChart && ieChart.data && Array.isArray(ieChart.data.datasets)){
-    if(ieChart.data.datasets[0]) ieChart.data.datasets[0].data = chartMonths.map(m => m.pureIncome);
-    if(ieChart.data.datasets[1]) ieChart.data.datasets[1].data = chartMonths.map(m => m.pureExpenses);
-    ieChart.update('none');
+    ieChart.data.labels = win.labels;
+    if(ieChart.data.datasets[0]) ieChart.data.datasets[0].data = win.income;
+    if(ieChart.data.datasets[1]) ieChart.data.datasets[1].data = win.expenses;
+    try { ieChart.update('none'); } catch(_e){}
   }
   const nfChart = charts['mo-nf'];
   if(nfChart && nfChart.data && Array.isArray(nfChart.data.datasets)){
-    const savingsRunning = FE.months.runningSavings();
-    const funFundRunning = FE.months.runningFunFund();
-    if(nfChart.data.datasets[0]) nfChart.data.datasets[0].data = savingsRunning;
-    if(nfChart.data.datasets[1]) nfChart.data.datasets[1].data = funFundRunning;
-    nfChart.update('none');
+    nfChart.data.labels = win.labels;
+    if(nfChart.data.datasets[0]) nfChart.data.datasets[0].data = win.savingsRunning;
+    if(nfChart.data.datasets[1]) nfChart.data.datasets[1].data = win.funFundRunning;
+    try { nfChart.update('none'); } catch(_e){}
   }
 }
 
@@ -23859,6 +23914,12 @@ class HZMobile {
     // pointer to it (state.activePanel can be 'propiq' from desktop) to Dashboard.
     if(this.data.tab==='property'||this.data.tab==='propiq')this.data.tab='dashboard';
     const t=this.data.tab;
+    // Re-paints of the tab already on screen (a tap on a month, a toggle,
+    // a saved edit) keep the scroll position and skip the fade-in — only a
+    // real tab switch animates and starts at the top. Previously every tap
+    // replayed the entrance animation and jumped back to the top.
+    if(this._paintedTab===t)silent=true;
+    this._paintedTab=t;
     const prevScroll=silent?this.body.scrollTop:0;
     this.nav.querySelectorAll('[data-nav]').forEach(b=>{const map={dashboard:'dashboard',lifewall:'lifewall',spend:'spend',retirement:'retirement'};const on=(b.dataset.nav===map[t])||(b.dataset.nav==='__more'&&!map[t]);b.classList.toggle('active',on);});
     let h='';
