@@ -6136,6 +6136,10 @@ const STRINGS = {
                               sv:'Visar ärvd grunddata — redigera ett fält för att skapa en överskrift' },
   'monthly.summary.label':  { en:'MONTH SUMMARY — {month}',
                               sv:'MÅNADSSAMMANFATTNING — {month}' },
+  'monthly.item.carryFrom': { en:'Carry-forward from {month}', sv:'Överfört från {month}' },
+  'monthly.item.deficitFrom':{ en:'Deficit from {month}',    sv:'Underskott från {month}' },
+  'monthly.item.trip':      { en:'Trip',                     sv:'Resa' },
+  'monthly.item.expense':   { en:'Expense',                  sv:'Utgift' },
   'monthly.summary.rolling':{ en:'12 mo: {amt}',           sv:'12 mån: {amt}' },
   'monthly.summary.rolling.title':{ en:'Total for the 12 months {from} – {to}',
                               sv:'Summa för de 12 månaderna {from} – {to}' },
@@ -7440,7 +7444,13 @@ function save() {
   // Cloud sync: flag a pending upload + debounce a push (no-op unless the
   // user has connected a project and auto-sync is on; skipped mid-pull).
   if(typeof _syncOnLocalChange === 'function') _syncOnLocalChange();
-  saveTimer = setTimeout(() => {
+  saveTimer = setTimeout(_writeStateNow, 400);
+}
+// The actual localStorage write behind save()'s 400 ms debounce. Also
+// called directly by flushPendingSave() when the page is hidden/closed.
+function _writeStateNow(){
+  saveTimer = null;
+  {
     // Strip vault before stringifying the main state blob. The
     // vault has its own storage key (see saveVault + loadState).
     // This keeps per-keystroke save payloads small and stops the
@@ -7459,8 +7469,14 @@ function save() {
     } finally {
       state.vault = vaultRef;
     }
-  }, 400);
+  }
 }
+// Write any debounced save immediately when the page is hidden or closed —
+// otherwise an edit made in the last 400 ms (e.g. typing an amount and
+// swiping the app away on a phone) was lost.
+function flushPendingSave(){ if(saveTimer){ clearTimeout(saveTimer); _writeStateNow(); } }
+window.addEventListener('pagehide', flushPendingSave);
+document.addEventListener('visibilitychange', () => { if(document.visibilityState === 'hidden') flushPendingSave(); });
 // Save confirmation badge removed — auto-save is now silent. This
 // no-op stub is kept so any stale call sites (including the
 // applyCurrency helper and third-party inline handlers) don't throw.
@@ -7719,11 +7735,11 @@ async function syncNow(){ return syncPull({ onLoad:false }); }
 // _syncApplying guard semantics. save() is debounced; force an immediate write
 // of the credentials/stamps so a reload can't lose them.
 function _syncPersist(){
+  // Never touch state.vault here — the spread copy already drops it. The
+  // old version blanked state.vault before setItem, so a quota throw
+  // skipped the restore and save()/sync then persisted an empty vault.
   try {
-    const vaultRef = state.vault;
-    state.vault = undefined;
     localStorage.setItem(STORAGE_KEY, JSON.stringify({ ...state, vault:undefined }));
-    state.vault = vaultRef;
   } catch(_){ save(); }
 }
 function _syncDeviceLabel(){
@@ -7736,8 +7752,12 @@ function _syncDeviceLabel(){
 // echoing a remote change doesn't bounce back, and while signed out so edits
 // made before sign-in aren't lost (they push on the next sync once signed in).
 function _syncOnLocalChange(){
-  if(_syncApplying || !syncConfigured() || !state.sync.autoSync) return;
+  if(_syncApplying || !syncConfigured()) return;
+  // Always flag local edits — even with auto-sync off — so a manual
+  // "Sync now" pushes them (or raises the conflict prompt) instead of
+  // reporting up-to-date or silently applying the cloud copy over them.
   state.sync.pendingPush = true;
+  if(!state.sync.autoSync) return; // manual mode: no auto push
   if(!_syncUser) return; // hold the flag; push happens after sign-in
   clearTimeout(_syncPushTimer);
   _syncPushTimer = setTimeout(() => { syncPush(); }, 2500);
@@ -8018,7 +8038,7 @@ function fmt(v, cur) {
 function fmtC(v, cur) {
   cur=cur||state.currency; const c=v*rate(cur); const s=sym(cur);
   const a=Math.abs(c);
-  const n = a>=1e6 ? `${(a/1e6).toFixed(1)}M` : a>=1e3 ? `${(a/1e3).toFixed(0)}K` : `${Math.round(a)}`;
+  const n = a>=999.5e3 ? `${(a/1e6).toFixed(1)}M` : a>=999.5 ? `${(a/1e3).toFixed(0)}K` : `${Math.round(a)}`;
   return `${(c<0&&n!=='0')?'−':''}${s}${n}`;
 }
 function inSEK(displayVal) { return +displayVal / rate(); }
@@ -8257,6 +8277,9 @@ function getYearlyPlan() {
   });
 }
 
+// t() alias for code where a local `t` (trip) shadows the i18n helper.
+function _tr(key, vars){ return t(key, vars); }
+
 // Internal 13-entry window used ONLY as the raw chain computation.
 // Public views — get12Months() and getNext12Forward() — slice this
 // to expose exactly 12 entries in their respective semantics. We
@@ -8300,7 +8323,7 @@ function _get13MonthChain() {
           if(!(Number(ex.amount) > 0)) return;
           expenseItems.push({
             id: `trip-${t.id}-${ex.id}`,
-            name: `${icon} ${t.name || 'Trip'} · ${ex.name || 'Expense'}`,
+            name: `${icon} ${t.name || _tr('monthly.item.trip')} · ${ex.name || _tr('monthly.item.expense')}`,
             amount: Number(ex.amount) || 0,
             type: 'variable',
             fromTrip: true,
@@ -8380,7 +8403,7 @@ function _get13MonthChain() {
           const target = onIncome ? m.incomeItems : m.expenseItems;
           target.push({
             id: `carry-${m.key}`,
-            name: onIncome ? `Carry-forward from ${prev.short}` : `Deficit from ${prev.short}`,
+            name: _tr(onIncome ? 'monthly.item.carryFrom' : 'monthly.item.deficitFrom', { month: prev.short }),
             amount: Math.round(Math.abs(displayCarry)),
             type: 'fixed',
             carryForward: true,
@@ -8448,7 +8471,7 @@ function getPrevMonthEntry() {
         if (!(Number(ex.amount) > 0)) return;
         expenseItems.push({
           id: `trip-${t.id}-${ex.id}`,
-          name: `${icon} ${t.name || 'Trip'} · ${ex.name || 'Expense'}`,
+          name: `${icon} ${t.name || _tr('monthly.item.trip')} · ${ex.name || _tr('monthly.item.expense')}`,
           amount: Number(ex.amount) || 0,
           type: 'variable',
           fromTrip: true,
@@ -8526,15 +8549,22 @@ function getProjection() {
     let appAcc=0;
     const data=[];
 
+    // Horizon is exactly ytr×12 months from the current month: year 0
+    // runs CM..Dec, middle years are full, and the retirement year runs
+    // Jan..CM-1. Previously every year after the first was a full 12
+    // months, so the horizon shrank a month at a time and then jumped
+    // by 11 months each New Year (nest egg +~6% on 1 January).
     for (let y=0; y<=ytr; y++) {
       const year=CY+y;
-      const startMo=y===0?CM:0, months=y===0?12-CM:12;
+      const startMo=y===0?CM:0;
+      const endMo=(y===ytr && y>0)?CM:12;
+      const months=endMo-startMo;
       let totalSav=0;
-      for (let m=startMo; m<12; m++) totalSav+=getEffective(year,m).savings;
+      for (let m=startMo; m<endMo; m++) totalSav+=getEffective(year,m).savings;
       const ms=months>0?totalSav/months:0;
       const rApp=state.growthRate/100/12;
       if(y===0) appAcc=ms*months;
-      else appAcc=appAcc*Math.pow(1+rApp,12)+ms*_annuityFactor(rApp,12);
+      else appAcc=appAcc*Math.pow(1+rApp,months)+ms*_annuityFactor(rApp,months);
       let ext=0;
       // Per-account balance snapshot for year y, keyed by account id so
       // downstream consumers (series catalog, chart builder) can plot each
@@ -8551,7 +8581,7 @@ function getProjection() {
           : grossRate;
         const ra = effectiveRate / 100 / 12;
         if(y===0) assetBals[idx]=a.balance*Math.pow(1+ra,months)+a.monthlyContribution*_annuityFactor(ra,months);
-        else assetBals[idx]=assetBals[idx]*Math.pow(1+ra,12)+a.monthlyContribution*_annuityFactor(ra,12);
+        else assetBals[idx]=assetBals[idx]*Math.pow(1+ra,months)+a.monthlyContribution*_annuityFactor(ra,months);
         ext+=assetBals[idx];
         perAccount[a.id] = Math.round(assetBals[idx]);
       });
@@ -17016,7 +17046,7 @@ function renderRetireAnywhere() {
     return `<div class="loc-card ${loc.verdict}${analysed?'':' estimate'}">
       <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:6px">
         <div>
-          <div class="loc-name">${loc.flag} ${esc(loc.name)}</div>
+          <div class="loc-name">${esc(loc.flag||"")} ${esc(loc.name)}</div>
           <div class="loc-country">${esc(loc.country)}</div>
         </div>
         ${verdictBadge}
@@ -17076,8 +17106,8 @@ function renderRetireAnywhere() {
                   : '#ff4d6d';
       const vText = STRINGS['ra.verdict.'+loc.verdict] ? t('ra.verdict.'+loc.verdict) : loc.label;
       const popup = loc.analysed
-        ? `<strong>${loc.flag} ${esc(loc.name)}</strong><br><span style="color:${color};font-weight:700">${esc(vText)}</span><br>${esc(t('ra.map.cost', { couple: loc.householdSize===2 ? t('ra.couple') : '', amt: fmt(raD(loc.effCostOfLiving)) }))}<br>${esc(t('ra.map.disc', { amt: fmt(raD(loc.surplus)) }))}`
-        : `<strong>${loc.flag} ${esc(loc.name)}</strong><br><span style="color:${color};font-weight:700">${esc(vText)}</span> · ${esc(t('ra.card.estimate'))}<br><span style="color:var(--text3)">${esc(t('ra.map.estimate'))}</span>`;
+        ? `<strong>${esc(loc.flag||"")} ${esc(loc.name)}</strong><br><span style="color:${color};font-weight:700">${esc(vText)}</span><br>${esc(t('ra.map.cost', { couple: loc.householdSize===2 ? t('ra.couple') : '', amt: fmt(raD(loc.effCostOfLiving)) }))}<br>${esc(t('ra.map.disc', { amt: fmt(raD(loc.surplus)) }))}`
+        : `<strong>${esc(loc.flag||"")} ${esc(loc.name)}</strong><br><span style="color:${color};font-weight:700">${esc(vText)}</span> · ${esc(t('ra.card.estimate'))}<br><span style="color:var(--text3)">${esc(t('ra.map.estimate'))}</span>`;
       return { lat: loc.lat, lng: loc.lng, color, popup, fillOpacity: loc.analysed ? 0.7 : 0.3 };
     });
     retireMap = createWorldMap('retire-map', points, {center:[20,20], zoom:2});
@@ -17091,7 +17121,7 @@ window.showLocDetail=function(id){
   const nums=getRetirementNumbers();
   const monthlyIncome=nums.totalGross; // pre-tax "income needed" — matches Retirement Plan tab
   document.getElementById('loc-modal-content').innerHTML=`
-    <div style="font-size:28px;margin-bottom:6px">${loc.flag}</div>
+    <div style="font-size:28px;margin-bottom:6px">${esc(loc.flag||"")}</div>
     <div class="modal-title">${esc(loc.name)}, ${esc(loc.country)}</div>
     <div style="margin-bottom:14px"><span class="loc-verdict ${loc.verdict}">${loc.label}</span></div>
     <div class="loc-affordability-bar" style="height:10px"><div class="loc-affordability-fill" style="width:${Math.round(loc.affordabilityScore*100)}%;background:${loc.verdict==='feasible'?'var(--green)':loc.verdict==='conditional'?'var(--amber)':'var(--red)'}"></div></div>
@@ -19252,7 +19282,12 @@ window.importSlice=function(input, sliceKey){
         // order matters), then replace wholesale.
         migrate(d);
         const keepKeys = state.aiKeys;
+        // Keep THIS device's cloud-sync block — a backup's stale copy
+        // (old remoteStamp, pendingPush:false) let the next pull treat
+        // the cloud as newer and silently discard the restored data.
+        const keepSync = state.sync;
         Object.assign(state, d);
+        state.sync = keepSync;
         state.aiKeys = _mergeImportedAiKeys(keepKeys, d.aiKeys);
         // The vault has its own storage key and save() deliberately strips
         // it from the main blob — without an explicit saveVault() here the
@@ -19291,7 +19326,9 @@ window.importData=function(input){
     try{
       const d=JSON.parse(e.target.result);
       const keepKeys=state.aiKeys;
+      const keepSync=state.sync; // see importSlice: never adopt a backup's sync block
       Object.assign(state,d); migrate(state);
+      state.sync=keepSync;
       state.aiKeys=_mergeImportedAiKeys(keepKeys, d.aiKeys);
       invalidateSelectors();
       // Imported backups may embed the vault inline — persist it to
@@ -23384,10 +23421,11 @@ class HZMobile {
     d.growthRate=this.n(s.growthRate,7);
     d.inflationRate=this.n(s.inflationRate,2);
     d.postRetGrowth=this.n(s.retirementPostGrowth,4);
-    d.withdrawTaxRate=this.n(s.savingsTaxRate,20);
+    d.withdrawTaxRate=this.n(s.savingsTaxRate,30);
     d.baseSavings=this.n(s.baseSavings,0);
     const fx=s.exchangeRates||{};
-    d.exchangeRates={SEK:1,USD:this.n(fx.USD,0.094)||0.094,EUR:this.n(fx.EUR,0.087)||0.087,KES:this.n(fx.KES,12.1)||12.1};
+    const _dr=(typeof DEFAULT_RATES!=='undefined')?DEFAULT_RATES:{USD:0.11,EUR:0.09,KES:14.27};
+    d.exchangeRates={SEK:1,USD:this.n(fx.USD,_dr.USD)||_dr.USD,EUR:this.n(fx.EUR,_dr.EUR)||_dr.EUR,KES:this.n(fx.KES,_dr.KES)||_dr.KES};
     // Clean copies of assets: balance/contribution coerced; growthRate coerced
     // only when present so absent rates keep falling back to the global rate.
     d.externalAssets=(s.externalAssets||[]).map(a=>Object.assign({},a,{
@@ -23650,7 +23688,7 @@ class HZMobile {
   // never as "NaN" in the ticker/KPIs.
   // Sign goes before the currency symbol ("−$1,234"), matching desktop fmt/fmtC.
   fmt(v,cur){v=this.n(v,0);cur=cur||this.data.currency;const r=Object.assign({SEK:1},this.data.exchangeRates);const c=v*(this.n(r[cur],1)||1);const sym={SEK:'kr',USD:'$',EUR:'€',KES:'KSh'}[cur]||'kr';if(cur==='SEK')return `${Math.round(c).toLocaleString('sv-SE')} ${sym}`;const a=Math.round(Math.abs(c)),m=(c<0&&a>0)?'−':'';if(cur==='KES')return `${m}${sym} ${a.toLocaleString()}`;return `${m}${sym}${a.toLocaleString()}`;}
-  fmtC(v){v=this.n(v,0);const r=Object.assign({SEK:1},this.data.exchangeRates);const cur=this.data.currency;const sym={SEK:'SEK',USD:'$',EUR:'€',KES:'KSh'}[cur]||'SEK';const c=v*(this.n(r[cur],1)||1);const a=Math.abs(c);const n=a>=1e6?`${(a/1e6).toFixed(1)}M`:a>=1e3?`${Math.round(a/1e3)}K`:Math.round(a).toLocaleString();const m=(c<0&&n!=='0')?'−':'';return cur==='SEK'?`${m}${n} SEK`:`${m}${sym}${n}`;}
+  fmtC(v){v=this.n(v,0);const r=Object.assign({SEK:1},this.data.exchangeRates);const cur=this.data.currency;const sym={SEK:'SEK',USD:'$',EUR:'€',KES:'KSh'}[cur]||'SEK';const c=v*(this.n(r[cur],1)||1);const a=Math.abs(c);const n=a>=999.5e3?`${(a/1e6).toFixed(1)}M`:a>=999.5?`${Math.round(a/1e3)}K`:Math.round(a).toLocaleString();const m=(c<0&&n!=='0')?'−':'';return cur==='SEK'?`${m}${n} SEK`:`${m}${sym}${n}`;}
   esc(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
   addMonths(b,n){return new Date(b.getFullYear(),b.getMonth()+n,1);}
   whenLib(check,cb){if(check()){cb();return;}let n=0;const t=setInterval(()=>{if(check()||n++>50){clearInterval(t);if(check())cb();}},100);}
@@ -24062,7 +24100,7 @@ class HZMobile {
       const badge=t.fit.overCapacity?this.chip('rose','OVER CAPACITY'):(t.status==='booked'?this.chip('info','BOOKED'):this.chip('honey','PLANNING'));
       const sub=[this.esc(t.country),this.esc(t.range||'No date')].filter(Boolean).join(' · ');
       const tonec={pos:'var(--green)',warn:'var(--amber)',neg:'var(--red)',dim:'var(--text3)'}[t.fit.tone]||'var(--text3)';
-      return `<div data-act="edittrip" data-id="${t.id}" style="padding:11px 0;border-bottom:1px solid var(--border);cursor:pointer"><div style="display:flex;align-items:center;gap:10px"><div style="font-size:20px">${t.icon}</div><div style="flex:1;min-width:0"><div style="font-size:13px;font-weight:600">${this.esc(t.name)}</div><div style="font-size:10.5px;color:var(--text2)">${sub||'No date'}</div></div><div style="text-align:right"><div style="font-family:var(--fm);font-weight:600;color:var(--amber)">${this.fmtC(t.budget)}</div><div style="margin-top:3px">${badge}</div></div><button data-act="rmtrip" data-id="${t.id}" style="background:none;border:none;color:var(--red);font-size:18px;line-height:1;cursor:pointer;opacity:.55;padding:8px;margin:-6px -4px -6px 0;flex-shrink:0" aria-label="Remove trip">×</button></div><div style="font-size:10.5px;color:${tonec};font-family:var(--fm);margin-top:6px;padding-left:30px">${t.fit.msg}</div></div>`;
+      return `<div data-act="edittrip" data-id="${t.id}" style="padding:11px 0;border-bottom:1px solid var(--border);cursor:pointer"><div style="display:flex;align-items:center;gap:10px"><div style="font-size:20px">${this.esc(t.icon||"")}</div><div style="flex:1;min-width:0"><div style="font-size:13px;font-weight:600">${this.esc(t.name)}</div><div style="font-size:10.5px;color:var(--text2)">${sub||'No date'}</div></div><div style="text-align:right"><div style="font-family:var(--fm);font-weight:600;color:var(--amber)">${this.fmtC(t.budget)}</div><div style="margin-top:3px">${badge}</div></div><button data-act="rmtrip" data-id="${t.id}" style="background:none;border:none;color:var(--red);font-size:18px;line-height:1;cursor:pointer;opacity:.55;padding:8px;margin:-6px -4px -6px 0;flex-shrink:0" aria-label="Remove trip">×</button></div><div style="font-size:10.5px;color:${tonec};font-family:var(--fm);margin-top:6px;padding-left:30px">${t.fit.msg}</div></div>`;
     }).join(''):`<div style="color:var(--text3);font-size:12px">No trips planned yet — tap “+ Add Trip” to see how a trip changes your fun fund.</div>`));
     h+=this.card(this.ct('📊 Fun Fund · 12-Month Balance Outlook')+`<div style="height:190px"><canvas id="hzFFBalChart"></canvas></div><div style="font-size:10.5px;color:var(--text3);margin-top:9px;line-height:1.45">Each bar is your carry-forward fun-fund balance 12 months on from that month. <span style="color:var(--green)">Green</span> = surplus; <span style="color:var(--red)">red</span> = a planned trip tips you into deficit.</div>`);
     h+=this.card(this.ct('🗺 Destination Map')+`<div id="hzVacMap" style="height:200px;border-radius:11px;overflow:hidden;border:1px solid var(--border)"></div>`);
@@ -24139,7 +24177,7 @@ class HZMobile {
     const body=kpiGrid+detail;
     return `<div data-act="editdest" data-id="${loc.id}" style="padding:12px 0;border-bottom:1px solid var(--border);cursor:pointer">
       <div style="display:flex;align-items:flex-start;gap:10px">
-        <div style="font-size:22px">${loc.flag||'📍'}</div>
+        <div style="font-size:22px">${this.esc(loc.flag||'📍')}</div>
         <div style="flex:1;min-width:0"><div style="font-size:14px;font-weight:600">${this.esc(loc.name)}</div><div style="font-size:10.5px;color:var(--text3)">${this.esc(loc.country||'')}${loc.climate?' · '+this.esc(loc.climate):''}</div></div>
         ${headChip}
       </div>${body}${ai}
@@ -24168,7 +24206,7 @@ class HZMobile {
     if(!this._ddRunning)this._ddRunning=new Set();
     this._ddRunning.add(id);
     if(this.data.tab==='retireanywhere')this.paint(true);
-    this.sheet(`${loc.flag||'📍'} ${this.esc(loc.name)} · Deep Dive`,`<div style="display:flex;align-items:center;gap:10px;color:var(--text2);font-size:13px;padding:10px 0"><span style="width:16px;height:16px;border:2px solid var(--border2);border-top-color:var(--green);border-radius:50%;display:inline-block;animation:hzspin .8s linear infinite;flex-shrink:0"></span><span>Generating your Deep Dive report… this takes 20–40 seconds. You can close this and keep using the app — the card shows progress.</span></div>`,'Tailored to your citizenship, home base and retirement income.');
+    this.sheet(`${this.esc(loc.flag||'📍')} ${this.esc(loc.name)} · Deep Dive`,`<div style="display:flex;align-items:center;gap:10px;color:var(--text2);font-size:13px;padding:10px 0"><span style="width:16px;height:16px;border:2px solid var(--border2);border-top-color:var(--green);border-radius:50%;display:inline-block;animation:hzspin .8s linear infinite;flex-shrink:0"></span><span>Generating your Deep Dive report… this takes 20–40 seconds. You can close this and keep using the app — the card shows progress.</span></div>`,'Tailored to your citizenship, home base and retirement income.');
     try{
       const nums=(typeof getRetirementNumbers==='function')?getRetirementNumbers():null;
       const income=nums?this.n(nums.totalGross,0):this.retIncome();
@@ -24228,7 +24266,7 @@ class HZMobile {
       +`<div><label style="${lbl}">Notes</label><input id="edNotes" value="${this.esc(loc.notes||'')}" placeholder="Visa, healthcare, anything to remember" style="${inp}"></div>`
       +`</div><div style="margin-top:14px">`+this.btn('Save','savedest','','g')
       +`<button data-act="rmdest" data-id="${id}" style="width:100%;margin-top:8px;background:var(--rose-bg);color:var(--rose-tx);border:1px solid var(--rose-bd);border-radius:8px;padding:10px;font-size:12px;font-weight:600;cursor:pointer">Remove destination</button></div>`;
-    this.sheet(`${loc.flag||'📍'} ${this.esc(loc.name)}`,body,'Cost of living & tax come from the Deep Dive — re-run it to change them.');
+    this.sheet(`${this.esc(loc.flag||'📍')} ${this.esc(loc.name)}`,body,'Cost of living & tax come from the Deep Dive — re-run it to change them.');
   }
   saveDest(){
     const id=(document.getElementById('edId')||{}).value;if(!id||typeof state==='undefined')return;
@@ -24403,7 +24441,7 @@ class HZMobile {
   // display currency, exactly like the app's other charts.
   chartFFBal(){this.whenLib(()=>window.Chart,()=>{const s=this.ffSummary();if(!s)return;const bars=(s.balanceBars||[]).map(v=>Math.round(this.n(v,0)));const wm=s.windowMonths||[];const labs=wm.length?wm.map(m=>this.MN[(+String(m.key).slice(5,7))-1]||''):bars.map((_,i)=>this.MN[(new Date().getMonth()+i)%12]);const c=this.cc();const ctx=document.getElementById('hzFFBalChart');if(!ctx)return;if(this.charts.ffbal)this.charts.ffbal.destroy();this.charts.ffbal=new Chart(ctx,{type:'bar',data:{labels:labs,datasets:[{data:bars,backgroundColor:bars.map(v=>v>=0?'#00e8a055':'#ff4d6d55'),borderColor:bars.map(v=>v>=0?'#00e8a0':'#ff4d6d'),borderWidth:1.5,borderRadius:3}]},options:this.chOpts({plugins:{legend:{display:false},tooltip:{callbacks:{label:ctx=>this.fmtC(ctx.parsed.y)}}},scales:{x:{ticks:{color:c.t3,font:{size:9},maxTicksLimit:12},grid:{display:false}},y:{ticks:{color:c.t3,font:{size:9},callback:v=>this.fmtC(v)},grid:{color:c.grid}}}})});});}
   initVacMap(){this.whenLib(()=>window.L&&document.getElementById('hzVacMap'),()=>{if(this.vacMap){this.vacMap.remove();this.vacMap=null;}const el=document.getElementById('hzVacMap');if(!el)return;this.vacMap=L.map(el,{zoomControl:false}).setView([20,20],1);L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'© <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a>'}).addTo(this.vacMap);this.PULSE.forEach(d=>{const m=L.circleMarker([d.lat,d.lng],{radius:8,fillColor:d.col,color:d.col,fillOpacity:.8,weight:2});m.bindPopup(`<strong>${d.flag} ${d.dest}</strong><br>${d.cost}`);m.addTo(this.vacMap);});setTimeout(()=>this.vacMap&&this.vacMap.invalidateSize(),140);});}
-  initRetMap(){this.whenLib(()=>window.L&&document.getElementById('hzRetMap'),()=>{if(this.retMap){this.retMap.remove();this.retMap=null;}const el=document.getElementById('hzRetMap');if(!el)return;this.retMap=L.map(el,{zoomControl:false}).setView([25,10],1);L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'© <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a>'}).addTo(this.retMap);this.raScored().forEach(l=>{if(!l.lat&&!l.lng)return;const col={feasible:'#00e8a0',conditional:'#f5a623',infeasible:'#ff4d6d'}[l.verdict]||'#7a8fb0';const m=L.circleMarker([l.lat,l.lng],{radius:9,fillColor:col,color:col,fillOpacity:.8,weight:2});m.bindPopup(`<strong>${l.flag||''} ${this.esc(l.name)}</strong><br>${this.fmtC(this.n(l.costOfLiving,0))}/mo · surplus ${this.fmtC(this.n(l.surplus,0))}`);m.addTo(this.retMap);});setTimeout(()=>this.retMap&&this.retMap.invalidateSize(),140);});}
+  initRetMap(){this.whenLib(()=>window.L&&document.getElementById('hzRetMap'),()=>{if(this.retMap){this.retMap.remove();this.retMap=null;}const el=document.getElementById('hzRetMap');if(!el)return;this.retMap=L.map(el,{zoomControl:false}).setView([25,10],1);L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'© <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a>'}).addTo(this.retMap);this.raScored().forEach(l=>{if(!l.lat&&!l.lng)return;const col={feasible:'#00e8a0',conditional:'#f5a623',infeasible:'#ff4d6d'}[l.verdict]||'#7a8fb0';const m=L.circleMarker([l.lat,l.lng],{radius:9,fillColor:col,color:col,fillOpacity:.8,weight:2});m.bindPopup(`<strong>${this.esc(l.flag||'')} ${this.esc(l.name)}</strong><br>${this.fmtC(this.n(l.costOfLiving,0))}/mo · surplus ${this.fmtC(this.n(l.surplus,0))}`);m.addTo(this.retMap);});setTimeout(()=>this.retMap&&this.retMap.invalidateSize(),140);});}
 
   // ══════ EVENTS ══════
   onClick(e){const el=e.target.closest('[data-act]');if(!el)return;const a=el.dataset.act;const d=el.dataset;
