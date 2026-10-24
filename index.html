@@ -23341,6 +23341,127 @@ if(_origNav){
 (function(){
 'use strict';
 
+// ─── MOBILE SWEDISH ──────────────────────────────────────────────────────────
+// The mobile shell (HZMobile) builds its markup from English literals. Rather
+// than threading t() through ~1,300 lines of template strings, every paint /
+// sheet / toast runs the rendered text through hzSv(): exact phrases first,
+// then a few patterns for strings that embed numbers. English is untouched
+// (hzSv returns its input when state.lang !== 'sv').
+const HZ_SV_EXACT = {
+  'OVERVIEW':'ÖVERSIKT','PERSONAL FINANCES':'PERSONLIG EKONOMI','PLANNING':'PLANERING','LIBRARY':'BIBLIOTEK','SYSTEM':'SYSTEM',
+  'Overview':'Översikt','Personal Finances':'Personlig ekonomi','Planning':'Planering','Library':'Bibliotek','System':'System',
+  'Home':'Hem','Spend':'Utgifter','Retire':'Pension','More':'Mer','Life Wall':'Livsväggen',
+  'Dashboard':'Översikt','Spend Insights':'Utgiftsinsikter','Forecast & Review':'Prognos & genomgång','Retirement Plan':'Pensionsplan',
+  'Retire Anywhere':'Pensionera var som helst','Retire anywhere':'Pensionera var som helst','Journal':'Dagbok','Vault':'Arkiv','Settings':'Inställningar',
+  'Where you stand today':'Där du står i dag','Live position ·':'Aktuell position ·',
+  'Years to Retire':'År till pension','Retire Status':'Pensionsstatus','Well Funded':'Väl finansierad','✅ Well Funded':'✅ Väl finansierad',
+  '⇄ Cash Flow This Month':'⇄ Kassaflöde denna månad','📊 Net Cash Flow · 12-Month':'📊 Nettokassaflöde · 12 mån',
+  'HORIZON AI · FULL ANALYSIS':'HORIZON AI · FULLSTÄNDIG ANALYS','✦ Run full analysis':'✦ Kör full analys',
+  'Jump to':'Gå till','Budget':'Budget','Retirement':'Pension',
+  'Where your money goes':'Vart dina pengar tar vägen','Bank transactions, grouped and analysed.':'Banktransaktioner, grupperade och analyserade.',
+  'No bank data on this account yet.':'Inga bankdata på det här kontot än.','Upload your bank\'s CSV/Excel export in':'Ladda upp bankens CSV/Excel-export i',
+  'Spend Insights on desktop':'Utgiftsinsikter på datorn','— it syncs here automatically. Or load sample data to explore.':'— det synkas hit automatiskt. Eller ladda exempeldata för att utforska.',
+  '🏦 Get started':'🏦 Kom igång','Most banks offer':'De flesta banker erbjuder','“Export as CSV”':'”Exportera som CSV”',
+  '🏦 Connect bank':'🏦 Anslut bank','📊 Load demo data':'📊 Ladda demodata',
+  'Plan the month ahead':'Planera månaden','Edit the baseline or override any single month.':'Redigera grunden eller ändra en enskild månad.',
+  'BASELINE':'GRUND','Net':'Netto','Flow':'Flöde','💰 Income':'💰 Inkomster','+ Add':'+ Lägg till','📤 Expenses':'📤 Utgifter',
+  '🏦 Savings Allocation':'🏦 Sparfördelning','Monthly savings (SEK)':'Månadssparande (SEK)','Fun Fund (auto)':'Fun Fund (auto)',
+  '📈 12-Month Forecast':'📈 12-månadersprognos','Are you on track?':'Är du på rätt spår?','Today':'Dagens','Nominal':'Nominellt','Real':'Real',
+  '🧮 Income Requirements':'🧮 Inkomstbehov','Total needed · pre-tax':'Totalt behov · före skatt','Avg withdrawal':'Snittuttag',
+  '/mo across retirement':'/mån under pensionen','Avg rate':'Snittakt','within 4% safe':'inom säkra 4 %','Net income':'Nettoinkomst',
+  'portfolio + pension, after tax':'portfölj + pension, efter skatt','Fund depletion':'Fonden tar slut','Never':'Aldrig','surplus at 90+':'överskott vid 90+',
+  'exp':'utg','portfolio ·':'portfölj ·','📈 Nest Egg Growth':'📈 Pensionskapitalets tillväxt','🔀 Lifestyle Scenarios':'🔀 Livsstilsscenarier',
+  'Projected leftover · today’s money':'Beräknat kvar · dagens pengar','Lean':'Snålt','Baseline':'Grund','Comfortable':'Bekvämt','● ACTIVE':'● AKTIV',
+  'Tap a scenario — the portfolio balance above, the verdict, and desktop all recalculate together.':'Tryck på ett scenario — portföljsaldot ovan, bedömningen och datorn räknas om tillsammans.',
+  '💸 Monthly Retirement Expenses':'💸 Månadsutgifter som pensionär','Fix':'Fast','Var':'Rörl','🏛 Pension Income':'🏛 Pensionsinkomst',
+  'No pensions yet — add Allmän, ITP or an annuity as monthly payouts.':'Inga pensioner än — lägg till allmän pension, ITP eller en livränta som månadsutbetalning.',
+  'Total pension':'Total pension','◆ Investment Assets':'◆ Investeringar','Savings Projection':'Sparprognos','💾 DERIVED':'💾 HÄRLEDD','at retirement':'vid pension',
+  'What can you afford?':'Vad har du råd med?','Project your discretionary fund forward and plan your next trip.':'Räkna fram din fria budget och planera nästa resa.',
+  'Fun fund is 0':'Fun Fund är 0','this month — expenses plus savings currently absorb all income. Trim a line in Budget to start building it.':'denna månad — utgifter plus sparande tar just nu hela inkomsten. Minska en rad i Budget för att börja bygga upp den.',
+  'Monthly Fund':'Månadsfond','This month, after savings':'Denna månad, efter sparande','Annual':'Årligt','Next 12 mo · after trips':'Nästa 12 mån · efter resor',
+  '6-Month Stack':'6-månadersbuffert','After planned trips':'Efter planerade resor','Saved Trips':'Sparade resor','Planned':'Planerat',
+  '✦ What Can You Afford?':'✦ Vad har du råd med?','Budget Explorer':'Budgetresenär','Hostels, local transport, street food':'Vandrarhem, lokaltrafik, gatumat',
+  'YOUR RANGE':'DIN NIVÅ','Mid-Range Comfort':'Mellanklass','3★ hotels, flights, dining out':'3★ hotell, flyg, restaurang',
+  'Luxury Experience':'Lyxupplevelse','5★ resorts, business class':'5★ resorter, business class','Months':'Månader',
+  '🎯 When Can I Afford It?':'🎯 När har jag råd?','Plan a Trip':'Planera en resa','Target trip budget (SEK)':'Målbudget för resa (SEK)',
+  'Enter a target budget above.':'Ange en målbudget ovan.','📅 Fun Fund Timeline':'📅 Fun Fund-tidslinje','💼 Your Trips':'💼 Dina resor','+ Add Trip':'+ Lägg till resa',
+  'BOOKED':'BOKAD','OVER CAPACITY':'ÖVER KAPACITET','PLANNING ':'PLANERING','📊 Fun Fund · 12-Month Balance Outlook':'📊 Fun Fund · saldo 12 mån framåt',
+  'Each bar is your carry-forward fun-fund balance 12 months on from that month.':'Varje stapel är ditt överförda Fun Fund-saldo 12 månader efter den månaden.',
+  'Green':'Grönt','= surplus;':'= överskott;','red':'rött','= a planned trip tips you into deficit.':'= en planerad resa ger underskott.',
+  '🗺 Destination Map':'🗺 Resmålskarta','Target retirement income':'Målinkomst som pensionär','Household':'Hushåll','👤 Single':'👤 Ensam','👥 Couple':'👥 Par',
+  'Deep Dives size cost of living, tax & discretionary income to you.':'Djupanalyser anpassar levnadskostnad, skatt och fri inkomst efter dig.',
+  'Feasible':'Genomförbar','Comfortably affordable':'Gott om marginal','Conditional':'Villkorlig','Tight but possible':'Snävt men möjligt',
+  'Income':'Inkomst','Years to Go':'År kvar','Until retirement':'Till pension','🗺 Retirement World Map':'🗺 Pensionskarta','📍 Destinations':'📍 Resmål',
+  'Affordable?':'Råd?','Discretionary':'Fri inkomst','Effective tax':'Effektiv skatt','Income rank':'Inkomstrang',
+  'Affordability is a quick estimate — run the analysis for city-specific figures for you.':'Överkomligheten är en snabb uppskattning — kör analysen för stadsspecifika siffror.',
+  '🔬 AI Deep Dive':'🔬 AI-djupanalys','CONDITIONAL · EST':'VILLKORLIG · UPPSK','FEASIBLE · EST':'GENOMFÖRBAR · UPPSK','INFEASIBLE · EST':'EJ GENOMFÖRBAR · UPPSK',
+  'CONDITIONAL':'VILLKORLIG','FEASIBLE':'GENOMFÖRBAR','INFEASIBLE':'EJ GENOMFÖRBAR',
+  'Every year from now to 90, one brick at a time.':'Varje år från nu till 90, en tegelsten i taget.','CURRENT LIFE CHAPTER':'NUVARANDE LIVSKAPITEL',
+  'Wealth Building':'Förmögenhetsuppbyggnad','✓ Funds are projected to last through age 90.':'✓ Pengarna beräknas räcka till 90 års ålder.',
+  'Building':'Uppbyggnad','Glide path':'Nedtrappning','🧱 The Wall':'🧱 Väggen','Tap any brick to see that year\'s projection.':'Tryck på en tegelsten för att se årets prognos.',
+  'Decisions and notes, timestamped alongside your numbers.':'Beslut och anteckningar, tidsstämplade bredvid dina siffror.','📓 Entries':'📓 Inlägg','+ New':'+ Ny',
+  'No entries yet. Tap “+ New” to record a decision.':'Inga inlägg än. Tryck på ”+ Ny” för att anteckna ett beslut.',
+  'Documents, statements and AI reports — encrypted at rest.':'Dokument, kontoutdrag och AI-rapporter — krypterade.',
+  'in your encrypted vault. Upload files or save analyses from anywhere in the app with':'i ditt krypterade arkiv. Ladda upp filer eller spara analyser var som helst i appen med',
+  '🗄 Save to Vault':'🗄 Spara i arkivet','🗄 Items':'🗄 Objekt','⬆ Upload':'⬆ Ladda upp','Your vault is empty.':'Ditt arkiv är tomt.',
+  'Profile, assumptions and appearance. Powers every AI analysis.':'Profil, antaganden och utseende. Används i varje AI-analys.',
+  '☁️ Cloud Sync':'☁️ Molnsynk','Supabase Project URL':'Supabase-projektets URL','Supabase anon key':'Supabase anon-nyckel','(public)':'(publik)','Connect':'Anslut',
+  'New to this? Open':'Ny på detta? Öppna','Settings → Cloud Sync':'Inställningar → Molnsynk','on desktop for the one-time Supabase setup guide.':'på datorn för Supabase-guiden (görs en gång).',
+  '🪪 Profile & Context':'🪪 Profil & sammanhang','Citizenship':'Medborgarskap','Home Base':'Hemort','Current Age':'Nuvarande ålder','Retirement Age':'Pensionsålder',
+  'Life Expectancy':'Förväntad livslängd','📊 Assumptions':'📊 Antaganden','Portfolio Growth %':'Portföljtillväxt %','Inflation %':'Inflation %',
+  'Post-Retire Growth %':'Tillväxt efter pension %','Savings Tax %':'Skatt på sparande %','✦ AI Key':'✦ AI-nyckel','🎨 Appearance':'🎨 Utseende',
+  'Currency':'Valuta','Language':'Språk','Theme':'Tema','☾ Switch to Dark':'☾ Byt till mörkt','☀ Switch to Light':'☀ Byt till ljust',
+  '💱 Exchange Rates':'💱 Växelkurser','● Live FX pending':'● Nya kurser väntar','USD per SEK':'USD per SEK','EUR per SEK':'EUR per SEK','KES per SEK':'KES per SEK',
+  '🏦 Connections':'🏦 Anslutningar','🏦 Connect Bank (PSD2)':'🏦 Anslut bank (PSD2)','📥 Import CSV':'📥 Importera CSV','📊 Load Demo Data':'📊 Ladda demodata',
+  '💾 Data':'💾 Data','⬇ Export JSON':'⬇ Exportera JSON','⬆ Import':'⬆ Importera','⚠ Reset':'⚠ Återställ',
+  '↻ Sync now':'↻ Synka nu','Auto-sync':'Autosynk','● Pending upload…':'● Väntar på uppladdning…','Connected':'Ansluten','No date':'Inget datum',
+  'Save':'Spara','Cancel':'Avbryt','Delete':'Ta bort','Close':'Stäng','Edit':'Redigera',
+};
+const HZ_SV_MON = {Jan:'jan',Feb:'feb',Mar:'mar',Apr:'apr',May:'maj',Jun:'jun',Jul:'jul',Aug:'aug',Sep:'sep',Oct:'okt',Nov:'nov',Dec:'dec'};
+const HZ_SV_PATTERNS = [
+  [/^(Net Income|Expenses|Savings|Fun Fund) · 12mo$/, (m,a)=>({'Net Income':'Nettoinkomst','Expenses':'Utgifter','Savings':'Sparande','Fun Fund':'Fun Fund'}[a])+' · 12 mån'],
+  [/^Nest Egg · Today's$/, ()=>'Pensionskapital · dagens'], [/^Nest Egg · Nominal$/, ()=>'Pensionskapital · nominellt'],
+  [/^Retire Income · Today's$/, ()=>'Pensionsinkomst · dagens'], [/^Retire Income · Nominal$/, ()=>'Pensionsinkomst · nominellt'],
+  [/^(.+) streams$/, (m,a)=>a+' källor'], [/^(.+)% of income$/, (m,a)=>a+' % av inkomsten'], [/^(.+)% rate$/, (m,a)=>a+' % sparkvot'],
+  [/^balance · (.+) capacity$/, (m,a)=>'saldo · '+a+' kapacitet'],
+  [/^Age (\d+) · nominal (.+)$/, (m,a,b)=>'Ålder '+a+' · nominellt '+b], [/^Age (\d+) → (\d+)$/, (m,a,b)=>'Ålder '+a+' → '+b],
+  [/^Age (\d+) · (\d+) · (\d+) years to retirement · (\d+) to plan for$/, (m,a,b,c,d)=>`Ålder ${a} · ${b} · ${c} år till pension · ${d} att planera för`],
+  [/^Draw (.+) \+ pension (.+)$/, (m,a,b)=>'Uttag '+a+' + pension '+b], [/^(\d+)% funded · (.+)$/, (m,a,b)=>a+' % finansierat · '+b],
+  [/^■ Expenses (.+)$/, (m,a)=>'■ Utgifter '+a], [/^■ Savings (.+)$/, (m,a)=>'■ Sparande '+a], [/^■ Fun (.+)$/, (m,a)=>'■ Fun '+a],
+  [/^In (.+)$/, (m,a)=>'In '+a], [/^Out (.+)$/, (m,a)=>'Ut '+a],
+  [/^Projected to age (\d+), sustained to (\d+)\.$/, (m,a,b)=>`Prognos till ${a} års ålder, räcker till ${b}.`],
+  [/^Portfolio at age (\d+) · (.+)$/, (m,a,b)=>`Portfölj vid ${a} års ålder · ${hzSv(b)}`],
+  [/^Total · (.+)$/, (m,a)=>'Totalt · '+hzSv(a)], [/^\/mo · Your plan$/, ()=>'/mån · Din plan'],
+  [/^From Budget savings · (.+) avg$/, (m,a)=>'Från budgetens sparande · '+a+' i snitt'],
+  [/^(\d+) months = (.+) available after trips$/, (m,a,b)=>`${a} månader = ${b} tillgängligt efter resor`],
+  [/^Absorbs ~(\d+) months? of fun fund$/, (m,a)=>`Tar ~${a} mån av Fun Fund`], [/^Pushes fund to (.+)$/, (m,a)=>'Driver fonden till '+a],
+  [/^÷\((.+)\) tax$/, (m,a)=>'÷('+a+') skatt'], [/^(.+) pre-tax$/, (m,a)=>a+' före skatt'], [/^of (.+)$/, (m,a)=>'av '+a],
+  [/^At age (\d+)$/, (m,a)=>`Vid ${a} års ålder`], [/^Bal (.+)$/, (m,a)=>'Saldo '+a],
+  [/^\+(\d+)mo$/, (m,a)=>'+'+a+' mån'], [/^(\d+) items?$/, (m,a)=>a+' objekt'], [/^●(\d+) retire$/, (m,a)=>'●'+a+' pension'],
+  [/^Every destination scored against your (.+) target retirement income \(pre-tax\) — net of each country's local tax\.$/,
+    (m,a)=>`Varje resmål bedöms mot din målinkomst på ${a} som pensionär (före skatt) — efter varje lands lokala skatt.`],
+];
+function hzSv(s){
+  if(typeof state === 'undefined' || state.lang !== 'sv' || typeof s !== 'string') return s;
+  const trimmed = s.trim(); if(!trimmed) return s;
+  let out = HZ_SV_EXACT[trimmed];
+  if(out == null){
+    for(const [re, fn] of HZ_SV_PATTERNS){ const m = trimmed.match(re); if(m){ out = fn(...m); break; } }
+  }
+  if(out == null) out = trimmed;
+  // Month abbreviations ("Oct '26", "May 2027") and the per-month suffix.
+  out = out.replace(/\b(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\b(?=( '\d\d| \d{4}|$| ·| –))/g, mo => HZ_SV_MON[mo])
+           .replace(/\/mo\b/g, '/mån');
+  return out === trimmed ? s : s.replace(trimmed, out);
+}
+// Translate every text node + placeholder under `root` in place.
+function hzSvDom(root){
+  if(!root || typeof state === 'undefined' || state.lang !== 'sv') return;
+  const w = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+  let n; while((n = w.nextNode())){ const v = n.nodeValue; if(/[A-Za-z]{2}/.test(v)){ const o = hzSv(v); if(o !== v) n.nodeValue = o; } }
+  root.querySelectorAll('[placeholder]').forEach(el => { const o = hzSv(el.placeholder); if(o !== el.placeholder) el.placeholder = o; });
+}
+
 class HZMobile {
   constructor(){
     this.MN=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
@@ -23728,7 +23849,7 @@ class HZMobile {
     // emit doesn't bounce back into our own hydrate/repaint listener.
     if(typeof save==='function'){this._persisting=true;try{save();}catch(_){}finally{this._persisting=false;}}}
     this.paint();this.body.scrollTop=0;}
-  toast(m){const t=document.getElementById('hzToast');if(!t)return;t.textContent=m;t.classList.add('show');clearTimeout(this._tt);this._tt=setTimeout(()=>t.classList.remove('show'),2400);}
+  toast(m){const t=document.getElementById('hzToast');if(!t)return;t.textContent=hzSv(m);t.classList.add('show');clearTimeout(this._tt);this._tt=setTimeout(()=>t.classList.remove('show'),2400);}
   syncThemeBtn(){const b=document.getElementById('hzTheme');if(b)b.textContent=this.data.theme==='dark'?'☀':'☾';}
   toggleTheme(){if(typeof toggleTheme==='function'){toggleTheme();}this.data.theme=(typeof state!=='undefined'&&state.darkMode===false)?'light':'dark';this.syncThemeBtn();this.paint();}
   setFab(){const fab=document.getElementById('hzFab');if(fab)fab.classList.toggle('hz-hidden',this.data.tab==='settings');}
@@ -23753,6 +23874,8 @@ class HZMobile {
     else if(t==='settings')h=this.vSettings();
     else h=this.vDash();
     this.body.innerHTML=`<div class="hz-body-inner${silent?' no-anim':''}">${h}</div>`;
+    hzSvDom(this.body);
+    this.nav.querySelectorAll('.hz-nav-lbl').forEach(l=>{if(!l.dataset.en)l.dataset.en=l.textContent;l.textContent=hzSv(l.dataset.en);});
     if(silent)this.body.scrollTop=prevScroll;
     this.setFab();
     if(t==='dashboard')this.chartDash();
@@ -24540,7 +24663,7 @@ class HZMobile {
 
   // ══════ OVERLAYS / SHEETS ══════
   closeOverlay(){this.overlay.style.display='none';this.overlay.innerHTML='';}
-  sheet(title,body,sub){this.overlay.style.display='block';this.overlay.innerHTML=`<div data-act="closeov" style="position:absolute;inset:0;background:rgba(0,0,0,.6);backdrop-filter:blur(2px);-webkit-backdrop-filter:blur(2px)"></div><div class="hz-sb" style="position:absolute;left:0;right:0;bottom:0;max-height:82%;overflow-y:auto;background:var(--bg1);border-top:1px solid var(--border2);border-radius:22px 22px 0 0;padding:8px 18px calc(env(safe-area-inset-bottom, 0px) + 26px);animation:hzsheet .3s cubic-bezier(.2,.8,.2,1)"><div style="width:38px;height:4px;border-radius:3px;background:var(--border2);margin:6px auto 14px"></div><div style="display:flex;align-items:center;gap:10px;margin-bottom:${sub?'4px':'14px'}"><div style="font-family:var(--fs);font-size:19px;font-weight:600;flex:1">${title}</div><button data-act="closeov" style="width:30px;height:30px;border-radius:8px;border:1px solid var(--border);background:var(--bg3);color:var(--text2);font-size:13px;cursor:pointer">✕</button></div>${sub?`<div style="font-size:12px;color:var(--text2);margin-bottom:14px;line-height:1.5">${sub}</div>`:''}${body}</div>`;}
+  sheet(title,body,sub){this.overlay.style.display='block';this.overlay.innerHTML=`<div data-act="closeov" style="position:absolute;inset:0;background:rgba(0,0,0,.6);backdrop-filter:blur(2px);-webkit-backdrop-filter:blur(2px)"></div><div class="hz-sb" style="position:absolute;left:0;right:0;bottom:0;max-height:82%;overflow-y:auto;background:var(--bg1);border-top:1px solid var(--border2);border-radius:22px 22px 0 0;padding:8px 18px calc(env(safe-area-inset-bottom, 0px) + 26px);animation:hzsheet .3s cubic-bezier(.2,.8,.2,1)"><div style="width:38px;height:4px;border-radius:3px;background:var(--border2);margin:6px auto 14px"></div><div style="display:flex;align-items:center;gap:10px;margin-bottom:${sub?'4px':'14px'}"><div style="font-family:var(--fs);font-size:19px;font-weight:600;flex:1">${title}</div><button data-act="closeov" style="width:30px;height:30px;border-radius:8px;border:1px solid var(--border);background:var(--bg3);color:var(--text2);font-size:13px;cursor:pointer">✕</button></div>${sub?`<div style="font-size:12px;color:var(--text2);margin-bottom:14px;line-height:1.5">${sub}</div>`:''}${body}</div>`;hzSvDom(this.overlay);}
   openMore(){this.sheet('More','<div style="display:flex;flex-direction:column;gap:6px">'+this.MORE.map(m=>`<button data-act="morenav" data-t="${m[0]}" style="display:flex;align-items:center;gap:13px;background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:13px 14px;color:var(--text);cursor:pointer;text-align:left"><span style="font-size:20px;width:26px;text-align:center">${m[1]}</span><div style="flex:1"><div style="font-size:14px;font-weight:600">${m[2]}</div><div style="font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.06em">${m[3]}</div></div><span style="color:var(--text3)">›</span></button>`).join('')+'</div>');}
   openSearch(){const items=this.MORE;this.sheet('Search','<input autofocus placeholder="Jump to a tab or action…" style="width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:9px;padding:11px 13px;color:var(--text);font-size:14px;margin-bottom:12px"><div style="font-family:var(--fm);font-size:9px;letter-spacing:.1em;color:var(--text3);text-transform:uppercase;margin-bottom:8px">Navigate</div><div style="display:flex;flex-direction:column;gap:5px">'+items.map(m=>`<button data-act="morenav" data-t="${m[0]}" style="display:flex;align-items:center;gap:12px;background:var(--bg2);border:1px solid var(--border);border-radius:10px;padding:11px 13px;color:var(--text);cursor:pointer;text-align:left"><span style="font-size:16px;width:22px;text-align:center">${m[1]}</span><span style="flex:1;font-size:13px">${m[2]}</span><span style="font-family:var(--fm);font-size:9px;color:var(--text3)">↵</span></button>`).join('')+'</div>');}
   openBank(){this.sheet('Connect Bank','<div style="display:flex;flex-direction:column;gap:10px">'+[['Open Banking (PSD2)','Requires bank credentials','🏦','info'],['Manual / Demo Mode','Pre-loaded sample data','📊','sage']].map(o=>`<div style="background:var(--${o[3]}-bg);border:1px solid var(--${o[3]}-bd);border-radius:12px;padding:13px;display:flex;align-items:center;gap:12px"><span style="font-size:22px">${o[2]}</span><div style="flex:1"><div style="font-size:13px;font-weight:600;color:var(--text)">${o[0]}</div><div style="font-size:11px;color:var(--text2)">${o[1]}</div></div></div>`).join('')+'</div><label style="display:block;font-size:11px;color:var(--text2);margin:14px 0 5px">Select your bank</label><select style="width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:10px 12px;color:var(--text);font-size:13px"><option>SEB</option><option>Swedbank</option><option>Handelsbanken</option><option>Nordea</option><option>Danske Bank</option><option>Other (PSD2)</option></select><div style="display:flex;gap:8px;margin-top:14px">'+this.btn('📊 Load Demo','demo','','g')+this.btn('🏦 Connect Live','bank','','o')+'</div>','Connect via Open Banking (PSD2) to pull real transactions, or use demo mode. Supported: SEB, Swedbank, Handelsbanken, Nordea, Danske Bank and all EU PSD2 banks.');}
