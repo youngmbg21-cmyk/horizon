@@ -4407,13 +4407,19 @@ body.light .piq-country-menu { box-shadow:0 12px 28px -10px rgba(60,40,10,0.22);
   }
   /* Leaflet tuning inside the shell */
   #hzApp .leaflet-tile { filter:brightness(.55) saturate(.65) hue-rotate(185deg); }
+  .hz-map-dark .leaflet-tile { filter:invert(1) hue-rotate(180deg) brightness(.85) contrast(.9) saturate(.6); }
+  .hz-map-dark.leaflet-container { background:#1a1d24; }
   body.light #hzApp .leaflet-tile { filter:none; }
   #hzApp .leaflet-container { background:#0a0d17; font-family:var(--fm); }
   body.light #hzApp .leaflet-container { background:#dfe7ef; }
   #hzApp .leaflet-popup-content-wrapper { background:var(--bg3)!important; border:1px solid var(--border2)!important; border-radius:10px!important; color:var(--text)!important; }
   #hzApp .leaflet-popup-content { font-size:11px; margin:8px 12px!important; }
   #hzApp .leaflet-popup-tip { background:var(--bg3)!important; }
-  #hzApp .leaflet-control-attribution, #hzApp .leaflet-control-zoom { display:none; }
+  #hzApp .leaflet-control-zoom { display:none; }
+  #hzApp .leaflet-control-attribution { font-size:9px; background:rgba(0,0,0,.35); color:#ccc; }
+  #hzApp .leaflet-control-attribution a { color:#ddd; }
+  body.light #hzApp .leaflet-control-attribution { background:rgba(255,255,255,.7); color:#555; }
+  body.light #hzApp .leaflet-control-attribution a { color:#333; }
   /* AI panel goes full-screen on phones — and stays KEYBOARD-SAFE: its height
      tracks the visual viewport (--hz-vvh, set from the visualViewport API), so
      when the on-screen keyboard opens the panel shrinks and the input row
@@ -10875,13 +10881,15 @@ function createWorldMap(containerId, points, opts){
     center: [20, 20], zoom: 2, zoomControl: true, scrollWheelZoom: false,
     ...(opts||{})
   };
-  const tileUrl = isLight()
-    ? 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png'
-    : 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png';
+  // OpenStreetMap's standard tiles are free and need no API key (CartoDB
+  // basemaps now return "API KEY REQUIRED" tiles). OSM has no dark style,
+  // so dark mode inverts the tiles with a CSS filter (.hz-map-dark).
+  const tileUrl = 'https://tile.openstreetmap.org/{z}/{x}/{y}.png';
+  el.classList.toggle('hz-map-dark', !isLight());
   let map;
   try {
     map = L.map(containerId, {zoomControl:o.zoomControl, scrollWheelZoom:o.scrollWheelZoom}).setView(o.center, o.zoom);
-    L.tileLayer(tileUrl, {attribution:'© CartoDB', maxZoom:18}).addTo(map);
+    L.tileLayer(tileUrl, {attribution:'© <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a> contributors', maxZoom:19}).addTo(map);
     (points||[]).forEach(pt => {
       if(typeof pt.lat!=='number' || typeof pt.lng!=='number') return;
       const color = pt.color || '#4d9fff';
@@ -24394,8 +24402,8 @@ class HZMobile {
   // fund into deficit. Native-kr values plotted; axis labels convert to the
   // display currency, exactly like the app's other charts.
   chartFFBal(){this.whenLib(()=>window.Chart,()=>{const s=this.ffSummary();if(!s)return;const bars=(s.balanceBars||[]).map(v=>Math.round(this.n(v,0)));const wm=s.windowMonths||[];const labs=wm.length?wm.map(m=>this.MN[(+String(m.key).slice(5,7))-1]||''):bars.map((_,i)=>this.MN[(new Date().getMonth()+i)%12]);const c=this.cc();const ctx=document.getElementById('hzFFBalChart');if(!ctx)return;if(this.charts.ffbal)this.charts.ffbal.destroy();this.charts.ffbal=new Chart(ctx,{type:'bar',data:{labels:labs,datasets:[{data:bars,backgroundColor:bars.map(v=>v>=0?'#00e8a055':'#ff4d6d55'),borderColor:bars.map(v=>v>=0?'#00e8a0':'#ff4d6d'),borderWidth:1.5,borderRadius:3}]},options:this.chOpts({plugins:{legend:{display:false},tooltip:{callbacks:{label:ctx=>this.fmtC(ctx.parsed.y)}}},scales:{x:{ticks:{color:c.t3,font:{size:9},maxTicksLimit:12},grid:{display:false}},y:{ticks:{color:c.t3,font:{size:9},callback:v=>this.fmtC(v)},grid:{color:c.grid}}}})});});}
-  initVacMap(){this.whenLib(()=>window.L&&document.getElementById('hzVacMap'),()=>{if(this.vacMap){this.vacMap.remove();this.vacMap=null;}const el=document.getElementById('hzVacMap');if(!el)return;this.vacMap=L.map(el,{zoomControl:false,attributionControl:false}).setView([20,20],1);L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(this.vacMap);this.PULSE.forEach(d=>{const m=L.circleMarker([d.lat,d.lng],{radius:8,fillColor:d.col,color:d.col,fillOpacity:.8,weight:2});m.bindPopup(`<strong>${d.flag} ${d.dest}</strong><br>${d.cost}`);m.addTo(this.vacMap);});setTimeout(()=>this.vacMap&&this.vacMap.invalidateSize(),140);});}
-  initRetMap(){this.whenLib(()=>window.L&&document.getElementById('hzRetMap'),()=>{if(this.retMap){this.retMap.remove();this.retMap=null;}const el=document.getElementById('hzRetMap');if(!el)return;this.retMap=L.map(el,{zoomControl:false,attributionControl:false}).setView([25,10],1);L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(this.retMap);this.raScored().forEach(l=>{if(!l.lat&&!l.lng)return;const col={feasible:'#00e8a0',conditional:'#f5a623',infeasible:'#ff4d6d'}[l.verdict]||'#7a8fb0';const m=L.circleMarker([l.lat,l.lng],{radius:9,fillColor:col,color:col,fillOpacity:.8,weight:2});m.bindPopup(`<strong>${l.flag||''} ${this.esc(l.name)}</strong><br>${this.fmtC(this.n(l.costOfLiving,0))}/mo · surplus ${this.fmtC(this.n(l.surplus,0))}`);m.addTo(this.retMap);});setTimeout(()=>this.retMap&&this.retMap.invalidateSize(),140);});}
+  initVacMap(){this.whenLib(()=>window.L&&document.getElementById('hzVacMap'),()=>{if(this.vacMap){this.vacMap.remove();this.vacMap=null;}const el=document.getElementById('hzVacMap');if(!el)return;this.vacMap=L.map(el,{zoomControl:false}).setView([20,20],1);L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'© <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a>'}).addTo(this.vacMap);this.PULSE.forEach(d=>{const m=L.circleMarker([d.lat,d.lng],{radius:8,fillColor:d.col,color:d.col,fillOpacity:.8,weight:2});m.bindPopup(`<strong>${d.flag} ${d.dest}</strong><br>${d.cost}`);m.addTo(this.vacMap);});setTimeout(()=>this.vacMap&&this.vacMap.invalidateSize(),140);});}
+  initRetMap(){this.whenLib(()=>window.L&&document.getElementById('hzRetMap'),()=>{if(this.retMap){this.retMap.remove();this.retMap=null;}const el=document.getElementById('hzRetMap');if(!el)return;this.retMap=L.map(el,{zoomControl:false}).setView([25,10],1);L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'© <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a>'}).addTo(this.retMap);this.raScored().forEach(l=>{if(!l.lat&&!l.lng)return;const col={feasible:'#00e8a0',conditional:'#f5a623',infeasible:'#ff4d6d'}[l.verdict]||'#7a8fb0';const m=L.circleMarker([l.lat,l.lng],{radius:9,fillColor:col,color:col,fillOpacity:.8,weight:2});m.bindPopup(`<strong>${l.flag||''} ${this.esc(l.name)}</strong><br>${this.fmtC(this.n(l.costOfLiving,0))}/mo · surplus ${this.fmtC(this.n(l.surplus,0))}`);m.addTo(this.retMap);});setTimeout(()=>this.retMap&&this.retMap.invalidateSize(),140);});}
 
   // ══════ EVENTS ══════
   onClick(e){const el=e.target.closest('[data-act]');if(!el)return;const a=el.dataset.act;const d=el.dataset;
