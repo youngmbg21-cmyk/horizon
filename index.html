@@ -5,7 +5,7 @@
 <!-- maximum-scale=1 stops iOS Safari's automatic zoom-in when focusing
      inputs (which visually "expands" the app and leaves it cropped, since the
      shell is overflow:hidden). iOS still honours user pinch-zoom gestures. -->
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1, viewport-fit=cover">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <!-- Mobile / installed-PWA chrome: dark status bar, standalone feel, and
      safe-area support (paired with env(safe-area-inset-*) in the phone shell). -->
 <meta name="theme-color" content="#05080f" media="(prefers-color-scheme: dark)">
@@ -4203,29 +4203,29 @@ body.light .piq-country-menu { box-shadow:0 12px 28px -10px rgba(60,40,10,0.22);
     <!-- Sidebar (desktop) = nav drawer (mobile) -->
     <div class="sidebar" id="app-sidebar">
       <div class="sb-section" data-i18n="sb.group.overview">OVERVIEW</div>
-      <div class="nav-item active" data-panel="dashboard" onclick="nav('dashboard')"><span class="nav-icon">◉</span><span class="nav-lbl" data-i18n="panel.dashboard">Dashboard</span></div>
-      <div class="nav-item" data-panel="lifewall" onclick="nav('lifewall')"><span class="nav-icon">🧱</span><span class="nav-lbl" data-i18n="panel.lifewall">Life Wall</span></div>
+      <div class="nav-item active" data-panel="dashboard" role="button" tabindex="0" onclick="nav('dashboard')"><span class="nav-icon">◉</span><span class="nav-lbl" data-i18n="panel.dashboard">Dashboard</span></div>
+      <div class="nav-item" data-panel="lifewall" role="button" tabindex="0" onclick="nav('lifewall')"><span class="nav-icon">🧱</span><span class="nav-lbl" data-i18n="panel.lifewall">Life Wall</span></div>
 
       <div class="sb-sep"></div>
       <div class="sb-section" data-i18n="sb.group.personal">PERSONAL FINANCES</div>
-      <div class="nav-item" data-panel="transactions" onclick="nav('transactions')"><span class="nav-icon">🏦</span><span class="nav-lbl" data-i18n="panel.transactions">Spend Insights</span></div>
-      <div class="nav-item" data-panel="review" onclick="nav('review')"><span class="nav-icon">▦</span><span class="nav-lbl" data-i18n="panel.review">Forecast & Review</span></div>
-      <div class="nav-item" data-panel="retirement" onclick="nav('retirement')"><span class="nav-icon">🌅</span><span class="nav-lbl" data-i18n="panel.retirement">Retirement Plan</span></div>
+      <div class="nav-item" data-panel="transactions" role="button" tabindex="0" onclick="nav('transactions')"><span class="nav-icon">🏦</span><span class="nav-lbl" data-i18n="panel.transactions">Spend Insights</span></div>
+      <div class="nav-item" data-panel="review" role="button" tabindex="0" onclick="nav('review')"><span class="nav-icon">▦</span><span class="nav-lbl" data-i18n="panel.review">Forecast & Review</span></div>
+      <div class="nav-item" data-panel="retirement" role="button" tabindex="0" onclick="nav('retirement')"><span class="nav-icon">🌅</span><span class="nav-lbl" data-i18n="panel.retirement">Retirement Plan</span></div>
 
       <div class="sb-sep"></div>
       <div class="sb-section" data-i18n="sb.group.planning">PLANNING</div>
-      <div class="nav-item" data-panel="funfund" onclick="nav('funfund')"><span class="nav-icon">✦</span><span class="nav-lbl" data-i18n="panel.funfund">Fun Fund</span></div>
-      <div class="nav-item" data-panel="retireanywhere" onclick="nav('retireanywhere')"><span class="nav-icon">🌍</span><span class="nav-lbl" data-i18n="panel.retireanywhere">Retire Anywhere</span></div>
-      <div class="nav-item" data-panel="propiq" onclick="nav('propiq')"><span class="nav-icon">🏠</span><span class="nav-lbl" data-i18n="panel.propiq">Property IQ</span></div>
+      <div class="nav-item" data-panel="funfund" role="button" tabindex="0" onclick="nav('funfund')"><span class="nav-icon">✦</span><span class="nav-lbl" data-i18n="panel.funfund">Fun Fund</span></div>
+      <div class="nav-item" data-panel="retireanywhere" role="button" tabindex="0" onclick="nav('retireanywhere')"><span class="nav-icon">🌍</span><span class="nav-lbl" data-i18n="panel.retireanywhere">Retire Anywhere</span></div>
+      <div class="nav-item" data-panel="propiq" role="button" tabindex="0" onclick="nav('propiq')"><span class="nav-icon">🏠</span><span class="nav-lbl" data-i18n="panel.propiq">Property IQ</span></div>
 
       <div class="sb-sep"></div>
       <div class="sb-section" data-i18n="sb.group.library">LIBRARY</div>
-      <div class="nav-item" data-panel="journal" onclick="nav('journal')"><span class="nav-icon">📓</span><span class="nav-lbl" data-i18n="panel.journal">Journal</span></div>
-      <div class="nav-item" data-panel="vault" onclick="nav('vault')"><span class="nav-icon">🗄</span><span class="nav-lbl" data-i18n="panel.vault">Vault</span></div>
+      <div class="nav-item" data-panel="journal" role="button" tabindex="0" onclick="nav('journal')"><span class="nav-icon">📓</span><span class="nav-lbl" data-i18n="panel.journal">Journal</span></div>
+      <div class="nav-item" data-panel="vault" role="button" tabindex="0" onclick="nav('vault')"><span class="nav-icon">🗄</span><span class="nav-lbl" data-i18n="panel.vault">Vault</span></div>
 
       <div class="sb-sep"></div>
       <div class="sb-section" data-i18n="sb.group.system">SYSTEM</div>
-      <div class="nav-item" data-panel="settings" onclick="nav('settings')"><span class="nav-icon">⚙</span><span class="nav-lbl" data-i18n="panel.settings">Settings</span></div>
+      <div class="nav-item" data-panel="settings" role="button" tabindex="0" onclick="nav('settings')"><span class="nav-icon">⚙</span><span class="nav-lbl" data-i18n="panel.settings">Settings</span></div>
 
       <div class="sb-bot">
         <div class="sb-mini">
@@ -4476,6 +4476,32 @@ body.light .piq-country-menu { box-shadow:0 12px 28px -10px rgba(60,40,10,0.22);
   .hz-ticker-track { animation:none; }
   .hz-body-inner { animation:none; }
 }
+
+/* ── Accessibility & touch polish ─────────────────────────────────────────
+   Keyboard focus ring: many inputs set outline:none (with class
+   specificity that beat the global :focus-visible rule), so keyboard users
+   couldn't see where they were. :focus-visible only fires for keyboard
+   focus on buttons/links; text fields always show it while focused. */
+button:focus-visible, a:focus-visible, [role="button"]:focus-visible, [tabindex]:focus-visible,
+select:focus-visible, input[type="checkbox"]:focus-visible, input[type="radio"]:focus-visible {
+  outline:2px solid var(--green) !important; outline-offset:2px;
+}
+/* Text fields match :focus-visible on mouse clicks too, so their ring
+   only shows while the user is navigating with the keyboard (html.kbd-nav
+   is set on Tab and cleared on the next mouse/touch press). */
+html.kbd-nav input:not([type="checkbox"]):not([type="radio"]):focus, html.kbd-nav textarea:focus {
+  outline:1.5px solid var(--green) !important; outline-offset:1px;
+}
+.nav-item[role="button"]:focus-visible { outline-offset:-2px; }
+/* No grey iOS tap flash — the app has its own pressed states. */
+#hzApp, #hzApp * { -webkit-tap-highlight-color:transparent; }
+/* Bigger tap areas on the phone without changing how controls look: an
+   invisible ::after extends each small control to ~44 px. */
+#hzApp .hz-icon-btn, #hzApp button[data-act="closeov"], #hzApp button[aria-label^="Remove"] { position:relative; }
+#hzApp .hz-icon-btn::after { content:''; position:absolute; inset:-6px; }
+#hzApp button[data-act="closeov"]::after { content:''; position:absolute; inset:-7px; }
+#hzApp button[aria-label^="Remove"]::after { content:''; position:absolute; inset:-8px; }
+#hzApp .hz-nav { min-height:44px; justify-content:center; }
 </style>
 <div id="hzApp" aria-hidden="true">
   <div class="hz-root" id="hzRoot">
@@ -11046,7 +11072,7 @@ function updateScopeChip(){
     label.textContent = String(state.selectedYear||CY);
   } else {
     // default: show selectedMonth (Monthly) or current month otherwise
-    const key = state.selectedMonth || `${CY}-${String(new Date().getMonth()+1).padStart(2,'0')}`;
+    const key = state.selectedMonth || `${CY}-${String(CM+1).padStart(2,'0')}`;
     const [y,m] = key.split('-').map(Number);
     const monthName = monthNames()[(m-1)]||'';
     label.textContent = `${monthName} ${y}`;
@@ -11085,6 +11111,18 @@ function scopeChipClick(){
   if(_scopeKind() === 'year') nav('yearly'); // legacy alias → review/yearly
   else nav('monthly');                       // legacy alias → review/monthly
 }
+
+// Keyboard activation for non-<button> controls marked role="button"
+// (sidebar items, clickable cards/KPIs): Enter or Space clicks them, the
+// same as a real button. Skipped when the key comes from a form field.
+document.addEventListener('keydown', e => { if(e.key === 'Tab') document.documentElement.classList.add('kbd-nav'); });
+document.addEventListener('pointerdown', () => document.documentElement.classList.remove('kbd-nav'));
+document.addEventListener('keydown', e => {
+  if(e.key !== 'Enter' && e.key !== ' ') return;
+  const el = e.target;
+  if(!el || el.tagName === 'BUTTON' || el.tagName === 'A' || el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.tagName === 'SELECT') return;
+  if(el.getAttribute && el.getAttribute('role') === 'button'){ e.preventDefault(); el.click(); }
+});
 
 // ─── COMMAND PALETTE (⌘K / Ctrl+K) ──────────────────────────────────────────
 // A keyboard-first command runner that indexes panels, deep-link sections,
@@ -17168,38 +17206,6 @@ function renderRetireAnywhere() {
     retireMap = createWorldMap('retire-map', points, {center:[20,20], zoom:2});
   }, 100);
 }
-window.showLocDetail=function(id){
-  const loc=scoreLocation(retirePlaces().find(l=>l.id===id));
-  if(!loc) return;
-  const r=rate(); const s=sym();
-  const months=get12Months();
-  const nums=getRetirementNumbers();
-  const monthlyIncome=nums.totalGross; // pre-tax "income needed" — matches Retirement Plan tab
-  document.getElementById('loc-modal-content').innerHTML=`
-    <div style="font-size:28px;margin-bottom:6px">${esc(loc.flag||"")}</div>
-    <div class="modal-title">${esc(loc.name)}, ${esc(loc.country)}</div>
-    <div style="margin-bottom:14px"><span class="loc-verdict ${loc.verdict}">${loc.label}</span></div>
-    <div class="loc-affordability-bar" style="height:10px"><div class="loc-affordability-fill" style="width:${Math.round(loc.affordabilityScore*100)}%;background:${loc.verdict==='feasible'?'var(--green)':loc.verdict==='conditional'?'var(--amber)':'var(--red)'}"></div></div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:14px 0;font-size:13px">
-      <div><span style="color:var(--text2)">Monthly cost of living</span><div style="font-family:var(--fm);font-weight:700;margin-top:2px">${fmt(loc.costOfLiving)}</div></div>
-      <div><span style="color:var(--text2)">Your income at retirement <span style="font-size:9px">(today's money)</span></span><div style="font-family:var(--fm);font-weight:700;color:var(--green);margin-top:2px">${fmt(monthlyIncome)}</div></div>
-      <div><span style="color:var(--text2)">Monthly surplus/deficit <span style="font-size:9px">(today's money)</span></span><div style="font-family:var(--fm);font-weight:700;color:${loc.surplus>=0?'var(--green)':'var(--red)'};margin-top:2px">${fmt(loc.surplus)}</div></div>
-      <div><span style="color:var(--text2)">Local income tax</span><div style="font-family:var(--fm);font-weight:700;margin-top:2px">${loc.taxRate}%</div></div>
-      <div><span style="color:var(--text2)">Climate</span><div style="font-weight:600;margin-top:2px">${loc.climate}</div></div>
-      <div><span style="color:var(--text2)">Healthcare</span><div style="font-weight:600;margin-top:2px">${loc.healthcare}</div></div>
-    </div>
-    ${loc.notes?`<div style="background:var(--bg3);border-radius:8px;padding:10px;font-size:12px;color:var(--text2);margin-bottom:14px">📝 ${esc(loc.notes)}</div>`:''}
-    <div class="field"><label>Monthly Cost of Living (${s})</label><input type="text" inputmode="decimal" data-lang-num="1" value="${Math.round(loc.costOfLiving*r)}" oninput="updateLocCost('${loc.id}',parseNum(this.value)/${r})"></div>
-    <div class="field"><label>Local Tax Rate (%)</label><input type="number" value="${loc.taxRate}" oninput="updateLocTax('${loc.id}',+this.value)"></div>
-    <div class="field"><label>Notes</label><input value="${esc(loc.notes||'')}" oninput="updateLocNotes('${loc.id}',this.value)"></div>
-    <div style="display:flex;gap:8px;margin-top:4px;flex-wrap:wrap">
-      <button class="btn btn-o btn-sm" onclick="aiAnalyzeLoc('${loc.id}')">🤖 Quick Analysis</button>
-      <button class="btn btn-g btn-sm" onclick="aiDeepDive('${loc.id}')">🔬 Deep Dive Report</button>
-      <button class="btn btn-danger" onclick="removeLoc('${loc.id}')" style="margin-left:auto">Remove</button>
-    </div>
-    <div id="loc-ai-out" style="margin-top:12px"></div>`;
-  openModal('loc-modal');
-};
 // ── LOCATION ANALYSIS SLIDE-OVER ────────────────────────────────────────────
 // Full-screen right-side panel that replaces the old narrow modal. Fixed
 // header + fixed footer + scrollable body. Non-blocking: the backdrop
@@ -19305,6 +19311,32 @@ function _mergeImportedAiKeys(current, incoming){
   }
   return out;
 }
+// "Everything" restore: a true replace. Fields the backup doesn't carry
+// fall back to defaults instead of lingering from the data being replaced
+// (Object.assign used to keep them). Device-local blocks are kept: this
+// device's cloud-sync block (a backup's stale copy let the next pull
+// silently discard the restore), AI keys (merged — backups never carry
+// them), and the vault when the file has none (never wipe reports on a
+// restore). Property IQ history rides along as `_propiq`.
+function _restoreFullBackup(d){
+  migrate(d);
+  const keepSync = state.sync, keepKeys = state.aiKeys, keepVault = state.vault;
+  const { _propiq, ...data } = d;
+  const next = Object.assign(defaultState(), data);
+  Object.keys(state).forEach(k => { if(!(k in next)) delete state[k]; });
+  Object.assign(state, next);
+  state.sync = keepSync;
+  state.aiKeys = _mergeImportedAiKeys(keepKeys, d.aiKeys);
+  if(!Array.isArray(data.vault)) state.vault = keepVault;
+  // The vault has its own storage key and save() deliberately strips it
+  // from the main blob — persist it explicitly or the restored reports
+  // evaporate on the next reload.
+  if(Array.isArray(state.vault)) saveVault();
+  if(Array.isArray(_propiq) && typeof piq_history !== 'undefined'){
+    piq_history = _propiq;
+    if(typeof piq_saveHistLS === 'function') piq_saveHistLS();
+  }
+}
 function downloadJSON(filename, data){
   const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});
   const url=URL.createObjectURL(blob);
@@ -19318,6 +19350,9 @@ window.exportSlice=function(sliceKey){
   if(slice.fields === null) {
     const { aiKeys, ...rest } = state; // full export, minus API keys
     payload = rest;
+    // Property IQ history lives in its own localStorage key — include it
+    // so a full backup really is everything (cloud sync already carries it).
+    if(typeof piq_history !== 'undefined' && Array.isArray(piq_history)) payload._propiq = piq_history;
   } else {
     payload = {version: STATE_VERSION, _slice: slice.key};
     slice.fields.forEach(f => { if(state[f] !== undefined) payload[f] = state[f]; });
@@ -19333,22 +19368,9 @@ window.importSlice=function(input, sliceKey){
     try{
       const d=JSON.parse(e.target.result);
       if(slice.fields === null) {
-        // Full import — migrate the blob first (see loadState for why the
-        // order matters), then replace wholesale.
-        migrate(d);
-        const keepKeys = state.aiKeys;
-        // Keep THIS device's cloud-sync block — a backup's stale copy
-        // (old remoteStamp, pendingPush:false) let the next pull treat
-        // the cloud as newer and silently discard the restored data.
-        const keepSync = state.sync;
-        Object.assign(state, d);
-        state.sync = keepSync;
-        state.aiKeys = _mergeImportedAiKeys(keepKeys, d.aiKeys);
-        // The vault has its own storage key and save() deliberately strips
-        // it from the main blob — without an explicit saveVault() here the
-        // imported reports evaporated on the next reload (loadState pulled
-        // the OLD vault back from VAULT_STORAGE_KEY).
-        if(Array.isArray(state.vault)) saveVault();
+        // Full import — migrate first (see loadState for why the order
+        // matters), then replace wholesale.
+        _restoreFullBackup(d);
       } else {
         // Slice import: merge only the fields this slice owns.
         // Refuse if the file was exported as a different slice (unless it's "all").
@@ -19380,17 +19402,8 @@ window.importData=function(input){
   reader.onload=e=>{
     try{
       const d=JSON.parse(e.target.result);
-      const keepKeys=state.aiKeys;
-      const keepSync=state.sync; // see importSlice: never adopt a backup's sync block
-      Object.assign(state,d); migrate(state);
-      state.sync=keepSync;
-      state.aiKeys=_mergeImportedAiKeys(keepKeys, d.aiKeys);
+      _restoreFullBackup(d);
       invalidateSelectors();
-      // Imported backups may embed the vault inline — persist it to
-      // its own key so subsequent saves don't rewrite it on every
-      // keystroke. saveVault() reads from state.vault which is
-      // already populated by the Object.assign above.
-      if(Array.isArray(state.vault)) saveVault();
       save(); renderAll();
     }catch(e){alert('Invalid backup file: '+e.message);}
   };
@@ -23696,7 +23709,7 @@ class HZMobile {
   // 'YYYY-MM' month key. Falls back to next month so a cost always lands in
   // the 12-month window and is visible.
   parseWhen(str){
-    const d=this.addMonths(new Date(),1);let y=d.getFullYear(),m=d.getMonth()+1;
+    const d=this.addMonths(this.today(),1);let y=d.getFullYear(),m=d.getMonth()+1;
     if(str){
       const iso=/(\d{4})-(\d{1,2})/.exec(String(str));
       if(iso){y=+iso[1];m=+iso[2];}
@@ -23868,7 +23881,10 @@ class HZMobile {
   esc(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
   addMonths(b,n){return new Date(b.getFullYear(),b.getMonth()+n,1);}
   whenLib(check,cb){if(check()){cb();return;}let n=0;const t=setInterval(()=>{if(check()||n++>50){clearInterval(t);if(check())cb();}},100);}
-  dkey(){const n=new Date();return `${n.getFullYear()}-${String(n.getMonth()+1).padStart(2,'0')}`;}
+  // The app's notion of "now" (CY/CM, refreshed on month rollover) so the
+  // phone views flip month/year in step with the desktop engine.
+  today(){return (typeof CY==='number'&&typeof CM==='number')?new Date(CY,CM,1):new Date();}
+  dkey(){const n=this.today();return `${n.getFullYear()}-${String(n.getMonth()+1).padStart(2,'0')}`;}
   expTotal(l){return Object.values(this.EXP[l]).reduce((s,v)=>s+v,0);}
 
   // ── ui helpers ──
@@ -23955,7 +23971,7 @@ class HZMobile {
     const cmn=this.cm();const sav=cmn?this.n(cmn.savings,0):this.n(this.data.baseSavings,0);
     const ne=this.lensNe();const dr=this.retIncome();const nw=this.nwTotal();
     const homeBase=this.data.homeBase||'—';
-    let h=this.ph('OVERVIEW','Where you stand today',`Live position · <span style="color:var(--amber)">${this.MN[new Date().getMonth()]} ${new Date().getFullYear()}</span> · ${this.esc(homeBase)}`);
+    let h=this.ph('OVERVIEW','Where you stand today',`Live position · <span style="color:var(--amber)">${this.MN[this.today().getMonth()]} ${this.today().getFullYear()}</span> · ${this.esc(homeBase)}`);
     // KPI grid — the SAME eight tiles as desktop (12-month cash-flow
     // aggregates + retirement headline), from the same engine getters.
     const inc12=this.inc12(),exp12=this.exp12(),sav12=this.sav12();
@@ -24085,7 +24101,7 @@ class HZMobile {
     // state.monthlyOverrides + state.paidFlags), so an override created on
     // either device is what the other one shows.
     const list=this.m12();
-    const keys=list.length?list.map(m=>m.key):Array.from({length:12},(_,i)=>{const d=this.addMonths(new Date(),i);return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;});
+    const keys=list.length?list.map(m=>m.key):Array.from({length:12},(_,i)=>{const d=this.addMonths(this.today(),i);return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;});
     if(!keys.includes(this.data.selectedMonth))this.data.selectedMonth=keys[0];
     const sm=this.data.selectedMonth;
     const ovMap=(typeof state!=='undefined'&&state.monthlyOverrides)||{};
@@ -24253,11 +24269,11 @@ class HZMobile {
   }
 
   // ══════ FUN FUND ══════
-  ffMonths(){const list=this.m12();if(list.length)return list.map(m=>({key:m.key,ff:Math.max(0,this.n(m.pureFunFund,0))}));const now=new Date(),ff=this.fun();return Array.from({length:12},(_,i)=>{const d=this.addMonths(now,i);return {key:`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`,ff};});}
+  ffMonths(){const list=this.m12();if(list.length)return list.map(m=>({key:m.key,ff:Math.max(0,this.n(m.pureFunFund,0))}));const now=this.today(),ff=this.fun();return Array.from({length:12},(_,i)=>{const d=this.addMonths(now,i);return {key:`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`,ff};});}
   // Same 12-month window as ffMonths() but UNCLAMPED — each month's net fun
   // fund after trips (pureFunFund can go negative when a trip exceeds that
   // month's capacity), so aggregates reflect the full cost of planned trips.
-  ffNetMonths(){const list=this.m12();if(list.length)return list.map(m=>({key:m.key,ff:this.n(m.pureFunFund,0)}));const now=new Date(),ff=this.fun();return Array.from({length:12},(_,i)=>{const d=this.addMonths(now,i);return {key:`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`,ff};});}
+  ffNetMonths(){const list=this.m12();if(list.length)return list.map(m=>({key:m.key,ff:this.n(m.pureFunFund,0)}));const now=this.today(),ff=this.fun();return Array.from({length:12},(_,i)=>{const d=this.addMonths(now,i);return {key:`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`,ff};});}
   ffAnnual(){try{const f=this.fe();if(f&&f.funFund&&f.funFund.summary)return this.n(f.funFund.summary().capacity12mo,0);}catch(_){} return this.ffMonths().reduce((s,m)=>s+m.ff,0);}
   // Discretionary funds available over N months, net of planned trips. Used by
   // the "What Can You Afford?" tiers + slider so committed trips shrink the
@@ -24291,7 +24307,7 @@ class HZMobile {
     return h;
   }
   tiers(budget){const t=[['🎒','Budget Explorer','Hostels, local transport, street food',20000],['🏨','Mid-Range Comfort','3★ hotels, flights, dining out',60000],['🥂','Luxury Experience','5★ resorts, business class',Infinity]];const sel=budget>=60000?2:budget>=20000?1:0;return `<div style="display:flex;flex-direction:column;gap:8px">${t.map((x,i)=>`<div style="background:var(--bg3);border:1px solid ${i===sel?'var(--green)':'var(--border)'};border-radius:11px;padding:11px;display:flex;align-items:center;gap:11px"><span style="font-size:22px">${x[0]}</span><div style="flex:1"><div style="font-weight:700;font-size:13px">${x[1]}</div><div style="font-size:10.5px;color:var(--text3)">${x[2]}</div></div>${i===sel?this.chip('sage','YOUR RANGE'):''}</div>`).join('')}</div>`;}
-  afford(){const ff=this.fun();const t=+this.data.targetBudget||0;if(!t||ff<=0)return `<div style="color:var(--text3);font-size:12px">Enter a target budget above.</div>`;const m=Math.ceil(t/ff);const r=this.addMonths(new Date(),m);return `<div style="font-family:var(--fm);font-size:12px;line-height:1.9"><div>Target: <strong style="color:var(--amber)">${this.fmt(t)}</strong></div><div>Monthly fund: <strong style="color:var(--green)">${this.fmt(ff)}</strong></div><div>Save for: <strong style="color:var(--cyan)">${m} months</strong></div><div>Ready by: <strong style="color:var(--green)">${this.MN[r.getMonth()]} ${r.getFullYear()}</strong></div></div>${this.bar(Math.min(100,ff/t*100),'var(--green)',6)}<div style="font-size:10px;color:var(--text3);font-family:var(--fm)">${Math.min(100,Math.round(ff/t*100))}% funded today</div>`;}
+  afford(){const ff=this.fun();const t=+this.data.targetBudget||0;if(!t||ff<=0)return `<div style="color:var(--text3);font-size:12px">Enter a target budget above.</div>`;const m=Math.ceil(t/ff);const r=this.addMonths(this.today(),m);return `<div style="font-family:var(--fm);font-size:12px;line-height:1.9"><div>Target: <strong style="color:var(--amber)">${this.fmt(t)}</strong></div><div>Monthly fund: <strong style="color:var(--green)">${this.fmt(ff)}</strong></div><div>Save for: <strong style="color:var(--cyan)">${m} months</strong></div><div>Ready by: <strong style="color:var(--green)">${this.MN[r.getMonth()]} ${r.getFullYear()}</strong></div></div>${this.bar(Math.min(100,ff/t*100),'var(--green)',6)}<div style="font-size:10px;color:var(--text3);font-family:var(--fm)">${Math.min(100,Math.round(ff/t*100))}% funded today</div>`;}
 
   // ══════ RETIRE ANYWHERE ══════
   // ══════ RETIRE ANYWHERE (desktop-parity) ══════
@@ -24475,7 +24491,7 @@ class HZMobile {
     const chapterNote=runout
       ? `<div style="font-size:12px;color:var(--red);font-weight:600;margin-top:7px;line-height:1.4">⚠ Funds run dry at age ${runout} — pension alone won't cover your budget after that.</div>`
       : (nu?`<div style="font-size:12px;color:var(--green);font-weight:600;margin-top:7px">✓ Funds are projected to last through age ${le}.</div>`:'');
-    h+=`<div style="position:relative;background:linear-gradient(140deg,var(--bg2),var(--bg1));border:1px solid var(--border2);border-radius:16px;padding:16px;margin-bottom:12px;overflow:hidden"><div style="position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,var(--green),var(--amber),var(--violet)${runout?',var(--red)':''})"></div><div style="font-size:9px;letter-spacing:.1em;color:var(--text3);font-weight:700;text-transform:uppercase;margin-bottom:5px">CURRENT LIFE CHAPTER</div><div style="font-family:var(--fs);font-size:23px;font-weight:600;color:${ch[1]}">${ch[0]}</div><div style="font-size:12px;color:var(--text2);margin-top:3px">Age ${a0} · ${new Date().getFullYear()} · ${ret-a0} years to retirement · ${le-a0} to plan for</div>${chapterNote}</div>`;
+    h+=`<div style="position:relative;background:linear-gradient(140deg,var(--bg2),var(--bg1));border:1px solid var(--border2);border-radius:16px;padding:16px;margin-bottom:12px;overflow:hidden"><div style="position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,var(--green),var(--amber),var(--violet)${runout?',var(--red)':''})"></div><div style="font-size:9px;letter-spacing:.1em;color:var(--text3);font-weight:700;text-transform:uppercase;margin-bottom:5px">CURRENT LIFE CHAPTER</div><div style="font-family:var(--fs);font-size:23px;font-weight:600;color:${ch[1]}">${ch[0]}</div><div style="font-size:12px;color:var(--text2);margin-top:3px">Age ${a0} · ${this.today().getFullYear()} · ${ret-a0} years to retirement · ${le-a0} to plan for</div>${chapterNote}</div>`;
     const legend=[['Building','var(--green)'],['Glide path','var(--amber)'],['Retirement','var(--violet)']];
     if(runout)legend.push(['Funds run dry','var(--red)']);
     h+=`<div style="display:flex;gap:13px;flex-wrap:wrap;margin-bottom:12px;font-size:10px;color:var(--text2)">${legend.map(l=>`<span style="display:inline-flex;align-items:center;gap:5px"><span style="width:11px;height:11px;border-radius:3px;background:${l[1]}"></span>${l[0]}</span>`).join('')}</div>`;
@@ -24501,7 +24517,7 @@ class HZMobile {
   }
   brickSheet(age){
     const y=age-this.data.currentAge;const retired=age>=this.data.retirementAge;
-    const yr=new Date().getFullYear()+y;
+    const yr=this.today().getFullYear()+y;
     const phase=age<this.data.retirementAge-5?'Wealth Building':age<this.data.retirementAge?'Glide Path':'Retirement';
     // Values from the engine: accumulation years use the projection series;
     // retired years use the drawdown simulation balances (today's money).
@@ -24608,9 +24624,9 @@ class HZMobile {
   // redraw instantly. resize animation is likewise off to avoid reflow jank.
   chOpts(extra){return Object.assign({responsive:true,maintainAspectRatio:false,animation:false,animations:{colors:false,x:false,y:false},transitions:{resize:{animation:{duration:0}}},plugins:{legend:{display:false}}},extra);}
   cc(){const g=getComputedStyle(this.root);return {t3:g.getPropertyValue('--text3').trim()||'#3d506e',t2:g.getPropertyValue('--text2').trim()||'#7a8fb0',grid:this.data.theme==='dark'?'#1a2640':'#D6CFBF'};}
-  chartDash(){this.whenLib(()=>window.Chart,()=>{const list=this.m12();const labs=[],net=[];if(list.length){list.forEach(m=>{labs.push(this.MN[(+m.key.slice(5,7))-1]);net.push(Math.round(this.n(m.pureIncome,0)-this.n(m.pureExpenses,0)));});}else{const now=new Date();for(let i=0;i<12;i++){const d=this.addMonths(now,i);labs.push(this.MN[d.getMonth()]);net.push(Math.round(this.disp()));}}const c=this.cc();const ctx=document.getElementById('hzDashChart');if(!ctx)return;if(this.charts.dash)this.charts.dash.destroy();this.charts.dash=new Chart(ctx,{type:'bar',data:{labels:labs,datasets:[{data:net,backgroundColor:net.map(v=>v>=0?'#00e8a055':'#ff4d6d55'),borderColor:net.map(v=>v>=0?'#00e8a0':'#ff4d6d'),borderWidth:1,borderRadius:4}]},options:this.chOpts({plugins:{legend:{display:false},tooltip:{callbacks:{label:ctx=>this.fmtC(ctx.parsed.y)}}},scales:{x:{ticks:{color:c.t3,font:{size:9}},grid:{display:false}},y:{ticks:{color:c.t3,font:{size:9},callback:v=>this.fmtC(v)},grid:{color:c.grid}}}})});});}
+  chartDash(){this.whenLib(()=>window.Chart,()=>{const list=this.m12();const labs=[],net=[];if(list.length){list.forEach(m=>{labs.push(this.MN[(+m.key.slice(5,7))-1]);net.push(Math.round(this.n(m.pureIncome,0)-this.n(m.pureExpenses,0)));});}else{const now=this.today();for(let i=0;i<12;i++){const d=this.addMonths(now,i);labs.push(this.MN[d.getMonth()]);net.push(Math.round(this.disp()));}}const c=this.cc();const ctx=document.getElementById('hzDashChart');if(!ctx)return;if(this.charts.dash)this.charts.dash.destroy();this.charts.dash=new Chart(ctx,{type:'bar',data:{labels:labs,datasets:[{data:net,backgroundColor:net.map(v=>v>=0?'#00e8a055':'#ff4d6d55'),borderColor:net.map(v=>v>=0?'#00e8a0':'#ff4d6d'),borderWidth:1,borderRadius:4}]},options:this.chOpts({plugins:{legend:{display:false},tooltip:{callbacks:{label:ctx=>this.fmtC(ctx.parsed.y)}}},scales:{x:{ticks:{color:c.t3,font:{size:9}},grid:{display:false}},y:{ticks:{color:c.t3,font:{size:9},callback:v=>this.fmtC(v)},grid:{color:c.grid}}}})});});}
   chartSpend(){this.whenLib(()=>window.Chart,()=>{const M=this.spendMetrics();if(!M||!M.cats.length)return;const top=M.cats.slice(0,8);const labs=top.map(x=>x[0]),vals=top.map(x=>x[1]);const cols=['#00e8a0','#4d9fff','#f5a623','#8b5cf6','#00d4ff','#ec4899','#ff4d6d','#7a8fb0'];const c=this.cc();const ctx=document.getElementById('hzSpendChart');if(!ctx)return;if(this.charts.spend)this.charts.spend.destroy();this.charts.spend=new Chart(ctx,{type:'doughnut',data:{labels:labs,datasets:[{data:vals,backgroundColor:cols,borderColor:getComputedStyle(this.root).getPropertyValue('--bg2').trim(),borderWidth:2}]},options:this.chOpts({cutout:'62%',plugins:{legend:{display:true,position:'right',labels:{color:c.t2,font:{size:9},boxWidth:8,padding:6}},tooltip:{callbacks:{label:ctx=>` ${ctx.label}: ${this.fmtC(ctx.parsed)}`}}}})});});}
-  chartForecast(){this.whenLib(()=>window.Chart,()=>{const list=this.m12();const labs=[],inc=[],exp=[];if(list.length){list.forEach(m=>{labs.push(this.MN[(+m.key.slice(5,7))-1]);inc.push(Math.round(this.n(m.pureIncome,0)));exp.push(Math.round(this.n(m.pureExpenses,0)));});}else{const now=new Date();for(let i=0;i<12;i++){const d=this.addMonths(now,i);labs.push(this.MN[d.getMonth()]);inc.push(Math.round(this.ti()));exp.push(Math.round(this.te()));}}const c=this.cc();const ctx=document.getElementById('hzForecastChart');if(!ctx)return;if(this.charts.fc)this.charts.fc.destroy();this.charts.fc=new Chart(ctx,{type:'line',data:{labels:labs,datasets:[{label:'Income',data:inc,borderColor:'#00e8a0',backgroundColor:'#00e8a015',fill:true,tension:.3,pointRadius:0},{label:'Expenses',data:exp,borderColor:'#ff4d6d',backgroundColor:'#ff4d6d10',fill:true,tension:.3,pointRadius:0}]},options:this.chOpts({plugins:{legend:{display:true,labels:{color:c.t2,font:{size:9},boxWidth:8}},tooltip:{callbacks:{label:ctx=>` ${ctx.dataset.label}: ${this.fmtC(ctx.parsed.y)}`}}},scales:{x:{ticks:{color:c.t3,font:{size:9}},grid:{display:false}},y:{ticks:{color:c.t3,font:{size:9},callback:v=>this.fmtC(v)},grid:{color:c.grid}}}})});});}
+  chartForecast(){this.whenLib(()=>window.Chart,()=>{const list=this.m12();const labs=[],inc=[],exp=[];if(list.length){list.forEach(m=>{labs.push(this.MN[(+m.key.slice(5,7))-1]);inc.push(Math.round(this.n(m.pureIncome,0)));exp.push(Math.round(this.n(m.pureExpenses,0)));});}else{const now=this.today();for(let i=0;i<12;i++){const d=this.addMonths(now,i);labs.push(this.MN[d.getMonth()]);inc.push(Math.round(this.ti()));exp.push(Math.round(this.te()));}}const c=this.cc();const ctx=document.getElementById('hzForecastChart');if(!ctx)return;if(this.charts.fc)this.charts.fc.destroy();this.charts.fc=new Chart(ctx,{type:'line',data:{labels:labs,datasets:[{label:'Income',data:inc,borderColor:'#00e8a0',backgroundColor:'#00e8a015',fill:true,tension:.3,pointRadius:0},{label:'Expenses',data:exp,borderColor:'#ff4d6d',backgroundColor:'#ff4d6d10',fill:true,tension:.3,pointRadius:0}]},options:this.chOpts({plugins:{legend:{display:true,labels:{color:c.t2,font:{size:9},boxWidth:8}},tooltip:{callbacks:{label:ctx=>` ${ctx.dataset.label}: ${this.fmtC(ctx.parsed.y)}`}}},scales:{x:{ticks:{color:c.t3,font:{size:9}},grid:{display:false}},y:{ticks:{color:c.t3,font:{size:9},callback:v=>this.fmtC(v)},grid:{color:c.grid}}}})});});}
   // Nest-egg growth. Values are plotted in NATIVE kr and both axis and tooltip
   // format through fmtC, so the chart converts to — and shows the sign of — the
   // currency chosen across the app (previously it plotted raw kr/1e6 with a
@@ -24623,7 +24639,7 @@ class HZMobile {
   // (engine balanceBars). Green = surplus, red = a planned trip pushes the
   // fund into deficit. Native-kr values plotted; axis labels convert to the
   // display currency, exactly like the app's other charts.
-  chartFFBal(){this.whenLib(()=>window.Chart,()=>{const s=this.ffSummary();if(!s)return;const bars=(s.balanceBars||[]).map(v=>Math.round(this.n(v,0)));const wm=s.windowMonths||[];const labs=wm.length?wm.map(m=>this.MN[(+String(m.key).slice(5,7))-1]||''):bars.map((_,i)=>this.MN[(new Date().getMonth()+i)%12]);const c=this.cc();const ctx=document.getElementById('hzFFBalChart');if(!ctx)return;if(this.charts.ffbal)this.charts.ffbal.destroy();this.charts.ffbal=new Chart(ctx,{type:'bar',data:{labels:labs,datasets:[{data:bars,backgroundColor:bars.map(v=>v>=0?'#00e8a055':'#ff4d6d55'),borderColor:bars.map(v=>v>=0?'#00e8a0':'#ff4d6d'),borderWidth:1.5,borderRadius:3}]},options:this.chOpts({plugins:{legend:{display:false},tooltip:{callbacks:{label:ctx=>this.fmtC(ctx.parsed.y)}}},scales:{x:{ticks:{color:c.t3,font:{size:9},maxTicksLimit:12},grid:{display:false}},y:{ticks:{color:c.t3,font:{size:9},callback:v=>this.fmtC(v)},grid:{color:c.grid}}}})});});}
+  chartFFBal(){this.whenLib(()=>window.Chart,()=>{const s=this.ffSummary();if(!s)return;const bars=(s.balanceBars||[]).map(v=>Math.round(this.n(v,0)));const wm=s.windowMonths||[];const labs=wm.length?wm.map(m=>this.MN[(+String(m.key).slice(5,7))-1]||''):bars.map((_,i)=>this.MN[(this.today().getMonth()+i)%12]);const c=this.cc();const ctx=document.getElementById('hzFFBalChart');if(!ctx)return;if(this.charts.ffbal)this.charts.ffbal.destroy();this.charts.ffbal=new Chart(ctx,{type:'bar',data:{labels:labs,datasets:[{data:bars,backgroundColor:bars.map(v=>v>=0?'#00e8a055':'#ff4d6d55'),borderColor:bars.map(v=>v>=0?'#00e8a0':'#ff4d6d'),borderWidth:1.5,borderRadius:3}]},options:this.chOpts({plugins:{legend:{display:false},tooltip:{callbacks:{label:ctx=>this.fmtC(ctx.parsed.y)}}},scales:{x:{ticks:{color:c.t3,font:{size:9},maxTicksLimit:12},grid:{display:false}},y:{ticks:{color:c.t3,font:{size:9},callback:v=>this.fmtC(v)},grid:{color:c.grid}}}})});});}
   initVacMap(){this.whenLib(()=>window.L&&document.getElementById('hzVacMap'),()=>{if(this.vacMap){this.vacMap.remove();this.vacMap=null;}const el=document.getElementById('hzVacMap');if(!el)return;this.vacMap=L.map(el,{zoomControl:false}).setView([20,20],1);L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'© <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a>'}).addTo(this.vacMap);this.PULSE.forEach(d=>{const m=L.circleMarker([d.lat,d.lng],{radius:8,fillColor:d.col,color:d.col,fillOpacity:.8,weight:2});m.bindPopup(`<strong>${d.flag} ${d.dest}</strong><br>${d.cost}`);m.addTo(this.vacMap);});setTimeout(()=>this.vacMap&&this.vacMap.invalidateSize(),140);});}
   initRetMap(){this.whenLib(()=>window.L&&document.getElementById('hzRetMap'),()=>{if(this.retMap){this.retMap.remove();this.retMap=null;}const el=document.getElementById('hzRetMap');if(!el)return;this.retMap=L.map(el,{zoomControl:false}).setView([25,10],1);L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'© <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a>'}).addTo(this.retMap);this.raScored().forEach(l=>{if(!l.lat&&!l.lng)return;const col={feasible:'#00e8a0',conditional:'#f5a623',infeasible:'#ff4d6d'}[l.verdict]||'#7a8fb0';const m=L.circleMarker([l.lat,l.lng],{radius:9,fillColor:col,color:col,fillOpacity:.8,weight:2});m.bindPopup(`<strong>${this.esc(l.flag||'')} ${this.esc(l.name)}</strong><br>${this.fmtC(this.n(l.costOfLiving,0))}/mo · surplus ${this.fmtC(this.n(l.surplus,0))}`);m.addTo(this.retMap);});setTimeout(()=>this.retMap&&this.retMap.invalidateSize(),140);});}
 
@@ -24723,14 +24739,16 @@ class HZMobile {
   doExport(){try{const {aiKeys,...rest}=state;/* API keys never go into a backup file */const blob=new Blob([JSON.stringify(rest,null,2)],{type:'application/json'});const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download='horizon-backup.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);this.toast('Exported horizon-backup.json');}catch(_){this.toast('Export failed');}}
 
   // ══════ OVERLAYS / SHEETS ══════
-  closeOverlay(){this.overlay.style.display='none';this.overlay.innerHTML='';}
-  sheet(title,body,sub){this.overlay.style.display='block';this.overlay.innerHTML=`<div data-act="closeov" style="position:absolute;inset:0;background:rgba(0,0,0,.6);backdrop-filter:blur(2px);-webkit-backdrop-filter:blur(2px)"></div><div class="hz-sb" style="position:absolute;left:0;right:0;bottom:0;max-height:82%;overflow-y:auto;background:var(--bg1);border-top:1px solid var(--border2);border-radius:22px 22px 0 0;padding:8px 18px calc(env(safe-area-inset-bottom, 0px) + 26px);animation:hzsheet .3s cubic-bezier(.2,.8,.2,1)"><div style="width:38px;height:4px;border-radius:3px;background:var(--border2);margin:6px auto 14px"></div><div style="display:flex;align-items:center;gap:10px;margin-bottom:${sub?'4px':'14px'}"><div style="font-family:var(--fs);font-size:19px;font-weight:600;flex:1">${title}</div><button data-act="closeov" style="width:30px;height:30px;border-radius:8px;border:1px solid var(--border);background:var(--bg3);color:var(--text2);font-size:13px;cursor:pointer">✕</button></div>${sub?`<div style="font-size:12px;color:var(--text2);margin-bottom:14px;line-height:1.5">${sub}</div>`:''}${body}</div>`;hzSvDom(this.overlay);}
+  // While a sheet is open the page behind it is locked so it can't scroll
+  // under the user's finger; closing restores it.
+  closeOverlay(){this.overlay.style.display='none';this.overlay.innerHTML='';if(this.body)this.body.style.overflowY='';}
+  sheet(title,body,sub){this.overlay.style.display='block';if(this.body)this.body.style.overflowY='hidden';this.overlay.innerHTML=`<div data-act="closeov" style="position:absolute;inset:0;background:rgba(0,0,0,.6);backdrop-filter:blur(2px);-webkit-backdrop-filter:blur(2px)"></div><div class="hz-sb" style="position:absolute;left:0;right:0;bottom:0;max-height:82%;overflow-y:auto;background:var(--bg1);border-top:1px solid var(--border2);border-radius:22px 22px 0 0;padding:8px 18px calc(env(safe-area-inset-bottom, 0px) + 26px);animation:hzsheet .3s cubic-bezier(.2,.8,.2,1)"><div style="width:38px;height:4px;border-radius:3px;background:var(--border2);margin:6px auto 14px"></div><div style="display:flex;align-items:center;gap:10px;margin-bottom:${sub?'4px':'14px'}"><div style="font-family:var(--fs);font-size:19px;font-weight:600;flex:1">${title}</div><button data-act="closeov" style="width:30px;height:30px;border-radius:8px;border:1px solid var(--border);background:var(--bg3);color:var(--text2);font-size:13px;cursor:pointer">✕</button></div>${sub?`<div style="font-size:12px;color:var(--text2);margin-bottom:14px;line-height:1.5">${sub}</div>`:''}${body}</div>`;hzSvDom(this.overlay);}
   openMore(){this.sheet('More','<div style="display:flex;flex-direction:column;gap:6px">'+this.MORE.map(m=>`<button data-act="morenav" data-t="${m[0]}" style="display:flex;align-items:center;gap:13px;background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:13px 14px;color:var(--text);cursor:pointer;text-align:left"><span style="font-size:20px;width:26px;text-align:center">${m[1]}</span><div style="flex:1"><div style="font-size:14px;font-weight:600">${m[2]}</div><div style="font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.06em">${m[3]}</div></div><span style="color:var(--text3)">›</span></button>`).join('')+'</div>');}
   openSearch(){const items=this.MORE;this.sheet('Search','<input autofocus placeholder="Jump to a tab or action…" style="width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:9px;padding:11px 13px;color:var(--text);font-size:14px;margin-bottom:12px"><div style="font-family:var(--fm);font-size:9px;letter-spacing:.1em;color:var(--text3);text-transform:uppercase;margin-bottom:8px">Navigate</div><div style="display:flex;flex-direction:column;gap:5px">'+items.map(m=>`<button data-act="morenav" data-t="${m[0]}" style="display:flex;align-items:center;gap:12px;background:var(--bg2);border:1px solid var(--border);border-radius:10px;padding:11px 13px;color:var(--text);cursor:pointer;text-align:left"><span style="font-size:16px;width:22px;text-align:center">${m[1]}</span><span style="flex:1;font-size:13px">${m[2]}</span><span style="font-family:var(--fm);font-size:9px;color:var(--text3)">↵</span></button>`).join('')+'</div>');}
   openBank(){this.sheet('Connect Bank','<div style="display:flex;flex-direction:column;gap:10px">'+[['Open Banking (PSD2)','Requires bank credentials','🏦','info'],['Manual / Demo Mode','Pre-loaded sample data','📊','sage']].map(o=>`<div style="background:var(--${o[3]}-bg);border:1px solid var(--${o[3]}-bd);border-radius:12px;padding:13px;display:flex;align-items:center;gap:12px"><span style="font-size:22px">${o[2]}</span><div style="flex:1"><div style="font-size:13px;font-weight:600;color:var(--text)">${o[0]}</div><div style="font-size:11px;color:var(--text2)">${o[1]}</div></div></div>`).join('')+'</div><label style="display:block;font-size:11px;color:var(--text2);margin:14px 0 5px">Select your bank</label><select style="width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:10px 12px;color:var(--text);font-size:13px"><option>SEB</option><option>Swedbank</option><option>Handelsbanken</option><option>Nordea</option><option>Danske Bank</option><option>Other (PSD2)</option></select><div style="display:flex;gap:8px;margin-top:14px">'+this.btn('📊 Load Demo','demo','','g')+this.btn('🏦 Connect Live','bank','','o')+'</div>','Connect via Open Banking (PSD2) to pull real transactions, or use demo mode. Supported: SEB, Swedbank, Handelsbanken, Nordea, Danske Bank and all EU PSD2 banks.');}
   openTrip(id){
     const tr=id?(this.data.savedTrips||[]).find(t=>t.id===id):null;
-    const def=this.addMonths(new Date(),1);const defMonth=`${def.getFullYear()}-${String(def.getMonth()+1).padStart(2,'0')}`;
+    const def=this.addMonths(this.today(),1);const defMonth=`${def.getFullYear()}-${String(def.getMonth()+1).padStart(2,'0')}`;
     const month=tr&&tr.firstMonth?tr.firstMonth:defMonth;
     const dest=tr?tr.name:'';const country=tr?tr.country:'';const budget=(tr&&tr.budget)?tr.budget:'';const status=tr?tr.status:'planning';
     const inp='width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:9px 11px;color:var(--text);font-size:13px';
