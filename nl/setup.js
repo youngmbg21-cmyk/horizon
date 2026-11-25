@@ -46,6 +46,16 @@
     else D()[f] = { value:v, words:w || null };
   }
   const draftCount = () => Object.keys(D()).length;
+  // Income lines: edited right here as a draft list, saved with "Save and start".
+  const savedIncome = () => (state.baseIncome || []).map(l => ({ id:l.id, name:l.name || '', amount:Number(l.amount) || 0, type:l.type || 'fixed' }));
+  const incomeLines = () => D().incomeLines ? D().incomeLines.value : savedIncome();
+  const incomeTotal = () => incomeLines().reduce((s, l) => s + (Number(l.amount) || 0), 0);
+  function setIncomeLines(lines){
+    const same = JSON.stringify(lines.map(l => [l.name, Math.round(l.amount)])) === JSON.stringify(savedIncome().map(l => [l.name, Math.round(l.amount)]));
+    if(same) delete D().incomeLines; else D().incomeLines = { value:lines, words:null };
+  }
+  window.nlSetupIncAdd = function(){ const l = incomeLines().slice(); l.push({ id:'new' + Date.now().toString(36), name:'', amount:0, type:'fixed' }); setIncomeLines(l); NLP.renderPage(SETUP); setTimeout(() => document.getElementById('nls-inc-name-' + (l.length - 1))?.focus(), 30); };
+  window.nlSetupIncRemove = function(i){ const l = incomeLines().slice(); l.splice(i, 1); setIncomeLines(l); NLP.renderPage(SETUP); };
 
   // The rows of the Setup page. req = needed before the plan makes sense.
   const ROWS = [
@@ -55,11 +65,11 @@
     { key:'household', label:'Household',   req:false, filled:() => !!val('marital') || val('people') != null },
     { key:'age',       label:'Your age',    req:true,  filled:() => !!val('age') },
     { key:'retire',    label:'Retire at',   req:true,  filled:() => !!val('retire') },
-    { key:'income',    label:'Income',      req:true,  filled:() => sumIncome() > 0 || !!D().income },
+    { key:'income',    label:'Income',      req:true,  filled:() => incomeTotal() > 0 || !!D().income },
     { key:'goals',     label:'Goals',       req:false, filled:() => !!String(val('goals')).trim() },
   ];
   const stateOf = r => r.filled() ? 'filled' : (r.req ? 'needed' : 'optional');
-  const drafted = r => r.key === 'household' ? (D().marital || D().people) : D()[r.key];
+  const drafted = r => r.key === 'household' ? (D().marital || D().people) : r.key === 'income' ? (D().income || D().incomeLines) : D()[r.key];
   function ageProblem(){
     const a = Number(val('age')), r = Number(val('retire'));
     if(!a || a < 18 || a > 99) return 'Your age should be between 18 and 99.';
@@ -84,7 +94,8 @@
       return NLP.whatIf(st => {
         if(d.age) st.currentAge = Number(d.age.value) || st.currentAge;
         if(d.retire) st.retirementAge = Number(d.retire.value) || st.retirementAge;
-        if(d.income && sumIncome() <= 0) st.baseIncome = [{ id:'nl-draft', name:'Income', amount:Number(d.income.value) || 0, type:'fixed' }];
+        if(d.incomeLines) st.baseIncome = d.incomeLines.value.map(l => ({ id:l.id, name:l.name || 'Income', amount:Number(l.amount) || 0, type:l.type || 'fixed' }));
+        else if(d.income && sumIncome() <= 0) st.baseIncome = [{ id:'nl-draft', name:'Income', amount:Number(d.income.value) || 0, type:'fixed' }];
       }, () => getProjection().map(r => ({ age:r.age, v:(state.displayMode === 'nominal' ? r.total : r.realTotal) || 0 })));
     } catch(err){ return []; }
   }
@@ -142,19 +153,14 @@
     else if(k === 'age') v = `<span class="nls-num"><input type="number" class="nl-num-in" id="nls-age" data-f="age" data-nl-keep="no" min="18" max="99" step="1" value="${H(val('age') || '')}"> <span>years old</span></span>`;
     else if(k === 'retire') v = `<span class="nls-num"><input type="number" class="nl-num-in" id="nls-retire" data-f="retire" data-nl-keep="no" min="19" max="100" step="1" value="${H(val('retire') || '')}"> <span>years old</span></span>`;
     else if(k === 'income'){
-      const lines = (state.baseIncome || []).filter(l => l && Number(l.amount));
+      const lines = incomeLines(), cur = H(typeof sym === 'function' ? sym() : '');
       const d = D().income;
-      if(lines.length){
-        v = `<div class="nls-val">${H(lines.slice(0, 3).map(l => l.name || 'Income').join(' + '))}${lines.length > 3 ? ` + ${lines.length - 3} more` : ''} · ${H(NLP.money(sumIncome()))} a month</div>`
-          + (d ? `<div class="nls-det">You said ${H(NLP.money(d.value))} a month in all. It is kept as your household income.</div>` : '')
-          ;
-      } else {
-        v = `<span class="nls-num"><input type="number" class="nl-num-in" id="nls-income" data-f="income" data-nl-keep="no" min="0" step="100" placeholder="0" value="${d ? H(Math.round(Number(d.value) * curRate())) : ''}"> <span>${H(typeof sym === 'function' ? sym() : '')} a month, after tax</span></span>`
-          ;
-      }
+      v = lines.map((l, i) => `<div class="nls-inc"><input type="text" class="nls-inc-name" id="nls-inc-name-${i}" data-inc="name" data-i="${i}" data-nl-keep="no" value="${H(l.name)}" placeholder="Who or what, e.g. Salary" aria-label="Income ${i + 1} name"><span class="nls-num"><input type="number" class="nl-num-in" id="nls-inc-amt-${i}" data-inc="amt" data-i="${i}" data-nl-keep="no" min="0" step="100" placeholder="0" value="${l.amount ? H(Math.round(l.amount * curRate())) : ''}" aria-label="Income ${i + 1} a month"> <span>${cur} a month</span></span>${NLP.link('Remove', `nlSetupIncRemove(${i})`)}</div>`).join('')
+        + `<div class="nls-det">${lines.length ? `In all <span class="nls-inc-total">${H(NLP.money(incomeTotal()))}</span> a month · ` : ''}${NLP.link(lines.length ? '+ Add income' : '+ Add your income', 'nlSetupIncAdd()')}</div>`
+        + (d && !D().incomeLines ? `<div class="nls-det">You said ${H(NLP.money(d.value))} a month in all.</div>` : '');
     }
     else if(k === 'goals') v = `<textarea id="nls-goals" data-f="goals" data-nl-keep="no" rows="2" placeholder="A house, a long trip, retiring early…">${H(val('goals'))}</textarea>`;
-    return `<div class="nl-field nls-row" id="nls-row-${k}" data-state="${stateOf(r)}"><label class="lb"${['name','citizenship','homeBase','age','retire','goals','income'].includes(k) ? ` for="nls-${k}"` : ''}>${H(r.label)}</label><div class="v">${v}${sub(r)}${k === 'income' ? `<div class="nls-det">${(state.baseIncome || []).some(l => l && Number(l.amount)) ? NLP.link('Change your income in Money plan', "NLP.go('nl-money')") : 'You can split it into lines later in ' + NLP.link('Money plan', "NLP.go('nl-money')")}</div>` : ''}</div><div class="a">${badge(r)}</div></div>`;
+    return `<div class="nl-field nls-row" id="nls-row-${k}" data-state="${stateOf(r)}"><label class="lb"${['name','citizenship','homeBase','age','retire','goals','income'].includes(k) ? ` for="nls-${k}"` : ''}>${H(r.label)}</label><div class="v">${v}${sub(r)}${k === 'income' ? `<div class="nls-det">Your everyday income. Changes for one month or a future year go in ${NLP.link('Money plan', "NLP.go('nl-money')")}.</div>` : ''}</div><div class="a">${badge(r)}</div></div>`;
   }
 
   function renderSetup(host){
@@ -184,6 +190,19 @@
     }, 120);
   }
   function wireSetup(host){
+    host.querySelectorAll('[data-inc]').forEach(el => {
+      const i = Number(el.dataset.i), which = el.dataset.inc;
+      const update = () => {
+        const l = incomeLines().map(x => Object.assign({}, x));
+        if(!l[i]) return;
+        if(which === 'name') l[i].name = el.value; else l[i].amount = el.value === '' ? 0 : Math.max(0, Number(el.value) / curRate());
+        setIncomeLines(l);
+      };
+      // No full redraw while typing: it would drop the box the person is moving into.
+      const refresh = () => { update(); const t = host.querySelector('.nls-inc-total'); if(t) t.textContent = NLP.money(incomeTotal()); live(host); NLP.refreshPanel(); };
+      el.addEventListener('input', refresh);
+      el.addEventListener('change', refresh);
+    });
     host.querySelectorAll('[data-f]').forEach(el => {
       const f = el.dataset.f;
       const read = () => {
@@ -225,7 +244,10 @@
     put('age', v => { state.currentAge = Number(v); });
     put('retire', v => { state.retirementAge = Number(v); });
     put('goals', v => { prof().goals = String(v || ''); });
-    put('income', v => {
+    put('incomeLines', v => {
+      state.baseIncome = v.filter(l => String(l.name || '').trim() || Number(l.amount)).map(l => ({ id:/^new/.test(String(l.id)) || !l.id ? (typeof genId === 'function' ? genId() : 'i' + Date.now()) : l.id, name:String(l.name || '').trim() || 'Income', amount:Math.round(Number(l.amount) || 0), type:l.type || 'fixed' }));
+    });
+    if(!d.incomeLines) put('income', v => {
       const amt = Math.round(Number(v) || 0); if(!amt) return;
       if(sumIncome() <= 0) state.baseIncome = [{ id:typeof genId === 'function' ? genId() : 'i' + Date.now(), name:'Income', amount:amt, type:'fixed' }];
       else prof().householdIncome = amt;
@@ -589,6 +611,10 @@ Amounts the person says are in ${state.currency || 'SEK'}.`;
 #panel-nl-setup .nls-num .nl-num-in, #panel-nl-settings .nls-num .nl-num-in { width:56px; text-align:left; border-bottom:1px solid var(--nl-edge); }
 #panel-nl-setup .nls-num .nl-num-in:focus, #panel-nl-settings .nls-num .nl-num-in:focus { border-bottom-color:var(--nl-accent); }
 #panel-nl-setup .nls-pills { display:flex; flex-wrap:wrap; gap:8px; }
+#panel-nl-setup .nls-inc { display:flex; align-items:baseline; gap:14px; flex-wrap:wrap; padding:2px 0 6px; }
+#panel-nl-setup .nls-inc-name { width:220px !important; max-width:100%; border-bottom:1px solid var(--nl-edge) !important; }
+#panel-nl-setup .nls-inc-name:focus { border-bottom-color:var(--nl-accent) !important; }
+#panel-nl-setup .nls-inc .nl-num-in { width:110px; text-align:right; }
 #panel-nl-setup .nls-chart { margin-top:18px; max-width:none; }
 #panel-nl-settings .nl-field input[type=password] { max-width:360px; border-bottom:1px solid var(--nl-edge); font-family:ui-monospace,Menlo,Consolas,monospace; font-size:13px; }
 #panel-nl-settings .nl-field input[type=password]:focus { border-bottom-color:var(--nl-accent); }

@@ -529,34 +529,52 @@
     const nm = opts.find(o => o[0] === ed.yLine)?.[1] || 'Savings target';
     let h = `<tr class="nlm-ed"><td></td><td colspan="6"><div class="nlm-edbox">`;
     h += `<div class="nl-field"><span class="lb">What to change</span><div class="nlm-pills">${opts.map(o => `<button type="button" class="nl-gp${ed.yLine === o[0] ? ' on' : ''}" aria-pressed="${ed.yLine === o[0]}" onclick="NLM.set('yLine','${o[0]}')">${H(o[1])}</button>`).join('')}</div><span></span></div>`;
-    h += `<div class="nl-field"><span class="lb">Each month from ${row.year}</span><span class="nlm-amtw"><input type="text" inputmode="decimal" id="nlm-yamt-${H(ed.yLine)}" class="nl-num-in" value="${H(toShown(cur || 0))}" aria-label="Amount each month"> <span class="nlm-cur">${H(curSym())}</span></span><span></span></div>`;
-    h += `<p class="nl-note">Changes ${row.year} and every later year that follows it, until another change.</p>`;
-    h += `<div class="nlm-edacts"><button type="button" class="nl-black" onclick="NLM.saveYear(${row.year})">${H(`Change ${nm.replace(/ \(income\)$/, '')} from ${row.year}`)}</button>${NLP.link('Cancel', 'NLM.close()')}</div></div></td></tr>`;
+    const only = ed.yScope === 'only';
+    h += `<div class="nl-field"><span class="lb">Which years</span><div class="nlm-pills"><button type="button" class="nl-gp${only ? ' on' : ''}" aria-pressed="${only}" onclick="NLM.yScope('only')">Only ${row.year}</button><button type="button" class="nl-gp${only ? '' : ' on'}" aria-pressed="${!only}" onclick="NLM.yScope('from')">From ${row.year} on</button></div><span></span></div>`;
+    h += `<div class="nl-field"><span class="lb">Each month ${only ? 'in' : 'from'} ${row.year}</span><span class="nlm-amtw"><input type="text" inputmode="decimal" id="nlm-yamt-${H(ed.yLine)}" class="nl-num-in" value="${H(toShown(cur || 0))}" aria-label="Amount each month"> <span class="nlm-cur">${H(curSym())}</span></span><span></span></div>`;
+    h += `<p class="nl-note">${only ? `Changes ${row.year} only. ${row.year + 1} and later stay as they are.` : `Changes ${row.year} and every later year that follows it, until another change.`}</p>`;
+    h += `<div class="nlm-edacts"><button type="button" class="nl-black" onclick="NLM.saveYear(${row.year})">${H(`Change ${nm.replace(/ \(income\)$/, '')} ${only ? 'for ' + row.year + ' only' : 'from ' + row.year}`)}</button>${NLP.link('Cancel', 'NLM.close()')}</div></div></td></tr>`;
     return h;
   }
+  NLM.yScope = function(v){ const ed = ui().edit || (ui().edit = {}); ed.yScope = v; NLP.renderPage(PANEL); };
+  // Put one field of a year plan in place, for that year only or from that year on,
+  // without changing what any other year shows.
+  function putYearField(s, year, field, value, only, nextBefore){
+    if(!s.yearlyBases) s.yearlyBases = {};
+    const yb = s.yearlyBases, b = yb[String(year)] || (yb[String(year)] = {});
+    const ownOther = ['income','expenses','savings'].some(f => f !== field && b[f] != null);
+    const carryNext = v => { const n = yb[String(year + 1)] || (yb[String(year + 1)] = {}); if(n[field] == null){ n[field] = clone(v); if(!('cascade' in n)) n.cascade = true; } };
+    if(only){
+      b[field] = value;
+      if(!ownOther || b.cascade === false) b.cascade = false;
+      else carryNext(nextBefore);              // this year keeps flowing its other fields: hold the next year as it was
+    } else {
+      b[field] = value;
+      if(!ownOther || b.cascade !== false) b.cascade = true;
+      else { const n = yb[String(year + 1)] || (yb[String(year + 1)] = {}); n[field] = clone(value); if(!('cascade' in n)) n.cascade = true; }
+    }
+  }
   NLM.saveYear = function(year){
-    const st = ui(), ed = st.edit || {}, line = ed.yLine || 'sav';
+    const st = ui(), ed = st.edit || {}, line = ed.yLine || 'sav', only = ed.yScope === 'only';
     const el = document.getElementById('nlm-yamt-' + line), raw = el ? el.value.trim() : '';
     if(raw === '' || !(Number(raw.replace(/\s/g, '').replace(',', '.')) >= 0)){ NLP.toast('Type an amount of 0 or more.', 'warn'); return; }
     const amount = fromShown(raw), base = resolveYearBase(year);
     let label;
-    if(line === 'sav') label = `Savings target: ${money(base.savings)} → ${money(amount)} a month · from ${year}`;
+    const when = only ? `${year} only` : `from ${year}`;
+    if(line === 'sav') label = `Savings target: ${money(base.savings)} → ${money(amount)} a month · ${when}`;
     else {
       const field = line[0] === 'e' ? 'expenses' : 'income', it = (base[field] || [])[+line.slice(1)];
       if(!it) return;
-      label = `${it.name}: ${money(it.amount)} → ${money(amount)} a month · from ${year}`;
+      label = `${it.name}: ${money(it.amount)} → ${money(amount)} a month · ${when}`;
     }
+    const nextBase = resolveYearBase(year + 1);
     const ok = NLP.record(label, s => {
-      if(!s.yearlyBases) s.yearlyBases = {};
-      const b = s.yearlyBases[String(year)] || (s.yearlyBases[String(year)] = {});
-      if(line === 'sav') b.savings = amount;
-      else {
-        const field = line[0] === 'e' ? 'expenses' : 'income';
-        if(!Array.isArray(b[field])) b[field] = clone(resolveYearBase(year)[field] || []);
-        const it = b[field][+line.slice(1)]; if(!it) throw new Error('that line is gone');
-        it.amount = amount;
-      }
-      b.cascade = true;
+      if(line === 'sav'){ putYearField(s, year, 'savings', amount, only, nextBase.savings); return; }
+      const field = line[0] === 'e' ? 'expenses' : 'income';
+      const list = clone(resolveYearBase(year)[field] || []);
+      const it = list[+line.slice(1)]; if(!it) throw new Error('that line is gone');
+      it.amount = amount;
+      putYearField(s, year, field, list, only, nextBase[field] || []);
     });
     if(ok !== false){ st.open = null; st.edit = null; NLP.renderPage(PANEL); }
   };
@@ -869,7 +887,7 @@
       return { headline:`${chosen.year}: ${src.text[0].toLowerCase() + src.text.slice(1)}.`, graphic, groups:[{ title:'This year', rows:[
         door(H(src.text), chosen.net < 0 ? { text:'Short', kind:'ruby' } : null, { label:`Change ${chosen.year}`, onclick:`NLM.open('${chosen.year}')` }, chosen.overrideMonths ? H(`${chosen.overrideMonths} month${chosen.overrideMonths > 1 ? 's have' : ' has'} its own changes.`) : ''),
         ...(chosen.year === retireYear ? [door('You retire this year. After it, your retirement budget takes over.', { text:'Retire', kind:'steel' }, { label:'Open Future', onclick:"NLP.go('nl-future')" })] : [])] }],
-        button:{ label:`Change ${chosen.year} and later`, onclick:`NLM.open('${chosen.year}')` } };
+        button:{ label:`Change ${chosen.year}`, onclick:`NLM.open('${chosen.year}')` } };
     }
     const groups = [];
     if(changed.length) groups.push({ title:'Years with their own changes', rows:changed.slice(0, 5).map(r => door(String(r.year), { text:'Changed', kind:'amber' }, { label:'Show in table', onclick:`NLP.choose('${PANEL}','${r.year}')` })) });
@@ -877,7 +895,7 @@
     groups.push({ title:'Worth a look', rows:[door(`From ${retireYear + 1} your retirement budget takes over.`, { text:'Info', kind:'steel' }, { label:'Open Future', onclick:"NLP.go('nl-future')" })] });
     const headline = shortY.length ? `${shortY.length} year${shortY.length > 1 ? 's run' : ' runs'} short before you retire.` : changed.length ? `${changed.length} year${changed.length > 1 ? 's have' : ' has'} its own changes; later years follow them.` : `Every year follows your plan until you retire in ${retireYear}.`;
     const next = rows.find(r => r.year > CY) || rows[0];
-    return { headline, graphic, groups, button:{ label:`Change ${next.year} and later`, onclick:`NLP.choose('${PANEL}','${next.year}');NLM.open('${next.year}')` } };
+    return { headline, graphic, groups, button:{ label:`Change ${next.year}`, onclick:`NLP.choose('${PANEL}','${next.year}');NLM.open('${next.year}')` } };
   }
   function overviewBank(){
     const all = txs();

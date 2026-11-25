@@ -331,8 +331,8 @@
   // ── Chart: Fun Fund running balance with trips ─────────────────────────
   function funChart(m){
     return (w, h) => {
-      const ms = m.months, run = m.run;
-      const T = NLP.ticks(Math.min(0, ...run), Math.max(1, ...run), 3, v => v === 0 ? '0' : NLP.moneyShort(v));
+      const ms = m.months, run = m.run, sav = savRun(m);
+      const T = NLP.ticks(Math.min(0, ...run), Math.max(1, ...run, ...sav), 3, v => v === 0 ? '0' : NLP.moneyShort(v));
       const every = w < 420 ? 2 : 1;
       const xt = ms.map((x, i) => [i, NLP.monthShort(x.key)]).filter((_, i) => i % every === 0);
       return NLP.chart({ w, h, x:[0, 11], y:[T.min, T.max], pad:{ l:52, r:18, t:12, b:24 }, yt:T.ticks, xt, label:'Fun Fund balance',
@@ -341,6 +341,10 @@
           let s = `<line x1="${sx(0)}" x2="${sx(11)}" y1="${sy(0).toFixed(1)}" y2="${sy(0).toFixed(1)}" class="tdy-zero"/>`;
           if(Math.min(...run) < 0) s += `<path d="${area(run.map((v, i) => [i, Math.min(0, v)]), 0)}" class="tdy-neg"/>`;
           s += `<path d="${line(pts)}" class="tdy-line"/>`;
+          // Savings adding up over the same months.
+          s += `<path d="${line(sav.map((v, i) => [i, v]))}" class="tdy-sav"/>`;
+          s += `<circle cx="${sx(11).toFixed(1)}" cy="${sy(sav[11]).toFixed(1)}" r="3.5" class="tdy-sav-dot"/>`;
+          s += `<text class="lab" x="${(sx(11) - 8).toFixed(1)}" y="${Math.max(12, sy(sav[11]) - 9).toFixed(1)}" text-anchor="end">Saved ${H(NLP.moneyShort(sav[11]))} by ${H(NLP.monthShort(ms[11].key))}</text>`;
           // Trip costs: a steel mark on the month they are paid.
           const byMonth = {};
           m.trips.forEach(t => { (byMonth[t.key] = byMonth[t.key] || []).push(t); });
@@ -355,11 +359,14 @@
           const left = sx(lo) > w * .6;
           s += `<circle cx="${sx(lo).toFixed(1)}" cy="${sy(run[lo]).toFixed(1)}" r="4" class="${run[lo] < 0 ? 'tdy-dot-rb' : 'tdy-dot'}"/>`;
           s += `<text class="lab${run[lo] < 0 ? ' rb' : ''}" x="${(sx(lo) + (left ? -8 : 8)).toFixed(1)}" y="${Math.min(h - 30, sy(run[lo]) + 16).toFixed(1)}" text-anchor="${left ? 'end' : 'start'}">${loTxt}</text>`;
-          if(lo !== 11 && Math.abs(sx(11) - sx(lo)) > 90) s += `<text class="lab" x="${sx(11).toFixed(1)}" y="${Math.max(12, sy(run[11]) - 9).toFixed(1)}" text-anchor="end">${H(NLP.moneyShort(run[11]))} in ${H(NLP.monthShort(ms[11].key))}</text>`;
+          const funY = Math.abs(sy(run[11]) - sy(sav[11])) < 18 ? sy(run[11]) + 18 : Math.max(12, sy(run[11]) - 9);
+          if(lo !== 11 && Math.abs(sx(11) - sx(lo)) > 90) s += `<text class="lab" x="${sx(11).toFixed(1)}" y="${funY.toFixed(1)}" text-anchor="end">${H(NLP.moneyShort(run[11]))} in ${H(NLP.monthShort(ms[11].key))}</text>`;
           return s;
         } });
     };
   }
+  // What you save, month by month, added up over the next 12 months.
+  function savRun(m){ let c = 0; return m.months.map(x => (c += num(x.savings))); }
   function funTitle(m){
     const run = m.run, neg = run.map((v, i) => v < 0 ? i : -1).filter(i => i >= 0);
     if(!neg.length){
@@ -394,8 +401,8 @@
         `<div class="nl-two tdy-two">` +
           NLP.card(nextTitle(m), 'Each month’s income split into costs, saving and Fun Fund.',
             NLP.chartBox(nextChart(m), 160, 'Next 12 months') + NLP.legend([{ label:'Costs', color:'var(--tdy-cost)' }, { label:'Saved', color:'var(--nl-accent)' }, { label:'Fun Fund', color:'var(--tdy-fun)' }].concat(m.short.length ? [{ label:'Short', color:'var(--tdy-ruby)' }] : []))) +
-          NLP.card(funTitle(m), m.trips.length ? 'Running balance, next 12 months. Dots: trip costs.' : 'Running balance, next 12 months. No trips in this window.',
-            NLP.chartBox(funChart(m), 160, 'Fun Fund balance') + NLP.legend([{ label:'Balance', color:'var(--nl-accent)' }].concat(m.trips.length ? [{ label:'Trip cost', color:'var(--tdy-steel)' }] : []).concat(Math.min(...m.run) < 0 ? [{ label:'Below zero', color:'var(--tdy-ruby-bg)' }] : []))) +
+          NLP.card(funTitle(m) + ` Savings reach ${NLP.moneyShort(savRun(m)[11])}.`, m.trips.length ? 'Fun Fund balance and your savings adding up, next 12 months. Dots: trip costs.' : 'Fun Fund balance and your savings adding up, next 12 months.',
+            NLP.chartBox(funChart(m), 160, 'Fun Fund balance and savings') + NLP.legend([{ label:'Fun Fund', color:'var(--nl-accent)' }, { label:'Savings', color:'#48639A' }].concat(m.trips.length ? [{ label:'Trip cost', color:'var(--tdy-steel)' }] : []).concat(Math.min(...m.run) < 0 ? [{ label:'Below zero', color:'var(--tdy-ruby-bg)' }] : []))) +
         `</div>`;
     } else {
       body = m.items.length
@@ -528,6 +535,8 @@ html.nl { --tdy-steel:#48639A; --tdy-amber:#8A5A0A; --tdy-amber-bg:#FBEEDB; --td
 #panel-nl-today .tdy-wif .nl-chip:disabled { opacity:.5; cursor:default; }
 #panel-nl-today .nl-legend i[style*="tdy-amber-bg"] { outline:1px solid #E9D3B0; }
 #panel-nl-today svg.nl-svg .tdy-line { fill:none; stroke:var(--nl-accent); stroke-width:2.5; stroke-linejoin:round; }
+#panel-nl-today svg.nl-svg .tdy-sav { fill:none; stroke:#48639A; stroke-width:2.25; stroke-linejoin:round; }
+#panel-nl-today svg.nl-svg .tdy-sav-dot { fill:#48639A; }
 #panel-nl-today svg.nl-svg .tdy-area { fill:var(--nl-accent); opacity:.13; }
 #panel-nl-today svg.nl-svg .tdy-dash { fill:none; stroke:var(--tdy-steel); stroke-width:2; stroke-dasharray:5 4; }
 #panel-nl-today svg.nl-svg .tdy-ret { fill:var(--tdy-amber-bg); opacity:.6; }

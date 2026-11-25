@@ -4175,6 +4175,9 @@ body.light .piq-country-menu { box-shadow:0 12px 28px -10px rgba(60,40,10,0.22);
 
 .nl-bar, .nl-sheet-back, .nl-toast { display:none; }
 html.nl .ticker-bar, html.nl #app > .topbar, html.nl #app-sidebar, html.nl .nav-overlay { display:none !important; }
+/* iPad/iPhone Safari: 100vh includes space hidden behind the browser's own bars, which pushed
+   the side panel's ask box off the bottom. Use the height that is really visible. */
+html.nl #app { height:100vh; height:100dvh; }
 html.nl .nl-bar { display:block; flex-shrink:0; position:relative; z-index:50; background:var(--nl-surface); border-bottom:1px solid var(--nl-line); color:var(--nl-ink); font:14px/1.4 var(--nl-sans); }
 .nl-row { display:flex; align-items:center; gap:10px; padding:8px 20px 4px; min-height:48px; }
 .nl-back { border:0; background:transparent; color:var(--nl-detail); font:400 22px/1 var(--nl-sans); padding:4px 8px; border-radius:8px; cursor:pointer; }
