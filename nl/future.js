@@ -465,7 +465,7 @@
     return `<div class="nlf-cap-l">${H(label)}</div><div class="nlf-cap"><i style="width:${p}%;background:${col}"></i></div><p class="nlf-cap-s">${H(note)}</p>`;
   }
   const steps = items => `<div class="nl-counts nlf-steps">${items.map(i => `<div class="${i.kind || ''}">${H(i.label)}</div>`).join('')}</div>`;
-  const pageLinks = extra => (extra || []).concat([{ label:'Classic retirement page', short:'Classic', onclick:"nav('retirement')" }]);
+  const pageLinks = extra => (extra || []);
 
   function overview(){
     const tab = NLP.tabOf(P, 'runway');

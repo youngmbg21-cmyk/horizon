@@ -935,7 +935,6 @@
   function overview(){
     const tab = ui().tab || 'plan';
     const o = tab === 'forecast' ? overviewForecast() : tab === 'years' ? overviewYears() : tab === 'bank' ? overviewBank() : tab === 'history' ? overviewHistory() : overviewPlan();
-    o.links = (o.links || []).concat([{ label:'Classic Forecast & Review', short:'Classic', onclick:"nav('review')" }]);
     return o;
   }
 

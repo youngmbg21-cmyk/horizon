@@ -151,6 +151,7 @@
     pending:() => { if(typeof window.nlFlip === 'function') window.nlFlip('chat'); },
     short:() => NLP.go('nl-money'), trips:() => NLP.go('nl-plans'),
     runout:() => NLP.go('nl-future'), pension:() => NLP.go('nl-future'), profile:() => NLP.go('nl-setup'),
+    rates:() => { NLP.ui('nl-settings').tab = 'general'; NLP.go('nl-settings'); setTimeout(() => document.getElementById('nlst-row-rates')?.scrollIntoView({ block:'center' }), 80); },
   };
   function needs(d){
     const out = [];
@@ -201,6 +202,12 @@
       detail:`Not filled in yet: ${listWords(miss)}`,
       why:'Horizon uses these to size taxes, places and your retirement.',
       badge:{ text:'Missing', kind:'amber' }, act:'Fill in your profile', go:"NLP.today.go('profile')",
+    });
+    if(state.pendingRates) out.push({
+      id:'rates', text:'New exchange rates are ready',
+      detail:'Your other currencies still use the rates from ' + (state.ratesUpdatedAt ? new Date(state.ratesUpdatedAt).toLocaleDateString('en-GB', { day:'numeric', month:'short', year:'numeric' }) : 'when you set them up'),
+      why:'Nothing changes until you approve them in Settings.',
+      badge:{ text:'Waiting for you', kind:'amber' }, act:'Review the rates', go:"NLP.today.go('rates')",
     });
     if(typeof getPensionAssets === 'function' && !getPensionAssets().length) out.push({
       id:'pension', text:'No pension added',
@@ -430,7 +437,7 @@
     const m = model(), ui = st(), r = m.life, L = lifeExp();
     const wi = activeWI();
     const items = m.items.filter(it => it.id !== 'pending');   // the panel lists suggestions itself
-    const links = [{ label:state.dashboardReport ? 'Full report' : 'Write a full report', short:'Report', onclick:'NLP.today.report()' }];
+    const links = [{ label:'Full review', short:'Review', onclick:'NLP.today.report()' }];
     // A chosen row on the Needs you tab.
     const chosen = ui.tab === 'needs' && ui.chosen != null ? m.items.find(it => it.id === String(ui.chosen)) : null;
     if(chosen){
@@ -486,10 +493,7 @@
       if(i && !i.value.trim()){ i.value = 'What if '; i.dispatchEvent(new Event('input')); i.focus(); i.setSelectionRange(i.value.length, i.value.length); }
     },
     report(){
-      const had = !!state.dashboardReport;
-      nav('dashboard');
-      if(!had && typeof window.runDashboardAIReport === 'function') window.runDashboardAIReport();
-      setTimeout(() => { const el = document.querySelector('#panel-dashboard .dash-ai-report'); if(el) el.scrollIntoView({ block:'start' }); }, 120);
+      NLP.ask('Write me a full review of my finances: where I stand, what is going well, what needs attention, and the three things to do next.');
     },
   };
 
