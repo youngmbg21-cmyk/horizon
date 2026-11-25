@@ -51,6 +51,12 @@
   NLP.renderPage = function(panel){
     const spec = pages[panel]; if(!spec || !NLP.isOn()) return;
     const el = host(panel); if(!el) return;
+    // The page being drawn is the open one: make sure it is the one showing
+    // (a redraw during start-up can create it before it is switched on).
+    if(typeof state !== 'undefined' && state.activePanel === panel && !el.classList.contains('active')){
+      document.querySelectorAll('#app .content > .panel.active').forEach(x => x.classList.remove('active'));
+      el.classList.add('active');
+    }
     const content = document.querySelector('#app .content');
     const keep = content ? content.scrollTop : 0;
     const active = document.activeElement, activeId = active && el.contains(active) ? active.id : null;
@@ -269,6 +275,16 @@
     renderPanel = function(panel){
       if(pages[panel]){ if(NLP.isOn()) NLP.renderPage(panel); return; }
       return classicRender.apply(this, arguments);
+    };
+  }
+  // The app's full redraw (start-up, cloud sync, imports) re-applies the open
+  // page from saved state. If that is a classic page, open its new page instead.
+  if(typeof renderAll === 'function'){
+    const classicAll = renderAll;
+    renderAll = function(){
+      const r = classicAll.apply(this, arguments);
+      if(NLP.isOn() && typeof state !== 'undefined' && newFor(state.activePanel)) nav(state.activePanel);
+      return r;
     };
   }
   // Re-mount charts after every page draw.
