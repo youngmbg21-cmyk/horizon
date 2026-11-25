@@ -226,9 +226,75 @@
   new MutationObserver(() => {
     if(typeof state === 'undefined') return;
     if(!NLP.isOn() && pages[state.activePanel]) nav(NLP.OLD_FOR[state.activePanel] || 'dashboard');
+    else if(NLP.isOn() && newFor(state.activePanel)) nav(state.activePanel);
   }).observe(document.documentElement, { attributes:true, attributeFilter:['class'] });
   // A reload on a new page (#nl-…): land on it once the pages have registered.
+  // ── No classic pages inside the new look ─────────────────────────────────
+  // Anything that would open a classic page opens its new page instead.
+  NLP.CLASSIC_TO_NEW = {
+    dashboard:['nl-today'], review:['nl-money','plan'], monthly:['nl-money','plan'], yearly:['nl-money','years'],
+    transactions:['nl-money','bank'], funfund:['nl-plans','trips'], retireanywhere:['nl-plans','places'], propiq:['nl-plans','places'],
+    retirement:['nl-future','runway'], lifewall:['nl-future','wall'], journal:['nl-notebook','notes'], vault:['nl-notebook','reports'],
+    settings:['nl-settings'],
+  };
+  const newFor = panel => { const m = NLP.CLASSIC_TO_NEW[panel]; return (m && pages[m[0]]) ? m : null; };
+  if(typeof nav === 'function'){
+    const classicNav = nav;
+    nav = function(panel, opts){
+      const m = NLP.isOn() ? newFor(panel) : null;
+      if(m){ if(m[1]) NLP.ui(m[0]).tab = m[1]; return classicNav.call(this, m[0], opts); }
+      return classicNav.apply(this, arguments);
+    };
+  }
+  // The classic ⌘K command box belongs to the classic look; in the new look the shortcut opens the assistant.
+  if(typeof cmdpOpen === 'function'){
+    const classicCmdp = cmdpOpen;
+    cmdpOpen = function(){ if(NLP.isOn()){ if(typeof window.nlOpenAssistant === 'function') window.nlOpenAssistant(); return; } return classicCmdp.apply(this, arguments); };
+  }
+
+  // ── The side panel's width: drag its left edge; each device remembers it ──
+  const PANEL_W_KEY = (typeof STORAGE_KEY !== 'undefined' ? STORAGE_KEY : 'horizon') + ':panelW';
+  const PANEL_W_DEFAULT = 340;
+  const panelMax = () => Math.max(PANEL_W_DEFAULT, Math.min(720, Math.round(window.innerWidth * 0.5)));
+  function setPanelW(w, keep){
+    const side = document.getElementById('nl-side'); if(!side) return;
+    const v = Math.round(Math.min(panelMax(), Math.max(300, w)));
+    side.style.width = v + 'px';
+    if(keep){ try { if(v === PANEL_W_DEFAULT) localStorage.removeItem(PANEL_W_KEY); else localStorage.setItem(PANEL_W_KEY, String(v)); } catch(_){} }
+    const h = document.getElementById('nl-resize'); if(h) h.setAttribute('aria-valuenow', String(v));
+  }
+  NLP.setPanelWidth = w => setPanelW(w, true);
+  function initResize(){
+    const side = document.getElementById('nl-side'); if(!side || document.getElementById('nl-resize')) return;
+    const h = document.createElement('div');
+    h.id = 'nl-resize'; h.className = 'nl-resize'; h.tabIndex = 0;
+    h.setAttribute('role', 'separator'); h.setAttribute('aria-orientation', 'vertical');
+    h.setAttribute('aria-label', 'Side panel width. Drag, or use the arrow keys. Double-click to reset.');
+    h.setAttribute('aria-valuemin', '300'); h.title = 'Drag to resize · double-click to reset';
+    side.prepend(h);
+    let saved = 0; try { saved = Number(localStorage.getItem(PANEL_W_KEY)) || 0; } catch(_){}
+    if(saved) setPanelW(saved, false);
+    let dragging = false;
+    const move = e => { if(!dragging) return; setPanelW(window.innerWidth - e.clientX, false); };
+    const stop = () => { if(!dragging) return; dragging = false; document.documentElement.classList.remove('nl-resizing'); setPanelW(side.getBoundingClientRect().width, true); };
+    h.addEventListener('pointerdown', e => { if(document.documentElement.classList.contains('nl-phone')) return; dragging = true; h.setPointerCapture(e.pointerId); document.documentElement.classList.add('nl-resizing'); e.preventDefault(); });
+    h.addEventListener('pointermove', move);
+    h.addEventListener('pointerup', stop); h.addEventListener('pointercancel', stop);
+    h.addEventListener('dblclick', () => setPanelW(PANEL_W_DEFAULT, true));
+    h.addEventListener('keydown', e => {
+      const w = side.getBoundingClientRect().width;
+      if(e.key === 'ArrowLeft'){ e.preventDefault(); setPanelW(w + 24, true); }
+      if(e.key === 'ArrowRight'){ e.preventDefault(); setPanelW(w - 24, true); }
+      if(e.key === 'Home'){ e.preventDefault(); setPanelW(PANEL_W_DEFAULT, true); }
+    });
+    window.addEventListener('resize', () => { const w = side.getBoundingClientRect().width; if(w > panelMax()) setPanelW(panelMax(), false); });
+  }
+  initResize();
+
   NLP.boot = function(){
+    // A classic page restored from the last visit opens as its new page.
+    const m0 = NLP.isOn() && typeof state !== 'undefined' ? newFor(state.activePanel) : null;
+    if(m0){ nav(state.activePanel); return; }
     const want = (location.hash || '').replace(/^#/, '').split('/')[0];
     if(NLP.isOn() && pages[want] && state.activePanel !== want) nav(want);
     else if(NLP.isOn() && pages[state.activePanel]) NLP.renderPage(state.activePanel);
@@ -236,13 +302,57 @@
 
   // ── Shared styles (scoped to the new look) ───────────────────────────────
   NLP.css('nl-core-css', `
+/* ── The top bar: one black bar (L+S allows dark or white, one per app) ── */
+html.nl .nl-bar { background:#111113; border-bottom:1px solid #000; color:#fff; }
+html.nl .nl-logo { color:#fff; font:600 16px/1 var(--nl-sans); letter-spacing:-.01em; display:inline-flex; align-items:center; gap:8px; }
+html.nl .nl-logo::before { content:''; width:18px; height:18px; border-radius:5px; background:linear-gradient(135deg,#1FA58C 0%,#087363 100%); box-shadow:inset 0 0 0 1px rgba(255,255,255,.12); }
+html.nl .nl-back { color:rgba(255,255,255,.6); }
+html.nl .nl-back:hover { background:rgba(255,255,255,.1); color:#fff; }
+html.nl .nl-nav button { color:rgba(255,255,255,.66); }
+html.nl .nl-nav button:hover { background:rgba(255,255,255,.08); color:#fff; }
+html.nl .nl-nav button[aria-current="page"] { background:rgba(255,255,255,.14); color:#fff; }
+html.nl .nl-bar .nl-pill { background:rgba(255,255,255,.1); color:#fff; }
+html.nl .nl-bar .nl-pill:hover, html.nl .nl-bar .nl-pill[aria-expanded="true"] { background:rgba(255,255,255,.18); color:#fff; }
+html.nl .nl-bar .nl-icon { color:rgba(255,255,255,.72); }
+html.nl .nl-bar .nl-icon:hover, html.nl .nl-bar .nl-icon[aria-current="page"] { background:rgba(255,255,255,.14); color:#fff; }
+html.nl .nl-bar .cur-toggle, html.nl .nl-bar .mode-toggle { background:rgba(255,255,255,.08) !important; }
+html.nl .nl-bar .cur-btn, html.nl .nl-bar .mode-btn { color:rgba(255,255,255,.62) !important; }
+html.nl .nl-bar .cur-btn:hover, html.nl .nl-bar .mode-btn:hover { color:#fff !important; }
+html.nl .nl-bar .cur-btn.active, html.nl .nl-bar .mode-btn.active { background:#fff !important; color:#111113 !important; box-shadow:none !important; }
+html.nl .nl-bar :focus-visible { outline-color:#5FD3BC; }
+html.nl .nl-bar .nl-where { color:rgba(255,255,255,.6); }
+html.nl .nl-tabs { display:none !important; }
+/* ── The side panel's resize handle ── */
+html.nl .nl-side { position:relative; }
+.nl-resize { display:none; }
+html.nl:not(.nl-phone) .nl-resize { display:block; position:absolute; left:-4px; top:0; bottom:0; width:8px; cursor:col-resize; z-index:5; touch-action:none; }
+html.nl:not(.nl-phone) .nl-resize::after { content:''; position:absolute; left:3px; top:0; bottom:0; width:2px; background:transparent; transition:background .12s; }
+html.nl:not(.nl-phone) .nl-resize:hover::after, html.nl:not(.nl-phone) .nl-resize:focus-visible::after, html.nl.nl-resizing .nl-resize::after { background:var(--nl-accent); }
+html.nl:not(.nl-phone) .nl-resize:focus-visible { outline:0; }
+html.nl.nl-resizing, html.nl.nl-resizing * { cursor:col-resize !important; user-select:none !important; }
+/* ── Classic overlays that must not show in the new look ── */
+html.nl .cmdp, html.nl .cmdp-backdrop { display:none !important; }
+/* The classic sync sign-in box, dressed in the new look. */
+html.nl #sync-auth-ov { background:rgba(17,17,19,.5) !important; }
+html.nl #sync-auth-ov > div { background:#fff !important; border:0 !important; border-radius:14px !important; box-shadow:0 24px 60px rgba(0,0,0,.22) !important; font-family:var(--nl-sans) !important; }
+html.nl #sync-auth-ov #sync-auth-title { color:var(--nl-ink) !important; font:600 20px/1.3 var(--nl-serif) !important; }
+html.nl #sync-auth-ov p { color:var(--nl-quiet) !important; }
+html.nl #sync-auth-ov input { background:#fff !important; color:var(--nl-ink) !important; border:1px solid var(--nl-edge) !important; border-radius:10px !important; font-family:var(--nl-sans) !important; }
+html.nl #sync-auth-ov #sync-auth-send { background:#111113 !important; color:#fff !important; border-radius:999px !important; font-weight:600 !important; }
+html.nl #sync-auth-ov .btn:not(#sync-auth-send) { color:var(--nl-accent) !important; }
+/* ── Commercial-grade finish ── */
+html.nl ::selection { background:#CDEDE4; color:var(--nl-ink); }
+html.nl .content { scrollbar-width:thin; scrollbar-color:#CFCFD6 transparent; }
+html.nl .content::-webkit-scrollbar, html.nl .nl-face::-webkit-scrollbar { width:10px; }
+html.nl .content::-webkit-scrollbar-thumb, html.nl .nl-face::-webkit-scrollbar-thumb { background:#D5D5DC; border-radius:999px; border:3px solid transparent; background-clip:padding-box; }
+html.nl .content::-webkit-scrollbar-track, html.nl .nl-face::-webkit-scrollbar-track { background:transparent; }
 html.nl .content { background:var(--nl-ground); }
 html.nl .panel.nl-page { max-width:none; padding:0; margin:0; background:var(--nl-surface); min-height:100%; color:var(--nl-ink); font:14px/1.5 var(--nl-sans); animation:none; }
 html.nl .panel.nl-page.active { display:block; }
 .nl-page * { box-sizing:border-box; }
-.nl-page .nl-wrap { padding:18px 24px 40px; max-width:none; }
+.nl-page .nl-wrap { padding:22px 20px 48px 28px; max-width:none; }
 .nl-head { display:flex; align-items:flex-end; gap:24px; border-bottom:1px solid var(--nl-line); margin-bottom:14px; min-width:0; }
-.nl-title { font:600 26px/1.2 var(--nl-serif); margin:0; padding-bottom:10px; white-space:nowrap; letter-spacing:-.01em; color:var(--nl-ink); }
+.nl-title { font:600 28px/1.15 var(--nl-serif); margin:0; padding-bottom:12px; white-space:nowrap; letter-spacing:-.015em; color:var(--nl-ink); }
 .nl-tabs-row { display:flex; gap:20px; min-width:0; overflow-x:auto; scrollbar-width:none; }
 .nl-tabs-row::-webkit-scrollbar { display:none; }
 .nl-tab { border:0; border-bottom:2px solid transparent; background:transparent; padding:0 0 11px; font:400 14px var(--nl-sans); color:var(--nl-detail); cursor:pointer; white-space:nowrap; }
@@ -251,7 +361,7 @@ html.nl .panel.nl-page.active { display:block; }
 .nl-tab.on { color:var(--nl-ink); border-color:var(--nl-ink); font-weight:500; }
 .nl-tab.filt, .nl-tab.filt i { color:var(--nl-accent); }
 .nl-acts { margin-left:auto; display:flex; gap:8px; padding-bottom:8px; flex-shrink:0; }
-.nl-gp { border:0; background:var(--nl-pill); color:var(--nl-ink); border-radius:999px; padding:6px 13px; font:500 13px var(--nl-sans); cursor:pointer; white-space:nowrap; }
+.nl-gp { border:0; background:var(--nl-pill); color:var(--nl-ink); border-radius:999px; padding:7px 14px; font:500 13px var(--nl-sans); cursor:pointer; white-space:nowrap; transition:background .12s, color .12s; }
 .nl-gp:hover { background:var(--nl-chosen); }
 .nl-gp[aria-pressed="true"], .nl-gp.on { background:var(--nl-ink); color:#fff; }
 .nl-seg { display:inline-flex; background:var(--nl-pill); border-radius:999px; padding:3px; gap:2px; }
@@ -273,7 +383,7 @@ table.nl-tbl { width:100%; border-collapse:collapse; font-size:14px; }
   .nl-page table.nl-tbl .mk { width:18px !important; }
 }
 table.nl-tbl th { font:500 12.5px var(--nl-sans); color:var(--nl-detail); text-align:left; padding:7px 8px; border-bottom:1px solid var(--nl-line); white-space:nowrap; }
-table.nl-tbl td { padding:9px 8px; border-bottom:1px solid var(--nl-line); vertical-align:top; }
+table.nl-tbl td { padding:11px 8px; border-bottom:1px solid var(--nl-line); vertical-align:top; transition:background .1s; }
 table.nl-tbl .r { text-align:right; font-variant-numeric:tabular-nums; white-space:nowrap; }
 table.nl-tbl .mk { width:28px; color:var(--nl-detail); font-size:12.5px; font-variant-numeric:tabular-nums; }
 table.nl-tbl .nm { font-weight:600; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; overflow-wrap:anywhere; }
@@ -286,21 +396,21 @@ table.nl-tbl tbody tr:focus-visible { outline:2px solid var(--nl-accent); outlin
 .nl-was { color:var(--nl-detail); text-decoration:line-through; margin-right:6px; }
 .nl-inrow { display:flex; gap:12px; margin-top:5px; font-size:13px; flex-wrap:wrap; }
 .nl-q { font-family:var(--nl-serif); font-style:italic; color:var(--nl-quiet); }
-.nl-cc { border:1px solid var(--nl-line); border-radius:10px; padding:14px 16px 10px; margin:0 0 12px; background:var(--nl-surface); min-width:0; }
-.nl-ct { font:600 16px/1.3 var(--nl-serif); margin:0; color:var(--nl-ink); }
+.nl-cc { border:1px solid var(--nl-line); border-radius:12px; padding:18px 20px 14px; margin:0 0 14px; background:var(--nl-surface); min-width:0; box-shadow:0 1px 2px rgba(17,17,19,.04); }
+.nl-ct { font:600 17px/1.3 var(--nl-serif); margin:0; color:var(--nl-ink); letter-spacing:-.005em; }
 .nl-cs { font-size:12.5px; color:var(--nl-detail); margin:2px 0 6px; }
 .nl-chart { position:relative; width:100%; overflow:hidden; }
 .nl-chart svg { display:block; }
 svg.nl-svg text { font:11.5px var(--nl-sans); fill:var(--nl-detail); }
 svg.nl-svg text.lab { fill:var(--nl-ink); font-weight:500; paint-order:stroke; stroke:#fff; stroke-width:4px; stroke-linejoin:round; }
-svg.nl-svg .gl { stroke:var(--nl-line); stroke-width:1; }
+svg.nl-svg .gl { stroke:#EDEDF1; stroke-width:1; }
 .nl-legend { display:flex; gap:14px; flex-wrap:wrap; font-size:12.5px; color:var(--nl-detail); margin-top:4px; }
 .nl-legend i { display:inline-block; width:10px; height:10px; border-radius:2px; margin-right:5px; vertical-align:-1px; }
 .nl-legend i.dash { height:0; width:14px; border-top:2px dashed #48639A; border-radius:0; vertical-align:3px; }
 .nl-fcards { display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:10px; margin:0 0 12px; }
-.nl-fcards > div { border:1px solid var(--nl-line); border-radius:10px; padding:10px 14px; min-width:0; }
+.nl-fcards > div { border:1px solid var(--nl-line); border-radius:12px; padding:14px 16px; min-width:0; box-shadow:0 1px 2px rgba(17,17,19,.04); background:var(--nl-surface); }
 .nl-fcards span { display:block; font-size:12.5px; color:var(--nl-detail); }
-.nl-fcards b { display:block; font-size:17px; font-weight:600; margin:2px 0 4px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.nl-fcards b { display:block; font-size:19px; font-weight:600; letter-spacing:-.01em; margin:3px 0 6px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 .nl-two { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:12px; }
 @media (max-width:1100px){ .nl-two { grid-template-columns:minmax(0,1fr); } }
 .nl-empty { padding:28px 16px; text-align:center; color:var(--nl-detail); }
@@ -317,7 +427,9 @@ svg.nl-svg .gl { stroke:var(--nl-line); stroke-width:1; }
 .nl-page input.nl-num-in, .nl-num-in { border:0; border-bottom:1px solid var(--nl-edge); background:transparent; font:500 14px var(--nl-sans); color:var(--nl-ink); width:110px; text-align:right; padding:2px 0; font-variant-numeric:tabular-nums; outline:0; }
 .nl-page input.nl-num-in:focus, .nl-num-in:focus { border-bottom-color:var(--nl-accent); }
 .nl-page .nl-link, .nl-side .nl-link { border:0; background:transparent; padding:0; font:400 13px/1.5 var(--nl-sans); color:var(--nl-accent); text-decoration:underline; text-underline-offset:2px; cursor:pointer; white-space:nowrap; }
-.nl-page .nl-black { border:0; background:var(--nl-black); color:#fff; border-radius:999px; padding:9px 16px; font:600 14px var(--nl-sans); cursor:pointer; white-space:nowrap; }
+.nl-page .nl-black { border:0; background:var(--nl-black); color:#fff; border-radius:999px; padding:10px 18px; font:600 14px var(--nl-sans); cursor:pointer; white-space:nowrap; transition:background .12s, transform .06s; }
+.nl-page .nl-black:hover:not(:disabled), html.nl .nl-side .nl-black:hover:not(:disabled) { background:#000; }
+.nl-page .nl-black:active:not(:disabled), html.nl .nl-side .nl-black:active:not(:disabled) { transform:translateY(1px); }
 .nl-page .nl-black:disabled { background:#C9CED8; cursor:default; }
 .nl-page .nl-note { font-size:12.5px; color:var(--nl-detail); margin:4px 0 0; }
 .nl-page :focus-visible { outline:2px solid var(--nl-accent); outline-offset:2px; }

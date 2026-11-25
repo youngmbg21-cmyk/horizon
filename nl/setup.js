@@ -455,6 +455,75 @@ Amounts the person says are in ${state.currency || 'SEK'}.`;
     setTimeout(() => { if(state.activePanel === SETTINGS) NLP.rerender(); }, 400);
   }
 
+  // ── Exchange rates: the app fetches them; nothing changes until the person approves ──
+  const FXC = () => (typeof FX_CURRENCIES !== 'undefined' ? FX_CURRENCIES : ['USD','EUR','KES']);
+  const fxShow = (c, v) => { const s = typeof sym === 'function' ? sym(c) : c; const n = Number(v); return `${H(s)}${n >= 10 ? n.toFixed(2) : n.toFixed(n >= 1 ? 3 : 4)}`; };
+  const fxDate = iso => { const d = new Date(iso || ''); return isNaN(d) ? '' : d.toLocaleDateString('en-GB', { day:'numeric', month:'short', year:'numeric' }); };
+  function ratesRow(){
+    const cur = state.exchangeRates || {}, pend = state.pendingRates, list = FXC();
+    let v = `<div class="nls-val">1 kr = ${list.map(c => fxShow(c, cur[c])).join(' · ')}</div>`;
+    v += det(state.ratesUpdatedAt ? `Updated ${H(fxDate(state.ratesUpdatedAt))}${state.ratesSource && state.ratesSource !== 'manual' ? ' from ' + H(state.ratesSource) : ''}.` : 'Set by hand; never updated from the market.');
+    if(pend){
+      const chg = c => { const a = Number(cur[c]), b = Number(pend[c]); if(!a || !b) return ''; const p = (b - a) / a * 100; return ` <span class="nls-det" style="display:inline">(${p >= 0 ? '+' : '−'}${Math.abs(p).toFixed(1)}%)</span>`; };
+      v += `<div class="nls-val nls-fx-new">Today: 1 kr = ${list.filter(c => pend[c]).map(c => fxShow(c, pend[c]) + chg(c)).join(' · ')}</div>`;
+      v += det(`Fetched ${H(fxDate(state.pendingRatesAt))}. Nothing changes until you use them.`);
+    }
+    const act = pend ? `<span class="nls-acts">${NLP.link('Use these rates', 'nlRatesUse()')}${NLP.link('Not now', 'nlRatesSkip()')}</span>` : NLP.link('Check today’s rates', 'nlRatesFetch()');
+    return row('rates', 'Exchange rates', v, pend ? NLP.badge('New rates', 'amber') + act : act);
+  }
+  window.nlRatesFetch = async function(){
+    if(typeof fetchLatestRates !== 'function') return;
+    NLP.toast('Checking today’s exchange rates…');
+    const r = await fetchLatestRates({ silent:true });
+    if(!r || !r.ok) NLP.toast('Today’s rates couldn’t be fetched' + (r && r.error ? ': ' + r.error : '') + '. Your current rates stay.', 'warn');
+    else NLP.toast('Today’s rates are ready. Nothing changes until you use them.');
+    if(state.activePanel === SETTINGS) NLP.renderPage(SETTINGS); else NLP.refreshPanel();
+  };
+  window.nlRatesUse = function(){
+    if(!state.pendingRates || typeof applyPendingRates !== 'function') return;
+    const before = JSON.parse(JSON.stringify({ r:state.exchangeRates, at:state.ratesUpdatedAt, src:state.ratesSource, p:state.pendingRates, pat:state.pendingRatesAt, psrc:state.pendingRatesSource }));
+    applyPendingRates();
+    NLP.toast('Today’s exchange rates are in use', '', { label:'Undo', fn:() => {
+      state.exchangeRates = before.r; state.ratesUpdatedAt = before.at; state.ratesSource = before.src;
+      state.pendingRates = before.p; state.pendingRatesAt = before.pat; state.pendingRatesSource = before.psrc;
+      if(typeof invalidateSelectors === 'function') invalidateSelectors(); save(); if(typeof renderAll === 'function') renderAll(); } });
+    if(state.activePanel === SETTINGS) NLP.renderPage(SETTINGS);
+  };
+  window.nlRatesSkip = function(){ if(typeof dismissPendingRates === 'function') dismissPendingRates(); if(state.activePanel === SETTINGS) NLP.renderPage(SETTINGS); };
+
+  // ── Cloud Sync, right here (sign-in uses the app's own Supabase code) ──
+  function syncRows(si){
+    const s = state.sync || {};
+    if(!si.on){
+      let h = row('sync', 'Sync', `<div class="nls-val">Off</div>` + det('Your data stays on this device. Sync shares it across your devices through your own Supabase project.'), NLP.badge('Off', 'grey'));
+      h += row('syncurl', 'Project address', `<input type="text" id="nlst-sync-url" data-nl-keep="no" autocomplete="off" spellcheck="false" placeholder="https://your-project.supabase.co" value="${H(s.url || '')}">`);
+      h += row('synckey', 'Project key', `<input type="password" id="nlst-sync-key" data-nl-keep="no" autocomplete="off" spellcheck="false" placeholder="The anon public key" value="${H(s.anonKey || '')}">` + det('From Supabase: Project settings, then API.'), NLP.link('Connect and sign in', 'nlSyncConnect()'));
+      return h;
+    }
+    const auto = s.autoSync !== false;
+    let h = row('sync', 'Sync', `<div class="nls-val">${H(si.text)}</div>` + det(H(si.detail)), si.err ? NLP.badge('Problem', 'ruby') : NLP.badge('On', 'green'));
+    h += row('syncnow', 'Sync now', `<div class="nls-val">${auto ? 'Automatic' : 'By hand'}</div>` + det(auto ? 'Changes are sent and fetched on their own.' : 'Nothing is sent until you press Sync now.'),
+      `<span class="nls-acts">${NLP.link('Sync now', 'nlSyncNow()')}${NLP.link(auto ? 'Turn automatic off' : 'Turn automatic on', `syncToggleAuto(${!auto});NLP.renderPage('${SETTINGS}')`)}</span>`);
+    h += row('syncacct', 'Account', `<div class="nls-val">${H(s.email || 'Signed out')}</div>` + det('Use the same account on every device.'),
+      `<span class="nls-acts">${NLP.link('Sign out', 'syncSignOut()')}${NLP.link('Disconnect this device', 'syncDisconnect()')}</span>`);
+    return h;
+  }
+  window.nlSyncConnect = function(){
+    const u = document.getElementById('nlst-sync-url'), k = document.getElementById('nlst-sync-key');
+    if(!state.sync) return;
+    state.sync.url = (u && u.value || '').trim(); state.sync.anonKey = (k && k.value || '').trim();
+    if(!state.sync.url || !state.sync.anonKey){ NLP.toast('Add the project address and key first.', 'warn'); return; }
+    if(!/^https:\/\//i.test(state.sync.url)){ NLP.toast('The project address should start with https://', 'warn'); return; }
+    if(typeof syncConnect === 'function') syncConnect().then(() => { if(state.activePanel === SETTINGS) NLP.renderPage(SETTINGS); });
+  };
+  window.nlSyncNow = async function(){
+    if(typeof syncNow !== 'function') return;
+    NLP.toast('Syncing…');
+    const r = await syncNow();
+    NLP.toast(r && r.ok ? 'Synced' : 'Sync didn’t finish' + (r && r.error ? ': ' + r.error : ''), r && r.ok ? '' : 'warn');
+    if(state.activePanel === SETTINGS) NLP.renderPage(SETTINGS);
+  };
+
   function renderSettings(host){
     const tab = NLP.tabOf(SETTINGS, 'general'), sg = tui().sug;
     const sugN = k => Object.keys(sg).filter(x => k.includes(x)).length;
@@ -463,8 +532,9 @@ Amounts the person says are in ${state.currency || 'SEK'}.`;
     if(tab === 'general'){
       const curOpts = Object.keys(typeof CURRENCY_SYMBOLS !== 'undefined' ? CURRENCY_SYMBOLS : { SEK:1 }).map(c => [c, c]);
       body += row('currency', 'Currency', seg('currency', curOpts) + sugLine('currency'));
+      body += ratesRow();
       body += row('displayMode', 'Show money as', seg('displayMode', [['real','Today’s money'],['nominal','Future money']]) + det(state.displayMode === 'nominal' ? 'Future money shows the amounts as they will be on the day.' : `Today’s money takes out ${H(Number(state.inflationRate) || 0)}% inflation a year.`) + sugLine('displayMode'));
-      body += row('lang', 'Language', seg('lang', [['en','English'],['sv','Svenska']]) + det('Classic pages follow this. The new look is in English for now.') + sugLine('lang'));
+      body += row('lang', 'Language', seg('lang', [['en','English'],['sv','Svenska']]) + det('Some words stay in English for now.') + sugLine('lang'));
       const ab = aboutSummary();
       body += row('about', 'About you', `<div class="nls-val">${ab || '<span class="nls-hint">Not set up yet</span>'}</div>` + det(Object.keys(words()).length ? 'From your setup chat' : 'From your setup'), `${!onboardOK() ? NLP.badge('Needed', 'amber') + ' ' : ''}${NLP.link(onboardOK() ? 'Change in Setup' : 'Finish setup', "NLP.go('nl-setup')")}`);
       ['growthRate','inflationRate','retirementPostGrowth','lifeExp'].forEach(k => {
@@ -476,7 +546,7 @@ Amounts the person says are in ${state.currency || 'SEK'}.`;
       body += row('can', 'What it can do', `<div class="nls-val">Prepares changes; you decide</div>` + det('It suggests, you press Apply. ' + NLP.link('How the assistant works', 'nlShowHow()')));
     } else {
       const si = syncInfo();
-      body += row('sync', 'Sync', `<div class="nls-val">${H(si.text)}</div>` + det(H(si.detail)) + det(NLP.link(si.on ? 'Open classic sync settings' : 'Turn on sync in classic settings', "nav('settings')")), si.on ? NLP.badge(si.err ? 'Problem' : 'On', si.err ? 'ruby' : 'green') : NLP.badge('Off', 'grey'));
+      body += syncRows(si);
       body += row('backup', 'Backup', `<div class="nls-val">A copy of everything as a file</div>` + det('Everything except your Claude key.'), NLP.link('Download a copy', "exportSlice('all')"));
       const b = backupInfo();
       body += row('nlbackup', 'Before the new look', `<div class="nls-val">${b.have ? 'Kept on this device' : 'No backup on this device'}</div>` + det(H(b.have ? b.text : 'Made the first time the new look is turned on.')), b.have ? `<span class="nls-acts">${NLP.link('Restore it', 'nlAskRestore()')}${NLP.link('Download it', 'nlDownloadBackup()')}</span>` : '');
@@ -517,7 +587,11 @@ Amounts the person says are in ${state.currency || 'SEK'}.`;
     let button = null;
     if(sk.length) button = { label:`Use ${sk.length} suggested setting${sk.length > 1 ? 's' : ''}`, onclick:'nlSettingsUseAll()' };
     else if(miss.length) button = miss[0].btn;
-    return { headline, graphic, groups, button, links:[{ label:'Classic settings', short:'Classic', onclick:"nav('settings')" }] };
+    if(state.pendingRates){
+      groups.unshift({ title:'Waiting for you', rows:[{ text:'New exchange rates are ready', badge:{ text:'Review', kind:'amber' }, why:'Your other currencies still use the older rates.', link:{ label:'Show them', onclick:"nlSettingsShow('rates')" } }] });
+      if(!sk.length) button = { label:'Use today’s exchange rates', onclick:'nlRatesUse()' };
+    }
+    return { headline:state.pendingRates && !sk.length && !miss.length ? 'New exchange rates are ready for you to approve.' : headline, graphic, groups, button, links:[] };
   }
   window.nlSettingsKey = function(){ NLP.ui(SETTINGS).tab = 'assistant'; if(state.activePanel !== SETTINGS) NLP.go(SETTINGS); else NLP.renderPage(SETTINGS); setTimeout(() => document.getElementById('nlst-key')?.focus(), 60); };
   window.nlSettingsShow = function(k){ NLP.ui(SETTINGS).tab = 'general'; if(state.activePanel !== SETTINGS) NLP.go(SETTINGS); else NLP.renderPage(SETTINGS); setTimeout(() => document.getElementById('nlst-row-' + k)?.scrollIntoView({ block:'center', behavior:'smooth' }), 60); };

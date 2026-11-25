@@ -818,7 +818,7 @@
           { title:'Sections', rows:heads.slice(0, 4).map((h2, i) => ({ text:H(cut(h2, 70)), link:{ label:'Go to that section', onclick:`NBK.openReport('${H(r.id)}',${i})` } })) },
         ],
         button:st.open === r.id ? { label:'Back to reports', onclick:'NBK.back()' } : { label:'Open ' + short(r.title, 24), onclick:`NBK.openReport('${H(r.id)}')` },
-        links:[{ label:'Classic Vault', short:'Vault', onclick:"nav('vault')" }],
+        links:[],
       };
     }
     const byKind = {}; list.forEach(x => { byKind[x.kind] = (byKind[x.kind] || 0) + 1; });
@@ -829,7 +829,7 @@
       graphic:list.length ? NLP.counts(kinds.slice(0, 3).map(k => ({ value:byKind[k], label:k.toLowerCase() + (byKind[k] === 1 ? '' : 's') }))) : NLP.counts([{ value:0, label:'deep dives' }, { value:0, label:'analyses' }, { value:0, label:'other' }]),
       groups:[{ title:'Latest', rows:list.slice(0, 3).map(x => ({ text:H(cut(x.title, 60)) + (reportFirst(x) ? `<span class="nb-pq">${pq(reportFirst(x), 80)}</span>` : ''), badge:fresh.includes(x) ? { text:'New', kind:'amber' } : null, why:H(x.kind + ', ' + dayLabel(x.when).toLowerCase()), link:{ label:'Open this report', onclick:`NBK.openReport('${H(x.id)}')` } })) }],
       button:list.length ? { label:'Open ' + short((fresh[0] || list[0]).title, 24), onclick:`NBK.openReport('${H((fresh[0] || list[0]).id)}')` } : { label:'Open Places to retire', onclick:"NLP.go('nl-plans')" },
-      links:[{ label:'Classic Vault', short:'Vault', onclick:"nav('vault')" }],
+      links:[],
     };
   }
 
