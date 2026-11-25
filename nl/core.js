@@ -210,6 +210,15 @@
     let t = null;
     bus.on('state:changed', () => { clearTimeout(t); t = setTimeout(() => { if(NLP.isOn() && !NLP._busy) NLP.rerender(); }, 60); });
   }
+  // The app's own redraw (currency, money view, imports, theme…) only knows the
+  // classic pages. Send a redraw of a new page to that page.
+  if(typeof renderPanel === 'function'){
+    const classicRender = renderPanel;
+    renderPanel = function(panel){
+      if(pages[panel]){ if(NLP.isOn()) NLP.renderPage(panel); return; }
+      return classicRender.apply(this, arguments);
+    };
+  }
   // Re-mount charts after every page draw.
   const _render = NLP.renderPage;
   NLP.renderPage = function(panel){ _render(panel); NLP.mountCharts(document.getElementById('panel-' + panel)); };
