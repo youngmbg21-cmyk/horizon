@@ -15,6 +15,17 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Horizon">
 <title>HORIZON FINANCE OS</title>
+<!-- New look (L+S), Phase 0: if this device chose the new look, mark <html>
+     before anything paints so the first frame is already the new look.
+     Phones keep the old look until the new look's phone screens exist. -->
+<script>
+(function(){try{
+  if(localStorage.getItem('horizon-finance-os-v1:look')==='new'
+     && !(window.matchMedia && matchMedia('(max-width:720px), (max-height:500px) and (pointer:coarse)').matches)){
+    document.documentElement.classList.add('nl');
+  }
+}catch(_){}})();
+</script>
 <!-- Inline favicon (brand ✦ on the dark shell) — no /favicon.ico request/404. -->
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%2305080f'/%3E%3Ctext x='32' y='46' font-size='40' text-anchor='middle' fill='%2300e8a0'%3E%E2%9C%A6%3C/text%3E%3C/svg%3E">
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700&family=JetBrains+Mono:wght@400;500&family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,600;1,9..144,400&display=swap" rel="stylesheet">
@@ -4141,6 +4152,81 @@ body.light .piq-country-menu { box-shadow:0 12px 28px -10px rgba(60,40,10,0.22);
 .piq-error-t { color:var(--red); font-weight:600; font-size:12px; margin-bottom:3px; }
 .piq-error-m { font-size:11px; color:var(--text2); line-height:1.5; margin-bottom:8px; }
 .piq-retry { background:var(--red-dim); border:1px solid #ff4d6d30; border-radius:4px; padding:5px 12px; color:var(--red); font-size:11px; cursor:pointer; font-family:var(--fm); }
+
+/* ══ NEW LOOK (L+S) · Phase 0 ═══════════════════════════════════════════
+   Everything below is scoped to html.nl or to .nl-* names, so with the
+   new look switched off the old app looks exactly as before. The only
+   old-look addition is the "Try the new Horizon" pill (.nl-try).
+   Tokens follow docs/LS-DESIGN.md. */
+:root{
+  --nl-ground:#F5F5F7; --nl-surface:#FFFFFF; --nl-ink:#1D1D1F; --nl-quiet:#4B4B50;
+  --nl-detail:#6A6A6F; --nl-line:#E6E6EA; --nl-edge:#D1D1D6; --nl-accent:#087363;
+  --nl-chosen:#E3F3EE; --nl-pill:#EDEDF0; --nl-black:#1D1D1F; --nl-toast-link:#9FE0CF;
+  --nl-sans:'Inter',system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;
+  --nl-serif:'Source Serif 4',Georgia,'Times New Roman',serif;
+}
+/* The switch, in the old top bar (old-look tokens so it sits in naturally). */
+.nl-try { display:inline-flex; align-items:center; background:var(--bg0); border:1px solid var(--border); border-radius:7px; padding:5px 10px; color:var(--text2); cursor:pointer; font-family:var(--fb); font-size:11.5px; font-weight:600; white-space:nowrap; transition:color .15s, border-color .15s; }
+.nl-try:hover { color:var(--green); border-color:var(--green); }
+@media (max-width:900px){ .nl-try { display:none; } }
+
+.nl-bar, .nl-sheet-back, .nl-toast { display:none; }
+html.nl .ticker-bar, html.nl #app > .topbar, html.nl #app-sidebar, html.nl .nav-overlay { display:none !important; }
+html.nl .nl-bar { display:block; flex-shrink:0; position:relative; z-index:50; background:var(--nl-surface); border-bottom:1px solid var(--nl-line); color:var(--nl-ink); font:14px/1.4 var(--nl-sans); }
+.nl-row { display:flex; align-items:center; gap:10px; padding:8px 20px 4px; min-height:48px; }
+.nl-back { border:0; background:transparent; color:var(--nl-detail); font:400 22px/1 var(--nl-sans); padding:4px 8px; border-radius:8px; cursor:pointer; }
+.nl-back:hover { background:var(--nl-chosen); color:var(--nl-ink); }
+.nl-logo { font-weight:600; font-size:15px; margin-right:10px; white-space:nowrap; }
+.nl-nav { display:flex; gap:4px; min-width:0; overflow-x:auto; scrollbar-width:none; }
+.nl-nav::-webkit-scrollbar { display:none; }
+.nl-nav button { border:0; background:transparent; color:var(--nl-quiet); font:500 14px var(--nl-sans); padding:6px 12px; border-radius:999px; cursor:pointer; white-space:nowrap; }
+.nl-nav button:hover { background:var(--nl-chosen); color:var(--nl-ink); }
+.nl-nav button[aria-current="page"] { background:var(--nl-pill); color:var(--nl-ink); }
+.nl-right { margin-left:auto; display:flex; align-items:center; gap:8px; flex-shrink:0; }
+.nl-pill { border:0; background:var(--nl-pill); color:var(--nl-ink); border-radius:999px; padding:6px 13px; font:500 13px var(--nl-sans); cursor:pointer; white-space:nowrap; }
+.nl-pill:hover { background:var(--nl-chosen); }
+.nl-pill[aria-expanded="true"] { background:var(--nl-chosen); color:var(--nl-accent); }
+.nl-icon { border:0; background:transparent; width:34px; height:34px; border-radius:999px; display:inline-flex; align-items:center; justify-content:center; color:var(--nl-quiet); cursor:pointer; }
+.nl-icon:hover { background:var(--nl-chosen); color:var(--nl-ink); }
+.nl-icon svg { width:18px; height:18px; }
+.nl-icon[aria-current="page"] { background:var(--nl-pill); color:var(--nl-ink); }
+.nl-tabs { display:flex; gap:22px; padding:0 20px; overflow-x:auto; scrollbar-width:none; }
+.nl-tabs::-webkit-scrollbar { display:none; }
+.nl-tabs button { border:0; border-bottom:2px solid transparent; background:transparent; color:var(--nl-detail); font:400 14px var(--nl-sans); padding:8px 0 9px; cursor:pointer; white-space:nowrap; }
+.nl-tabs button:hover { color:var(--nl-ink); }
+.nl-tabs button[aria-selected="true"] { color:var(--nl-ink); border-color:var(--nl-ink); font-weight:500; }
+html.nl .nl-bar :focus-visible, .nl-sheet :focus-visible { outline:2px solid var(--nl-accent); outline-offset:2px; }
+/* Currency + money-mode selectors, moved into the new bar while it shows. */
+html.nl .nl-bar .cur-toggle, html.nl .nl-bar .mode-toggle { background:var(--nl-pill); border:0; border-radius:999px; padding:3px; gap:2px; }
+html.nl .nl-bar .cur-btn, html.nl .nl-bar .mode-btn { font:500 12.5px var(--nl-sans); color:var(--nl-quiet); padding:4px 10px; border-radius:999px; letter-spacing:0; }
+html.nl .nl-bar .cur-btn.active, html.nl .nl-bar .mode-btn.active { background:var(--nl-surface); color:var(--nl-ink); font-weight:600; box-shadow:0 1px 2px rgba(0,0,0,.08); }
+/* The New look menu: one pop-over of lines. */
+.nl-menu { position:absolute; right:20px; top:46px; width:300px; background:var(--nl-surface); border:1px solid var(--nl-line); border-radius:10px; box-shadow:0 10px 30px rgba(0,0,0,.12); padding:4px 0; z-index:60; }
+.nl-menu[hidden] { display:none; }
+.nl-menu button { display:block; width:100%; text-align:left; border:0; border-top:1px solid var(--nl-line); background:transparent; padding:10px 16px; font:500 14px var(--nl-sans); color:var(--nl-ink); cursor:pointer; }
+.nl-menu button:first-child { border-top:0; }
+.nl-menu button:hover:not(:disabled) { background:var(--nl-chosen); }
+.nl-menu button:disabled { color:var(--nl-detail); cursor:default; }
+.nl-menu .nl-sub { display:block; font-weight:400; font-size:12.5px; color:var(--nl-detail); margin-top:1px; }
+/* A pop-up is one 480px sheet: lines, one black button, Cancel last. */
+.nl-sheet-back { position:fixed; inset:0; z-index:1000; background:rgba(29,29,31,.32); align-items:center; justify-content:center; padding:16px; }
+.nl-sheet-back.on { display:flex; }
+.nl-sheet { width:min(480px,100%); background:var(--nl-surface); color:var(--nl-ink); border-radius:12px; padding:20px 20px 16px; font:14px/1.5 var(--nl-sans); box-shadow:0 20px 50px rgba(0,0,0,.18); }
+.nl-sheet h2 { font:600 20px/1.25 var(--nl-serif); margin:0 0 10px; }
+.nl-sheet p { margin:0; padding:9px 0; border-top:1px solid var(--nl-line); color:var(--nl-quiet); }
+.nl-sheet p:first-of-type { border-top:0; padding-top:0; }
+.nl-sheet a { color:var(--nl-accent); }
+.nl-sheet-acts { display:flex; gap:8px; justify-content:flex-end; margin-top:14px; }
+.nl-black { border:0; background:var(--nl-black); color:#fff; border-radius:999px; padding:9px 16px; font:600 14px var(--nl-sans); cursor:pointer; white-space:nowrap; }
+.nl-grey { border:0; background:var(--nl-pill); color:var(--nl-ink); border-radius:999px; padding:9px 16px; font:500 14px var(--nl-sans); cursor:pointer; white-space:nowrap; }
+/* Toasts: bottom-centre, one at a time. */
+.nl-toast { position:fixed; left:50%; bottom:22px; transform:translateX(-50%); z-index:1001; background:var(--nl-ink); color:#fff; border-radius:999px; padding:10px 18px; font:14px/1.3 var(--nl-sans); white-space:nowrap; box-shadow:0 6px 18px rgba(0,0,0,.2); gap:14px; align-items:center; }
+.nl-toast.on { display:flex; }
+.nl-toast.warn { background:#8A5A0A; }
+.nl-toast button { border:0; background:transparent; color:var(--nl-toast-link); font:600 14px var(--nl-sans); text-decoration:underline; cursor:pointer; padding:0; }
+@media (prefers-reduced-motion:no-preference){ .nl-toast.on { animation:nlFade .18s ease-out; } .nl-menu:not([hidden]) { animation:nlFade .12s ease-out; } }
+@keyframes nlFade { from { opacity:0; } to { opacity:1; } }
+@media (max-width:1100px){ .nl-assist-lbl { display:none; } }
 </style>
 </head>
 <body>
@@ -4167,6 +4253,31 @@ body.light .piq-country-menu { box-shadow:0 12px 28px -10px rgba(60,40,10,0.22);
      MAIN APP SHELL
 ══════════════════════════════════════ -->
 <div class="app" id="app">
+  <!-- New look (L+S) top bar. Hidden unless <html class="nl">. -->
+  <div class="nl-bar" id="nl-bar">
+    <div class="nl-row">
+      <button class="nl-back" type="button" onclick="nlBack()" aria-label="Back">‹</button>
+      <span class="nl-logo">Horizon</span>
+      <nav class="nl-nav" id="nl-nav" aria-label="Pages">
+        <button type="button" data-nl-sec="today">Today</button>
+        <button type="button" data-nl-sec="money">Money plan</button>
+        <button type="button" data-nl-sec="plans">Plans</button>
+        <button type="button" data-nl-sec="future">Future</button>
+        <button type="button" data-nl-sec="notebook">Notebook</button>
+      </nav>
+      <div class="nl-right" id="nl-right">
+        <button class="nl-pill" type="button" onclick="toggleAIPanel()" aria-label="Open the assistant">✦<span class="nl-assist-lbl">&nbsp;Assistant</span></button>
+        <button class="nl-icon" type="button" id="nl-gear" onclick="nav('settings')" aria-label="Settings" title="Settings"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg></button>
+        <button class="nl-pill" type="button" id="nl-menu-btn" onclick="nlMenu()" aria-haspopup="true" aria-expanded="false" aria-controls="nl-menu">New look ▾</button>
+      </div>
+    </div>
+    <div class="nl-tabs" id="nl-tabs" role="tablist" aria-label="Pages in this section"></div>
+    <div class="nl-menu" id="nl-menu" hidden>
+      <button type="button" onclick="nlSetLook(false)">Back to the old look<span class="nl-sub">Switch on again any time from the top bar.</span></button>
+      <button type="button" id="nl-restore-btn" onclick="nlAskRestore()" disabled>Restore the backup<span class="nl-sub" id="nl-restore-sub">Looking for the backup…</span></button>
+      <button type="button" id="nl-download-btn" onclick="nlDownloadBackup()" disabled>Download the backup<span class="nl-sub">Save it as a file on this device.</span></button>
+    </div>
+  </div>
 
   <!-- Ticker -->
   <div class="ticker-bar"><div class="ticker-track" id="ticker-track"></div></div>
@@ -4182,6 +4293,7 @@ body.light .piq-country-menu { box-shadow:0 12px 28px -10px rgba(60,40,10,0.22);
       <div class="logo-text">HORIZON <span>FINANCE OS</span></div>
     </div>
     <div class="topbar-right">
+      <button class="nl-try" id="nl-try" type="button" onclick="nlSetLook(true)">Try the new Horizon</button>
       <button class="cmdp-hint" id="cmdp-hint" onclick="cmdpOpen()" title="Command palette" data-i18n-title="topbar.cmdp">
         <span class="cmdp-hint-icon">⌘</span><span class="cmdp-hint-lbl">K</span>
       </button>
@@ -11525,12 +11637,14 @@ window.applyCurrency = function(c){
 // ─── THEME ─────────────────────────────────────────────────────────────────
 function toggleTheme() {
   state.darkMode=!state.darkMode; save();
-  document.body.classList.toggle('light',!state.darkMode);
+  // The new look (L+S) is light only; the saved choice still applies to the old look.
+  document.body.classList.toggle('light',!state.darkMode || document.documentElement.classList.contains('nl'));
   const btn=document.getElementById('theme-btn');
   if(btn) btn.textContent=state.darkMode?'☀':'🌙';
 }
 function applyTheme() {
-  document.body.classList.toggle('light',!state.darkMode);
+  // The new look (L+S) is light only; the saved choice still applies to the old look.
+  document.body.classList.toggle('light',!state.darkMode || document.documentElement.classList.contains('nl'));
   const btn=document.getElementById('theme-btn');
   if(btn) btn.textContent=state.darkMode?'☀':'🌙';
 }
@@ -24841,6 +24955,199 @@ class HZMobile {
 
 })();
 
+</script>
+<!-- ══ NEW LOOK (L+S) · Phase 0 ══════════════════════════════════════════
+     The switch, the one-time backup, and the new top bar. The choice is
+     kept per device (not synced). Old pages show inside the new look until
+     their new versions are built. -->
+<div class="nl-sheet-back" id="nl-sheet-back" role="dialog" aria-modal="true" aria-labelledby="nl-sheet-title">
+  <div class="nl-sheet">
+    <h2 id="nl-sheet-title">Restore the backup?</h2>
+    <p id="nl-sheet-when">Your data goes back to how it was when you first turned on the new look.</p>
+    <p>Anything you changed since then is replaced. <a href="#" onclick="nlDownloadCurrent();return false">Download today's data first</a> if you might want it.</p>
+    <div class="nl-sheet-acts"><button class="nl-black" type="button" onclick="nlRestore()">Restore the backup</button><button class="nl-grey" type="button" onclick="nlCloseSheet()">Cancel</button></div>
+  </div>
+</div>
+<div class="nl-toast" id="nl-toast" role="status" aria-live="polite"></div>
+<script>
+(function(){
+  const LOOK_KEY = STORAGE_KEY + ':look';
+  const PHONE_MQ = window.matchMedia('(max-width:720px), (max-height:500px) and (pointer:coarse)');
+  // Old pages live under the five new pages until their new versions exist.
+  const SECTIONS = [
+    { key:'today',    pages:[['dashboard','Dashboard']] },
+    { key:'money',    pages:[['review','Forecast & Review'],['transactions','Spend Insights']] },
+    { key:'plans',    pages:[['funfund','Fun Fund'],['retireanywhere','Retire Anywhere'],['propiq','Property IQ']] },
+    { key:'future',   pages:[['retirement','Retirement Plan'],['lifewall','Life Wall']] },
+    { key:'notebook', pages:[['journal','Journal'],['vault','Vault']] },
+  ];
+  const sectionOf = panel => SECTIONS.find(s => s.pages.some(p => p[0] === panel)) || null;
+  const isOn = () => document.documentElement.classList.contains('nl');
+  let fontsLoaded = false, toastTimer = null, backupAt = null;
+
+  // ── Backup: one copy per device, kept in IndexedDB (no size squeeze) ──
+  function idb(){
+    return new Promise((res, rej) => {
+      if(!window.indexedDB) return rej(new Error('no indexedDB'));
+      const r = indexedDB.open('horizon-newlook', 1);
+      r.onupgradeneeded = () => r.result.createObjectStore('kv');
+      r.onsuccess = () => res(r.result);
+      r.onerror = () => rej(r.error);
+    });
+  }
+  async function idbGet(key){ const db = await idb(); return new Promise((res, rej) => { const q = db.transaction('kv').objectStore('kv').get(key); q.onsuccess = () => res(q.result); q.onerror = () => rej(q.error); }); }
+  async function idbSet(key, val){ const db = await idb(); return new Promise((res, rej) => { const t = db.transaction('kv','readwrite'); t.objectStore('kv').put(val, key); t.oncomplete = () => res(); t.onerror = () => rej(t.error); }); }
+  // The same payload as Settings' "Everything" export (never the AI keys).
+  function fullPayload(){
+    const { aiKeys, ...rest } = state;
+    const payload = JSON.parse(JSON.stringify(rest));
+    if(typeof piq_history !== 'undefined' && Array.isArray(piq_history)) payload._propiq = piq_history;
+    return payload;
+  }
+  const whenText = iso => { const d = new Date(iso); return isNaN(d) ? '' : d.toLocaleString(state.lang === 'sv' ? 'sv-SE' : 'en-GB', { day:'numeric', month:'short', year:'numeric', hour:'2-digit', minute:'2-digit' }); };
+  async function refreshBackupInfo(){
+    let b = null; try { b = await idbGet('backup'); } catch(_){}
+    backupAt = b && b.at || null;
+    const r = document.getElementById('nl-restore-btn'), d = document.getElementById('nl-download-btn'), sub = document.getElementById('nl-restore-sub');
+    if(r) r.disabled = !backupAt;
+    if(d) d.disabled = !backupAt;
+    if(sub) sub.textContent = backupAt ? 'Your data from ' + whenText(backupAt) + '.' : 'No backup on this device yet.';
+    return b;
+  }
+  async function ensureBackup(){
+    let have = null; try { have = await idbGet('backup'); } catch(_){}
+    if(have) return;
+    const copy = { at:new Date().toISOString(), data:fullPayload() };
+    try {
+      await idbSet('backup', copy);
+      toast('Your data is backed up. Restore it any time from New look ▾.');
+    } catch(_){
+      // No IndexedDB here: hand the copy over as a file instead.
+      downloadJSON('horizon-backup-before-new-look.json', copy.data);
+      toast('Your data was saved as a file, because this browser can’t keep a backup.', 'warn');
+    }
+    refreshBackupInfo();
+  }
+
+  // ── Toasts and the sheet ──
+  function toast(msg, kind){
+    const t = document.getElementById('nl-toast'); if(!t) return;
+    t.textContent = msg; t.className = 'nl-toast on' + (kind ? ' ' + kind : '');
+    clearTimeout(toastTimer); toastTimer = setTimeout(() => { t.className = 'nl-toast'; }, 5000);
+  }
+  window.nlAskRestore = function(){
+    closeMenu();
+    const w = document.getElementById('nl-sheet-when');
+    if(w) w.textContent = 'Your data goes back to how it was on ' + whenText(backupAt) + ', when you first turned on the new look.';
+    document.getElementById('nl-sheet-back').classList.add('on');
+    setTimeout(() => document.querySelector('#nl-sheet-back .nl-black')?.focus(), 0);
+  };
+  window.nlCloseSheet = function(){ document.getElementById('nl-sheet-back').classList.remove('on'); };
+  window.nlRestore = async function(){
+    const b = await refreshBackupInfo();
+    nlCloseSheet();
+    if(!b || !b.data){ toast('No backup found on this device.', 'warn'); return; }
+    try {
+      _restoreFullBackup(JSON.parse(JSON.stringify(b.data)));
+      invalidateSelectors(); save(); renderAll(); syncBar();
+      toast('Backup restored.');
+    } catch(err){ toast('The backup could not be restored: ' + err.message, 'warn'); }
+  };
+  window.nlDownloadBackup = async function(){
+    closeMenu();
+    const b = await refreshBackupInfo();
+    if(b && b.data) downloadJSON('horizon-backup-' + String(b.at).slice(0,10) + '.json', b.data);
+  };
+  window.nlDownloadCurrent = function(){ downloadJSON('horizon-today-' + new Date().toISOString().slice(0,10) + '.json', fullPayload()); };
+
+  // ── The New look menu: closes on a second press, Esc, or a press outside ──
+  function closeMenu(){ const m = document.getElementById('nl-menu'); if(m) m.hidden = true; document.getElementById('nl-menu-btn')?.setAttribute('aria-expanded','false'); }
+  window.nlMenu = function(){
+    const m = document.getElementById('nl-menu'); if(!m) return;
+    if(!m.hidden){ closeMenu(); return; }
+    refreshBackupInfo();
+    m.hidden = false; document.getElementById('nl-menu-btn').setAttribute('aria-expanded','true');
+  };
+  document.addEventListener('click', e => {
+    const m = document.getElementById('nl-menu');
+    if(m && !m.hidden && !e.target.closest('#nl-menu') && !e.target.closest('#nl-menu-btn')) closeMenu();
+    if(e.target.id === 'nl-sheet-back') nlCloseSheet();
+  });
+  document.addEventListener('keydown', e => {
+    if(e.key !== 'Escape') return;
+    if(document.getElementById('nl-sheet-back')?.classList.contains('on')){ nlCloseSheet(); return; }
+    closeMenu();
+  });
+
+  // ── The bar follows whatever page is open ──
+  function syncBar(){
+    if(!isOn()) return;
+    const panel = (typeof state !== 'undefined' && state.activePanel) || (location.hash.slice(1).split('/')[0]) || 'dashboard';
+    const sec = sectionOf(panel);
+    document.querySelectorAll('#nl-nav button').forEach(b => {
+      if(sec && b.dataset.nlSec === sec.key) b.setAttribute('aria-current','page'); else b.removeAttribute('aria-current');
+    });
+    const gear = document.getElementById('nl-gear');
+    if(gear){ if(panel === 'settings') gear.setAttribute('aria-current','page'); else gear.removeAttribute('aria-current'); }
+    const tabs = document.getElementById('nl-tabs');
+    if(tabs){
+      const pages = sec ? sec.pages.filter(p => (typeof VALID_PANELS === 'undefined') || VALID_PANELS.includes(p[0])) : [['settings','Settings']];
+      tabs.innerHTML = pages.map(p => `<button type="button" role="tab" data-nl-panel="${p[0]}" aria-selected="${p[0] === panel}">${p[1]}</button>`).join('');
+    }
+  }
+  document.getElementById('nl-nav')?.addEventListener('click', e => {
+    const b = e.target.closest('button[data-nl-sec]'); if(!b) return;
+    const sec = SECTIONS.find(s => s.key === b.dataset.nlSec);
+    if(sec) nav(sec.pages[0][0]);
+  });
+  document.getElementById('nl-tabs')?.addEventListener('click', e => {
+    const b = e.target.closest('button[data-nl-panel]'); if(b) nav(b.dataset.nlPanel);
+  });
+  window.nlBack = function(){ if(history.length > 1) history.back(); else nav('dashboard'); };
+
+  // ── Move the currency + money-mode selectors between the two bars ──
+  function moveSelectors(toNew){
+    const cur = document.getElementById('cur-toggle'), mode = document.getElementById('mode-toggle');
+    if(!cur || !mode) return;
+    if(toNew){
+      const right = document.getElementById('nl-right');
+      right.insertBefore(mode, right.firstChild); right.insertBefore(cur, right.firstChild);
+    } else {
+      const theme = document.getElementById('theme-btn');
+      if(theme){ theme.parentNode.insertBefore(cur, theme); theme.parentNode.insertBefore(mode, theme); }
+    }
+  }
+  function loadFonts(){
+    if(fontsLoaded) return; fontsLoaded = true;
+    const l = document.createElement('link'); l.rel = 'stylesheet';
+    l.href = 'https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;1,8..60,400&display=swap';
+    document.head.appendChild(l);
+  }
+  function apply(on){
+    document.documentElement.classList.toggle('nl', on);
+    moveSelectors(on);
+    if(on){ loadFonts(); syncBar(); } else closeMenu();
+    if(typeof applyTheme === 'function') applyTheme();
+    // The content area changed width: let charts re-measure.
+    setTimeout(() => window.dispatchEvent(new Event('resize')), 30);
+  }
+  window.nlSetLook = function(on){
+    if(on && PHONE_MQ.matches) return;
+    try { if(on) localStorage.setItem(LOOK_KEY, 'new'); else localStorage.removeItem(LOOK_KEY); } catch(_){}
+    apply(on);
+    if(on) ensureBackup();
+  };
+  // Rotating or resizing into phone size keeps the phone screens; coming
+  // back to a large screen brings this device's choice back.
+  const wanted = () => { try { return localStorage.getItem(LOOK_KEY) === 'new'; } catch(_){ return false; } };
+  const onMQ = () => { const should = wanted() && !PHONE_MQ.matches; if(should !== isOn()) apply(should); };
+  if(PHONE_MQ.addEventListener) PHONE_MQ.addEventListener('change', onMQ); else if(PHONE_MQ.addListener) PHONE_MQ.addListener(onMQ);
+  if(typeof bus !== 'undefined') bus.on('panel:changed', syncBar);
+  window.addEventListener('hashchange', () => setTimeout(syncBar, 0));
+  if(isOn()) apply(true);
+  // Expose for checks.
+  window.nlSyncBar = syncBar;
+})();
 </script>
 </body>
 </html>
