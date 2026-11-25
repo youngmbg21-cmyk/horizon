@@ -98,7 +98,10 @@
     const total = hits.reduce((s, t) => s + Math.abs(Number(t.amount) || 0), 0);
     const freq = {}; hits.forEach(t => { const k = String(t.name || '').trim(); if(k) freq[k] = (freq[k] || 0) + 1; });
     const names = Object.keys(freq).sort((a, b) => freq[b] - freq[a]).slice(0, 2).map(s => s.length > 28 ? s.slice(0, 27) + '…' : s);
-    return { found:true, names, avg:total / last.length, months:last, count:hits.length };
+    // Average over the months of the file's last three in which the line shows up,
+    // so a line that started recently is not diluted by months before it began.
+    const seen = last.filter(k => hits.some(t => String(t.date || '').slice(0, 7) === k));
+    return { found:true, names, avg:total / seen.length, months:seen, count:hits.length };
   }
   const rangeText = months => months.length ? (months.length === 1 ? monShort(months[0]) : `${monShort(months[0])}–${monShort(months[months.length - 1])}`) : '';
   function bankStatus(plan, b){
@@ -130,7 +133,7 @@
   function sugFor(list, name, y, m){
     return pendingList().filter(x => x.c.list === list && ['set_amount','remove_line'].includes(x.c.kind) && norm(x.c.name) === norm(name) && scopeHits(x.c, list, y, m));
   }
-  const sugLinks = s => `<span class="nl-inrow">${NLP.link(s.live > 1 ? `Keep all ${s.live} changes` : 'Keep it', `nlApply('${s.pid}')`)}${NLP.link('Drop', `nlDrop('${s.pid}',${s.idx})`)}</span>`;
+  const sugLinks = s => `<span class="nl-inrow">${NLP.link('Keep it', (typeof nlApplyOne === 'function') ? `nlApplyOne('${s.pid}',${s.idx})` : `nlApply('${s.pid}')`)}${NLP.link('Drop', `nlDrop('${s.pid}',${s.idx})`)}</span>`;
   const whereWords = c => c.where === 'plan' ? 'In your plan, every month.' : c.where === 'year' ? `From ${c.year} on.` : `${monLabel(c.month)} only.`;
 
   // ── Plan rows for the month ───────────────────────────────────────────
@@ -152,7 +155,7 @@
       const items = list === 'expenses' ? e.expenseItems : e.incomeItems;
       items.forEach(it => {
         if(it.carryForward){
-          rows.push({ id:'carry:' + list, kind:'carry', list, name:it.name, amount:it.amount, item:it });
+          rows.push({ id:'carry:' + list, kind:'carry', list, name:it.fromKey ? `${list === 'expenses' ? 'Carried over' : 'Left over'} from ${monLong(it.fromKey)}` : it.name, amount:it.amount, item:it });
           return;
         }
         if(it.fromTrip){
@@ -374,6 +377,7 @@
   function renderPlan(){
     const st = ui(), { v, rows } = planRows();
     NLM._rows = {}; rows.forEach(r => { NLM._rows[r.id] = r; });
+    if(st.filt === 'suggested' && !rows.some(isSug)) st.filt = 'expenses';
     const shown = filterRows(rows);
     const f = st.filt || 'expenses';
     const n = k => rows.filter(r => r.list === k && r.kind === 'line').length;
@@ -823,10 +827,12 @@
     const shorts = info.filter(x => x.short);
     const headline = me && me.short ? `${monLong(v.key)} runs short.` : diffs.length ? `${diffs.length} line${diffs.length > 1 ? 's' : ''} differ${diffs.length > 1 ? '' : 's'} from the bank.` : shorts.length ? `${monLong(v.key)} covers every line.` : `${monLong(v.key)} covers every line, and so does every month ahead.`;
     const groups = [];
+    const fix = me && me.short ? savingsFix(me) : null;
+    if(fix) groups.push({ title:'A way to fix it, prepared for you', rows:[door(H(`Save less in ${monLong(v.key)} only`), fix.fixesIt ? (fix.still.length ? { text:`${fix.still.length} still short`, kind:'amber' } : { text:'No short month', kind:'green' }) : { text:'Helps', kind:'amber' }, { label:'Prepare this', onclick:`NLM.proposeFix('${v.key}')` }, H(whyShort(me)[0].toUpperCase() + whyShort(me).slice(1) + '.'))] });
     if(diffs.length) groups.push({ title:'Worth a look', rows:diffs.slice(0, 5).map(d => door(H(d.name), { text:d.status.text, kind:d.status.kind }, { label:'Prepare this change', onclick:`NLM.proposeBank(${JSON.stringify(d.name)})` }, H(`About ${d.status.pct}% ${d.status.key === 'high' ? 'more' : 'less'} at the bank than in your plan.`))) });
-    if(shorts.length) groups.push({ title:'Short months', rows:shorts.slice(0, 3).map(x => door(H(`${monLong(x.key)} runs short`), { text:'Short', kind:'ruby' }, { label:'See why on Forecast', onclick:"NLM.tab('forecast')" })) });
+    if(shorts.length) groups.push({ title:'Short months', rows:shorts.filter(x => x.key !== v.key).slice(0, 2).map(x => door(H(`${monLong(x.key)} runs short`), { text:'Short', kind:'ruby' }, { label:'See why on Forecast', onclick:"NLM.tab('forecast')" })) });
     if(!txs().length) groups.push({ title:'Bank file', rows:[door('No bank file yet, so lines show your plan only.', { text:'Plan only', kind:'grey' }, { label:'Add a bank file', onclick:'NLM.pickFile()' })] });
-    const button = diffs.length ? { label:`Prepare ${diffs.length} change${diffs.length > 1 ? 's' : ''} from the bank`, onclick:'NLM.proposeBank()' } : { label:'Add a line', onclick:'NLM.addLine()' };
+    const button = fix ? { label:`Prepare a fix for ${monLong(v.key)}`, onclick:`NLM.proposeFix('${v.key}')` } : diffs.length ? { label:`Prepare ${diffs.length} change${diffs.length > 1 ? 's' : ''} from the bank`, onclick:'NLM.proposeBank()' } : { label:'Add a line', onclick:'NLM.addLine()' };
     return { headline, graphic, groups, button };
   }
   function overviewForecast(){

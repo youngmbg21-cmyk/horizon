@@ -25294,8 +25294,8 @@ class HZMobile {
     if(!Array.isArray(n.history)) n.history = [];
     return n;
   }
-  const pendingProposal = () => { const n = NL(); return Object.values(n.proposals).find(p => p.status === 'pending' && p.changes.some(c => !c.dropped)) || null; };
-  const liveChanges = p => p ? p.changes.filter(c => !c.dropped) : [];
+  const pendingProposal = () => { const n = NL(); return Object.values(n.proposals).find(p => p.status === 'pending' && p.changes.some(c => !c.dropped && !c.moved)) || null; };
+  const liveChanges = p => p ? p.changes.filter(c => !c.dropped && !c.moved) : [];
 
   // ── Where a change lands ──
   const LISTS = { income:['baseIncome','income','incomeItems'], expenses:['baseExpenses','expenses','expenseItems'] };
@@ -25470,6 +25470,19 @@ class HZMobile {
     n.history[0].sig = signature(); save();
     toast(`${live.length} change${live.length > 1 ? 's' : ''} saved`, '', { label:'Undo', fn:() => nlUndo() });
     render();
+  };
+  // Keep just one change of a suggestion; the others keep waiting as their own suggestion.
+  window.nlApplyOne = function(pid, idx){
+    const n = NL(), p = n.proposals[pid];
+    if(!p || p.status !== 'pending' || !p.changes[idx] || p.changes[idx].dropped || p.changes[idx].moved) return;
+    const rest = p.changes.filter((c, i) => i !== idx && !c.dropped && !c.moved).map(c => Object.assign({}, c));
+    p.changes.forEach((c, i) => { if(i !== idx && !c.dropped) c.moved = true; });
+    nlApply(pid);
+    if(rest.length){
+      const id = 'p' + Date.now().toString(36) + Math.random().toString(36).slice(2,6);
+      n.proposals[id] = { id, at:Date.now(), ask:p.ask, summary:p.summary, changes:rest, status:'pending' };
+      save(); render();
+    }
   };
   window.nlDrop = function(pid, idx){
     const p = NL().proposals[pid]; if(!p || p.status !== 'pending' || !p.changes[idx]) return;
@@ -25670,7 +25683,7 @@ You are Horizon, the assistant. You PREPARE, the person DECIDES.
   const dots = '<span class="nl-dots" aria-hidden="true"><i></i><i></i><i></i></span>';
   function proposalCard(p){
     const isPending = p.status === 'pending';
-    const rows = p.changes.map((c, i) => `<div class="nl-chg${c.dropped ? ' dropped' : ''}"><span class="w">${h(c.label)}</span>${isPending && !c.dropped ? `<button class="nl-link" type="button" onclick="nlDrop('${p.id}',${i})">Drop</button>` : (c.dropped ? '<span class="nl-badge grey">Dropped</span>' : '')}${c.why ? `<span class="nl-why">${md(c.why).replace(/<\/?p>/g, '')}</span>` : ''}</div>`).join('');
+    const rows = p.changes.map((c, i) => `<div class="nl-chg${c.dropped ? ' dropped' : ''}"><span class="w">${h(c.label)}</span>${isPending && !c.dropped && !c.moved ? `<button class="nl-link" type="button" onclick="nlDrop('${p.id}',${i})">Drop</button>` : (c.dropped ? '<span class="nl-badge grey">Dropped</span>' : (c.moved ? '<span class="nl-badge amber">Still waiting</span>' : ''))}${c.why ? `<span class="nl-why">${md(c.why).replace(/<\/?p>/g, '')}</span>` : ''}</div>`).join('');
     const live = liveChanges(p).length;
     const foot = {
       pending:`Nothing is saved until you press Apply.`,
