@@ -50,6 +50,7 @@
   const sizeLabel = b => b >= 1048576 ? (b / 1048576).toFixed(1) + ' MB' : Math.max(1, Math.round(b / 1024)) + ' KB';
   const plural = (n, one, many) => `${n} ${n === 1 ? one : (many || one + 's')}`;
   const cut = (s, n) => { s = String(s || '').replace(/\s+/g, ' ').trim(); return s.length > n ? s.slice(0, n - 1).replace(/\s+\S*$/, '') + '…' : s; };
+  const short = (n, k) => cut(String(n || '').replace(/\.[a-z0-9]{2,5}$/i, ''), k);
   const persist = () => { if(typeof save === 'function') save(); };
   const ui = () => NLP.ui(P);
   const isHere = () => NLP.isOn() && typeof state !== 'undefined' && state.activePanel === P;
@@ -246,11 +247,13 @@
     }
     const chunks = r.chunks || [];
     local[meta.id] = { chunks, sheets:r.sheets || null };
-    const k = keyOf(chunks);
+    const firstSheet = r.sheets && r.sheets[0] ? chunks.filter(c => c.s === r.sheets[0].name) : chunks;
+    const k0 = keyOf(firstSheet), k = { keyLine:k0.keyLine, keyChunk:k0.keyChunk == null ? null : chunks.indexOf(firstSheet[k0.keyChunk]) };
     meta.keyLine = k.keyLine; meta.keyChunk = k.keyChunk;
     meta.pages = r.pages || undefined; meta.rows = r.rows || undefined; meta.paras = r.paras || (meta.kind === 'text' ? chunks.length : undefined);
     meta.sheets = r.sheets ? r.sheets.length : undefined;
-    meta.template = (meta.kind === 'sheet' || meta.kind === 'csv') && looksLikeTemplate(meta.name, chunks);
+    meta.template = (meta.kind === 'sheet' || meta.kind === 'csv') && looksLikeTemplate(meta.name, firstSheet);
+    meta.blanks = meta.template ? firstSheet.filter((c, i) => i > 0 && c.cells && String(c.cells[0] || '').trim() && c.cells.slice(1).some(v => !String(v || '').trim())).length : undefined;
     try { const rec = await idbGet('files', meta.id); if(rec){ rec.chunks = chunks; rec.sheets = r.sheets || null; await idbPut('files', rec); } } catch(_){}
     persist(); redraw();
   }
@@ -359,6 +362,7 @@
     if(m.paras) return plural(m.paras, m.kind === 'text' ? 'line' : 'paragraph');
     return sizeLabel(m.size || 0);
   }
+  const norm = s => String(s || '').toLowerCase().replace(/[^\p{L}\p{N}]+/gu, ' ').trim();
   const chunkAt = (id, i) => { const L = local[id]; return L && L.chunks && i != null ? L.chunks[i] : null; };
 
   // ── Reference numbers the assistant quotes: [n] → file + passage ─────────
@@ -380,7 +384,8 @@
     const last = [...chat].reverse().find(m => m.role === 'assistant' && !m.kind);
     const out = {};
     if(!last) return out;
-    String(last.content || '').replace(/\[(\d{1,4})\]/g, (_, n) => { const r = refInfo(+n); if(r){ (out[r.f] = out[r.f] || new Set()).add(r.c); } return ''; });
+    // Remember the quoted words just before each [n], to mark only those lines.
+    String(last.content || '').replace(/(?:[“"]([^”"]{3,400})[”"]\s*)?\[(\d{1,4})\]/g, (_, q, n) => { const r = refInfo(+n); if(r){ const m = out[r.f] = out[r.f] || new Map(); m.set(r.c, q || m.get(r.c) || null); } return ''; });
     return out;
   }
 
@@ -395,7 +400,8 @@
   NBK.openFile = function(id, chunk){
     const m = fileById(id); if(!m) return;
     const st = ui(); st.tab = 'files'; st.chosen = id; st.open = id; st.focus = chunk != null ? +chunk : null; st.scroll = true;
-    const L = local[id]; st.sheet = (chunk != null && L && L.chunks[chunk] && L.chunks[chunk].s) || (L && L.sheets && L.sheets[0] && L.sheets[0].name) || null;
+    const L = local[id];
+    st.focusQuote = chunk != null && L && L.chunks[chunk] ? bestLine(L.chunks[chunk].t) : null; st.sheet = (chunk != null && L && L.chunks[chunk] && L.chunks[chunk].s) || (L && L.sheets && L.sheets[0] && L.sheets[0].name) || null;
     if(state.activePanel !== P) NLP.go(P); else NLP.renderPage(P);
     if(ready && !local[id] && m.remotePath) fetchRemote(id);
   };
@@ -575,7 +581,7 @@
   // Files: the reading view (paper sheet)
   function fileView(m){
     const st = ui(), s = statusOf(m), L = local[m.id];
-    const cited = citedLast()[m.id] || new Set();
+    const cited = citedLast()[m.id] || new Map();
     const isMarked = i => cited.has(i) || st.focus === i;
     let tabsH = [], body = '';
     const acts = NLP.pill('‹ Files', 'NBK.back()') + ((L || m.remotePath) ? NLP.pill('Download', `NBK.download('${m.id}')`) : '') + ((m.kind === 'sheet' || m.kind === 'csv') && L ? NLP.pill('Fill with my plan', `NBK.fill('${m.id}')`) : '');
@@ -602,8 +608,15 @@
       body = shown.map((c, i) => {
         const pageHead = m.kind === 'pdf' && c.w !== lastW ? `<h5 class="nb-ph">${H(c.w.replace(/^page/, 'Page'))}</h5>` : '';
         lastW = c.w;
-        const t = H(c.t).replace(/\n/g, '<br>');
-        return `${pageHead}<p id="nb-c-${i}">${isMarked(i) ? `<mark class="${st.focus === i ? 'focus' : ''}">${t}</mark>` : t}</p>`;
+        const lines = c.t.split('\n');
+        let on = null;
+        if(isMarked(i)){
+          const q = norm(cited.get(i) || (st.focus === i && st.focusQuote) || '');
+          on = lines.map(l => { const n = norm(l); return !!q && !!n && (q.includes(n) || n.includes(q)); });
+          if(!on.some(Boolean)) on = lines.map(() => true);
+        }
+        const t = lines.map((l, k) => on && on[k] ? `<mark class="${st.focus === i ? 'focus' : ''}">${H(l)}</mark>` : H(l)).join('<br>');
+        return `${pageHead}<p id="nb-c-${i}">${t}</p>`;
       }).join('') + (L.chunks.length > shown.length ? `<p class="nb-more">…${L.chunks.length - shown.length} more passages</p>` : '');
     }
     if(m.kind === 'image') setTimeout(async () => { const box = document.getElementById('nb-img-' + m.id); if(!box || box.firstChild) return; const b = await blobOf(m.id); if(b && document.getElementById('nb-img-' + m.id)){ const u = URL.createObjectURL(b); box.innerHTML = `<img alt="${H(m.name)}" src="${u}">`; } }, 0);
@@ -690,7 +703,7 @@
         { title:'Filled copies', rows:fillRows },
         { title:'Sync', rows:sr ? [sr] : [] },
       ],
-      button:tpl ? { label:'Fill ' + cut(tpl.name, 28) + ' with my plan', onclick:`NBK.fill('${tpl.id}')` } : { label:'Choose files to add', onclick:'NBK.pick()' },
+      button:tpl ? { label:'Fill ' + short(tpl.name, 22) + ' from my plan', onclick:`NBK.fill('${tpl.id}')` } : { label:'Choose files to add', onclick:'NBK.pick()' },
       links:[{ label:'Choose files', short:'Add', onclick:'NBK.pick()' }].concat(all.some(f => f.kind === 'sheet' || f.kind === 'csv') ? [{ label:'Fill a template', short:'Fill', onclick:'NBK.fillAny()' }] : []),
     };
   }
@@ -699,17 +712,17 @@
     const n = all.indexOf(m) + 1;
     const cited = citedLast()[m.id];
     const name = H(cut(m.name, 60));
-    const heads = { reading:`Reading ${name} now.`, fetching:`Fetching ${name} from your account.`, elsewhere:`${name} is on another device.`, notsynced:`${name} was added on another device and hasn’t synced.`, cant:`${name} can’t be read yet.`, used:`${name} is used in your plan.`, template:`${name} is a template with ${plural(m.rows || 0, 'line')} to fill.`, read:`${name} is read: ${H(sizeWords(m))}.` };
+    const heads = { reading:`Reading ${name} now.`, fetching:`Fetching ${name} from your account.`, elsewhere:`${name} is on another device.`, notsynced:`${name} was added on another device and hasn’t synced.`, cant:`${name} can’t be read yet.`, used:`${name} is used in your plan.`, template:`${name} is a template with ${plural(m.blanks || m.rows || 0, 'line')} to fill.`, read:`${name} is read: ${H(sizeWords(m))}.` };
     // A few telling passages (best scores), each with its place.
     const top = L && L.chunks.length ? L.chunks.map((c, i) => ({ c, i, sc:lineScore(bestLine(c.t)) })).sort((a, b) => b.sc - a.sc || a.i - b.i).slice(0, 3).sort((a, b) => a.i - b.i) : [];
     const fillRow = filled[m.id] ? [{ text:'Filled copy, ' + plural(filled[m.id].count || 0, 'cell'), badge:{ text:'Ready', kind:'green' }, why:'Filled from your plan. The original file is unchanged.', link:{ label:'Download the filled copy', onclick:`NBK.downloadFilled('${m.id}')` } }] : [];
     let button;
-    if(s.key === 'elsewhere') button = { label:'Fetch ' + cut(m.name, 30), onclick:`NBK.fetch('${m.id}')` };
-    else if(s.key === 'notsynced') button = { label:'Open ' + cut(m.name, 30), disabledWhy:'It’s only on the device it was added on, until that device syncs.' };
-    else if(s.key === 'fetching' || s.key === 'reading') button = { label:'Open ' + cut(m.name, 30), disabledWhy:'Wait a moment: it’s still ' + (s.key === 'reading' ? 'being read.' : 'on its way.') };
+    if(s.key === 'elsewhere') button = { label:'Fetch this file now', onclick:`NBK.fetch('${m.id}')` };
+    else if(s.key === 'notsynced') button = { label:'Open this file', disabledWhy:'It’s only on the device it was added on, until that device syncs.' };
+    else if(s.key === 'fetching' || s.key === 'reading') button = { label:'Open this file', disabledWhy:'Wait a moment: it’s still ' + (s.key === 'reading' ? 'being read.' : 'on its way.') };
     else if(s.key === 'cant' && m.libFail) button = { label:'Try reading it again', onclick:`NBK.retry('${m.id}')` };
-    else if(m.template) button = { label:'Fill ' + cut(m.name, 28) + ' with my plan', onclick:`NBK.fill('${m.id}')` };
-    else button = { label:'Open ' + cut(m.name, 30), onclick:`NBK.openFile('${m.id}')` };
+    else if(m.template) button = { label:'Fill this template from my plan', onclick:`NBK.fill('${m.id}')` };
+    else button = { label:'Open ' + short(m.name, 24), onclick:`NBK.openFile('${m.id}')` };
     return {
       headline:heads[s.key] || name,
       graphic:NLP.counts([{ value:m.pages || m.rows || m.paras || 0, label:m.pages ? 'pages' : m.rows ? 'rows' : m.kind === 'text' ? 'lines' : 'paragraphs', kind:'ok' }, { value:L ? L.chunks.length : 0, label:'passages read' }, { value:cited ? cited.size : 0, label:'quoted last', kind:cited && cited.size ? 'on' : '' }]),
@@ -794,7 +807,7 @@
           { title:'From the report', rows:keys.map(k => ({ text:NLP.quote(k) })) },
           { title:'Sections', rows:heads.slice(0, 4).map((h2, i) => ({ text:H(cut(h2, 70)), link:{ label:'Go to that section', onclick:`NBK.openReport('${H(r.id)}',${i})` } })) },
         ],
-        button:st.open === r.id ? { label:'Back to reports', onclick:'NBK.back()' } : { label:'Open ' + cut(r.title, 30), onclick:`NBK.openReport('${H(r.id)}')` },
+        button:st.open === r.id ? { label:'Back to reports', onclick:'NBK.back()' } : { label:'Open ' + short(r.title, 24), onclick:`NBK.openReport('${H(r.id)}')` },
         links:[{ label:'Classic Vault', short:'Vault', onclick:"nav('vault')" }],
       };
     }
@@ -805,7 +818,7 @@
       headline:list.length ? (fresh.length ? `${plural(fresh.length, 'new report')} to read.` : `${plural(list.length, 'saved report')}; the latest is ${H(cut(list[0].title, 40))}.`) : 'No saved reports yet.',
       graphic:list.length ? NLP.counts(kinds.slice(0, 3).map(k => ({ value:byKind[k], label:k.toLowerCase() + (byKind[k] === 1 ? '' : 's') }))) : NLP.counts([{ value:0, label:'deep dives' }, { value:0, label:'analyses' }, { value:0, label:'other' }]),
       groups:[{ title:'Latest', rows:list.slice(0, 3).map(x => ({ text:H(cut(x.title, 60)) + (reportFirst(x) ? `<span class="nb-pq">${NLP.quote(cut(reportFirst(x), 80))}</span>` : ''), badge:fresh.includes(x) ? { text:'New', kind:'amber' } : null, why:H(x.kind + ', ' + dayLabel(x.when).toLowerCase()), link:{ label:'Open this report', onclick:`NBK.openReport('${H(x.id)}')` } })) }],
-      button:list.length ? { label:'Open ' + cut((fresh[0] || list[0]).title, 30), onclick:`NBK.openReport('${H((fresh[0] || list[0]).id)}')` } : { label:'Open Places to retire', onclick:"NLP.go('nl-plans')" },
+      button:list.length ? { label:'Open ' + short((fresh[0] || list[0]).title, 24), onclick:`NBK.openReport('${H((fresh[0] || list[0]).id)}')` } : { label:'Open Places to retire', onclick:"NLP.go('nl-plans')" },
       links:[{ label:'Classic Vault', short:'Vault', onclick:"nav('vault')" }],
     };
   }
@@ -964,10 +977,11 @@
 #panel-nl-notebook .nb-tbl .sub { display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
 #panel-nl-notebook .nl-acts .nl-gp:disabled { color:var(--nl-detail); cursor:default; background:var(--nl-pill); opacity:.7; }
 #panel-nl-notebook .nl-head .nl-title { max-width:min(560px, 52vw); overflow:hidden; text-overflow:ellipsis; }
-#panel-nl-notebook .nl-sheet-page { margin:0 -24px -40px; min-height:calc(100vh - 150px); }
+#panel-nl-notebook .nl-sheet-page { margin:0 -24px -40px; min-height:calc(100vh - 110px); }
 #panel-nl-notebook .nl-paper { overflow-wrap:anywhere; }
 #panel-nl-notebook .nl-paper p { margin:0 0 10px; }
-#panel-nl-notebook .nl-paper mark.focus, #panel-nl-notebook .nb-sheet tr.focus mark { box-shadow:0 0 0 2px #F2D27A; }
+#panel-nl-notebook .nl-paper mark { -webkit-box-decoration-break:clone; box-decoration-break:clone; }
+#panel-nl-notebook .nl-paper mark.focus, #panel-nl-notebook .nb-sheet tr.focus mark { background:#FCE3A0; }
 #panel-nl-notebook .nb-ph { font:600 12px/1.3 var(--nl-sans); letter-spacing:.06em; text-transform:uppercase; color:var(--nl-detail); margin:18px 0 8px; }
 #panel-nl-notebook .nb-ph:first-child { margin-top:0; }
 #panel-nl-notebook .nb-wait, #panel-nl-notebook .nb-why { font-family:var(--nl-sans); color:var(--nl-quiet); font-size:14px; }
