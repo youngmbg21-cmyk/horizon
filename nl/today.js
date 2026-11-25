@@ -254,6 +254,12 @@
       });
       return NLP.chart({ w, h, x:[r.cur, r.L], y:[T.min, T.max], pad:{ l:58, r:14, t:12, b:24 }, yt:T.ticks, xt:xs,
         label:'Money over your life',
+        hover:{ n:r.pts.length, x:i => r.pts[i][0],
+          title:i => `Age ${Math.round(r.pts[i][0])}${r.pts[i][0] >= r.ret ? ' · retired' : ''}`,
+          rows:i => { const out = [{ name:'Your plan', value:NLP.money(r.pts[i][1]), color:'var(--nl-accent)' }];
+            if(alt){ const q = alt.life.pts.reduce((b, p) => Math.abs(p[0] - r.pts[i][0]) < Math.abs(b[0] - r.pts[i][0]) ? p : b, alt.life.pts[0]); if(q) out.push({ name:'What if (not saved)', value:NLP.money(q[1]), color:'#48639A' }); }
+            return out; },
+          y:i => { const out = [{ v:r.pts[i][1], color:'var(--nl-accent)' }]; if(alt){ const q = alt.life.pts.reduce((b, p) => Math.abs(p[0] - r.pts[i][0]) < Math.abs(b[0] - r.pts[i][0]) ? p : b, alt.life.pts[0]); if(q) out.push({ v:q[1], color:'#48639A' }); } return out; } },
         draw:({ sx, sy, line, area }) => {
           const acc = r.pts.slice(0, r.retStart), all2 = r.pts;
           let s = `<rect x="${sx(r.ret).toFixed(1)}" y="${sy(T.max).toFixed(1)}" width="${Math.max(0, sx(r.L) - sx(r.ret)).toFixed(1)}" height="${(sy(T.min) - sy(T.max)).toFixed(1)}" class="tdy-ret"/>`;
@@ -311,6 +317,8 @@
       const T = NLP.ticks(Math.min(0, ...lows), Math.max(1, ...tops), 3, v => v === 0 ? '0' : NLP.moneyShort(v));
       const every = w < 420 ? 2 : 1;
       return NLP.chart({ w, h, x:[0, 12], y:[T.min, T.max], pad:{ l:52, r:8, t:10, b:24 }, yt:T.ticks, label:'Next 12 months',
+        hover:{ n:ms.length, x:i => i + .5, title:i => NLP.monthLabel(ms[i].key),
+          rows:i => [{ name:'Comes in', value:NLP.money(num(ms[i].pureIncome)), color:'transparent' }, { name:'Costs', value:NLP.money(num(ms[i].pureExpenses)), color:'#C9CED8' }, { name:'Saved', value:NLP.money(num(ms[i].savings)), color:'var(--nl-accent)' }, { name:num(ms[i].funFund) < 0 ? 'Short by' : 'Fun Fund', value:NLP.money(num(ms[i].funFund) < 0 ? -num(ms[i].funFund) : num(ms[i].pureFunFund)), color:num(ms[i].funFund) < 0 ? '#E3A89F' : '#9FD2BF' }] },
         draw:({ sx, sy }) => {
           const bw = (sx(1) - sx(0)) * .62;
           let s = '';
@@ -343,6 +351,9 @@
       const every = w < 420 ? 2 : 1;
       const xt = ms.map((x, i) => [i, NLP.monthShort(x.key)]).filter((_, i) => i % every === 0);
       return NLP.chart({ w, h, x:[0, 11], y:[T.min, T.max], pad:{ l:52, r:18, t:12, b:24 }, yt:T.ticks, xt, label:'Fun Fund balance',
+        hover:{ n:ms.length, x:i => i, title:i => NLP.monthLabel(ms[i].key),
+          rows:i => { const t = m.trips.filter(q => q.key === ms[i].key); return [{ name:'Fun Fund balance', value:NLP.money(run[i]), color:'var(--nl-accent)' }, { name:'Savings so far', value:NLP.money(sav[i]), color:'#48639A' }].concat(t.length ? [{ name:'Trip: ' + t.map(q => q.trip).join(', '), value:NLP.money(t.reduce((a, q) => a + q.amount, 0)), color:'#C9A56A' }] : []); },
+          y:i => [{ v:run[i], color:'var(--nl-accent)' }, { v:sav[i], color:'#48639A' }] },
         draw:({ sx, sy, line, area }) => {
           const pts = run.map((v, i) => [i, v]);
           let s = `<line x1="${sx(0)}" x2="${sx(11)}" y1="${sy(0).toFixed(1)}" y2="${sy(0).toFixed(1)}" class="tdy-zero"/>`;

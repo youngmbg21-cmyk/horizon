@@ -292,6 +292,9 @@
     const xt = []; for(let a = x0; a <= x1; a++) if((a - x0) % step === 0 || a === x1) xt.push([a, String(a)]);
     if(xt.length > 1 && xt[xt.length - 1][0] - xt[xt.length - 2][0] < step / 2) xt.splice(xt.length - 2, 1);
     return NLP.chart({ w, h, x:[x0 - 0.6, x1 + 0.6], y:[tk.min, tk.max], yt:tk.ticks, xt, pad:{ l:58, r:14, t:16, b:24 }, label:'Money in retirement, by age',
+      hover:{ n:ages.length, x:i => ages[i], title:i => `Age ${ages[i]}`,
+        rows:i => [{ name:'Money left', value:M(bal[i][1]), color:'var(--nl-accent)' }, { name:'Taken out this year', value:M(wd[i][1]), color:'var(--nlf-amber)' }].concat(pen[i][1] > 0 ? [{ name:'From pensions this year', value:M(pen[i][1]), color:'var(--nlf-steel)' }] : []).concat(wb && wb[i] ? [{ name:'What if (not saved)', value:M(wb[i][1]), color:'var(--nlf-steel)' }] : []).concat(sb && sb[i] ? [{ name:'With the suggested pension', value:M(sb[i][1]), color:'var(--nlf-steel)' }] : []),
+        y:i => [{ v:bal[i][1], color:'var(--nl-accent)' }].concat(wb && wb[i] ? [{ v:wb[i][1], color:'var(--nlf-steel)' }] : []) },
       draw:({ sx, sy, line, area }) => {
         const bw = Math.max(2, Math.min(12, (sx(1) - sx(0)) * 0.55));
         let g = `<path d="${area(bal, 0)}" fill="var(--nl-accent)" opacity=".13"/>`;
@@ -389,6 +392,8 @@
     const step = span > 30 ? 10 : span > 12 ? 5 : span > 6 ? 2 : 1;
     const xt = [[a0, String(a0)]]; for(let a = Math.ceil((a0 + 1) / step) * step; a < a1; a += step) if(a - a0 >= step * 0.6 && a1 - a >= step * 0.6) xt.push([a, String(a)]); xt.push([a1, String(a1)]);
     return NLP.chart({ w, h, x:[a0, a1], y:[tk.min, tk.max], yt:tk.ticks, xt, pad:{ l:58, r:padR, t:12, b:24 }, label:'Accounts growing to retirement',
+      hover:{ n, x:i => ages[i], title:i => `Age ${ages[i]} · ${M(totals[i])} in all`,
+        rows:i => series.map(x => ({ name:x.name, value:M(Math.max(0, x.vals[i])), color:x.col })).reverse() },
       draw:({ sx, sy }) => {
         let lower = ages.map(() => 0), g = '', labs = [];
         series.forEach(s => {
