@@ -255,6 +255,14 @@ html.nl .panel.nl-page.active { display:block; }
 .nl-b.amber { background:#FBEEDB; color:#8A5A0A; } .nl-b.green { background:#DFF2E7; color:#1F4D3B; } .nl-b.ruby { background:#FBE5E3; color:#8F2A22; } .nl-b.steel { background:#E6ECF6; color:#48639A; } .nl-b.grey { background:var(--nl-pill); color:var(--nl-quiet); }
 .nl-tbl-wrap { overflow-x:auto; }
 table.nl-tbl { width:100%; border-collapse:collapse; font-size:14px; }
+.nl-page .nl-wrap { container-type:inline-size; }
+/* Narrow page area (small iPads, beside the panel): tighter tables so nothing reaches under the panel. */
+@container (max-width:760px){
+  .nl-page table.nl-tbl { font-size:13px !important; }
+  .nl-page table.nl-tbl th, .nl-page table.nl-tbl td { padding-left:4px !important; padding-right:4px !important; }
+  .nl-page table.nl-tbl th { font-size:12px !important; white-space:normal !important; }
+  .nl-page table.nl-tbl .mk { width:18px !important; }
+}
 table.nl-tbl th { font:500 12.5px var(--nl-sans); color:var(--nl-detail); text-align:left; padding:7px 8px; border-bottom:1px solid var(--nl-line); white-space:nowrap; }
 table.nl-tbl td { padding:9px 8px; border-bottom:1px solid var(--nl-line); vertical-align:top; }
 table.nl-tbl .r { text-align:right; font-variant-numeric:tabular-nums; white-space:nowrap; }
