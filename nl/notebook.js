@@ -226,7 +226,12 @@
     return width >= 2 && open >= 3 && open / (rows.length - 1) >= 0.4;
   }
 
+  const busyRead = {};
   async function readFile(meta, blob){
+    if(busyRead[meta.id]) return; busyRead[meta.id] = true;
+    try { await readFile2(meta, blob); } finally { delete busyRead[meta.id]; }
+  }
+  async function readFile2(meta, blob){
     meta.status = 'reading'; delete meta.why; delete meta.libFail;
     redraw();
     let r;
@@ -253,7 +258,7 @@
     meta.pages = r.pages || undefined; meta.rows = r.rows || undefined; meta.paras = r.paras || (meta.kind === 'text' ? chunks.length : undefined);
     meta.sheets = r.sheets ? r.sheets.length : undefined;
     meta.template = (meta.kind === 'sheet' || meta.kind === 'csv') && looksLikeTemplate(meta.name, firstSheet);
-    meta.blanks = meta.template ? firstSheet.filter((c, i) => i > 0 && c.cells && String(c.cells[0] || '').trim() && c.cells.slice(1).some(v => !String(v || '').trim())).length : undefined;
+    meta.blanks = meta.template ? firstSheet.filter((c, i) => i > 0 && c.cells && String(c.cells[0] || '').trim() && !String(c.cells[1] || '').trim()).length : undefined;
     try { const rec = await idbGet('files', meta.id); if(rec){ rec.chunks = chunks; rec.sheets = r.sheets || null; await idbPut('files', rec); } } catch(_){}
     persist(); redraw();
   }
@@ -362,6 +367,10 @@
     if(m.paras) return plural(m.paras, m.kind === 'text' ? 'line' : 'paragraph');
     return sizeLabel(m.size || 0);
   }
+  // The side panel never shows money: amounts inside quotes are left out with “…”.
+  const MONEY = /(?:(?:kr|sek|eur|usd|kes|€|\$|£)\s?\d[\d\s.,]*\d|\d(?:[\d\s.,]*\d)?\s?(?:kr|sek|eur|usd|kes|kronor|euro|€|\$|£|k\b|m\b))/gi;
+  const noMoney = (s, sheet) => { let t = String(s || '').replace(MONEY, '…'); if(sheet) t = t.replace(/\b(?!(?:19|20)\d\d\b)\d[\d\s.,]{2,}\d\b|\b\d{3,}\b/g, m => /^(19|20)\d\d$/.test(m) ? m : '…'); return t.replace(/…(\s*…)+/g, '…'); };
+  const pq = (s, n, sheet) => NLP.quote(cut(noMoney(s, sheet), n));
   const norm = s => String(s || '').toLowerCase().replace(/[^\p{L}\p{N}]+/gu, ' ').trim();
   const chunkAt = (id, i) => { const L = local[id]; return L && L.chunks && i != null ? L.chunks[i] : null; };
 
@@ -439,10 +448,10 @@
     }, 9000);
   };
   NBK.fill = id => { const m = fileById(id); if(m) NLP.ask('Fill ' + m.name + ' with my plan'); };
-  NBK.fillAny = () => { const t = files().find(f => f.template && local[f.id]) || files().find(f => (f.kind === 'sheet' || f.kind === 'csv')); if(t) NBK.fill(t.id); };
+  NBK.fillAny = () => { const t = files().find(f => f.template && local[f.id] && f.status === 'read') || files().find(f => (f.kind === 'sheet' || f.kind === 'csv')); if(t) NBK.fill(t.id); };
   NBK.askAbout = id => { const m = fileById(id); if(m) NLP.ask('What does ' + m.name + ' say that matters for my plan?'); };
   NBK.filter = function(k){ const st = ui(); st.filter = st.filter === k ? null : k; st.chosen = null; NLP.renderPage(P); };
-  NBK.setupHelp = () => NLP.toast('See SYNC-SETUP.md, “Notebook files”: one bucket and three rules, done once.');
+  NBK.setupHelp = () => NLP.toast('Run the short SQL in SYNC-SETUP.md, “Notebook files”, once in Supabase.');
 
   // Notes
   NBK.newNote = function(){ const st = ui(); st.tab = 'notes'; st.open = 'new'; st.chosen = 'new'; st.editTag = ''; st.editFor = 'new'; st.scroll = true; clearEditor(); NLP.renderPage(P); setTimeout(() => document.getElementById('nb-n-body')?.focus(), 30); };
@@ -680,7 +689,7 @@
     if(m) return fileOverview(m);
     const S = all.map(statusOf);
     const nRead = S.filter(s => ['read','template','used'].includes(s.key)).length, nWait = S.filter(s => ['reading','fetching'].includes(s.key)).length, nCant = S.filter(s => ['cant','notsynced'].includes(s.key)).length;
-    const tpl = all.find(f => f.template && local[f.id]);
+    const tpl = all.find(f => f.template && local[f.id] && f.status === 'read');
     const sr = syncRow();
     if(!all.length) return {
       headline:'Add a file and Horizon reads it for you.',
@@ -692,15 +701,15 @@
       button:{ label:'Choose files to add', onclick:'NBK.pick()' },
       links:[{ label:'Choose files', short:'Choose', onclick:'NBK.pick()' }],
     };
-    const ready2 = all.filter(f => f.keyLine && local[f.id] && f.status !== 'cant').slice(0, 4);
+    const ready2 = all.filter(f => f.keyLine && local[f.id] && f.status !== 'cant').slice(0, Object.keys(filled).length ? 2 : 3);
     const fillRows = Object.keys(filled).filter(id => fileById(id)).map(id => ({ text:'Filled copy of ' + H(cut(fileById(id).name, 50)), badge:{ text:'Ready', kind:'green' }, why:plural(filled[id].count || 0, 'cell') + ' filled from your plan. The original is unchanged.', link:{ label:'Download the filled copy', onclick:`NBK.downloadFilled('${id}')` } }));
     const head = nWait ? `Reading ${plural(nWait, 'file')} now.` : tpl ? `Your template ${H(cut(tpl.name, 40))} can be filled from your plan.` : nCant ? `${plural(nRead, 'file')} read; ${nCant} can’t be read yet.` : `${plural(nRead, 'file')} read. Ask about any of them below.`;
     return {
       headline:head,
       graphic:NLP.counts([{ value:nRead, label:'read', kind:nRead ? 'ok' : '' }, { value:nWait, label:'reading' }, { value:nCant, label:'can’t read yet', kind:nCant ? 'on' : '' }]),
       groups:[
-        { title:'Key words read', rows:ready2.map(f => ({ text:`${NLP.quote(cut(f.keyLine, 90))}${cite(f.id, f.keyChunk, all.indexOf(f) + 1)}`, badge:{ text:statusOf(f).text, kind:statusOf(f).kind }, why:H(cut(f.name, 60)) + (chunkAt(f.id, f.keyChunk) ? ', ' + H(chunkAt(f.id, f.keyChunk).w) : ''), link:{ label:'Open at these words', onclick:`NBK.openFile('${f.id}',${f.keyChunk == null ? 'null' : f.keyChunk})` } })) },
         { title:'Filled copies', rows:fillRows },
+        { title:'Key words read', rows:ready2.map(f => ({ text:`${pq(f.keyLine, 90, f.kind === 'sheet' || f.kind === 'csv')}${cite(f.id, f.keyChunk, all.indexOf(f) + 1)}`, badge:statusOf(f).key === 'read' ? null : { text:statusOf(f).text, kind:statusOf(f).kind }, why:H(cut(f.name, 60)) + (chunkAt(f.id, f.keyChunk) ? ', ' + H(chunkAt(f.id, f.keyChunk).w) : ''), link:{ label:'Open at these words', onclick:`NBK.openFile('${f.id}',${f.keyChunk == null ? 'null' : f.keyChunk})` } })) },
         { title:'Sync', rows:sr ? [sr] : [] },
       ],
       button:tpl ? { label:'Fill ' + short(tpl.name, 22) + ' from my plan', onclick:`NBK.fill('${tpl.id}')` } : { label:'Choose files to add', onclick:'NBK.pick()' },
@@ -714,7 +723,8 @@
     const name = H(cut(m.name, 60));
     const heads = { reading:`Reading ${name} now.`, fetching:`Fetching ${name} from your account.`, elsewhere:`${name} is on another device.`, notsynced:`${name} was added on another device and hasn’t synced.`, cant:`${name} can’t be read yet.`, used:`${name} is used in your plan.`, template:`${name} is a template with ${plural(m.blanks || m.rows || 0, 'line')} to fill.`, read:`${name} is read: ${H(sizeWords(m))}.` };
     // A few telling passages (best scores), each with its place.
-    const top = L && L.chunks.length ? L.chunks.map((c, i) => ({ c, i, sc:lineScore(bestLine(c.t)) })).sort((a, b) => b.sc - a.sc || a.i - b.i).slice(0, 3).sort((a, b) => a.i - b.i) : [];
+    const blanks = m.template && L ? L.chunks.map((c, i) => ({ c, i })).filter(x => x.c.cells && x.c.n > (L.chunks[0] ? L.chunks[0].n : 0) && (!L.sheets || x.c.s === L.sheets[0].name) && String(x.c.cells[0] || '').trim() && !String(x.c.cells[1] || '').trim()) : [];
+    const top = blanks.length ? blanks.slice(0, 3) : L && L.chunks.length ? L.chunks.map((c, i) => ({ c, i, sc:lineScore(bestLine(c.t)) })).sort((a, b) => b.sc - a.sc || a.i - b.i).slice(0, 3).sort((a, b) => a.i - b.i) : [];
     const fillRow = filled[m.id] ? [{ text:'Filled copy, ' + plural(filled[m.id].count || 0, 'cell'), badge:{ text:'Ready', kind:'green' }, why:'Filled from your plan. The original file is unchanged.', link:{ label:'Download the filled copy', onclick:`NBK.downloadFilled('${m.id}')` } }] : [];
     let button;
     if(s.key === 'elsewhere') button = { label:'Fetch this file now', onclick:`NBK.fetch('${m.id}')` };
@@ -725,12 +735,12 @@
     else button = { label:'Open ' + short(m.name, 24), onclick:`NBK.openFile('${m.id}')` };
     return {
       headline:heads[s.key] || name,
-      graphic:NLP.counts([{ value:m.pages || m.rows || m.paras || 0, label:m.pages ? 'pages' : m.rows ? 'rows' : m.kind === 'text' ? 'lines' : 'paragraphs', kind:'ok' }, { value:L ? L.chunks.length : 0, label:'passages read' }, { value:cited ? cited.size : 0, label:'quoted last', kind:cited && cited.size ? 'on' : '' }]),
+      graphic:NLP.counts([{ value:m.pages || m.rows || m.paras || 0, label:{ pdf:'pages', sheet:'rows', csv:'rows', text:'lines', word:'paragraphs' }[m.kind] || 'pages read', kind:'ok' }, { value:L ? L.chunks.length : 0, label:'passages read' }, { value:cited ? cited.size : 0, label:'quoted last', kind:cited && cited.size ? 'on' : '' }]),
       groups:[
-        { title:'Key words', rows:top.map(x => ({ text:`${NLP.quote(cut(bestLine(x.c.t), 90))}${cite(m.id, x.i, n)}`, badge:x.i === m.keyChunk ? { text:'Key line', kind:'steel' } : null, why:H(x.c.w), link:{ label:'Open at these words', onclick:`NBK.openFile('${m.id}',${x.i})` } })) },
+        { title:blanks.length ? 'Lines to fill' : 'Key words', rows:top.map(x => ({ text:`${pq(blanks.length ? x.c.cells[0] : bestLine(x.c.t), 90, m.kind === 'sheet' || m.kind === 'csv')}${cite(m.id, x.i, n)}`, badge:blanks.length ? { text:'Empty', kind:'amber' } : x.i === m.keyChunk ? { text:'Key line', kind:'steel' } : null, why:H(x.c.w) + (blanks.length && x.c.cells[2] ? ' · ' + pq(x.c.cells[2], 50, true) : ''), link:{ label:'Open at these words', onclick:`NBK.openFile('${m.id}',${x.i})` } })) },
         { title:'Why it can’t be read', rows:s.key === 'cant' ? [{ text:H(m.why || 'Horizon couldn’t read it.'), badge:{ text:'Kept', kind:'grey' }, why:'The file is kept safe here either way.' }] : [] },
         { title:'Filled copy', rows:fillRow },
-        { title:'About the file', rows:[{ text:`${H(KIND_LABEL[m.kind] || 'File')}, ${H(sizeLabel(m.size || 0))}, added ${H(dayLabel(m.addedAt).toLowerCase())}`, badge:m.remotePath ? { text:'Synced', kind:'green' } : { text:'This device', kind:'grey' }, link:L ? { label:'Ask Horizon about this file', onclick:`NBK.askAbout('${m.id}')` } : null }] },
+        { title:'About the file', rows:[{ text:`${H(KIND_LABEL[m.kind] || 'File')}, ${H(sizeLabel(m.size || 0))}, added ${H(dayLabel(m.addedAt).toLowerCase())}`, badge:m.remotePath ? { text:'Synced', kind:'green' } : { text:'This device', kind:'grey' }, link:L && L.chunks.length ? { label:'Ask Horizon about this file', onclick:`NBK.askAbout('${m.id}')` } : null }] },
       ],
       button,
       links:[{ label:'Remove file', short:'Remove', onclick:`NBK.remove('${m.id}')` }].concat(L || m.remotePath ? [{ label:'Download original', short:'Download', onclick:`NBK.download('${m.id}')` }] : []),
@@ -757,7 +767,7 @@
       return {
         headline:H(isDraft ? (e.title || 'Draft note') : noteName(e)) + (isDraft ? ', not saved yet.' : '.'),
         graphic:NLP.counts([{ value:lines.length, label:'lines' }, { value:String(e.content || '').split(/\s+/).filter(Boolean).length, label:'words' }, { value:e.tag && TAGS[e.tag] ? TAGS[e.tag] : '–', label:'tag' }]),
-        groups:[{ title:isDraft ? 'Draft' : 'From the note', rows:lines.slice(0, 3).map(l => ({ text:NLP.quote(cut(l, 120)) })) }],
+        groups:[{ title:isDraft ? 'Draft' : 'From the note', rows:lines.slice(0, 3).map(l => ({ text:pq(l, 120) })) }],
         button:isDraft ? { label:'Save ' + month.split(' ')[0] + '’s note', onclick:'NBK.saveDraft()' } : { label:'Open this note', onclick:`NBK.openNote('${H(st.chosen)}')` },
         links:isDraft ? [{ label:'Edit draft', short:'Edit', onclick:"NBK.openNote('draft')" }, { label:'Drop draft', short:'Drop', onclick:"NBK.deleteNote('draft')" }] : [{ label:'Delete note', short:'Delete', onclick:`NBK.deleteNote('${H(st.chosen)}')` }],
       };
@@ -766,14 +776,14 @@
     const now = new Date(), months = [], counts = [];
     for(let i = 11; i >= 0; i--){ const dt = new Date(now.getFullYear(), now.getMonth() - i, 1); const k = `${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,'0')}`; months.push(k); counts.push(list.filter(e => (e.date || '').startsWith(k)).length); }
     const tagCount = {}; list.filter(e => (e.date || '').slice(0, 4) === ym.slice(0, 4)).forEach(e => { if(e.tag) tagCount[e.tag] = (tagCount[e.tag] || 0) + 1; });
-    const draftRows = d ? [{ text:NLP.quote(cut(firstLine(d.content), 110)), badge:{ text:'Draft', kind:'amber' }, why:'Drafted by Horizon. Not saved until you press Save.', link:{ label:'Edit draft', onclick:"NBK.openNote('draft')" } }] : [];
+    const draftRows = d ? [{ text:pq(firstLine(d.content), 110), badge:{ text:'Draft', kind:'amber' }, why:'Drafted by Horizon. Not saved until you press Save.', link:{ label:'Edit draft', onclick:"NBK.openNote('draft')" } }] : [];
     return {
       headline:d ? `Horizon drafted ${month.split(' ')[0]}’s note from your numbers.` : list.length ? `${plural(list.length, 'note')}; ${thisMonth ? plural(thisMonth, 'note') + ' this month' : 'none yet this month'}.` : 'No notes yet. A short note each month helps later.',
       graphic:list.length ? `<div class="nb-g-cap">Notes a month, last 12 months</div>` + NLP.minibars(counts, [NLP.monthShort(months[0]), NLP.monthShort(months[11])]) : NLP.counts([{ value:0, label:'notes' }, { value:0, label:'this month' }, { value:d ? 1 : 0, label:'draft' }]),
       groups:[
         { title:'Draft', rows:draftRows },
         { title:'Noticed in your notes', rows:Object.keys(tagCount).map(t => ({ text:`${plural(tagCount[t], TAGS[t].toLowerCase())} this year`, badge:{ text:'Pattern', kind:'steel' } })) },
-        { title:'Latest', rows:list.slice(0, 3).map(e => ({ text:NLP.quote(cut(noteQuote(e) || noteName(e), 90)), why:H(dayLabel(e.date)), link:{ label:'Open this note', onclick:`NBK.openNote('${H(e.id)}')` } })) },
+        { title:'Latest', rows:(d ? [] : list.slice(0, 2)).map(e => ({ text:pq(noteQuote(e) || noteName(e), 90), why:H(dayLabel(e.date)), link:{ label:'Open this note', onclick:`NBK.openNote('${H(e.id)}')` } })) },
       ],
       button:d ? { label:'Save ' + month.split(' ')[0] + '’s note', onclick:'NBK.saveDraft()' } : { label:'Draft ' + month.split(' ')[0] + '’s note', onclick:'NBK.draftMonth()' },
       links:[{ label:'+ New note', short:'New', onclick:'NBK.newNote()' }].concat(d ? [{ label:'Edit draft', short:'Edit', onclick:"NBK.openNote('draft')" }] : []),
@@ -801,10 +811,10 @@
       const days = Math.max(0, Math.round((Date.now() - r.when) / 864e5));
       const first = reportFirst(r);
       return {
-        headline:H(r.title) + (first ? ': ' + NLP.quote(cut(first, 90)) : '.'),
+        headline:H(r.title) + (first ? ': ' + pq(first, 90) : '.'),
         graphic:NLP.counts([{ value:heads.length, label:'sections' }, { value:Math.max(1, Math.round(words / 220)), label:'min to read' }, { value:days, label:days === 1 ? 'day old' : 'days old', kind:days > 90 ? 'on' : 'ok' }]),
         groups:[
-          { title:'From the report', rows:keys.map(k => ({ text:NLP.quote(k) })) },
+          { title:'From the report', rows:keys.map(k => ({ text:pq(k, 110) })) },
           { title:'Sections', rows:heads.slice(0, 4).map((h2, i) => ({ text:H(cut(h2, 70)), link:{ label:'Go to that section', onclick:`NBK.openReport('${H(r.id)}',${i})` } })) },
         ],
         button:st.open === r.id ? { label:'Back to reports', onclick:'NBK.back()' } : { label:'Open ' + short(r.title, 24), onclick:`NBK.openReport('${H(r.id)}')` },
@@ -817,7 +827,7 @@
     return {
       headline:list.length ? (fresh.length ? `${plural(fresh.length, 'new report')} to read.` : `${plural(list.length, 'saved report')}; the latest is ${H(cut(list[0].title, 40))}.`) : 'No saved reports yet.',
       graphic:list.length ? NLP.counts(kinds.slice(0, 3).map(k => ({ value:byKind[k], label:k.toLowerCase() + (byKind[k] === 1 ? '' : 's') }))) : NLP.counts([{ value:0, label:'deep dives' }, { value:0, label:'analyses' }, { value:0, label:'other' }]),
-      groups:[{ title:'Latest', rows:list.slice(0, 3).map(x => ({ text:H(cut(x.title, 60)) + (reportFirst(x) ? `<span class="nb-pq">${NLP.quote(cut(reportFirst(x), 80))}</span>` : ''), badge:fresh.includes(x) ? { text:'New', kind:'amber' } : null, why:H(x.kind + ', ' + dayLabel(x.when).toLowerCase()), link:{ label:'Open this report', onclick:`NBK.openReport('${H(x.id)}')` } })) }],
+      groups:[{ title:'Latest', rows:list.slice(0, 3).map(x => ({ text:H(cut(x.title, 60)) + (reportFirst(x) ? `<span class="nb-pq">${pq(reportFirst(x), 80)}</span>` : ''), badge:fresh.includes(x) ? { text:'New', kind:'amber' } : null, why:H(x.kind + ', ' + dayLabel(x.when).toLowerCase()), link:{ label:'Open this report', onclick:`NBK.openReport('${H(x.id)}')` } })) }],
       button:list.length ? { label:'Open ' + short((fresh[0] || list[0]).title, 24), onclick:`NBK.openReport('${H((fresh[0] || list[0]).id)}')` } : { label:'Open Places to retire', onclick:"NLP.go('nl-plans')" },
       links:[{ label:'Classic Vault', short:'Vault', onclick:"nav('vault')" }],
     };
@@ -1000,7 +1010,7 @@
 #panel-nl-notebook .nb-report pre { white-space:pre-wrap; font-size:13px; }
 #panel-nl-notebook .nb-report a { color:var(--nl-accent); }
 #panel-nl-notebook .nb-editor { max-width:760px; }
-#panel-nl-notebook .nb-editor .nl-field textarea { resize:vertical; font:400 15px/1.6 var(--nl-serif); min-height:180px; border:0; border-bottom:1px solid var(--nl-line); }
+#panel-nl-notebook .nb-editor .nl-field textarea { resize:vertical; font:400 15px/1.6 var(--nl-serif); min-height:180px; }
 #panel-nl-notebook .nb-editor .nl-field input[type=date] { border:0; background:transparent; font:500 14px var(--nl-sans); color:var(--nl-ink); outline:0; padding:2px 0; }
 #panel-nl-notebook .nb-pills { display:flex; gap:6px; flex-wrap:wrap; }
 html.nl .nl-side .nb-g-cap { font-size:12.5px; color:var(--nl-detail); margin-bottom:6px; }
@@ -1019,15 +1029,18 @@ html.nl .nl-side .nb-pq { display:block; font-weight:400; font-size:13px; margin
   });
 
   // ── Start: read what this device holds, finish any interrupted reading ───
+  let idbLoaded = false;
   async function boot(){
+    // No files yet: nothing to open (the file store is made on the first upload).
+    if(typeof state === 'undefined' || !files().length){ ready = true; return; }
+    if(idbLoaded) return; idbLoaded = true; ready = false;
     try {
       const recs = await idbAll('files');
-      recs.forEach(r => { local[r.id] = { chunks:Array.isArray(r.chunks) ? r.chunks : [], sheets:r.sheets || null }; });
+      recs.forEach(r => { if(!local[r.id] || !local[r.id].chunks.length) local[r.id] = { chunks:Array.isArray(r.chunks) ? r.chunks : [], sheets:r.sheets || null }; });
       const fl = await idbAll('filled');
       fl.forEach(r => { filled[r.id] = { name:r.name, at:r.at, count:r.count }; });
     } catch(_){}
     ready = true;
-    if(typeof state === 'undefined') return;
     // A reading cut short (the tab closed): read it again.
     for(const m of files()){
       if(local[m.id] && (m.status === 'reading' || (m.status === 'read' && !local[m.id].chunks.length && m.kind !== 'image'))){
@@ -1039,5 +1052,5 @@ html.nl .nl-side .nb-pq { display:block; font-weight:400; font-size:13px; margin
     setTimeout(backfill, 4000);
   }
   setTimeout(boot, 0);
-  if(typeof bus !== 'undefined') bus.on('panel:changed', ({ panel }) => { if(panel === P) setTimeout(backfill, 500); });
+  if(typeof bus !== 'undefined') bus.on('panel:changed', ({ panel }) => { if(panel !== P) return; if(!idbLoaded && files().length) boot(); setTimeout(backfill, 500); });
 })();

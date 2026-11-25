@@ -112,3 +112,57 @@ keep — financial data is never silently overwritten.
 - Data is stored as JSON your Supabase project can read (this is the RLS-only
   model). Anyone with dashboard/database access to your project can read it, so
   keep your Supabase account secure (use a strong password + 2FA).
+
+---
+
+## Notebook files (new look) — one-time file storage setup
+
+The new look's **Notebook** page keeps your own files (statements, letters,
+budget templates). The list of files syncs with everything else. The files
+themselves go to a private storage folder in **your own** Supabase project, so
+your other devices can fetch them when you open them.
+
+Until you do this step, nothing breaks: files stay on the device you added them
+on, and the Notebook's side panel says "Files can't sync yet".
+
+**Do this once:**
+
+1. In the Supabase dashboard, open **SQL Editor → New query**.
+2. Paste everything below and press **Run**.
+
+```sql
+-- 1. A private place for your Notebook files
+insert into storage.buckets (id, name, public)
+values ('horizon-files', 'horizon-files', false)
+on conflict (id) do nothing;
+
+-- 2. Rules: each signed-in person can only see and change their own folder
+create policy "Notebook files: read own" on storage.objects
+  for select to authenticated
+  using (bucket_id = 'horizon-files' and (storage.foldername(name))[1] = auth.uid()::text);
+
+create policy "Notebook files: add own" on storage.objects
+  for insert to authenticated
+  with check (bucket_id = 'horizon-files' and (storage.foldername(name))[1] = auth.uid()::text);
+
+create policy "Notebook files: replace own" on storage.objects
+  for update to authenticated
+  using (bucket_id = 'horizon-files' and (storage.foldername(name))[1] = auth.uid()::text);
+
+create policy "Notebook files: remove own" on storage.objects
+  for delete to authenticated
+  using (bucket_id = 'horizon-files' and (storage.foldername(name))[1] = auth.uid()::text);
+```
+
+3. Open Horizon, go to **Notebook**. Files you added earlier upload by themselves
+   within a few seconds.
+
+**Good to know**
+
+- Each file is stored as `your-account-id / file-id / file name`. Only you can
+  reach your folder; the bucket is private (not a public link).
+- On another device, a file shows **"On another device"**. Press it twice and it
+  is fetched and opened.
+- Supabase's free plan allows files up to 50 MB each and 1 GB in total.
+- If you see "already exists" when running the SQL, that part was done before —
+  that's fine.
