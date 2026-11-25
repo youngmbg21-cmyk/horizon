@@ -242,7 +242,7 @@
     if(tab === 'runway' && tb) NLP.rows(tb, P, id => { const st = U(); if(id === 'spend'){ st.open = st.open === 'spend' ? null : 'spend'; NLP.renderPage(P); } else if(id === 'pension'){ NLP.tab(P, 'accounts'); NLP.ui(P).chosen = pens.length ? pens[0].id : 'pen-none'; NLP.renderPage(P); } });
     if(tab === 'accounts' && tb) NLP.rows(tb, P, id => {
       const st = U();
-      if(id === 'sav'){ NLP.go('nl-money'); return; }
+      if(id === 'sav'){ st.open = st.open === 'sav' ? null : 'sav'; NLP.renderPage(P); if(st.open) setTimeout(() => document.getElementById('nlf-sv-g')?.focus(), 60); return; }
       if(id === 'pen-sug') return;
       if(id === 'pen-none'){ st.penForm = !st.penForm; st.open = st.penForm ? id : null; NLP.renderPage(P); return; }
       st.open = st.open === id ? null : id; NLP.renderPage(P);
@@ -398,7 +398,11 @@
     const rows = [];
     series.forEach((s, i) => {
       if(s.id === 'sav'){
-        rows.push(`<tr data-nl-row="sav"><td class="mk">${sw(s.col)}</td><td><span class="nm">Savings from Money plan</span><span class="sub">Read from your Money plan savings target</span></td><td class="k">Savings</td><td class="r">${M(FE.projection.savingsYearToDate())}</td><td class="r">${M(savMonthly)}</td><td class="r">${pct(state.growthRate || 0)}</td><td class="r">${M(atRet('sav'))}</td></tr>`);
+        const edS = st.open === 'sav' ? `<div class="nlf-ed nlf-acc">
+        <label>Growth<input type="text" inputmode="decimal" class="nl-num-in nlf-short" id="nlf-sv-g" value="${state.growthRate ?? 0}" onchange="NLF.savGrowth(this.value)"><span class="nlf-u">% a year</span></label>
+        <p class="nlf-sv-note">What you save each month comes from your Money plan.</p>
+        <div class="nl-inrow">${NLP.link('Done', 'NLF.accClose()')}</div></div>` : '';
+        rows.push(`<tr data-nl-row="sav"><td class="mk">${sw(s.col)}</td><td><span class="nm">Savings from Money plan</span><span class="sub">Read from your Money plan savings target</span>${edS}</td><td class="k">Savings</td><td class="r">${M(FE.projection.savingsYearToDate())}</td><td class="r">${M(savMonthly)}</td><td class="r">${pct(state.growthRate || 0)}</td><td class="r">${M(atRet('sav'))}</td></tr>`);
         return;
       }
       const a = inv.find(x => x.id === s.id); if(!a) return;
@@ -473,6 +477,12 @@
       const st = U(); st.chosen = id; st.open = id;
       setTimeout(() => { const el = document.getElementById('nlf-ac-n-' + id); if(el){ el.focus(); el.select(); } }, 120);
     }
+  };
+  NLF.savGrowth = v => {
+    const nv = Math.round(parseNum(v) * 10) / 10;
+    if(!(nv >= 0 && nv <= 30)){ NLP.toast('Growth must be between 0% and 30% a year.', 'warn'); return; }
+    if(nv === Number(state.growthRate)) return;
+    change(`Savings growth ${pct(state.growthRate || 0)} → ${pct(nv)}`, ['growthRate'], s => { s.growthRate = nv; });
   };
   NLF.accClose = () => { U().open = null; NLP.renderPage(P); };
   NLF.accSet = (id, f, v) => {
@@ -597,7 +607,9 @@
     } else if(a && a.assetType === 'pension'){
       groups.push({ title:a.name, rows:[{ text:`Pays from age ${a.startAge ?? ra}${a.endAge ? ' to ' + a.endAge : ', for life'}`, badge:{ text:'Counted', kind:'green' }, link:{ label:'Change it', onclick:`NLF.accOpen('${H(a.id)}')` } }] });
     } else if(chosen === 'sav'){
-      groups.push({ title:'Savings from Money plan', rows:[{ text:'Read from your monthly savings target', badge:{ text:'From Money plan', kind:'steel' }, why:'Press the row again to open the Money plan.', link:{ label:'Open the Money plan', onclick:"NLP.go('nl-money')" } }] });
+      groups.push({ title:'Savings from Money plan', rows:[
+        { text:`Grows at ${pct(state.growthRate || 0)} a year`, badge:{ text:'Info', kind:'steel' }, why:'Press the row again to change the growth.', link:{ label:'Change growth', onclick:"NLF.accOpen('sav')" } },
+        { text:'What you save each month comes from your Money plan', badge:{ text:'From Money plan', kind:'steel' }, link:{ label:'Open the Money plan', onclick:"NLP.go('nl-money')" } }] });
     }
     if(!pens.length && !st.penSug) groups.push({ title:'Missing', rows:[{ text:'No pension added', badge:{ text:'Missing', kind:'amber' }, why:'Your state or work pension lowers what you take from savings.', link:{ label:'Add a pension here', onclick:'NLF.penShowForm()' } }] });
     if(!st.penSug) groups.push({ title:'Two kinds of account', rows:[
@@ -674,6 +686,7 @@ html.nl { --nlf-amber:#8A5A0A; --nlf-steel:#48639A; --nlf-ruby:#8F2A22; --nlf-c1
 #panel-nl-future .nlf-planbar span { display:block; font-size:13px; color:var(--nl-quiet); margin-top:2px; }
 #panel-nl-future .nlf-planbar .nl-inrow { display:flex; align-items:center; gap:16px; margin:0; }
 #panel-nl-future .nlf-planbar .nlf-pb { width:auto; padding:9px 18px; margin:0; }
+#panel-nl-future .nlf-sv-note { grid-column:1/-1; margin:6px 0 0; font-size:13px; color:var(--nl-quiet); }
 #panel-nl-future .nlf-wifres { margin:8px 0 0; font-size:13px; color:var(--nl-quiet); }
 #panel-nl-future .nlf-wifres i.dash { display:inline-block; width:14px; height:0; border-top:2px dashed var(--nlf-steel); vertical-align:3px; margin-right:6px; }
 #panel-nl-future .nlf-wifres .nl-link { margin-left:8px; }
