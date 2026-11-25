@@ -25372,6 +25372,7 @@ class HZMobile {
       if(amt == null) return { error:'set_savings needs amount' };
       const old = readSavings(c); c.amount = amt;
       c.label = `Savings target: ${money(old)} → ${money(amt)} a month${tail}`;
+      c.short = `Savings target, ${amt > old ? 'higher' : amt < old ? 'lower' : 'same'}${tail}`;
       return { change:c };
     }
     if(c.kind === 'set_trip_cost'){
@@ -25386,6 +25387,7 @@ class HZMobile {
       if(amt != null) parts.push(`${money(ex.item.amount)} → ${money(amt)}`);
       if(to) parts.push(`${monthLabel(String(ex.item.date || '').slice(0,7)) || 'no month'} → ${monthLabel(to.key)}`);
       c.label = `${c.trip}, ${c.cost}: ${parts.join(', ')}`;
+      c.short = `${c.trip}, ${c.cost}: ${to ? 'moves to ' + monthLabel(to.key) : 'new amount'}`;
       return { change:c };
     }
     if(!LISTS[c.list]) return { error:'list must be income or expenses' };
@@ -25397,14 +25399,16 @@ class HZMobile {
       if(arr.some(i => norm(i.name) === norm(c.name))) return { error:`There is already a ${what} called "${c.name}". Use set_amount.` };
       c.name = String(c.name).trim(); c.amount = amt; c.type = c.type === 'fixed' ? 'fixed' : 'variable';
       c.label = `${c.name}: new ${c.list === 'income' ? 'income' : 'line'}, ${money(amt)} a month${tail}`;
+      c.short = `${c.name}: new ${c.list === 'income' ? 'income' : 'line'}${tail}`;
       return { change:c };
     }
     const f = findIn(arr, c.name, what); if(f.error) return f;
     c.name = f.item.name;
-    if(c.kind === 'remove_line'){ c.label = `${c.name}: removed (was ${money(f.item.amount)} a month)${tail}`; return { change:c }; }
+    if(c.kind === 'remove_line'){ c.label = `${c.name}: removed (was ${money(f.item.amount)} a month)${tail}`; c.short = `${c.name}: removed${tail}`; return { change:c }; }
     if(amt == null) return { error:'set_amount needs amount' };
     c.amount = amt;
     c.label = `${c.name}: ${money(f.item.amount)} → ${money(amt)} a month${tail}`;
+    c.short = `${c.name}, ${amt > f.item.amount ? 'higher' : amt < f.item.amount ? 'lower' : 'same'}${tail}`;
     return { change:c };
   }
   function applyChange(c){
@@ -25458,7 +25462,7 @@ class HZMobile {
     }
     p.status = 'applied'; p.appliedAt = Date.now();
     n.history.forEach(e => { delete e.undo; delete e.sig; });
-    n.history.unshift({ id:'h' + Date.now().toString(36), at:Date.now(), by:'Horizon', ask:p.ask, items:live.map(c => c.label), proposal:pid, undo:before });
+    n.history.unshift({ id:'h' + Date.now().toString(36), at:Date.now(), by:'Horizon', ask:p.ask, items:live.map(c => c.label), short:live.map(c => c.short || c.label), proposal:pid, undo:before });
     n.history = n.history.slice(0, 50);
     afterDataChange();
     n.history[0].sig = signature(); save();
@@ -25702,9 +25706,10 @@ You are Horizon, the assistant. You PREPARE, the person DECIDES.
     const pg = (typeof window.nlPageOverview === 'function') ? window.nlPageOverview() : null;
     if(pg){
       const row = r => `<div class="nl-door"><span class="w">${r.text}</span>${r.badge ? `<span class="nl-badge ${h(r.badge.kind || 'grey')}">${h(r.badge.text)}</span>` : ''}${r.why ? `<span class="nl-why">${r.why}</span>` : ''}${r.link ? `<div class="nl-door-acts"><button class="nl-link" type="button" onclick="${h(r.link.onclick)}">${h(r.link.label)}</button></div>` : ''}</div>`;
-      let html = `<p class="nl-hl">${live.length ? `${live.length} change${live.length > 1 ? 's' : ''} wait${live.length > 1 ? '' : 's'} for your answer.` : (pg.headline || 'Nothing waits for you right now.')}</p>`;
+      const chosenRow = window.NLP && NLP.activePage && NLP.activePage() && NLP.chosen(NLP.activePage().panel) != null;
+      let html = `<p class="nl-hl">${live.length && !chosenRow ? `${live.length} change${live.length > 1 ? 's' : ''} wait${live.length > 1 ? '' : 's'} for your answer.` : (pg.headline || 'Nothing waits for you right now.')}</p>`;
       if(pg.graphic) html += `<div>${pg.graphic}</div>`;
-      if(live.length) html += `<div class="nl-grp"><h4>Waiting for you</h4>${live.map(c => row({ text:h(c.label), badge:{ text:'Suggested', kind:'amber' }, link:{ label:'See it in the conversation', onclick:"nlFlip('chat')" } })).join('')}</div>`;
+      if(live.length) html += `<div class="nl-grp"><h4>Waiting for you</h4>${live.map(c => row({ text:h(c.short || c.label), badge:{ text:'Suggested', kind:'amber' }, link:{ label:'See it in the conversation', onclick:"nlFlip('chat')" } })).join('')}</div>`;
       (pg.groups || []).filter(g => g && g.rows && g.rows.length).forEach(g => { html += `<div class="nl-grp"><h4>${h(g.title)}</h4>${g.rows.map(row).join('')}</div>`; });
       if(live.length) html += `<button class="nl-black" type="button" onclick="nlApply('${p.id}')">Apply ${live.length} change${live.length > 1 ? 's' : ''}</button>`;
       else if(pg.button) html += pg.button.disabledWhy ? `<button class="nl-black" type="button" disabled>${h(pg.button.label)}</button><p class="nl-note">${h(pg.button.disabledWhy)}</p>` : `<button class="nl-black" type="button" onclick="${h(pg.button.onclick)}">${h(pg.button.label)}</button>`;
@@ -25715,11 +25720,11 @@ You are Horizon, the assistant. You PREPARE, the person DECIDES.
     let html = `<p class="nl-hl">${live.length ? `${live.length} change${live.length > 1 ? 's' : ''} wait${live.length > 1 ? '' : 's'} for your answer.` : 'Nothing waits for you right now.'}</p>`;
     html += `<div class="nl-counts"><div class="${live.length ? 'on' : ''}"><b>${live.length}</b>waiting</div><div class="${today ? 'ok' : ''}"><b>${today}</b>changed today</div><div><b>${n.history.length}</b>in history</div></div>`;
     if(live.length){
-      html += `<div class="nl-grp"><h4>Waiting for you</h4>${live.map(c => `<div class="nl-door"><span class="w">${h(c.label)}</span><span class="nl-badge amber">Suggested</span><div class="nl-door-acts"><button class="nl-link" type="button" onclick="nlFlip('chat')">See it in the conversation</button></div></div>`).join('')}</div>`;
+      html += `<div class="nl-grp"><h4>Waiting for you</h4>${live.map(c => `<div class="nl-door"><span class="w">${h(c.short || c.label)}</span><span class="nl-badge amber">Suggested</span><div class="nl-door-acts"><button class="nl-link" type="button" onclick="nlFlip('chat')">See it in the conversation</button></div></div>`).join('')}</div>`;
     }
     const recent = n.history.slice(0, 3);
     if(recent.length){
-      html += `<div class="nl-grp"><h4>Recent changes</h4>${recent.map((e, i) => `<div class="nl-door"><span class="w">${h(e.items[0])}${e.items.length > 1 ? ` and ${e.items.length - 1} more` : ''}</span><span class="nl-badge ${e.undone ? 'grey' : 'green'}">${e.undone ? 'Undone' : 'Saved'}</span><span class="nl-why">${h(byText(e))}, ${h(timeLabel(e.at))}</span>${i === 0 && !e.undone ? `<div class="nl-door-acts">${u.ok ? `<button class="nl-link" type="button" onclick="nlUndo()">Undo</button>` : `<span class="nl-why" style="grid-column:auto">${h(u.why)}</span>`}</div>` : ''}</div>`).join('')}</div>`;
+      html += `<div class="nl-grp"><h4>Recent changes</h4>${recent.map((e, i) => `<div class="nl-door"><span class="w">${h((e.short || e.items)[0])}${e.items.length > 1 ? ` and ${e.items.length - 1} more` : ''}</span><span class="nl-badge ${e.undone ? 'grey' : 'green'}">${e.undone ? 'Undone' : 'Saved'}</span><span class="nl-why">${h(byText(e))}, ${h(timeLabel(e.at))}</span>${i === 0 && !e.undone ? `<div class="nl-door-acts">${u.ok ? `<button class="nl-link" type="button" onclick="nlUndo()">Undo</button>` : `<span class="nl-why" style="grid-column:auto">${h(u.why)}</span>`}</div>` : ''}</div>`).join('')}</div>`;
     } else if(!live.length){
       html += `<div class="nl-grp"><h4>Try asking</h4><div class="nl-door"><span class="w nl-q">“Groceries are about 8 500 now.”</span></div><div class="nl-door"><span class="w nl-q">“Raise my savings to 30 000 from next year.”</span></div><div class="nl-door"><span class="w nl-q">“Move the Cape Town hotel to April.”</span></div></div>`;
     }
