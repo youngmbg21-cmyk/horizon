@@ -169,7 +169,7 @@
         { key:'optional', label:'Optional', count:by.optional.length, on:tab === 'optional' } ] })}
       <div class="nls-fields">${shown.length ? shown.map(fieldHtml).join('') : NLP.empty(tab === 'needed' ? 'Nothing is needed. You can start.' : 'Nothing here.')}</div>
       ${ageProblem() ? `<p class="nls-hint nls-age-why">${H(ageProblem())}</p>` : ''}
-      <section class="nl-cc nls-chart"><h2 class="nl-ct" id="nls-chart-title">${H(chartTitle(pts))}</h2><p class="nl-cs">From the lines above, in ${state.displayMode === 'nominal' ? 'future' : 'today’s'} money. It redraws as you fill them in.</p>${NLP.chartBox(drawProjection, 170, 'Money until retirement')}</section>
+      <section class="nl-cc nls-chart"><h2 class="nl-ct" id="nls-chart-title">${H(chartTitle(pts))}</h2><p class="nl-cs">From your answers, in ${state.displayMode === 'nominal' ? 'future' : 'today’s'} money. It redraws as you fill them in.</p>${NLP.chartBox(drawProjection, 170, 'Money until retirement')}</section>
     </div>`;
     wireSetup(host);
     st.drawn = true;
@@ -563,7 +563,14 @@ Amounts the person says are in ${state.currency || 'SEK'}.`;
 
   // ══ Styles (scoped to the two pages) ═════════════════════════════════════
   NLP.css('nl-setup-css', `
-#panel-nl-setup .nls-fields, #panel-nl-settings .nls-fields { max-width:880px; }
+#panel-nl-setup .nls-fields, #panel-nl-settings .nls-fields { max-width:none; }
+/* Wide screens: Setup's form and its chart sit side by side instead of leaving empty space. */
+@media (min-width:1700px){
+  #panel-nl-setup .nl-wrap { display:grid; grid-template-columns:minmax(0,1.15fr) minmax(0,1fr); gap:0 32px; align-items:start; }
+  #panel-nl-setup .nl-wrap > * { grid-column:1; }
+  #panel-nl-setup .nl-wrap > .nl-head { grid-column:1 / -1; }
+  #panel-nl-setup .nl-wrap > .nls-chart { grid-column:2; grid-row:2 / span 8; margin-top:0; }
+}
 #panel-nl-setup .nl-field, #panel-nl-settings .nl-field { align-items:start; grid-template-columns:150px minmax(0,1fr) auto; }
 #panel-nl-setup .nl-field > .lb, #panel-nl-settings .nl-field > .lb { padding-top:3px; }
 #panel-nl-setup .nl-field > .v, #panel-nl-settings .nl-field > .v { min-width:0; }
@@ -582,7 +589,7 @@ Amounts the person says are in ${state.currency || 'SEK'}.`;
 #panel-nl-setup .nls-num .nl-num-in, #panel-nl-settings .nls-num .nl-num-in { width:56px; text-align:left; border-bottom:1px solid var(--nl-edge); }
 #panel-nl-setup .nls-num .nl-num-in:focus, #panel-nl-settings .nls-num .nl-num-in:focus { border-bottom-color:var(--nl-accent); }
 #panel-nl-setup .nls-pills { display:flex; flex-wrap:wrap; gap:8px; }
-#panel-nl-setup .nls-chart { margin-top:18px; max-width:880px; }
+#panel-nl-setup .nls-chart { margin-top:18px; max-width:none; }
 #panel-nl-settings .nl-field input[type=password] { max-width:360px; border-bottom:1px solid var(--nl-edge); font-family:ui-monospace,Menlo,Consolas,monospace; font-size:13px; }
 #panel-nl-settings .nl-field input[type=password]:focus { border-bottom-color:var(--nl-accent); }
 #panel-nl-settings .nl-field.need > .lb { color:#8A5A0A; }

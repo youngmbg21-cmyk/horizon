@@ -160,7 +160,7 @@
   NLP._chartFns = {};
   let chartSeq = 0;
   // Returns a placeholder; call NLP.mountCharts(host) after inserting HTML.
-  NLP.chartBox = (fn, height, label) => { const id = 'c' + (++chartSeq); NLP._chartFns[id] = fn; return `<div class="nl-chart" data-nl-chart="${id}" style="height:${height || 220}px" role="img" aria-label="${H(label || 'chart')}"></div>`; };
+  NLP.chartBox = (fn, height, label) => { const id = 'c' + (++chartSeq); NLP._chartFns[id] = fn; const hh = height || 220; return `<div class="nl-chart" data-nl-chart="${id}" style="height:clamp(${hh}px, ${(hh / 13.66).toFixed(2)}vw, ${Math.round(hh * 1.6)}px)" role="img" aria-label="${H(label || 'chart')}"></div>`; };
 
   // ── What-if: compute on a temporary copy of the plan, then put it back ────
   const WHATIF_FIELDS = ['baseIncome','baseExpenses','baseSavings','monthlyOverrides','yearlyBases','trips','externalAssets','retirementExpenses','retirementScenario','retirementAge','currentAge','growthRate','inflationRate','retirementPostGrowth','lifeExp'];
@@ -231,7 +231,7 @@ html.nl .content { background:var(--nl-ground); }
 html.nl .panel.nl-page { max-width:none; padding:0; margin:0; background:var(--nl-surface); min-height:100%; color:var(--nl-ink); font:14px/1.5 var(--nl-sans); animation:none; }
 html.nl .panel.nl-page.active { display:block; }
 .nl-page * { box-sizing:border-box; }
-.nl-page .nl-wrap { padding:18px 24px 40px; max-width:1240px; }
+.nl-page .nl-wrap { padding:18px 24px 40px; max-width:none; }
 .nl-head { display:flex; align-items:flex-end; gap:24px; border-bottom:1px solid var(--nl-line); margin-bottom:14px; min-width:0; }
 .nl-title { font:600 26px/1.2 var(--nl-serif); margin:0; padding-bottom:10px; white-space:nowrap; letter-spacing:-.01em; color:var(--nl-ink); }
 .nl-tabs-row { display:flex; gap:20px; min-width:0; overflow-x:auto; scrollbar-width:none; }

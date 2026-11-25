@@ -14,3 +14,14 @@ The owner is not a developer. Explain everything in plain, simple English and ke
 - `index.html` blocks marked `NEW LOOK (L+S) · Phase 0` and `Phase 1`: the switch, backup, top bar, and the one side panel (Overview / Assistant), Apply / Undo / History.
 - `nl/core.js`: shared page framework. One file per page: `nl/today.js`, `nl/money.js`, `nl/plans.js`, `nl/future.js`, `nl/notebook.js`, `nl/setup.js` (Setup + Settings), `nl/phone.js`.
 - The new look is the default; a device that chooses "Back to the old look" stores `horizon-finance-os-v1:look = old`. All new-look CSS is scoped to `html.nl`, so the old look must stay pixel-identical.
+
+## SCREENS — every visual change is measured before it is called done
+
+- The screens: 1366×768, 1536×864, 1920×1080, 2560×1440.
+- Before saying a visual change is done: open the real page at ALL four sizes, take a photo of each, and show the owner the photos.
+- At every size, measure and report:
+  1. NO DEAD BAND: the page content and the side panel together fill the window. The gap between the content's right edge and the panel's left edge is at most 32px. Content grows to fill, or is centred — never stuck to the left with empty space beside it.
+  2. NOTHING CUT, NOTHING OVERLAPPING: no text or chart is clipped, hidden behind the panel, or scrolls sideways.
+  3. CHARTS GROW WITH THE PAGE: on a wide screen, cards and charts use the extra width (more columns or wider charts), not more empty space.
+- A failed measurement is fixed before merging, never shipped quietly.
+- Never say "looks fine" without the measurements.
