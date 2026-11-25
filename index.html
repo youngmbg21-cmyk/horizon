@@ -20,9 +20,12 @@
      Phones keep the old look until the new look's phone screens exist. -->
 <script>
 (function(){try{
-  if(localStorage.getItem('horizon-finance-os-v1:look')==='new'
-     && !(window.matchMedia && matchMedia('(max-width:720px), (max-height:500px) and (pointer:coarse)').matches)){
+  // Phase 9: the new look is the normal one; 'old' means this device chose
+  // the classic look. Phase 8: phones get the new look too (.nl-phone).
+  if(localStorage.getItem('horizon-finance-os-v1:look')!=='old'){
     document.documentElement.classList.add('nl');
+    if(window.matchMedia && matchMedia('(max-width:720px), (max-height:500px) and (pointer:coarse)').matches)
+      document.documentElement.classList.add('nl-phone');
   }
 }catch(_){}})();
 </script>
@@ -4345,7 +4348,7 @@ html.nl .nl-side { display:flex; order:9; flex-direction:column; width:340px; fl
     </div>
     <div class="nl-tabs" id="nl-tabs" role="tablist" aria-label="Pages in this section"></div>
     <div class="nl-menu" id="nl-menu" hidden>
-      <button type="button" onclick="nlSetLook(false)">Back to the old look<span class="nl-sub">Switch on again any time from the top bar.</span></button>
+      <button type="button" onclick="nlSetLook(false)">Back to the old look<span class="nl-sub">Come back any time with “Try the new Horizon”.</span></button>
       <button type="button" id="nl-restore-btn" onclick="nlAskRestore()" disabled>Restore the backup<span class="nl-sub" id="nl-restore-sub">Looking for the backup…</span></button>
       <button type="button" id="nl-download-btn" onclick="nlDownloadBackup()" disabled>Download the backup<span class="nl-sub">Save it as a file on this device.</span></button>
     </div>
@@ -24776,6 +24779,7 @@ class HZMobile {
     h+=this.card(this.ct('🪪 Profile & Context')+this.srow('Citizenship',`<input value="${this.esc(this.data.citizenship)}" data-model="s:citizenship" style="${this.inpS(150)}">`)+this.srow('Home Base',`<input value="${this.esc(this.data.homeBase)}" data-model="s:homeBase" style="${this.inpS(150)}">`)+this.srow('Current Age',`<input type="number" value="${this.data.currentAge}" data-model="n:currentAge" style="${this.inpS(70)}">`)+this.srow('Retirement Age',`<input type="number" value="${this.data.retirementAge}" data-model="n:retirementAge" style="${this.inpS(70)}">`)+this.srow('Life Expectancy',`<input type="number" value="${this.data.lifeExp}" data-model="n:lifeExp" style="${this.inpS(70)}">`,true));
     h+=this.card(this.ct('📊 Assumptions')+this.srow('Portfolio Growth %',`<input type="number" step=".5" value="${this.data.growthRate}" data-model="n:growthRate" style="${this.inpS(70)}">`)+this.srow('Inflation %',`<input type="number" step=".5" value="${this.data.inflationRate}" data-model="n:inflationRate" style="${this.inpS(70)}">`)+this.srow('Post-Retire Growth %',`<input type="number" step=".5" value="${this.data.postRetGrowth}" data-model="n:postRetGrowth" style="${this.inpS(70)}">`)+this.srow('Savings Tax %',`<input type="number" value="${this.data.withdrawTaxRate}" data-model="n:withdrawTaxRate" style="${this.inpS(70)}">`,true));
     const aiKey=(typeof state!=='undefined'&&state.aiKeys&&state.aiKeys.claude)||'';
+    h+=this.card(this.ct('✦ New look')+`<div style="font-size:11.5px;color:var(--text2);line-height:1.55;margin-bottom:10px">Horizon has a new, calmer look with an assistant that prepares changes for you to approve.</div><button type="button" onclick="if(typeof nlSetLook==='function')nlSetLook(true)" style="background:var(--green);color:#000;border:none;border-radius:8px;padding:10px 14px;font-weight:700;font-size:13px">Try the new Horizon</button>`);
     h+=this.card(this.ct('✦ AI Key')+`<div style="font-size:11.5px;color:var(--text2);line-height:1.55;margin-bottom:10px">Paste your Claude API key to power the AI advisor and the full-analysis reports on this device. Stored locally, never synced.</div><input id="hz-ai-key" type="password" autocapitalize="none" autocorrect="off" spellcheck="false" value="${this.esc(aiKey)}" placeholder="sk-ant-…" oninput="(function(v){if(typeof state!=='undefined'){if(!state.aiKeys)state.aiKeys={};state.aiKeys.claude=v.trim();if(typeof save==='function')save();}})(this.value)" style="width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:10px 11px;color:var(--text);font-family:var(--fm);font-size:13px">${aiKey?`<div style="font-size:10.5px;color:var(--green);margin-top:8px">✓ Key set — AI analysis enabled</div>`:''}`);
     h+=this.card(this.ct('🎨 Appearance')+this.srow('Currency',this.seg('currency',[['SEK','kr'],['USD','$'],['EUR','€'],['KES','KSh']]))+this.srow('Language',this.seg('lang',[['EN','EN'],['SV','SV']]))+this.srow('Theme',`<button data-act="theme" style="background:var(--bg4);border:1px solid var(--border2);color:var(--text);border-radius:7px;padding:6px 12px;font-size:11px;cursor:pointer">${this.data.theme==='dark'?'☀ Switch to Light':'☾ Switch to Dark'}</button>`,true));
     h+=this.card(this.ct('💱 Exchange Rates',this.chip('sage','● Live FX pending'))+['USD','EUR','KES'].map((k,i)=>this.srow(k+' per SEK',`<input type="number" step=".001" value="${this.data.exchangeRates[k]}" data-model="fx:${k}" style="${this.inpS(90)}">`,i===2)).join(''));
@@ -25239,6 +25243,7 @@ class HZMobile {
   }
   function apply(on){
     document.documentElement.classList.toggle('nl', on);
+    document.documentElement.classList.toggle('nl-phone', on && PHONE_MQ.matches);
     moveSelectors(on);
     if(on){ loadFonts(); syncBar(); } else closeMenu();
     if(typeof applyTheme === 'function') applyTheme();
@@ -25246,19 +25251,19 @@ class HZMobile {
     setTimeout(() => window.dispatchEvent(new Event('resize')), 30);
   }
   window.nlSetLook = function(on){
-    if(on && PHONE_MQ.matches) return;
-    try { if(on) localStorage.setItem(LOOK_KEY, 'new'); else localStorage.removeItem(LOOK_KEY); } catch(_){}
+    try { localStorage.setItem(LOOK_KEY, on ? 'new' : 'old'); } catch(_){}
     apply(on);
     if(on) ensureBackup();
   };
   // Rotating or resizing into phone size keeps the phone screens; coming
   // back to a large screen brings this device's choice back.
-  const wanted = () => { try { return localStorage.getItem(LOOK_KEY) === 'new'; } catch(_){ return false; } };
-  const onMQ = () => { const should = wanted() && !PHONE_MQ.matches; if(should !== isOn()) apply(should); };
+  const wanted = () => { try { return localStorage.getItem(LOOK_KEY) !== 'old'; } catch(_){ return true; } };
+  const onMQ = () => { const should = wanted(); if(should !== isOn()) apply(should); else document.documentElement.classList.toggle('nl-phone', should && PHONE_MQ.matches); };
   if(PHONE_MQ.addEventListener) PHONE_MQ.addEventListener('change', onMQ); else if(PHONE_MQ.addListener) PHONE_MQ.addListener(onMQ);
   if(typeof bus !== 'undefined') bus.on('panel:changed', syncBar);
   window.addEventListener('hashchange', () => setTimeout(syncBar, 0));
-  if(isOn()) apply(true);
+  // The first time the new look opens on this device (now by default), keep a backup.
+  if(isOn()){ apply(true); ensureBackup(); }
   // Expose for checks.
   window.nlSyncBar = syncBar;
 })();

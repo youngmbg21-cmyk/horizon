@@ -52,6 +52,7 @@ html.nl.nl-phone .nl-fcards { grid-template-columns:repeat(2,minmax(0,1fr)); }
 html.nl.nl-phone .nl-field { grid-template-columns:minmax(0,1fr) auto; }
 html.nl.nl-phone .nl-field > .lb { grid-column:1 / -1; }
 html.nl.nl-phone .nl-paper { padding:18px 16px; }
+html.nl.nl-phone .nl-page .nl-seg { flex-wrap:wrap; border-radius:14px; max-width:100%; }
 /* Table rows stack: name on its own line, then badges and numbers. */
 html.nl.nl-phone table.nl-tbl thead { display:none; }
 html.nl.nl-phone table.nl-tbl, html.nl.nl-phone table.nl-tbl tbody { display:block; width:100%; }
@@ -59,7 +60,10 @@ html.nl.nl-phone table.nl-tbl tr { display:flex; flex-wrap:wrap; align-items:cen
 html.nl.nl-phone table.nl-tbl td { display:block; padding:0; border:0; background:transparent !important; }
 html.nl.nl-phone table.nl-tbl td.mk { display:none; }
 html.nl.nl-phone table.nl-tbl td:not(.r):not(.mk):first-of-type, html.nl.nl-phone table.nl-tbl tr > td:nth-child(2):not(.r) { flex:1 1 100%; min-width:0; }
-html.nl.nl-phone table.nl-tbl td.r { margin-left:auto; }
+html.nl.nl-phone table.nl-tbl td.r { margin-left:auto; width:auto !important; flex-shrink:0; white-space:nowrap; }
+html.nl.nl-phone table.nl-tbl td { width:auto !important; min-width:0; }
+/* Toasts sit above the sheet and the tab bar, and wrap instead of spilling. */
+html.nl.nl-phone .nl-toast.on { bottom:calc(150px + 58px + env(safe-area-inset-bottom,0px)); max-width:calc(100vw - 24px); white-space:normal; border-radius:14px; text-align:center; justify-content:center; flex-wrap:wrap; }
 html.nl.nl-phone table.nl-tbl tbody tr.on { background:var(--nl-chosen); }
 html.nl.nl-phone table.nl-tbl tbody tr.sug { background:#F3FAF7; }
 html.nl.nl-phone table.nl-tbl td[colspan] { flex:1 1 100%; }
