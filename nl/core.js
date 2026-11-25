@@ -163,7 +163,7 @@
   NLP.chartBox = (fn, height, label) => { const id = 'c' + (++chartSeq); NLP._chartFns[id] = fn; return `<div class="nl-chart" data-nl-chart="${id}" style="height:${height || 220}px" role="img" aria-label="${H(label || 'chart')}"></div>`; };
 
   // ── What-if: compute on a temporary copy of the plan, then put it back ────
-  const WHATIF_FIELDS = ['baseIncome','baseExpenses','baseSavings','monthlyOverrides','yearlyBases','trips','externalAssets','retirementExpenses','retirementScenario','retirementAge','currentAge','growthRate','inflationRate','postRetGrowth','lifeExpectancy'];
+  const WHATIF_FIELDS = ['baseIncome','baseExpenses','baseSavings','monthlyOverrides','yearlyBases','trips','externalAssets','retirementExpenses','retirementScenario','retirementAge','currentAge','growthRate','inflationRate','retirementPostGrowth','lifeExp'];
   NLP.whatIf = function(mutate, compute){
     const keep = {}; WHATIF_FIELDS.forEach(f => { keep[f] = state[f] === undefined ? undefined : JSON.parse(JSON.stringify(state[f])); });
     let out;

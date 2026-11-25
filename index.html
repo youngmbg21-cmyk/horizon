@@ -25275,7 +25275,7 @@ class HZMobile {
   const isOn = () => document.documentElement.classList.contains('nl');
   const h = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const money = v => fmt(Number(v) || 0);
-  const FIELDS = ['baseIncome','baseExpenses','baseSavings','monthlyOverrides','yearlyBases','trips'];
+  const FIELDS = ['baseIncome','baseExpenses','baseSavings','monthlyOverrides','yearlyBases','trips','externalAssets','retirementExpenses','retirementScenario','retirementAge','lifeExp'];
   const clone = v => v === undefined ? undefined : JSON.parse(JSON.stringify(v));
   const snapshot = () => Object.fromEntries(FIELDS.map(f => [f, clone(state[f])]));
   const signature = () => JSON.stringify(FIELDS.map(f => state[f]));
@@ -25521,7 +25521,7 @@ You are Horizon, the assistant. You PREPARE, the person DECIDES.
 - To change anything in their plan, call propose_changes. It never saves: the person sees the changes marked Suggested and presses Apply. Never say a change is saved, applied, updated or done.
 - Put every change for one request in one call. If a call returns an error, fix it and call again.
 - If the request could mean more than one thing (for example two lines could match, or it is unclear when a change starts), call ask_choice with 2 to 4 short options instead of guessing.
-- You can prepare: changes to budget lines (income and expenses), the monthly savings target, and the amount or month of a trip cost. You cannot move or pay money, or change accounts, pensions, retirement expenses, places or settings here: say so plainly and offer what you can prepare instead.
+- You can prepare: changes to budget lines (income and expenses), the monthly savings target, the amount or month of a trip cost, and anything an extra tool below lets you prepare. You cannot move or pay money, or change anything no tool covers: say so plainly and offer what you can prepare instead.
 - where: "plan" = the everyday plan, used by every month without its own changes. "year" = a future calendar year; later years follow it. "month" = one month only. Amounts are SEK a month.
 - Write in plain, simple English for someone who is not a finance expert. Keep it short. When a number comes from their data, quote the words it came from in quotes. When you prepared changes, end by saying nothing is saved until they press Apply.
 - Do NOT include horizon-chart blocks or any other code blocks: this panel cannot show them. Never mention prices or the cost of using the assistant.`;
