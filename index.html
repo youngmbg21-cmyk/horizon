@@ -25157,6 +25157,8 @@ class HZMobile {
     const b = await refreshBackupInfo();
     if(b && b.data) downloadJSON('horizon-backup-' + String(b.at).slice(0,10) + '.json', b.data);
   };
+  // For the new Settings page: when the one-time backup was made (or null).
+  window.nlBackupInfo = async function(){ const b = await refreshBackupInfo(); return b && b.at ? { at:b.at } : null; };
   window.nlDownloadCurrent = function(){ downloadJSON('horizon-today-' + new Date().toISOString().slice(0,10) + '.json', fullPayload()); };
 
   // ── The New look menu: closes on a second press, Esc, or a press outside ──
@@ -25689,7 +25691,7 @@ You are Horizon, the assistant. You PREPARE, the person DECIDES.
     n.chat.forEach((m, i) => {
       if(m.role === 'user'){ html += `<div class="nl-msg me">${h(m.content)}</div>`; return; }
       if(m.kind === 'error'){ html += `<div class="nl-msg warn">${h(m.content)} <button class="nl-link" type="button" onclick="nlRetry(${i})">Try again</button></div>`; return; }
-      if(m.kind === 'nokey'){ html += `<div class="nl-msg ai"><p>${h(m.content)}</p><p><button class="nl-link" type="button" onclick="nlFlip('overview');nav('settings')">Open Settings</button></p></div>`; return; }
+      if(m.kind === 'nokey'){ html += `<div class="nl-msg ai"><p>${h(m.content)}</p><p><button class="nl-link" type="button" onclick="nlFlip('overview');(typeof nlSettingsKey==='function')?nlSettingsKey():nav('settings')">Open Settings</button></p></div>`; return; }
       html += `<div class="nl-msg ai">${md(m.content)}${m.proposal && n.proposals[m.proposal] ? proposalCard(n.proposals[m.proposal]) : ''}</div>`;
       if(m.choices && i === n.chat.length - 1 && !busy) html += `<div class="nl-choices">${m.choices.options.map(o => `<button type="button" onclick="nlChoose(this.textContent)">${h(o)}</button>`).join('')}</div>`;
     });
