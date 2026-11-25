@@ -4191,6 +4191,7 @@ html.nl .nl-bar { display:block; flex-shrink:0; position:relative; z-index:50; b
 .nl-icon svg { width:18px; height:18px; }
 .nl-icon[aria-current="page"] { background:var(--nl-pill); color:var(--nl-ink); }
 .nl-tabs { display:flex; gap:22px; padding:0 20px; overflow-x:auto; scrollbar-width:none; }
+.nl-tabs[hidden] { display:none; }
 .nl-tabs::-webkit-scrollbar { display:none; }
 .nl-tabs button { border:0; border-bottom:2px solid transparent; background:transparent; color:var(--nl-detail); font:400 14px var(--nl-sans); padding:8px 0 9px; cursor:pointer; white-space:nowrap; }
 .nl-tabs button:hover { color:var(--nl-ink); }
@@ -4338,7 +4339,7 @@ html.nl .nl-side { display:flex; order:9; flex-direction:column; width:340px; fl
       </nav>
       <div class="nl-right" id="nl-right">
         <button class="nl-pill" type="button" onclick="nlOpenAssistant()" aria-label="Open the assistant">✦<span class="nl-assist-lbl">&nbsp;Assistant</span></button>
-        <button class="nl-icon" type="button" id="nl-gear" onclick="nav('settings')" aria-label="Settings" title="Settings"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg></button>
+        <button class="nl-icon" type="button" id="nl-gear" onclick="(window.NLP&&NLP.has('nl-settings'))?nav('nl-settings'):nav('settings')" aria-label="Settings" title="Settings"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg></button>
         <button class="nl-pill" type="button" id="nl-menu-btn" onclick="nlMenu()" aria-haspopup="true" aria-expanded="false" aria-controls="nl-menu">New look ▾</button>
       </div>
     </div>
@@ -25041,6 +25042,15 @@ class HZMobile {
 })();
 
 </script>
+<!-- New look (L+S) pages. Each file only acts when the new look is on. -->
+<script src="nl/core.js"></script>
+<script src="nl/today.js"></script>
+<script src="nl/money.js"></script>
+<script src="nl/plans.js"></script>
+<script src="nl/future.js"></script>
+<script src="nl/notebook.js"></script>
+<script src="nl/setup.js"></script>
+<script src="nl/phone.js"></script>
 <!-- ══ NEW LOOK (L+S) · Phase 0 ══════════════════════════════════════════
      The switch, the one-time backup, and the new top bar. The choice is
      kept per device (not synced). Old pages show inside the new look until
@@ -25066,7 +25076,11 @@ class HZMobile {
     { key:'future',   pages:[['retirement','Retirement Plan'],['lifewall','Life Wall']] },
     { key:'notebook', pages:[['journal','Journal'],['vault','Vault']] },
   ];
-  const sectionOf = panel => SECTIONS.find(s => s.pages.some(p => p[0] === panel)) || null;
+  const sectionOf = panel => {
+    const np = window.NLP && NLP.page && NLP.page(panel);
+    if(np) return SECTIONS.find(s => s.key === np.section) || null;
+    return SECTIONS.find(s => s.pages.some(p => p[0] === panel)) || null;
+  };
   const isOn = () => document.documentElement.classList.contains('nl');
   let fontsLoaded = false, toastTimer = null, backupAt = null;
 
@@ -25174,17 +25188,29 @@ class HZMobile {
       if(sec && b.dataset.nlSec === sec.key) b.setAttribute('aria-current','page'); else b.removeAttribute('aria-current');
     });
     const gear = document.getElementById('nl-gear');
-    if(gear){ if(panel === 'settings') gear.setAttribute('aria-current','page'); else gear.removeAttribute('aria-current'); }
+    if(gear){ if(panel === 'settings' || panel === 'nl-settings') gear.setAttribute('aria-current','page'); else gear.removeAttribute('aria-current'); }
     const tabs = document.getElementById('nl-tabs');
     if(tabs){
-      const pages = sec ? sec.pages.filter(p => (typeof VALID_PANELS === 'undefined') || VALID_PANELS.includes(p[0])) : [['settings','Settings']];
-      tabs.innerHTML = pages.map(p => `<button type="button" role="tab" data-nl-panel="${p[0]}" aria-selected="${p[0] === panel}">${p[1]}</button>`).join('');
+      const isNew = !!(window.NLP && NLP.page && NLP.page(panel));
+      // New pages carry their own tabs. Classic pages show their section's
+      // classic pages, plus the way back to the section's new page.
+      if(isNew){ tabs.innerHTML = ''; tabs.hidden = true; }
+      else {
+        tabs.hidden = false;
+        const newTarget = sec && window.NLP && NLP.sectionTarget && NLP.sectionTarget(sec.key);
+        const newSettings = panel === 'settings' && window.NLP && NLP.has && NLP.has('nl-settings');
+        let pages = sec ? sec.pages.filter(p => (typeof VALID_PANELS === 'undefined') || VALID_PANELS.includes(p[0])) : [['settings','Settings']];
+        if(newTarget) pages = [[newTarget, '‹ ' + (document.querySelector(`#nl-nav button[data-nl-sec="${sec.key}"]`)?.textContent || 'New page')]].concat(pages.map(p => [p[0], 'Classic: ' + p[1]]));
+        if(newSettings) pages = [['nl-settings','‹ Settings'],['settings','Classic: Settings']];
+        tabs.innerHTML = pages.map(p => `<button type="button" role="tab" data-nl-panel="${p[0]}" aria-selected="${p[0] === panel}">${p[1]}</button>`).join('');
+      }
     }
   }
   document.getElementById('nl-nav')?.addEventListener('click', e => {
     const b = e.target.closest('button[data-nl-sec]'); if(!b) return;
     const sec = SECTIONS.find(s => s.key === b.dataset.nlSec);
-    if(sec) nav(sec.pages[0][0]);
+    const target = window.NLP && NLP.sectionTarget && NLP.sectionTarget(b.dataset.nlSec);
+    if(target) nav(target); else if(sec) nav(sec.pages[0][0]);
   });
   document.getElementById('nl-tabs')?.addEventListener('click', e => {
     const b = e.target.closest('button[data-nl-panel]'); if(b) nav(b.dataset.nlPanel);
@@ -25461,6 +25487,8 @@ class HZMobile {
     toast('Change undone');
     render(); if($('nl-info-back').classList.contains('on')) nlShowHistory();
   };
+  window.nlUndoState = () => undoState();
+  const byText = e => e.by === 'You' ? 'You changed it' : 'Horizon prepared, you applied';
 
   // ── Talking to Claude (reuses the advisor's key, lookups and request code) ──
   const NL_TOOLS = [
@@ -25531,11 +25559,12 @@ You are Horizon, the assistant. You PREPARE, the person DECIDES.
     busy = true; statusText = 'Reading your plan'; render();
     let reply = '', proposalId = null, choices = null, failed = null;
     try {
-      const system = buildAIContext({ tools:true }) + NL_SYSTEM;
+      const system = buildAIContext({ tools:true }) + NL_SYSTEM + (window.NL_EXTRA_SYSTEM || []).join('');
+      const extra = (window.NL_EXTRA_TOOLS || []);
       const convo = historyForApi();
       let withFallback = true;
       for(let step = 0; step < AI_CHAT_MAX_STEPS; step++){
-        const body = { model:AI_CHAT_MODEL, max_tokens:16000, output_config:{ effort:'medium' }, system, tools:AI_CHAT_TOOLS.concat(NL_TOOLS), messages:convo };
+        const body = { model:AI_CHAT_MODEL, max_tokens:16000, output_config:{ effort:'medium' }, system, tools:AI_CHAT_TOOLS.concat(NL_TOOLS, extra.map(t => t.def)), messages:convo };
         let res;
         try { res = await _aiChatRequest(key, body, withFallback); }
         catch(netErr){ if(!withFallback) throw netErr; withFallback = false; res = await _aiChatRequest(key, body, false); }
@@ -25554,13 +25583,24 @@ You are Horizon, the assistant. You PREPARE, the person DECIDES.
         const calls = blocks.filter(b => b.type === 'tool_use');
         if(d.stop_reason !== 'tool_use' || !calls.length){ reply = textNow; break; }
         convo.push({ role:'assistant', content:blocks });
-        const results = calls.map(c => {
+        const results = [];
+        for(const c of calls){
+          const ext = extra.find(t => t.def.name === c.name);
+          if(ext){
+            statusText = (ext.label && ext.label(c.input)) || 'Looking that up'; render();
+            let o; try { o = await ext.run(c.input || {}); } catch(err){ o = { error:err.message || String(err) }; }
+            const txt = typeof o === 'string' ? o : JSON.stringify(o);
+            results.push({ type:'tool_result', tool_use_id:c.id, content:txt.slice(0, 60000), ...(o && o.error ? { is_error:true } : {}) });
+            continue;
+          }
+          results.push((() => {
           let out;
           if(c.name === 'propose_changes'){ statusText = 'Preparing changes'; out = prepare(c.input); if(out.ok) proposalId = out.id; }
           else if(c.name === 'ask_choice'){ const o = (c.input && c.input.options || []).map(String).slice(0,4); choices = { question:String(c.input && c.input.question || ''), options:o }; out = { ok:true, note:'Shown as buttons. Stop here and wait for their answer.' }; }
           else { statusText = _aiToolLabel(c.name, c.input).replace(/…$/, ''); const r = _aiToolResultText(c.name, c.input); return { type:'tool_result', tool_use_id:c.id, content:r.text, ...(r.isError ? { is_error:true } : {}) }; }
           return { type:'tool_result', tool_use_id:c.id, content:JSON.stringify(out), ...(out.error ? { is_error:true } : {}) };
-        });
+          })());
+        }
         render();
         convo.push({ role:'user', content:results });
         if(step === AI_CHAT_MAX_STEPS - 1) reply = textNow;
@@ -25577,6 +25617,31 @@ You are Horizon, the assistant. You PREPARE, the person DECIDES.
     n.chat = n.chat.slice(-200);
     save(); render();
   }
+  // ── For the new pages (nl/core.js) ──
+  window.nlPendingProposal = pendingProposal;
+  window.nlAsk = function(text){ nlFlip('chat'); send(text); };
+  window.nlProposeFromApp = function(summary, changes){
+    currentAsk = String(summary || '');
+    const r = prepare({ summary, changes });
+    if(r.ok){
+      NL().chat.push({ role:'assistant', content:String(summary || 'Prepared from the page.') + ' Nothing is saved until you press Apply.', at:Date.now(), proposal:r.id, fromPage:true });
+      save(); render();
+    }
+    return r;
+  };
+  // A change the person makes directly on a page: saved now, in History, undoable.
+  window.nlRecordChange = function(label, mutate){
+    const n = NL(), before = snapshot();
+    try { mutate(state); } catch(err){ FIELDS.forEach(f => { state[f] = before[f]; }); toast('Nothing was saved: ' + err.message, 'warn'); return false; }
+    n.history.forEach(e => { delete e.undo; delete e.sig; });
+    n.history.unshift({ id:'h' + Date.now().toString(36), at:Date.now(), by:'You', items:[String(label)], undo:before });
+    n.history = n.history.slice(0, 50);
+    afterDataChange();
+    n.history[0].sig = signature(); save();
+    toast(String(label) + ' · saved', '', { label:'Undo', fn:() => nlUndo() });
+    render();
+    return true;
+  };
   window.nlRetry = function(i){ const m = NL().chat[i]; if(m && m.retry){ NL().chat.splice(i, 1); NL().chat.splice(i - 1, 1); send(m.retry); } };
   window.nlChoose = function(opt){ send(opt); };
 
@@ -25593,6 +25658,7 @@ You are Horizon, the assistant. You PREPARE, the person DECIDES.
       para.push(l.replace(/^#+\s*/, ''));
     });
     flush(); if(list) out += '</ul>';
+    (window.NL_MD_HOOKS || []).forEach(f => { try { out = f(out) || out; } catch(_){} });
     return out;
   }
   const dots = '<span class="nl-dots" aria-hidden="true"><i></i><i></i><i></i></span>';
@@ -25633,6 +25699,19 @@ You are Horizon, the assistant. You PREPARE, the person DECIDES.
     const p = pendingProposal(), live = liveChanges(p);
     const today = n.history.filter(e => !e.undone && new Date(e.at).toDateString() === new Date().toDateString()).length;
     const u = undoState();
+    const pg = (typeof window.nlPageOverview === 'function') ? window.nlPageOverview() : null;
+    if(pg){
+      const row = r => `<div class="nl-door"><span class="w">${r.text}</span>${r.badge ? `<span class="nl-badge ${h(r.badge.kind || 'grey')}">${h(r.badge.text)}</span>` : ''}${r.why ? `<span class="nl-why">${r.why}</span>` : ''}${r.link ? `<div class="nl-door-acts"><button class="nl-link" type="button" onclick="${h(r.link.onclick)}">${h(r.link.label)}</button></div>` : ''}</div>`;
+      let html = `<p class="nl-hl">${live.length ? `${live.length} change${live.length > 1 ? 's' : ''} wait${live.length > 1 ? '' : 's'} for your answer.` : (pg.headline || 'Nothing waits for you right now.')}</p>`;
+      if(pg.graphic) html += `<div>${pg.graphic}</div>`;
+      if(live.length) html += `<div class="nl-grp"><h4>Waiting for you</h4>${live.map(c => row({ text:h(c.label), badge:{ text:'Suggested', kind:'amber' }, link:{ label:'See it in the conversation', onclick:"nlFlip('chat')" } })).join('')}</div>`;
+      (pg.groups || []).filter(g => g && g.rows && g.rows.length).forEach(g => { html += `<div class="nl-grp"><h4>${h(g.title)}</h4>${g.rows.map(row).join('')}</div>`; });
+      if(live.length) html += `<button class="nl-black" type="button" onclick="nlApply('${p.id}')">Apply ${live.length} change${live.length > 1 ? 's' : ''}</button>`;
+      else if(pg.button) html += pg.button.disabledWhy ? `<button class="nl-black" type="button" disabled>${h(pg.button.label)}</button><p class="nl-note">${h(pg.button.disabledWhy)}</p>` : `<button class="nl-black" type="button" onclick="${h(pg.button.onclick)}">${h(pg.button.label)}</button>`;
+      box.innerHTML = html; box.scrollTop = keep;
+      if(window.NLP && NLP.mountCharts) NLP.mountCharts(box);
+      return;
+    }
     let html = `<p class="nl-hl">${live.length ? `${live.length} change${live.length > 1 ? 's' : ''} wait${live.length > 1 ? '' : 's'} for your answer.` : 'Nothing waits for you right now.'}</p>`;
     html += `<div class="nl-counts"><div class="${live.length ? 'on' : ''}"><b>${live.length}</b>waiting</div><div class="${today ? 'ok' : ''}"><b>${today}</b>changed today</div><div><b>${n.history.length}</b>in history</div></div>`;
     if(live.length){
@@ -25640,7 +25719,7 @@ You are Horizon, the assistant. You PREPARE, the person DECIDES.
     }
     const recent = n.history.slice(0, 3);
     if(recent.length){
-      html += `<div class="nl-grp"><h4>Recent changes</h4>${recent.map((e, i) => `<div class="nl-door"><span class="w">${h(e.items[0])}${e.items.length > 1 ? ` and ${e.items.length - 1} more` : ''}</span><span class="nl-badge ${e.undone ? 'grey' : 'green'}">${e.undone ? 'Undone' : 'Saved'}</span><span class="nl-why">${h(e.by)} prepared, you applied, ${h(timeLabel(e.at))}</span>${i === 0 && !e.undone ? `<div class="nl-door-acts">${u.ok ? `<button class="nl-link" type="button" onclick="nlUndo()">Undo</button>` : `<span class="nl-why" style="grid-column:auto">${h(u.why)}</span>`}</div>` : ''}</div>`).join('')}</div>`;
+      html += `<div class="nl-grp"><h4>Recent changes</h4>${recent.map((e, i) => `<div class="nl-door"><span class="w">${h(e.items[0])}${e.items.length > 1 ? ` and ${e.items.length - 1} more` : ''}</span><span class="nl-badge ${e.undone ? 'grey' : 'green'}">${e.undone ? 'Undone' : 'Saved'}</span><span class="nl-why">${h(byText(e))}, ${h(timeLabel(e.at))}</span>${i === 0 && !e.undone ? `<div class="nl-door-acts">${u.ok ? `<button class="nl-link" type="button" onclick="nlUndo()">Undo</button>` : `<span class="nl-why" style="grid-column:auto">${h(u.why)}</span>`}</div>` : ''}</div>`).join('')}</div>`;
     } else if(!live.length){
       html += `<div class="nl-grp"><h4>Try asking</h4><div class="nl-door"><span class="w nl-q">“Groceries are about 8 500 now.”</span></div><div class="nl-door"><span class="w nl-q">“Raise my savings to 30 000 from next year.”</span></div><div class="nl-door"><span class="w nl-q">“Move the Cape Town hotel to April.”</span></div></div>`;
     }
@@ -25654,6 +25733,7 @@ You are Horizon, the assistant. You PREPARE, the person DECIDES.
     const n = NL(), items = [];
     if(face === 'chat') items.push({ t:'‹ Overview', s:'‹ Overview', main:true, fn:"nlFlip('overview')" });
     else if(n.chat.length || busy) items.push({ t:busy ? 'Assistant ' + dots + ' ›' : 'Assistant ›', s:busy ? 'Assistant ' + dots + ' ›' : 'Assistant ›', main:true, fn:"nlFlip('chat')" });
+    if(face === 'overview'){ const pg = (typeof window.nlPageOverview === 'function') ? window.nlPageOverview() : null; (pg && pg.links || []).forEach(l => items.push({ t:l.label, s:l.short || l.label, fn:l.onclick })); }
     items.push({ t:'History', s:'History', fn:'nlShowHistory()' });
     items.push({ t:'How this works', s:'Help', fn:'nlShowHow()' });
     if(face === 'chat' && n.chat.length) items.push({ t:'Clear the conversation', s:'Clear', fn:'nlClear()' });
@@ -25692,7 +25772,7 @@ You are Horizon, the assistant. You PREPARE, the person DECIDES.
   window.nlCloseInfo = function(){ $('nl-info-back').classList.remove('on'); };
   window.nlShowHistory = function(){
     const n = NL(), u = undoState();
-    const items = n.history.map((e, i) => `<li>${e.items.map(h).join('<br>')}<span class="nl-meta">${h(e.by)} prepared, you applied · ${h(timeLabel(e.at))}${e.undone ? ' · undone' : ''}</span></li>`).join('');
+    const items = n.history.map((e, i) => `<li>${e.items.map(h).join('<br>')}<span class="nl-meta">${h(byText(e))} · ${h(timeLabel(e.at))}${e.undone ? ' · undone' : ''}</span></li>`).join('');
     openInfo(`<h2 id="nl-info-title">History</h2>${items ? `<ul class="nl-lines">${items}</ul>` : '<p>No changes yet. Changes the assistant prepares and you apply are listed here.</p>'}
       ${n.history.length && !u.ok && n.history[0] && !n.history[0].undone ? `<p class="nl-meta" style="border-top:1px solid var(--nl-line)">${h(u.why)}</p>` : ''}
       <div class="nl-sheet-acts">${u.ok ? '<button class="nl-black" type="button" onclick="nlUndo()">Undo the latest change</button>' : ''}<button class="nl-grey" type="button" onclick="nlCloseInfo()">Close</button></div>`);
@@ -25708,6 +25788,7 @@ You are Horizon, the assistant. You PREPARE, the person DECIDES.
 
   // ── Toast (bottom-centre, with an optional action) ──
   let toastTimer = null;
+  window.nlToast = (m, k, a) => toast(m, k, a);
   function toast(msg, kind, action){
     const t = $('nl-toast'); if(!t) return;
     t.innerHTML = `<span>${h(msg)}</span>` + (action ? `<button type="button">${h(action.label)}</button>` : '');
@@ -25744,5 +25825,6 @@ You are Horizon, the assistant. You PREPARE, the person DECIDES.
   window.nlRender = render;
 })();
 </script>
+<script>try{ if(window.NLP && NLP.boot) NLP.boot(); }catch(e){ console.warn('[nl] boot', e); }</script>
 </body>
 </html>
