@@ -22,3 +22,10 @@
   for = "/*.html"
   [headers.values]
     Cache-Control = "public, max-age=0, must-revalidate"
+
+# New look (L+S) page files: revalidate on every load, like index.html, so a
+# deploy reaches every device at once and the files never mix versions.
+[[headers]]
+  for = "/nl/*"
+  [headers.values]
+    Cache-Control = "public, max-age=0, must-revalidate"

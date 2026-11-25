@@ -15,6 +15,20 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Horizon">
 <title>HORIZON FINANCE OS</title>
+<!-- New look (L+S), Phase 0: if this device chose the new look, mark <html>
+     before anything paints so the first frame is already the new look.
+     Phones keep the old look until the new look's phone screens exist. -->
+<script>
+(function(){try{
+  // Phase 9: the new look is the normal one; 'old' means this device chose
+  // the classic look. Phase 8: phones get the new look too (.nl-phone).
+  if(localStorage.getItem('horizon-finance-os-v1:look')!=='old'){
+    document.documentElement.classList.add('nl');
+    if(window.matchMedia && matchMedia('(max-width:720px), (max-height:500px) and (pointer:coarse)').matches)
+      document.documentElement.classList.add('nl-phone');
+  }
+}catch(_){}})();
+</script>
 <!-- Inline favicon (brand ✦ on the dark shell) — no /favicon.ico request/404. -->
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%2305080f'/%3E%3Ctext x='32' y='46' font-size='40' text-anchor='middle' fill='%2300e8a0'%3E%E2%9C%A6%3C/text%3E%3C/svg%3E">
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700&family=JetBrains+Mono:wght@400;500&family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,600;1,9..144,400&display=swap" rel="stylesheet">
@@ -4141,6 +4155,153 @@ body.light .piq-country-menu { box-shadow:0 12px 28px -10px rgba(60,40,10,0.22);
 .piq-error-t { color:var(--red); font-weight:600; font-size:12px; margin-bottom:3px; }
 .piq-error-m { font-size:11px; color:var(--text2); line-height:1.5; margin-bottom:8px; }
 .piq-retry { background:var(--red-dim); border:1px solid #ff4d6d30; border-radius:4px; padding:5px 12px; color:var(--red); font-size:11px; cursor:pointer; font-family:var(--fm); }
+
+/* ══ NEW LOOK (L+S) · Phase 0 ═══════════════════════════════════════════
+   Everything below is scoped to html.nl or to .nl-* names, so with the
+   new look switched off the old app looks exactly as before. The only
+   old-look addition is the "Try the new Horizon" pill (.nl-try).
+   Tokens follow docs/LS-DESIGN.md. */
+:root{
+  --nl-ground:#F5F5F7; --nl-surface:#FFFFFF; --nl-ink:#1D1D1F; --nl-quiet:#4B4B50;
+  --nl-detail:#6A6A6F; --nl-line:#E6E6EA; --nl-edge:#D1D1D6; --nl-accent:#087363;
+  --nl-chosen:#E3F3EE; --nl-pill:#EDEDF0; --nl-black:#1D1D1F; --nl-toast-link:#9FE0CF;
+  --nl-sans:'Inter',system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;
+  --nl-serif:'Source Serif 4',Georgia,'Times New Roman',serif;
+}
+/* The switch, in the old top bar (old-look tokens so it sits in naturally). */
+.nl-try { display:inline-flex; align-items:center; background:var(--bg0); border:1px solid var(--border); border-radius:7px; padding:5px 10px; color:var(--text2); cursor:pointer; font-family:var(--fb); font-size:11.5px; font-weight:600; white-space:nowrap; transition:color .15s, border-color .15s; }
+.nl-try:hover { color:var(--green); border-color:var(--green); }
+@media (max-width:900px){ .nl-try { display:none; } }
+
+.nl-bar, .nl-sheet-back, .nl-toast { display:none; }
+html.nl .ticker-bar, html.nl #app > .topbar, html.nl #app-sidebar, html.nl .nav-overlay { display:none !important; }
+html.nl .nl-bar { display:block; flex-shrink:0; position:relative; z-index:50; background:var(--nl-surface); border-bottom:1px solid var(--nl-line); color:var(--nl-ink); font:14px/1.4 var(--nl-sans); }
+.nl-row { display:flex; align-items:center; gap:10px; padding:8px 20px 4px; min-height:48px; }
+.nl-back { border:0; background:transparent; color:var(--nl-detail); font:400 22px/1 var(--nl-sans); padding:4px 8px; border-radius:8px; cursor:pointer; }
+.nl-back:hover { background:var(--nl-chosen); color:var(--nl-ink); }
+.nl-logo { font-weight:600; font-size:15px; margin-right:10px; white-space:nowrap; }
+.nl-nav { display:flex; gap:4px; min-width:0; overflow-x:auto; scrollbar-width:none; }
+.nl-nav::-webkit-scrollbar { display:none; }
+.nl-nav button { border:0; background:transparent; color:var(--nl-quiet); font:500 14px var(--nl-sans); padding:6px 12px; border-radius:999px; cursor:pointer; white-space:nowrap; }
+.nl-nav button:hover { background:var(--nl-chosen); color:var(--nl-ink); }
+.nl-nav button[aria-current="page"] { background:var(--nl-pill); color:var(--nl-ink); }
+.nl-right { margin-left:auto; display:flex; align-items:center; gap:8px; flex-shrink:0; }
+.nl-pill { border:0; background:var(--nl-pill); color:var(--nl-ink); border-radius:999px; padding:6px 13px; font:500 13px var(--nl-sans); cursor:pointer; white-space:nowrap; }
+.nl-pill:hover { background:var(--nl-chosen); }
+.nl-pill[aria-expanded="true"] { background:var(--nl-chosen); color:var(--nl-accent); }
+.nl-icon { border:0; background:transparent; width:34px; height:34px; border-radius:999px; display:inline-flex; align-items:center; justify-content:center; color:var(--nl-quiet); cursor:pointer; }
+.nl-icon:hover { background:var(--nl-chosen); color:var(--nl-ink); }
+.nl-icon svg { width:18px; height:18px; }
+.nl-icon[aria-current="page"] { background:var(--nl-pill); color:var(--nl-ink); }
+.nl-tabs { display:flex; gap:22px; padding:0 20px; overflow-x:auto; scrollbar-width:none; }
+.nl-tabs[hidden] { display:none; }
+.nl-tabs::-webkit-scrollbar { display:none; }
+.nl-tabs button { border:0; border-bottom:2px solid transparent; background:transparent; color:var(--nl-detail); font:400 14px var(--nl-sans); padding:8px 0 9px; cursor:pointer; white-space:nowrap; }
+.nl-tabs button:hover { color:var(--nl-ink); }
+.nl-tabs button[aria-selected="true"] { color:var(--nl-ink); border-color:var(--nl-ink); font-weight:500; }
+html.nl .nl-bar :focus-visible, .nl-sheet :focus-visible { outline:2px solid var(--nl-accent); outline-offset:2px; }
+/* Currency + money-mode selectors, moved into the new bar while it shows. */
+html.nl .nl-bar .cur-toggle, html.nl .nl-bar .mode-toggle { background:var(--nl-pill); border:0; border-radius:999px; padding:3px; gap:2px; }
+html.nl .nl-bar .cur-btn, html.nl .nl-bar .mode-btn { font:500 12.5px var(--nl-sans); color:var(--nl-quiet); padding:4px 10px; border-radius:999px; letter-spacing:0; }
+html.nl .nl-bar .cur-btn.active, html.nl .nl-bar .mode-btn.active { background:var(--nl-surface); color:var(--nl-ink); font-weight:600; box-shadow:0 1px 2px rgba(0,0,0,.08); }
+/* The New look menu: one pop-over of lines. */
+.nl-menu { position:absolute; right:20px; top:46px; width:300px; background:var(--nl-surface); border:1px solid var(--nl-line); border-radius:10px; box-shadow:0 10px 30px rgba(0,0,0,.12); padding:4px 0; z-index:60; }
+.nl-menu[hidden] { display:none; }
+.nl-menu button { display:block; width:100%; text-align:left; border:0; border-top:1px solid var(--nl-line); background:transparent; padding:10px 16px; font:500 14px var(--nl-sans); color:var(--nl-ink); cursor:pointer; }
+.nl-menu button:first-child { border-top:0; }
+.nl-menu button:hover:not(:disabled) { background:var(--nl-chosen); }
+.nl-menu button:disabled { color:var(--nl-detail); cursor:default; }
+.nl-menu .nl-sub { display:block; font-weight:400; font-size:12.5px; color:var(--nl-detail); margin-top:1px; }
+/* A pop-up is one 480px sheet: lines, one black button, Cancel last. */
+.nl-sheet-back { position:fixed; inset:0; z-index:1000; background:rgba(29,29,31,.32); align-items:center; justify-content:center; padding:16px; }
+.nl-sheet-back.on { display:flex; }
+.nl-sheet { width:min(480px,100%); background:var(--nl-surface); color:var(--nl-ink); border-radius:12px; padding:20px 20px 16px; font:14px/1.5 var(--nl-sans); box-shadow:0 20px 50px rgba(0,0,0,.18); }
+.nl-sheet h2 { font:600 20px/1.25 var(--nl-serif); margin:0 0 10px; }
+.nl-sheet p { margin:0; padding:9px 0; border-top:1px solid var(--nl-line); color:var(--nl-quiet); }
+.nl-sheet p:first-of-type { border-top:0; padding-top:0; }
+.nl-sheet a { color:var(--nl-accent); }
+.nl-sheet-acts { display:flex; gap:8px; justify-content:flex-end; margin-top:14px; }
+.nl-black { border:0; background:var(--nl-black); color:#fff; border-radius:999px; padding:9px 16px; font:600 14px var(--nl-sans); cursor:pointer; white-space:nowrap; }
+.nl-grey { border:0; background:var(--nl-pill); color:var(--nl-ink); border-radius:999px; padding:9px 16px; font:500 14px var(--nl-sans); cursor:pointer; white-space:nowrap; }
+/* Toasts: bottom-centre, one at a time. */
+.nl-toast { position:fixed; left:50%; bottom:22px; transform:translateX(-50%); z-index:1001; background:var(--nl-ink); color:#fff; border-radius:999px; padding:10px 18px; font:14px/1.3 var(--nl-sans); white-space:nowrap; box-shadow:0 6px 18px rgba(0,0,0,.2); gap:14px; align-items:center; }
+html.nl .nl-toast.on { display:flex; }
+.nl-toast.warn { background:#8A5A0A; }
+.nl-toast button { border:0; background:transparent; color:var(--nl-toast-link); font:600 14px var(--nl-sans); text-decoration:underline; cursor:pointer; padding:0; }
+@media (prefers-reduced-motion:no-preference){ .nl-toast.on { animation:nlFade .18s ease-out; } .nl-menu:not([hidden]) { animation:nlFade .12s ease-out; } }
+@keyframes nlFade { from { opacity:0; } to { opacity:1; } }
+@media (max-width:1100px){ .nl-assist-lbl { display:none; } }
+
+/* ══ NEW LOOK (L+S) · Phase 1: one side panel, two faces ═══════════════ */
+.nl-side { display:none; }
+html.nl #ai-fab { display:none !important; }
+/* The old chat window stays usable (⌘K can open it) but its off-screen shadow must not fall on the new panel. */
+html.nl #ai-panel:not(.open) { visibility:hidden; box-shadow:none; }
+html.nl .retire-slideover:not(.open) { box-shadow:none; }
+.nl-ask textarea:focus-visible { outline:0; }
+.nl-chg .nl-badge { align-self:start; }
+html.nl .nl-side { display:flex; order:9; flex-direction:column; width:340px; flex-shrink:0; min-height:0; background:var(--nl-surface); border-left:1px solid var(--nl-line); color:var(--nl-ink); font:14px/1.5 var(--nl-sans); }
+.nl-face-hd { display:flex; justify-content:space-between; align-items:baseline; gap:8px; margin:0 16px; padding:14px 0 9px; border-bottom:1px solid var(--nl-line); }
+.nl-face-hd #nl-face-title { font:600 11.5px/1.2 var(--nl-sans); letter-spacing:.06em; text-transform:uppercase; color:var(--nl-detail); }
+.nl-face-hd.chat #nl-face-title { font:600 15px/1.2 var(--nl-sans); letter-spacing:0; text-transform:none; color:var(--nl-ink); }
+.nl-face-sub { font-size:12.5px; color:var(--nl-detail); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.nl-face { flex:1; min-height:0; overflow-y:auto; overflow-x:hidden; padding:14px 16px; display:flex; flex-direction:column; gap:14px; }
+.nl-face[hidden] { display:none; }
+.nl-hl { font:600 19px/1.3 var(--nl-serif); margin:0; }
+.nl-counts { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:6px; }
+.nl-counts div { border-top:3px solid var(--nl-edge); padding-top:5px; font-size:12.5px; color:var(--nl-detail); }
+.nl-counts div.on { border-color:#8A5A0A; color:var(--nl-ink); }
+.nl-counts div.ok { border-color:var(--nl-accent); color:var(--nl-ink); }
+.nl-counts b { display:block; font:600 17px/1.2 var(--nl-sans); color:var(--nl-ink); font-variant-numeric:tabular-nums; }
+.nl-grp h4 { margin:0 0 4px; font:600 11.5px/1.3 var(--nl-sans); letter-spacing:.06em; text-transform:uppercase; color:var(--nl-detail); }
+.nl-door { display:grid; grid-template-columns:minmax(0,1fr) auto; gap:2px 8px; padding:8px 0; border-top:1px solid var(--nl-line); font-size:13.5px; }
+.nl-door:first-of-type { border-top:0; }
+.nl-door .w { font-weight:500; overflow-wrap:anywhere; }
+.nl-door .nl-badge { align-self:start; }
+.nl-door .nl-door-acts { grid-column:1/-1; display:flex; gap:12px; flex-wrap:wrap; }
+.nl-door .nl-why { grid-column:1/-1; font-size:12.5px; color:var(--nl-detail); }
+.nl-badge { display:inline-block; padding:2px 9px; border-radius:999px; font:500 12px/1.5 var(--nl-sans); white-space:nowrap; }
+.nl-badge.amber { background:#FBEEDB; color:#8A5A0A; } .nl-badge.green { background:#DFF2E7; color:#1F4D3B; }
+.nl-badge.ruby { background:#FBE5E3; color:#8F2A22; } .nl-badge.steel { background:#E6ECF6; color:#48639A; } .nl-badge.grey { background:var(--nl-pill); color:var(--nl-quiet); }
+.nl-link { border:0; background:transparent; padding:0; font:400 13px/1.5 var(--nl-sans); color:var(--nl-accent); text-decoration:underline; text-underline-offset:2px; cursor:pointer; white-space:nowrap; }
+.nl-link:disabled { color:var(--nl-detail); text-decoration:none; cursor:default; }
+.nl-link.main { font-weight:600; }
+.nl-side .nl-black { width:100%; }
+.nl-black:disabled { background:#C9CED8; cursor:default; }
+.nl-note { font-size:12.5px; color:var(--nl-detail); margin:-6px 0 0; }
+.nl-foot { padding:8px 16px 14px; display:flex; flex-direction:column; gap:8px; }
+.nl-links { display:flex; gap:14px; white-space:nowrap; overflow:hidden; min-height:20px; }
+.nl-ask { display:flex; align-items:flex-end; gap:8px; border:1px solid var(--nl-edge); border-radius:10px; padding:7px 7px 7px 12px; background:var(--nl-surface); margin:0; }
+.nl-ask:focus-within { border-color:var(--nl-accent); }
+.nl-ask textarea { flex:1; min-width:0; border:0; outline:0; resize:none; background:transparent; font:14px/1.45 var(--nl-sans); color:var(--nl-ink); padding:4px 0; max-height:120px; }
+.nl-ask textarea::placeholder { color:var(--nl-detail); }
+.nl-send { flex-shrink:0; width:30px; height:30px; border:0; border-radius:999px; background:var(--nl-black); color:#fff; font:600 15px/1 var(--nl-sans); cursor:pointer; }
+.nl-send:disabled { background:#C9CED8; cursor:default; }
+.nl-msg { font-size:13.5px; line-height:1.5; padding:9px 11px; border-radius:10px; overflow-wrap:anywhere; }
+.nl-msg.me { background:var(--nl-pill); align-self:flex-end; max-width:88%; white-space:pre-wrap; }
+.nl-msg.ai { background:#EEF8F4; max-width:100%; }
+.nl-msg.ai p { margin:0 0 7px; } .nl-msg.ai p:last-child { margin-bottom:0; }
+.nl-msg.ai ul { margin:4px 0 7px; padding-left:18px; }
+.nl-msg.warn { background:#FBEEDB; color:#5c3d07; }
+.nl-q { font-family:var(--nl-serif); font-style:italic; color:var(--nl-quiet); }
+.nl-chg { display:grid; grid-template-columns:minmax(0,1fr) auto; gap:2px 8px; border-top:1px solid var(--nl-line); padding:7px 0; font-size:13px; }
+.nl-chg:first-child { border-top:0; }
+.nl-chg.dropped .w { color:var(--nl-detail); text-decoration:line-through; }
+.nl-chg .nl-why { grid-column:1/-1; font-size:12.5px; color:var(--nl-detail); }
+.nl-card { background:var(--nl-surface); border:1px solid var(--nl-line); border-radius:10px; padding:4px 12px; margin-top:8px; }
+.nl-card-foot { font-size:12.5px; color:var(--nl-detail); padding:6px 0 8px; border-top:1px solid var(--nl-line); }
+.nl-choices { display:flex; flex-wrap:wrap; gap:8px; }
+.nl-choices button { border:0; background:var(--nl-pill); color:var(--nl-ink); border-radius:999px; padding:6px 13px; font:500 13px var(--nl-sans); cursor:pointer; white-space:nowrap; }
+.nl-choices button:hover { background:var(--nl-chosen); }
+.nl-status { font-size:13px; color:var(--nl-detail); }
+.nl-dots i { display:inline-block; width:4px; height:4px; margin-left:3px; border-radius:50%; background:currentColor; vertical-align:middle; opacity:.35; }
+@media (prefers-reduced-motion:no-preference){ .nl-dots i { animation:nlDot 1.2s infinite; } .nl-dots i:nth-child(2){ animation-delay:.2s; } .nl-dots i:nth-child(3){ animation-delay:.4s; } }
+@keyframes nlDot { 0%,100% { opacity:.25; } 50% { opacity:1; } }
+.nl-sheet ul.nl-lines { list-style:none; margin:0; padding:0; max-height:52vh; overflow-y:auto; }
+.nl-sheet ul.nl-lines li { padding:9px 0; border-top:1px solid var(--nl-line); color:var(--nl-ink); }
+.nl-sheet ul.nl-lines li:first-child { border-top:0; }
+.nl-sheet .nl-meta { display:block; font-size:12.5px; color:var(--nl-detail); }
+.nl-side :focus-visible { outline:2px solid var(--nl-accent); outline-offset:2px; }
 </style>
 </head>
 <body>
@@ -4167,6 +4328,31 @@ body.light .piq-country-menu { box-shadow:0 12px 28px -10px rgba(60,40,10,0.22);
      MAIN APP SHELL
 ══════════════════════════════════════ -->
 <div class="app" id="app">
+  <!-- New look (L+S) top bar. Hidden unless <html class="nl">. -->
+  <div class="nl-bar" id="nl-bar">
+    <div class="nl-row">
+      <button class="nl-back" type="button" onclick="nlBack()" aria-label="Back">‹</button>
+      <span class="nl-logo">Horizon</span>
+      <nav class="nl-nav" id="nl-nav" aria-label="Pages">
+        <button type="button" data-nl-sec="today">Today</button>
+        <button type="button" data-nl-sec="money">Money plan</button>
+        <button type="button" data-nl-sec="plans">Plans</button>
+        <button type="button" data-nl-sec="future">Future</button>
+        <button type="button" data-nl-sec="notebook">Notebook</button>
+      </nav>
+      <div class="nl-right" id="nl-right">
+        <button class="nl-pill" type="button" onclick="nlOpenAssistant()" aria-label="Open the assistant">✦<span class="nl-assist-lbl">&nbsp;Assistant</span></button>
+        <button class="nl-icon" type="button" id="nl-gear" onclick="(window.NLP&&NLP.has('nl-settings'))?nav('nl-settings'):nav('settings')" aria-label="Settings" title="Settings"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg></button>
+        <button class="nl-pill" type="button" id="nl-menu-btn" onclick="nlMenu()" aria-haspopup="true" aria-expanded="false" aria-controls="nl-menu">New look ▾</button>
+      </div>
+    </div>
+    <div class="nl-tabs" id="nl-tabs" role="tablist" aria-label="Pages in this section"></div>
+    <div class="nl-menu" id="nl-menu" hidden>
+      <button type="button" onclick="nlSetLook(false)">Back to the old look<span class="nl-sub">Come back any time with “Try the new Horizon”.</span></button>
+      <button type="button" id="nl-restore-btn" onclick="nlAskRestore()" disabled>Restore the backup<span class="nl-sub" id="nl-restore-sub">Looking for the backup…</span></button>
+      <button type="button" id="nl-download-btn" onclick="nlDownloadBackup()" disabled>Download the backup<span class="nl-sub">Save it as a file on this device.</span></button>
+    </div>
+  </div>
 
   <!-- Ticker -->
   <div class="ticker-bar"><div class="ticker-track" id="ticker-track"></div></div>
@@ -4182,6 +4368,7 @@ body.light .piq-country-menu { box-shadow:0 12px 28px -10px rgba(60,40,10,0.22);
       <div class="logo-text">HORIZON <span>FINANCE OS</span></div>
     </div>
     <div class="topbar-right">
+      <button class="nl-try" id="nl-try" type="button" onclick="nlSetLook(true)">Try the new Horizon</button>
       <button class="cmdp-hint" id="cmdp-hint" onclick="cmdpOpen()" title="Command palette" data-i18n-title="topbar.cmdp">
         <span class="cmdp-hint-icon">⌘</span><span class="cmdp-hint-lbl">K</span>
       </button>
@@ -4198,6 +4385,20 @@ body.light .piq-country-menu { box-shadow:0 12px 28px -10px rgba(60,40,10,0.22);
 
   <!-- Main Row -->
   <div class="main-row">
+    <!-- New look (L+S): ONE side panel with TWO faces (Overview / Assistant).
+         Hidden unless <html class="nl">. -->
+    <aside class="nl-side" id="nl-side" aria-label="Side panel">
+      <div class="nl-face-hd" id="nl-face-hd"><span id="nl-face-title">Overview</span><span class="nl-face-sub" id="nl-face-sub"></span></div>
+      <div class="nl-face" id="nl-ov"></div>
+      <div class="nl-face" id="nl-chat" hidden aria-live="polite"></div>
+      <div class="nl-foot">
+        <div class="nl-links" id="nl-links"></div>
+        <form class="nl-ask" id="nl-ask" autocomplete="off">
+          <textarea id="nl-ask-input" rows="1" placeholder="Ask Horizon…" aria-label="Ask Horizon"></textarea>
+          <button class="nl-send" id="nl-send" type="submit" aria-label="Send">↑</button>
+        </form>
+      </div>
+    </aside>
     <!-- Mobile nav drawer backdrop — sits UNDER the sidebar, over the page. -->
     <div class="nav-overlay" id="nav-overlay" onclick="closeNavDrawer()"></div>
     <!-- Sidebar (desktop) = nav drawer (mobile) -->
@@ -11525,12 +11726,14 @@ window.applyCurrency = function(c){
 // ─── THEME ─────────────────────────────────────────────────────────────────
 function toggleTheme() {
   state.darkMode=!state.darkMode; save();
-  document.body.classList.toggle('light',!state.darkMode);
+  // The new look (L+S) is light only; the saved choice still applies to the old look.
+  document.body.classList.toggle('light',!state.darkMode || document.documentElement.classList.contains('nl'));
   const btn=document.getElementById('theme-btn');
   if(btn) btn.textContent=state.darkMode?'☀':'🌙';
 }
 function applyTheme() {
-  document.body.classList.toggle('light',!state.darkMode);
+  // The new look (L+S) is light only; the saved choice still applies to the old look.
+  document.body.classList.toggle('light',!state.darkMode || document.documentElement.classList.contains('nl'));
   const btn=document.getElementById('theme-btn');
   if(btn) btn.textContent=state.darkMode?'☀':'🌙';
 }
@@ -24576,6 +24779,7 @@ class HZMobile {
     h+=this.card(this.ct('🪪 Profile & Context')+this.srow('Citizenship',`<input value="${this.esc(this.data.citizenship)}" data-model="s:citizenship" style="${this.inpS(150)}">`)+this.srow('Home Base',`<input value="${this.esc(this.data.homeBase)}" data-model="s:homeBase" style="${this.inpS(150)}">`)+this.srow('Current Age',`<input type="number" value="${this.data.currentAge}" data-model="n:currentAge" style="${this.inpS(70)}">`)+this.srow('Retirement Age',`<input type="number" value="${this.data.retirementAge}" data-model="n:retirementAge" style="${this.inpS(70)}">`)+this.srow('Life Expectancy',`<input type="number" value="${this.data.lifeExp}" data-model="n:lifeExp" style="${this.inpS(70)}">`,true));
     h+=this.card(this.ct('📊 Assumptions')+this.srow('Portfolio Growth %',`<input type="number" step=".5" value="${this.data.growthRate}" data-model="n:growthRate" style="${this.inpS(70)}">`)+this.srow('Inflation %',`<input type="number" step=".5" value="${this.data.inflationRate}" data-model="n:inflationRate" style="${this.inpS(70)}">`)+this.srow('Post-Retire Growth %',`<input type="number" step=".5" value="${this.data.postRetGrowth}" data-model="n:postRetGrowth" style="${this.inpS(70)}">`)+this.srow('Savings Tax %',`<input type="number" value="${this.data.withdrawTaxRate}" data-model="n:withdrawTaxRate" style="${this.inpS(70)}">`,true));
     const aiKey=(typeof state!=='undefined'&&state.aiKeys&&state.aiKeys.claude)||'';
+    h+=this.card(this.ct('✦ New look')+`<div style="font-size:11.5px;color:var(--text2);line-height:1.55;margin-bottom:10px">Horizon has a new, calmer look with an assistant that prepares changes for you to approve.</div><button type="button" onclick="if(typeof nlSetLook==='function')nlSetLook(true)" style="background:var(--green);color:#000;border:none;border-radius:8px;padding:10px 14px;font-weight:700;font-size:13px">Try the new Horizon</button>`);
     h+=this.card(this.ct('✦ AI Key')+`<div style="font-size:11.5px;color:var(--text2);line-height:1.55;margin-bottom:10px">Paste your Claude API key to power the AI advisor and the full-analysis reports on this device. Stored locally, never synced.</div><input id="hz-ai-key" type="password" autocapitalize="none" autocorrect="off" spellcheck="false" value="${this.esc(aiKey)}" placeholder="sk-ant-…" oninput="(function(v){if(typeof state!=='undefined'){if(!state.aiKeys)state.aiKeys={};state.aiKeys.claude=v.trim();if(typeof save==='function')save();}})(this.value)" style="width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:10px 11px;color:var(--text);font-family:var(--fm);font-size:13px">${aiKey?`<div style="font-size:10.5px;color:var(--green);margin-top:8px">✓ Key set — AI analysis enabled</div>`:''}`);
     h+=this.card(this.ct('🎨 Appearance')+this.srow('Currency',this.seg('currency',[['SEK','kr'],['USD','$'],['EUR','€'],['KES','KSh']]))+this.srow('Language',this.seg('lang',[['EN','EN'],['SV','SV']]))+this.srow('Theme',`<button data-act="theme" style="background:var(--bg4);border:1px solid var(--border2);color:var(--text);border-radius:7px;padding:6px 12px;font-size:11px;cursor:pointer">${this.data.theme==='dark'?'☀ Switch to Light':'☾ Switch to Dark'}</button>`,true));
     h+=this.card(this.ct('💱 Exchange Rates',this.chip('sage','● Live FX pending'))+['USD','EUR','KES'].map((k,i)=>this.srow(k+' per SEK',`<input type="number" step=".001" value="${this.data.exchangeRates[k]}" data-model="fx:${k}" style="${this.inpS(90)}">`,i===2)).join(''));
@@ -24842,5 +25046,813 @@ class HZMobile {
 })();
 
 </script>
+<!-- New look (L+S) pages. Each file only acts when the new look is on. -->
+<script src="nl/core.js"></script>
+<script src="nl/today.js"></script>
+<script src="nl/money.js"></script>
+<script src="nl/plans.js"></script>
+<script src="nl/future.js"></script>
+<script src="nl/notebook.js"></script>
+<script src="nl/setup.js"></script>
+<script src="nl/phone.js"></script>
+<!-- ══ NEW LOOK (L+S) · Phase 0 ══════════════════════════════════════════
+     The switch, the one-time backup, and the new top bar. The choice is
+     kept per device (not synced). Old pages show inside the new look until
+     their new versions are built. -->
+<div class="nl-sheet-back" id="nl-sheet-back" role="dialog" aria-modal="true" aria-labelledby="nl-sheet-title">
+  <div class="nl-sheet">
+    <h2 id="nl-sheet-title">Restore the backup?</h2>
+    <p id="nl-sheet-when">Your data goes back to how it was when you first turned on the new look.</p>
+    <p>Anything you changed since then is replaced. <a href="#" onclick="nlDownloadCurrent();return false">Download today's data first</a> if you might want it.</p>
+    <div class="nl-sheet-acts"><button class="nl-black" type="button" onclick="nlRestore()">Restore the backup</button><button class="nl-grey" type="button" onclick="nlCloseSheet()">Cancel</button></div>
+  </div>
+</div>
+<div class="nl-toast" id="nl-toast" role="status" aria-live="polite"></div>
+<script>
+(function(){
+  const LOOK_KEY = STORAGE_KEY + ':look';
+  const PHONE_MQ = window.matchMedia('(max-width:720px), (max-height:500px) and (pointer:coarse)');
+  // Old pages live under the five new pages until their new versions exist.
+  const SECTIONS = [
+    { key:'today',    pages:[['dashboard','Dashboard']] },
+    { key:'money',    pages:[['review','Forecast & Review'],['transactions','Spend Insights']] },
+    { key:'plans',    pages:[['funfund','Fun Fund'],['retireanywhere','Retire Anywhere'],['propiq','Property IQ']] },
+    { key:'future',   pages:[['retirement','Retirement Plan'],['lifewall','Life Wall']] },
+    { key:'notebook', pages:[['journal','Journal'],['vault','Vault']] },
+  ];
+  const sectionOf = panel => {
+    const np = window.NLP && NLP.page && NLP.page(panel);
+    if(np) return SECTIONS.find(s => s.key === np.section) || null;
+    return SECTIONS.find(s => s.pages.some(p => p[0] === panel)) || null;
+  };
+  const isOn = () => document.documentElement.classList.contains('nl');
+  let fontsLoaded = false, toastTimer = null, backupAt = null;
+
+  // ── Backup: one copy per device, kept in IndexedDB (no size squeeze) ──
+  function idb(){
+    return new Promise((res, rej) => {
+      if(!window.indexedDB) return rej(new Error('no indexedDB'));
+      const r = indexedDB.open('horizon-newlook', 1);
+      r.onupgradeneeded = () => r.result.createObjectStore('kv');
+      r.onsuccess = () => res(r.result);
+      r.onerror = () => rej(r.error);
+    });
+  }
+  async function idbGet(key){ const db = await idb(); return new Promise((res, rej) => { const q = db.transaction('kv').objectStore('kv').get(key); q.onsuccess = () => res(q.result); q.onerror = () => rej(q.error); }); }
+  async function idbSet(key, val){ const db = await idb(); return new Promise((res, rej) => { const t = db.transaction('kv','readwrite'); t.objectStore('kv').put(val, key); t.oncomplete = () => res(); t.onerror = () => rej(t.error); }); }
+  // The same payload as Settings' "Everything" export (never the AI keys).
+  function fullPayload(){
+    const { aiKeys, ...rest } = state;
+    const payload = JSON.parse(JSON.stringify(rest));
+    if(typeof piq_history !== 'undefined' && Array.isArray(piq_history)) payload._propiq = piq_history;
+    return payload;
+  }
+  const whenText = iso => { const d = new Date(iso); return isNaN(d) ? '' : d.toLocaleString(state.lang === 'sv' ? 'sv-SE' : 'en-GB', { day:'numeric', month:'short', year:'numeric', hour:'2-digit', minute:'2-digit' }); };
+  async function refreshBackupInfo(){
+    let b = null; try { b = await idbGet('backup'); } catch(_){}
+    backupAt = b && b.at || null;
+    const r = document.getElementById('nl-restore-btn'), d = document.getElementById('nl-download-btn'), sub = document.getElementById('nl-restore-sub');
+    if(r) r.disabled = !backupAt;
+    if(d) d.disabled = !backupAt;
+    if(sub) sub.textContent = backupAt ? 'Your data from ' + whenText(backupAt) + '.' : 'No backup on this device yet.';
+    return b;
+  }
+  async function ensureBackup(){
+    let have = null; try { have = await idbGet('backup'); } catch(_){}
+    if(have) return;
+    const copy = { at:new Date().toISOString(), data:fullPayload() };
+    try {
+      await idbSet('backup', copy);
+      toast('Your data is backed up. Restore it any time from New look ▾.');
+    } catch(_){
+      // No IndexedDB here: hand the copy over as a file instead.
+      downloadJSON('horizon-backup-before-new-look.json', copy.data);
+      toast('Your data was saved as a file, because this browser can’t keep a backup.', 'warn');
+    }
+    refreshBackupInfo();
+  }
+
+  // ── Toasts and the sheet ──
+  function toast(msg, kind){
+    const t = document.getElementById('nl-toast'); if(!t) return;
+    t.textContent = msg; t.className = 'nl-toast on' + (kind ? ' ' + kind : '');
+    clearTimeout(toastTimer); toastTimer = setTimeout(() => { t.className = 'nl-toast'; }, 5000);
+  }
+  window.nlAskRestore = function(){
+    closeMenu();
+    const w = document.getElementById('nl-sheet-when');
+    if(w) w.textContent = 'Your data goes back to how it was on ' + whenText(backupAt) + ', when you first turned on the new look.';
+    document.getElementById('nl-sheet-back').classList.add('on');
+    setTimeout(() => document.querySelector('#nl-sheet-back .nl-black')?.focus(), 0);
+  };
+  window.nlCloseSheet = function(){ document.getElementById('nl-sheet-back').classList.remove('on'); };
+  window.nlRestore = async function(){
+    const b = await refreshBackupInfo();
+    nlCloseSheet();
+    if(!b || !b.data){ toast('No backup found on this device.', 'warn'); return; }
+    try {
+      _restoreFullBackup(JSON.parse(JSON.stringify(b.data)));
+      invalidateSelectors(); save(); renderAll(); syncBar();
+      toast('Backup restored.');
+    } catch(err){ toast('The backup could not be restored: ' + err.message, 'warn'); }
+  };
+  window.nlDownloadBackup = async function(){
+    closeMenu();
+    const b = await refreshBackupInfo();
+    if(b && b.data) downloadJSON('horizon-backup-' + String(b.at).slice(0,10) + '.json', b.data);
+  };
+  // For the new Settings page: when the one-time backup was made (or null).
+  window.nlBackupInfo = async function(){ const b = await refreshBackupInfo(); return b && b.at ? { at:b.at } : null; };
+  window.nlDownloadCurrent = function(){ downloadJSON('horizon-today-' + new Date().toISOString().slice(0,10) + '.json', fullPayload()); };
+
+  // ── The New look menu: closes on a second press, Esc, or a press outside ──
+  function closeMenu(){ const m = document.getElementById('nl-menu'); if(m) m.hidden = true; document.getElementById('nl-menu-btn')?.setAttribute('aria-expanded','false'); }
+  window.nlMenu = function(){
+    const m = document.getElementById('nl-menu'); if(!m) return;
+    if(!m.hidden){ closeMenu(); return; }
+    refreshBackupInfo();
+    m.hidden = false; document.getElementById('nl-menu-btn').setAttribute('aria-expanded','true');
+  };
+  document.addEventListener('click', e => {
+    const m = document.getElementById('nl-menu');
+    if(m && !m.hidden && !e.target.closest('#nl-menu') && !e.target.closest('#nl-menu-btn')) closeMenu();
+    if(e.target.id === 'nl-sheet-back') nlCloseSheet();
+  });
+  document.addEventListener('keydown', e => {
+    if(e.key !== 'Escape') return;
+    if(document.getElementById('nl-sheet-back')?.classList.contains('on')){ nlCloseSheet(); e.nlDone = true; return; }
+    const m = document.getElementById('nl-menu');
+    if(m && !m.hidden){ closeMenu(); e.nlDone = true; }
+  });
+
+  // ── The bar follows whatever page is open ──
+  function syncBar(){
+    if(!isOn()) return;
+    const panel = (typeof state !== 'undefined' && state.activePanel) || (location.hash.slice(1).split('/')[0]) || 'dashboard';
+    const sec = sectionOf(panel);
+    document.querySelectorAll('#nl-nav button').forEach(b => {
+      if(sec && b.dataset.nlSec === sec.key) b.setAttribute('aria-current','page'); else b.removeAttribute('aria-current');
+    });
+    const gear = document.getElementById('nl-gear');
+    if(gear){ if(panel === 'settings' || panel === 'nl-settings') gear.setAttribute('aria-current','page'); else gear.removeAttribute('aria-current'); }
+    const tabs = document.getElementById('nl-tabs');
+    if(tabs){
+      const isNew = !!(window.NLP && NLP.page && NLP.page(panel));
+      // New pages carry their own tabs. Classic pages show their section's
+      // classic pages, plus the way back to the section's new page.
+      if(isNew){ tabs.innerHTML = ''; tabs.hidden = true; }
+      else {
+        tabs.hidden = false;
+        const newTarget = sec && window.NLP && NLP.sectionTarget && NLP.sectionTarget(sec.key);
+        const newSettings = panel === 'settings' && window.NLP && NLP.has && NLP.has('nl-settings');
+        let pages = sec ? sec.pages.filter(p => (typeof VALID_PANELS === 'undefined') || VALID_PANELS.includes(p[0])) : [['settings','Settings']];
+        if(newTarget) pages = [[newTarget, '‹ ' + (document.querySelector(`#nl-nav button[data-nl-sec="${sec.key}"]`)?.textContent || 'New page')]].concat(pages.map(p => [p[0], 'Classic: ' + p[1]]));
+        if(newSettings) pages = [['nl-settings','‹ Settings'],['settings','Classic: Settings']];
+        tabs.innerHTML = pages.map(p => `<button type="button" role="tab" data-nl-panel="${p[0]}" aria-selected="${p[0] === panel}">${p[1]}</button>`).join('');
+      }
+    }
+  }
+  document.getElementById('nl-nav')?.addEventListener('click', e => {
+    const b = e.target.closest('button[data-nl-sec]'); if(!b) return;
+    const sec = SECTIONS.find(s => s.key === b.dataset.nlSec);
+    const target = window.NLP && NLP.sectionTarget && NLP.sectionTarget(b.dataset.nlSec);
+    if(target) nav(target); else if(sec) nav(sec.pages[0][0]);
+  });
+  document.getElementById('nl-tabs')?.addEventListener('click', e => {
+    const b = e.target.closest('button[data-nl-panel]'); if(b) nav(b.dataset.nlPanel);
+  });
+  window.nlBack = function(){ if(history.length > 1) history.back(); else nav('dashboard'); };
+
+  // ── Move the currency + money-mode selectors between the two bars ──
+  function moveSelectors(toNew){
+    const cur = document.getElementById('cur-toggle'), mode = document.getElementById('mode-toggle');
+    if(!cur || !mode) return;
+    if(toNew){
+      const right = document.getElementById('nl-right');
+      right.insertBefore(mode, right.firstChild); right.insertBefore(cur, right.firstChild);
+    } else {
+      const theme = document.getElementById('theme-btn');
+      if(theme){ theme.parentNode.insertBefore(cur, theme); theme.parentNode.insertBefore(mode, theme); }
+    }
+  }
+  function loadFonts(){
+    if(fontsLoaded) return; fontsLoaded = true;
+    const l = document.createElement('link'); l.rel = 'stylesheet';
+    l.href = 'https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;1,8..60,400&display=swap';
+    document.head.appendChild(l);
+  }
+  function apply(on){
+    document.documentElement.classList.toggle('nl', on);
+    document.documentElement.classList.toggle('nl-phone', on && PHONE_MQ.matches);
+    moveSelectors(on);
+    if(on){ loadFonts(); syncBar(); } else closeMenu();
+    if(typeof applyTheme === 'function') applyTheme();
+    // The content area changed width: let charts re-measure.
+    setTimeout(() => window.dispatchEvent(new Event('resize')), 30);
+  }
+  window.nlSetLook = function(on){
+    try { localStorage.setItem(LOOK_KEY, on ? 'new' : 'old'); } catch(_){}
+    apply(on);
+    if(on) ensureBackup();
+  };
+  // Rotating or resizing into phone size keeps the phone screens; coming
+  // back to a large screen brings this device's choice back.
+  const wanted = () => { try { return localStorage.getItem(LOOK_KEY) !== 'old'; } catch(_){ return true; } };
+  const onMQ = () => { const should = wanted(); if(should !== isOn()) apply(should); else document.documentElement.classList.toggle('nl-phone', should && PHONE_MQ.matches); };
+  if(PHONE_MQ.addEventListener) PHONE_MQ.addEventListener('change', onMQ); else if(PHONE_MQ.addListener) PHONE_MQ.addListener(onMQ);
+  if(typeof bus !== 'undefined') bus.on('panel:changed', syncBar);
+  window.addEventListener('hashchange', () => setTimeout(syncBar, 0));
+  // The first time the new look opens on this device (now by default), keep a backup.
+  if(isOn()){ apply(true); ensureBackup(); }
+  // Expose for checks.
+  window.nlSyncBar = syncBar;
+})();
+</script>
+<!-- ══ NEW LOOK (L+S) · Phase 1 ══════════════════════════════════════════
+     One side panel with two faces (Overview / Assistant), one conversation
+     for the whole app, and changes the assistant PREPARES that the person
+     APPLIES with one press — with Undo and History. New look only: the old
+     chat window is untouched. Data lives in state.nl (synced like the rest). -->
+<div class="nl-sheet-back" id="nl-info-back" role="dialog" aria-modal="true" aria-labelledby="nl-info-title">
+  <div class="nl-sheet" id="nl-info"></div>
+</div>
+<script>
+(function(){
+  const $ = id => document.getElementById(id);
+  const isOn = () => document.documentElement.classList.contains('nl');
+  const h = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  const money = v => fmt(Number(v) || 0);
+  const FIELDS = ['baseIncome','baseExpenses','baseSavings','monthlyOverrides','yearlyBases','trips','externalAssets','retirementExpenses','retirementScenario','retirementAge','lifeExp','places'];
+  const clone = v => v === undefined ? undefined : JSON.parse(JSON.stringify(v));
+  const snapshot = () => Object.fromEntries(FIELDS.map(f => [f, clone(state[f])]));
+  const signature = () => JSON.stringify(FIELDS.map(f => state[f]));
+  const monthLabel = ym => { const m = /^(\d{4})-(\d{2})$/.exec(ym || ''); if(!m) return ym || ''; return new Date(+m[1], +m[2]-1, 1).toLocaleString('en-GB', { month:'short', year:'numeric' }); };
+  const timeLabel = at => { const d = new Date(at); const today = new Date().toDateString() === d.toDateString();
+    return today ? 'today ' + d.toLocaleTimeString('en-GB', { hour:'2-digit', minute:'2-digit' }) : d.toLocaleDateString('en-GB', { day:'numeric', month:'short' }); };
+
+  // ── Saved data for the new panel ──
+  function NL(){
+    if(!state.nl || typeof state.nl !== 'object') state.nl = {};
+    const n = state.nl;
+    if(!Array.isArray(n.chat)) n.chat = [];
+    if(!n.proposals || typeof n.proposals !== 'object') n.proposals = {};
+    if(!Array.isArray(n.history)) n.history = [];
+    return n;
+  }
+  const pendingProposal = () => { const n = NL(); return Object.values(n.proposals).find(p => p.status === 'pending' && p.changes.some(c => !c.dropped && !c.moved)) || null; };
+  const liveChanges = p => p ? p.changes.filter(c => !c.dropped && !c.moved) : [];
+
+  // ── Where a change lands ──
+  const LISTS = { income:['baseIncome','income','incomeItems'], expenses:['baseExpenses','expenses','expenseItems'] };
+  function parseMonth(ym){ const m = /^(\d{4})-(\d{2})$/.exec(String(ym || '')); return m && +m[2] >= 1 && +m[2] <= 12 ? { y:+m[1], m:+m[2]-1, key:`${m[1]}-${m[2]}` } : null; }
+  function readList(c){
+    const L = LISTS[c.list];
+    if(c.where === 'plan') return state[L[0]] || [];
+    if(c.where === 'year') return resolveYearBase(c.year)[L[1]] || [];
+    const pm = parseMonth(c.month); return getEffective(pm.y, pm.m)[L[2]] || [];
+  }
+  function readSavings(c){
+    if(c.where === 'plan') return state.baseSavings;
+    if(c.where === 'year') return resolveYearBase(c.year).savings;
+    const pm = parseMonth(c.month); return getEffective(pm.y, pm.m).savings;
+  }
+  function writableList(c){
+    const L = LISTS[c.list];
+    if(c.where === 'plan'){ if(!Array.isArray(state[L[0]])) state[L[0]] = []; return state[L[0]]; }
+    if(c.where === 'year'){
+      const copy = clone(resolveYearBase(c.year)[L[1]] || []);
+      if(!state.yearlyBases) state.yearlyBases = {};
+      const b = state.yearlyBases[String(c.year)] || (state.yearlyBases[String(c.year)] = {});
+      if(!Array.isArray(b[L[1]])) b[L[1]] = copy;
+      if(!('cascade' in b)) b.cascade = true;
+      return b[L[1]];
+    }
+    const pm = parseMonth(c.month);
+    const copy = clone(getEffective(pm.y, pm.m)[L[2]] || []);
+    if(!state.monthlyOverrides) state.monthlyOverrides = {};
+    const ov = state.monthlyOverrides[pm.key] || (state.monthlyOverrides[pm.key] = {});
+    if(!Array.isArray(ov[L[1]])) ov[L[1]] = copy;
+    return ov[L[1]];
+  }
+  function writeSavings(c, amount){
+    if(c.where === 'plan'){ state.baseSavings = amount; return; }
+    if(c.where === 'year'){
+      if(!state.yearlyBases) state.yearlyBases = {};
+      const b = state.yearlyBases[String(c.year)] || (state.yearlyBases[String(c.year)] = {});
+      b.savings = amount; if(!('cascade' in b)) b.cascade = true; return;
+    }
+    const pm = parseMonth(c.month);
+    if(!state.monthlyOverrides) state.monthlyOverrides = {};
+    (state.monthlyOverrides[pm.key] || (state.monthlyOverrides[pm.key] = {})).savings = amount;
+  }
+  const norm = s => String(s || '').trim().toLowerCase();
+  function findIn(arr, name, what){
+    const exact = arr.filter(i => norm(i.name) === norm(name));
+    if(exact.length === 1) return { item:exact[0] };
+    if(exact.length > 1) return { error:`More than one ${what} is called "${name}". Ask which one with ask_choice.` };
+    const part = arr.filter(i => norm(i.name).includes(norm(name)) || norm(name).includes(norm(i.name)));
+    if(part.length === 1) return { item:part[0] };
+    if(part.length > 1) return { error:`"${name}" matches several ${what}s: ${part.map(i => i.name).join(', ')}. Ask which one with ask_choice.` };
+    return { error:`No ${what} called "${name}". Existing: ${arr.map(i => i.name).join(', ') || 'none'}.` };
+  }
+  function whereText(c){
+    if(c.where === 'plan') return 'your plan';
+    if(c.where === 'year') return 'from ' + c.year;
+    return monthLabel(c.month) + ' only';
+  }
+
+  // Check one change against today's data and describe it in plain words.
+  // Returns { change } or { error }. Used when preparing AND again on Apply.
+  function checkChange(raw){
+    const c = Object.assign({}, raw);
+    const kinds = ['set_amount','add_line','remove_line','set_savings','set_trip_cost'];
+    if(!kinds.includes(c.kind)) return { error:`kind must be one of ${kinds.join(', ')}` };
+    if(c.kind !== 'set_trip_cost'){
+      if(!['plan','year','month'].includes(c.where)) return { error:'where must be plan, year or month' };
+      if(c.where === 'year'){ c.year = Math.round(Number(c.year)); if(!(c.year >= CY && c.year <= CY + 80)) return { error:`year must be ${CY} or later` }; }
+      if(c.where === 'month'){ const pm = parseMonth(c.month); if(!pm) return { error:'month must be YYYY-MM' }; c.month = pm.key; }
+    }
+    const amt = c.amount == null ? null : Math.round(Number(c.amount));
+    if(c.amount != null && !(amt >= 0)) return { error:'amount must be a number of kronor, 0 or more' };
+    const tail = ' · ' + (c.kind === 'set_trip_cost' ? 'trip' : whereText(c));
+    if(c.kind === 'set_savings'){
+      if(amt == null) return { error:'set_savings needs amount' };
+      const old = readSavings(c); c.amount = amt;
+      c.label = `Savings target: ${money(old)} → ${money(amt)} a month${tail}`;
+      c.short = `Savings target, ${amt > old ? 'higher' : amt < old ? 'lower' : 'same'}${tail}`;
+      return { change:c };
+    }
+    if(c.kind === 'set_trip_cost'){
+      const t = findIn(state.trips || [], c.trip, 'trip'); if(t.error) return t;
+      const ex = findIn(t.item.expenses || [], c.cost, 'cost in that trip'); if(ex.error) return ex;
+      c.trip = t.item.name; c.cost = ex.item.name;
+      const to = c.to_month ? parseMonth(c.to_month) : null;
+      if(c.to_month && !to) return { error:'to_month must be YYYY-MM' };
+      if(amt == null && !to) return { error:'set_trip_cost needs amount and/or to_month' };
+      c.amount = amt; c.to_month = to ? to.key : null;
+      const parts = [];
+      if(amt != null) parts.push(`${money(ex.item.amount)} → ${money(amt)}`);
+      if(to) parts.push(`${monthLabel(String(ex.item.date || '').slice(0,7)) || 'no month'} → ${monthLabel(to.key)}`);
+      c.label = `${c.trip}, ${c.cost}: ${parts.join(', ')}`;
+      c.short = `${c.trip}, ${c.cost}: ${to ? 'moves to ' + monthLabel(to.key) : 'new amount'}`;
+      return { change:c };
+    }
+    if(!LISTS[c.list]) return { error:'list must be income or expenses' };
+    const what = c.list === 'income' ? 'income line' : 'expense line';
+    const arr = readList(c);
+    if(c.kind === 'add_line'){
+      if(!String(c.name || '').trim()) return { error:'add_line needs name' };
+      if(amt == null) return { error:'add_line needs amount' };
+      if(arr.some(i => norm(i.name) === norm(c.name))) return { error:`There is already a ${what} called "${c.name}". Use set_amount.` };
+      c.name = String(c.name).trim(); c.amount = amt; c.type = c.type === 'fixed' ? 'fixed' : 'variable';
+      c.label = `${c.name}: new ${c.list === 'income' ? 'income' : 'line'}, ${money(amt)} a month${tail}`;
+      c.short = `${c.name}: new ${c.list === 'income' ? 'income' : 'line'}${tail}`;
+      return { change:c };
+    }
+    const f = findIn(arr, c.name, what); if(f.error) return f;
+    c.name = f.item.name;
+    if(c.kind === 'remove_line'){ c.label = `${c.name}: removed (was ${money(f.item.amount)} a month)${tail}`; c.short = `${c.name}: removed${tail}`; return { change:c }; }
+    if(amt == null) return { error:'set_amount needs amount' };
+    c.amount = amt;
+    c.label = `${c.name}: ${money(f.item.amount)} → ${money(amt)} a month${tail}`;
+    c.short = `${c.name}, ${amt > f.item.amount ? 'higher' : amt < f.item.amount ? 'lower' : 'same'}${tail}`;
+    return { change:c };
+  }
+  function applyChange(c){
+    if(c.kind === 'set_savings'){ writeSavings(c, c.amount); return; }
+    if(c.kind === 'set_trip_cost'){
+      const t = findIn(state.trips || [], c.trip, 'trip').item, ex = findIn(t.expenses || [], c.cost, 'cost').item;
+      if(c.amount != null) ex.amount = c.amount;
+      if(c.to_month) ex.date = c.to_month;
+      return;
+    }
+    const arr = writableList(c);
+    if(c.kind === 'add_line'){ arr.push({ id:genId(), name:c.name, amount:c.amount, type:c.type }); return; }
+    const i = arr.findIndex(x => norm(x.name) === norm(c.name));
+    if(i < 0) throw new Error(`${c.name} is no longer in the plan`);
+    if(c.kind === 'remove_line') arr.splice(i, 1); else arr[i].amount = c.amount;
+  }
+
+  // ── Prepare (assistant), Apply / Drop / Undo (person) ──
+  let currentAsk = '';
+  function prepare(input){
+    const n = NL();
+    const list = Array.isArray(input && input.changes) ? input.changes : [];
+    if(!list.length) return { error:'changes must list at least one change' };
+    const out = [], errors = [];
+    list.forEach((raw, i) => { const r = checkChange(raw); if(r.error) errors.push(`change ${i+1}: ${r.error}`); else out.push(Object.assign(r.change, { why:String(raw.why || '').slice(0, 300) })); });
+    if(errors.length) return { error:'Nothing was prepared. Fix these and call again: ' + errors.join(' | ') };
+    Object.values(n.proposals).forEach(p => { if(p.status === 'pending') p.status = 'replaced'; });
+    const id = 'p' + Date.now().toString(36) + Math.random().toString(36).slice(2,6);
+    n.proposals[id] = { id, at:Date.now(), ask:currentAsk, summary:String(input.summary || '').slice(0, 200), changes:out, status:'pending' };
+    const ids = Object.keys(n.proposals).sort((a,b) => n.proposals[b].at - n.proposals[a].at);
+    ids.slice(30).forEach(k => delete n.proposals[k]);
+    return { ok:true, id, prepared:out.map(c => c.label), note:'Shown to the person, marked Suggested, with an Apply button. Nothing is saved until they press it. Do not say it is saved or done.' };
+  }
+  function afterDataChange(){
+    if(typeof invalidateSelectors === 'function') invalidateSelectors();
+    save();
+    if(typeof renderAll === 'function') renderAll();
+  }
+  window.nlApply = function(pid){
+    const n = NL(), p = n.proposals[pid];
+    if(!p || p.status !== 'pending') return;
+    const live = liveChanges(p); if(!live.length) return;
+    const before = snapshot();
+    try {
+      live.forEach(c => { const r = checkChange(c); if(r.error) throw new Error(r.error); });
+      live.forEach(applyChange);
+    } catch(err){
+      FIELDS.forEach(f => { state[f] = before[f]; });
+      toast('Nothing was saved: ' + err.message, 'warn');
+      render(); return;
+    }
+    p.status = 'applied'; p.appliedAt = Date.now();
+    n.history.forEach(e => { delete e.undo; delete e.sig; });
+    n.history.unshift({ id:'h' + Date.now().toString(36), at:Date.now(), by:'Horizon', ask:p.ask, items:live.map(c => c.label), short:live.map(c => c.short || c.label), proposal:pid, undo:before });
+    n.history = n.history.slice(0, 50);
+    afterDataChange();
+    n.history[0].sig = signature(); save();
+    toast(`${live.length} change${live.length > 1 ? 's' : ''} saved`, '', { label:'Undo', fn:() => nlUndo() });
+    render();
+  };
+  // Keep just one change of a suggestion; the others keep waiting as their own suggestion.
+  window.nlApplyOne = function(pid, idx){
+    const n = NL(), p = n.proposals[pid];
+    if(!p || p.status !== 'pending' || !p.changes[idx] || p.changes[idx].dropped || p.changes[idx].moved) return;
+    const rest = p.changes.filter((c, i) => i !== idx && !c.dropped && !c.moved).map(c => Object.assign({}, c));
+    p.changes.forEach((c, i) => { if(i !== idx && !c.dropped) c.moved = true; });
+    nlApply(pid);
+    if(rest.length){
+      const id = 'p' + Date.now().toString(36) + Math.random().toString(36).slice(2,6);
+      n.proposals[id] = { id, at:Date.now(), ask:p.ask, summary:p.summary, changes:rest, status:'pending' };
+      save(); render();
+    }
+  };
+  window.nlDrop = function(pid, idx){
+    const p = NL().proposals[pid]; if(!p || p.status !== 'pending' || !p.changes[idx]) return;
+    p.changes[idx].dropped = true;
+    if(!liveChanges(p).length) p.status = 'dropped';
+    save(); render();
+  };
+  function undoState(){
+    const e = NL().history[0];
+    if(!e || !e.undo) return { ok:false, why:'Only the latest change can be undone.' };
+    if(e.sig && e.sig !== signature()) return { ok:false, why:'Your plan was changed again since, so undoing this would also remove those changes.' };
+    return { ok:true, entry:e };
+  }
+  window.nlUndo = function(){
+    const u = undoState();
+    if(!u.ok){ toast(u.why, 'warn'); return; }
+    FIELDS.forEach(f => { if(u.entry.undo[f] === undefined) delete state[f]; else state[f] = u.entry.undo[f]; });
+    const p = NL().proposals[u.entry.proposal]; if(p) p.status = 'undone';
+    u.entry.undone = Date.now(); delete u.entry.undo; delete u.entry.sig;
+    afterDataChange();
+    toast('Change undone');
+    render(); if($('nl-info-back').classList.contains('on')) nlShowHistory();
+  };
+  window.nlUndoState = () => undoState();
+  const byText = e => e.by === 'You' ? 'You changed it' : 'Horizon prepared, you applied';
+
+  // ── Talking to Claude (reuses the advisor's key, lookups and request code) ──
+  const NL_TOOLS = [
+    { name:'propose_changes',
+      description:'Prepare changes to the plan for the person to approve. Nothing is saved: they see each change marked Suggested and press Apply. A new call replaces any earlier suggestion still waiting. Put every change for this request in one call.',
+      input_schema:{ type:'object', properties:{
+        summary:{ type:'string', description:'One short plain sentence saying what these changes do.' },
+        changes:{ type:'array', minItems:1, items:{ type:'object', properties:{
+          kind:{ type:'string', enum:['set_amount','add_line','remove_line','set_savings','set_trip_cost'] },
+          where:{ type:'string', enum:['plan','year','month'], description:'plan = the everyday plan used by every month without its own changes; year = a future calendar year (later years follow it); month = one month only. Not used for set_trip_cost.' },
+          year:{ type:'integer', description:'For where=year.' },
+          month:{ type:'string', description:'YYYY-MM, for where=month.' },
+          list:{ type:'string', enum:['income','expenses'], description:'For line changes.' },
+          name:{ type:'string', description:'The line name as it appears in the plan (or the new line name for add_line).' },
+          amount:{ type:'number', description:'SEK a month (for trips: the cost in SEK).' },
+          type:{ type:'string', enum:['fixed','variable'], description:'For add_line.' },
+          trip:{ type:'string', description:'Trip name, for set_trip_cost.' },
+          cost:{ type:'string', description:'The trip cost line name, e.g. Flights, for set_trip_cost.' },
+          to_month:{ type:'string', description:'YYYY-MM to move a trip cost to.' },
+          why:{ type:'string', description:'Short plain reason; quote the source words in quotes when a number came from their data.' }
+        }, required:['kind'] } } }, required:['summary','changes'], additionalProperties:false } },
+    { name:'ask_choice',
+      description:'When the request could mean more than one thing, show the person 2 to 4 short options to press instead of guessing. Their press comes back as their next message.',
+      input_schema:{ type:'object', properties:{ question:{ type:'string' }, options:{ type:'array', minItems:2, maxItems:4, items:{ type:'string' } } }, required:['question','options'], additionalProperties:false } },
+  ];
+  const NL_SYSTEM = `
+
+## You are in Horizon's side panel (the new look)
+You are Horizon, the assistant. You PREPARE, the person DECIDES.
+- To change anything in their plan, call propose_changes. It never saves: the person sees the changes marked Suggested and presses Apply. Never say a change is saved, applied, updated or done.
+- Put every change for one request in one call. If a call returns an error, fix it and call again.
+- If the request could mean more than one thing (for example two lines could match, or it is unclear when a change starts), call ask_choice with 2 to 4 short options instead of guessing.
+- You can prepare: changes to budget lines (income and expenses), the monthly savings target, the amount or month of a trip cost, and anything an extra tool below lets you prepare. You cannot move or pay money, or change anything no tool covers: say so plainly and offer what you can prepare instead.
+- where: "plan" = the everyday plan, used by every month without its own changes. "year" = a future calendar year; later years follow it. "month" = one month only. Amounts are SEK a month.
+- Write in plain, simple English for someone who is not a finance expert. Keep it short. When a number comes from their data, quote the words it came from in quotes. When you prepared changes, end by saying nothing is saved until they press Apply.
+- Do NOT include horizon-chart blocks or any other code blocks: this panel cannot show them. Never mention prices or the cost of using the assistant.`;
+  let busy = false, statusText = '', face = 'overview', pendingChoices = null;
+  function historyForApi(){
+    const n = NL(), turns = [];
+    n.chat.slice(-28).forEach(m => {
+      if(m.role !== 'user' && m.role !== 'assistant') return;
+      let text = String(m.content || '');
+      if(m.role === 'assistant' && m.proposal && n.proposals[m.proposal]){
+        const p = n.proposals[m.proposal];
+        text += `\n[Prepared changes (${p.status}): ${p.changes.map(c => c.label + (c.dropped ? ' (dropped by the person)' : '')).join('; ')}]`;
+      }
+      if(m.role === 'assistant' && m.choices) text += `\n[Offered choices: ${m.choices.options.join(' / ')}]`;
+      if(!text.trim()) return;
+      const last = turns[turns.length - 1];
+      if(last && last.role === m.role) last.content += '\n\n' + text; else turns.push({ role:m.role, content:text });
+    });
+    while(turns.length && turns[0].role !== 'user') turns.shift();
+    return turns;
+  }
+  const cleanReply = t => String(t || '').replace(/```[\s\S]*?```/g, '').trim();
+  async function send(text){
+    text = String(text || '').trim(); if(!text || busy) return;
+    const n = NL();
+    n.chat.push({ role:'user', content:text, at:Date.now(), page:state.activePanel || '' });
+    n.chat = n.chat.slice(-200);
+    pendingChoices = null; currentAsk = text;
+    save(); nlFlip('chat');
+    const key = state.aiKeys && state.aiKeys.claude;
+    if(!key){
+      n.chat.push({ role:'assistant', kind:'nokey', content:'To talk with Horizon, add your Claude key in Settings, under AI Keys. It stays on this device.', at:Date.now() });
+      save(); render(); return;
+    }
+    busy = true; statusText = 'Reading your plan'; render();
+    let reply = '', proposalId = null, choices = null, failed = null;
+    try {
+      const system = buildAIContext({ tools:true }) + NL_SYSTEM + (window.NL_EXTRA_SYSTEM || []).join('');
+      const extra = (window.NL_EXTRA_TOOLS || []);
+      const convo = historyForApi();
+      let withFallback = true;
+      for(let step = 0; step < AI_CHAT_MAX_STEPS; step++){
+        const body = { model:AI_CHAT_MODEL, max_tokens:16000, output_config:{ effort:'medium' }, system, tools:AI_CHAT_TOOLS.concat(NL_TOOLS, extra.map(t => t.def)), messages:convo };
+        let res;
+        try { res = await _aiChatRequest(key, body, withFallback); }
+        catch(netErr){ if(!withFallback) throw netErr; withFallback = false; res = await _aiChatRequest(key, body, false); }
+        if(res.status === 401) throw new Error('Your Claude key was not accepted. Check it in Settings, under AI Keys.');
+        if(res.status === 429) throw new Error('Too many requests right now. Wait a moment and try again.');
+        if(res.status === 400 && withFallback){
+          const t = await res.text();
+          if(/fallback|beta/i.test(t)){ withFallback = false; step--; continue; }
+          throw new Error('The request was refused (400).');
+        }
+        if(!res.ok) throw new Error('Horizon could not be reached (' + res.status + ').');
+        const d = await res.json();
+        if(d.stop_reason === 'refusal'){ reply = 'Sorry, I can’t help with that. Try asking about your plan in another way.'; break; }
+        const blocks = Array.isArray(d.content) ? d.content : [];
+        const textNow = blocks.filter(b => b.type === 'text').map(b => b.text || '').join('');
+        const calls = blocks.filter(b => b.type === 'tool_use');
+        if(d.stop_reason !== 'tool_use' || !calls.length){ reply = textNow; break; }
+        convo.push({ role:'assistant', content:blocks });
+        const results = [];
+        for(const c of calls){
+          const ext = extra.find(t => t.def.name === c.name);
+          if(ext){
+            statusText = (ext.label && ext.label(c.input)) || 'Looking that up'; render();
+            let o; try { o = await ext.run(c.input || {}); } catch(err){ o = { error:err.message || String(err) }; }
+            const txt = typeof o === 'string' ? o : JSON.stringify(o);
+            results.push({ type:'tool_result', tool_use_id:c.id, content:txt.slice(0, 60000), ...(o && o.error ? { is_error:true } : {}) });
+            continue;
+          }
+          results.push((() => {
+          let out;
+          if(c.name === 'propose_changes'){ statusText = 'Preparing changes'; out = prepare(c.input); if(out.ok) proposalId = out.id; }
+          else if(c.name === 'ask_choice'){ const o = (c.input && c.input.options || []).map(String).slice(0,4); choices = { question:String(c.input && c.input.question || ''), options:o }; out = { ok:true, note:'Shown as buttons. Stop here and wait for their answer.' }; }
+          else { statusText = _aiToolLabel(c.name, c.input).replace(/…$/, ''); const r = _aiToolResultText(c.name, c.input); return { type:'tool_result', tool_use_id:c.id, content:r.text, ...(r.isError ? { is_error:true } : {}) }; }
+          return { type:'tool_result', tool_use_id:c.id, content:JSON.stringify(out), ...(out.error ? { is_error:true } : {}) };
+          })());
+        }
+        render();
+        convo.push({ role:'user', content:results });
+        if(step === AI_CHAT_MAX_STEPS - 1) reply = textNow;
+      }
+    } catch(err){ failed = err.message || String(err); }
+    busy = false; statusText = '';
+    if(failed) n.chat.push({ role:'assistant', kind:'error', content:failed, retry:text, at:Date.now() });
+    else {
+      reply = cleanReply(reply);
+      if(!reply) reply = proposalId ? 'I prepared the changes below. Nothing is saved until you press Apply.' : (choices ? choices.question : 'I couldn’t put an answer together that time. Please try again.');
+      n.chat.push({ role:'assistant', content:reply, at:Date.now(), proposal:proposalId, choices });
+    }
+    pendingChoices = choices;
+    n.chat = n.chat.slice(-200);
+    save(); render();
+  }
+  // ── For the new pages (nl/core.js) ──
+  window.nlPendingProposal = pendingProposal;
+  window.nlAsk = function(text){ nlFlip('chat'); send(text); };
+  window.nlProposeFromApp = function(summary, changes){
+    currentAsk = String(summary || '');
+    const r = prepare({ summary, changes });
+    if(r.ok){
+      NL().chat.push({ role:'assistant', content:String(summary || 'Prepared from the page.') + ' Nothing is saved until you press Apply.', at:Date.now(), proposal:r.id, fromPage:true });
+      save(); render();
+    }
+    return r;
+  };
+  // A change the person makes directly on a page: saved now, in History, undoable.
+  window.nlRecordChange = function(label, mutate){
+    const n = NL(), before = snapshot();
+    try { mutate(state); } catch(err){ FIELDS.forEach(f => { state[f] = before[f]; }); toast('Nothing was saved: ' + err.message, 'warn'); return false; }
+    n.history.forEach(e => { delete e.undo; delete e.sig; });
+    n.history.unshift({ id:'h' + Date.now().toString(36), at:Date.now(), by:'You', items:[String(label)], undo:before });
+    n.history = n.history.slice(0, 50);
+    afterDataChange();
+    n.history[0].sig = signature(); save();
+    toast(String(label) + ' · saved', '', { label:'Undo', fn:() => nlUndo() });
+    render();
+    return true;
+  };
+  window.nlRetry = function(i){ const m = NL().chat[i]; if(m && m.retry){ NL().chat.splice(i, 1); NL().chat.splice(i - 1, 1); send(m.retry); } };
+  window.nlChoose = function(opt){ send(opt); };
+
+  // ── Drawing the two faces ──
+  function md(t){
+    const lines = h(t).replace(/\*\*(.+?)\*\*/g, '<b>$1</b>').replace(/“([^”]{2,240})”/g, '<span class="nl-q">“$1”</span>').replace(/&quot;([^&]{2,240}?)&quot;/g, '<span class="nl-q">“$1”</span>').split('\n');
+    let out = '', list = false, para = [];
+    const flush = () => { if(para.length){ out += '<p>' + para.join('<br>') + '</p>'; para = []; } };
+    lines.forEach(l => {
+      const li = /^\s*[-*•]\s+(.*)$/.exec(l);
+      if(li){ flush(); if(!list){ out += '<ul>'; list = true; } out += '<li>' + li[1] + '</li>'; return; }
+      if(list){ out += '</ul>'; list = false; }
+      if(!l.trim()){ flush(); return; }
+      para.push(l.replace(/^#+\s*/, ''));
+    });
+    flush(); if(list) out += '</ul>';
+    (window.NL_MD_HOOKS || []).forEach(f => { try { out = f(out) || out; } catch(_){} });
+    return out;
+  }
+  const dots = '<span class="nl-dots" aria-hidden="true"><i></i><i></i><i></i></span>';
+  function proposalCard(p){
+    const isPending = p.status === 'pending';
+    const rows = p.changes.map((c, i) => `<div class="nl-chg${c.dropped ? ' dropped' : ''}"><span class="w">${h(c.label)}</span>${isPending && !c.dropped && !c.moved ? `<button class="nl-link" type="button" onclick="nlDrop('${p.id}',${i})">Drop</button>` : (c.dropped ? '<span class="nl-badge grey">Dropped</span>' : (c.moved ? '<span class="nl-badge amber">Still waiting</span>' : ''))}${c.why ? `<span class="nl-why">${md(c.why).replace(/<\/?p>/g, '')}</span>` : ''}</div>`).join('');
+    const live = liveChanges(p).length;
+    const foot = {
+      pending:`Nothing is saved until you press Apply.`,
+      applied:`Applied by you, ${timeLabel(p.appliedAt)}.`,
+      undone:`Applied, then undone.`,
+      replaced:`Replaced by a newer suggestion.`,
+      dropped:`You dropped these.`,
+    }[p.status] || '';
+    return `<div class="nl-card">${rows}<div class="nl-card-foot">${foot}</div></div>` +
+      (isPending && live ? `<button class="nl-black" type="button" onclick="nlApply('${p.id}')">Apply ${live} change${live > 1 ? 's' : ''}</button>` : '');
+  }
+  function renderChat(){
+    const box = $('nl-chat'); if(!box) return;
+    const n = NL();
+    const nearEnd = box.scrollHeight - box.scrollTop - box.clientHeight < 80;
+    let html = '';
+    if(!n.chat.length) html = `<p class="nl-status">Ask anything about your plan, or tell Horizon what to change. It prepares; you decide.</p>`;
+    n.chat.forEach((m, i) => {
+      if(m.role === 'user'){ html += `<div class="nl-msg me">${h(m.content)}</div>`; return; }
+      if(m.kind === 'error'){ html += `<div class="nl-msg warn">${h(m.content)} <button class="nl-link" type="button" onclick="nlRetry(${i})">Try again</button></div>`; return; }
+      if(m.kind === 'nokey'){ html += `<div class="nl-msg ai"><p>${h(m.content)}</p><p><button class="nl-link" type="button" onclick="nlFlip('overview');(typeof nlSettingsKey==='function')?nlSettingsKey():nav('settings')">Open Settings</button></p></div>`; return; }
+      html += `<div class="nl-msg ai">${md(m.content)}${m.proposal && n.proposals[m.proposal] ? proposalCard(n.proposals[m.proposal]) : ''}</div>`;
+      if(m.choices && i === n.chat.length - 1 && !busy) html += `<div class="nl-choices">${m.choices.options.map(o => `<button type="button" onclick="nlChoose(this.textContent)">${h(o)}</button>`).join('')}</div>`;
+    });
+    if(busy) html += `<div class="nl-status">${h(statusText || 'Thinking')} ${dots}</div>`;
+    box.innerHTML = html;
+    if(nearEnd || busy) box.scrollTop = box.scrollHeight;
+  }
+  function renderOverview(){
+    const box = $('nl-ov'); if(!box) return;
+    const ap = window.NLP && NLP.activePage && NLP.activePage();
+    const ovKey = ap ? ap.panel + '|' + (NLP.ui(ap.panel).tab || '') + '|' + (NLP.ui(ap.panel).chosen ?? '') : (state.activePanel || '');
+    const keep = ovKey === box.dataset.key ? box.scrollTop : 0; box.dataset.key = ovKey;
+    const n = NL();
+    const p = pendingProposal(), live = liveChanges(p);
+    const today = n.history.filter(e => !e.undone && new Date(e.at).toDateString() === new Date().toDateString()).length;
+    const u = undoState();
+    const pg = (typeof window.nlPageOverview === 'function') ? window.nlPageOverview() : null;
+    if(pg){
+      const row = r => `<div class="nl-door"><span class="w">${r.text}</span>${r.badge ? `<span class="nl-badge ${h(r.badge.kind || 'grey')}">${h(r.badge.text)}</span>` : ''}${r.why ? `<span class="nl-why">${r.why}</span>` : ''}${r.link ? `<div class="nl-door-acts"><button class="nl-link" type="button" onclick="${h(r.link.onclick)}">${h(r.link.label)}</button></div>` : ''}</div>`;
+      const chosenRow = window.NLP && NLP.activePage && NLP.activePage() && NLP.chosen(NLP.activePage().panel) != null;
+      let html = `<p class="nl-hl">${live.length && !chosenRow ? `${live.length} change${live.length > 1 ? 's' : ''} wait${live.length > 1 ? '' : 's'} for your answer.` : (pg.headline || 'Nothing waits for you right now.')}</p>`;
+      if(pg.graphic) html += `<div>${pg.graphic}</div>`;
+      if(live.length) html += `<div class="nl-grp"><h4>Waiting for you</h4>${live.map(c => row({ text:h(c.short || c.label), badge:{ text:'Suggested', kind:'amber' }, link:{ label:'See it in the conversation', onclick:"nlFlip('chat')" } })).join('')}</div>`;
+      (pg.groups || []).filter(g => g && g.rows && g.rows.length).forEach(g => { html += `<div class="nl-grp"><h4>${h(g.title)}</h4>${g.rows.map(row).join('')}</div>`; });
+      if(live.length) html += `<button class="nl-black" type="button" onclick="nlApply('${p.id}')">Apply ${live.length} change${live.length > 1 ? 's' : ''}</button>`;
+      else if(pg.button) html += pg.button.disabledWhy ? `<button class="nl-black" type="button" disabled>${h(pg.button.label)}</button><p class="nl-note">${h(pg.button.disabledWhy)}</p>` : `<button class="nl-black" type="button" onclick="${h(pg.button.onclick)}">${h(pg.button.label)}</button>`;
+      box.innerHTML = html; box.scrollTop = keep;
+      if(window.NLP && NLP.mountCharts) NLP.mountCharts(box);
+      return;
+    }
+    let html = `<p class="nl-hl">${live.length ? `${live.length} change${live.length > 1 ? 's' : ''} wait${live.length > 1 ? '' : 's'} for your answer.` : 'Nothing waits for you right now.'}</p>`;
+    html += `<div class="nl-counts"><div class="${live.length ? 'on' : ''}"><b>${live.length}</b>waiting</div><div class="${today ? 'ok' : ''}"><b>${today}</b>changed today</div><div><b>${n.history.length}</b>in history</div></div>`;
+    if(live.length){
+      html += `<div class="nl-grp"><h4>Waiting for you</h4>${live.map(c => `<div class="nl-door"><span class="w">${h(c.short || c.label)}</span><span class="nl-badge amber">Suggested</span><div class="nl-door-acts"><button class="nl-link" type="button" onclick="nlFlip('chat')">See it in the conversation</button></div></div>`).join('')}</div>`;
+    }
+    const recent = n.history.slice(0, 3);
+    if(recent.length){
+      html += `<div class="nl-grp"><h4>Recent changes</h4>${recent.map((e, i) => `<div class="nl-door"><span class="w">${h((e.short || e.items)[0])}${e.items.length > 1 ? ` and ${e.items.length - 1} more` : ''}</span><span class="nl-badge ${e.undone ? 'grey' : 'green'}">${e.undone ? 'Undone' : 'Saved'}</span><span class="nl-why">${h(byText(e))}, ${h(timeLabel(e.at))}</span>${i === 0 && !e.undone ? `<div class="nl-door-acts">${u.ok ? `<button class="nl-link" type="button" onclick="nlUndo()">Undo</button>` : `<span class="nl-why" style="grid-column:auto">${h(u.why)}</span>`}</div>` : ''}</div>`).join('')}</div>`;
+    } else if(!live.length){
+      html += `<div class="nl-grp"><h4>Try asking</h4><div class="nl-door"><span class="w nl-q">“Groceries are about 8 500 now.”</span></div><div class="nl-door"><span class="w nl-q">“Raise my savings to 30 000 from next year.”</span></div><div class="nl-door"><span class="w nl-q">“Move the Cape Town hotel to April.”</span></div></div>`;
+    }
+    if(live.length) html += `<button class="nl-black" type="button" onclick="nlApply('${p.id}')">Apply ${live.length} change${live.length > 1 ? 's' : ''}</button>`;
+    box.innerHTML = html;
+    box.scrollTop = keep;
+  }
+  // The link row: one line above the ask box, never wrapped.
+  function renderLinks(){
+    const row = $('nl-links'); if(!row) return;
+    const n = NL(), items = [];
+    if(face === 'chat') items.push({ t:'‹ Overview', s:'‹ Overview', main:true, fn:"nlFlip('overview')" });
+    else if(n.chat.length || busy) items.push({ t:busy ? 'Assistant ' + dots + ' ›' : 'Assistant ›', s:busy ? 'Assistant ' + dots + ' ›' : 'Assistant ›', main:true, fn:"nlFlip('chat')" });
+    if(face === 'overview'){ const pg = (typeof window.nlPageOverview === 'function') ? window.nlPageOverview() : null; (pg && pg.links || []).forEach(l => items.push({ t:l.label, s:l.short || l.label, fn:l.onclick })); }
+    items.push({ t:'History', s:'History', fn:'nlShowHistory()' });
+    items.push({ t:'How this works', s:'Help', fn:'nlShowHow()' });
+    if(face === 'chat' && n.chat.length) items.push({ t:'Clear the conversation', s:'Clear', fn:'nlClear()' });
+    const draw = (short, count) => { row.innerHTML = items.slice(0, count).map(i => `<button class="nl-link${i.main ? ' main' : ''}" type="button" onclick="${i.fn}">${short ? i.s : i.t}</button>`).join(''); };
+    let count = items.length; draw(false, count);
+    if(row.scrollWidth > row.clientWidth + 1){ draw(true, count); while(row.scrollWidth > row.clientWidth + 1 && count > 1){ count--; draw(true, count); } }
+  }
+  function render(){
+    if(!$('nl-side')) return;
+    renderOverview(); renderChat();
+    const hd = $('nl-face-hd');
+    hd.classList.toggle('chat', face === 'chat');
+    $('nl-face-title').textContent = face === 'chat' ? 'Horizon' : 'Overview';
+    $('nl-face-sub').textContent = face === 'chat' ? 'One conversation, every page' : '';
+    renderLinks();
+    const inp = $('nl-ask-input'); if($('nl-send')) $('nl-send').disabled = busy || !(inp && inp.value.trim());
+  }
+  // Flip the same panel between its faces. Only the person's own action
+  // flips back to the Overview; a new message flips to the chat.
+  window.nlFlip = function(to){
+    face = to === 'chat' ? 'chat' : 'overview';
+    $('nl-ov').hidden = face !== 'overview';
+    $('nl-chat').hidden = face !== 'chat';
+    render();
+    if(face === 'chat'){ const b = $('nl-chat'); b.scrollTop = b.scrollHeight; }
+  };
+  window.nlOpenAssistant = function(){ nlFlip('chat'); setTimeout(() => $('nl-ask-input')?.focus(), 0); };
+  window.nlFace = () => face;
+  window.nlClear = function(){
+    const n = NL(); const old = n.chat; n.chat = []; pendingChoices = null; save(); render();
+    toast('Conversation cleared', '', { label:'Undo', fn:() => { NL().chat = old.concat(NL().chat); save(); render(); } });
+  };
+
+  // ── Sheets: History and How this works ──
+  function openInfo(html){ $('nl-info').innerHTML = html; $('nl-info-back').classList.add('on'); setTimeout(() => $('nl-info').querySelector('button')?.focus(), 0); }
+  window.nlCloseInfo = function(){ $('nl-info-back').classList.remove('on'); };
+  window.nlShowHistory = function(){
+    const n = NL(), u = undoState();
+    const items = n.history.map((e, i) => `<li>${e.items.map(h).join('<br>')}<span class="nl-meta">${h(byText(e))} · ${h(timeLabel(e.at))}${e.undone ? ' · undone' : ''}</span></li>`).join('');
+    openInfo(`<h2 id="nl-info-title">History</h2>${items ? `<ul class="nl-lines">${items}</ul>` : '<p>No changes yet. Changes the assistant prepares and you apply are listed here.</p>'}
+      ${n.history.length && !u.ok && n.history[0] && !n.history[0].undone ? `<p class="nl-meta" style="border-top:1px solid var(--nl-line)">${h(u.why)}</p>` : ''}
+      <div class="nl-sheet-acts">${u.ok ? '<button class="nl-black" type="button" onclick="nlUndo()">Undo the latest change</button>' : ''}<button class="nl-grey" type="button" onclick="nlCloseInfo()">Close</button></div>`);
+  };
+  window.nlShowHow = function(){
+    openInfo(`<h2 id="nl-info-title">How Horizon's assistant works</h2>
+      <p><b>It may</b> read your whole plan, bank file and journal, prepare changes and mark them Suggested, and ask you which one you mean.</p>
+      <p><b>Only after your press</b> it changes an amount, adds or removes a line, changes a year ahead or one month, sets your savings target, or moves a trip cost.</p>
+      <p><b>Never</b> does it move or pay money, change anything without your press, or delete your history. The latest change can always be undone.</p>
+      <div class="nl-sheet-acts"><button class="nl-grey" type="button" onclick="nlCloseInfo()">Close</button></div>`);
+  };
+  document.addEventListener('click', e => { if(e.target.id === 'nl-info-back') nlCloseInfo(); });
+
+  // ── Toast (bottom-centre, with an optional action) ──
+  let toastTimer = null;
+  window.nlToast = (m, k, a) => toast(m, k, a);
+  function toast(msg, kind, action){
+    const t = $('nl-toast'); if(!t) return;
+    t.innerHTML = `<span>${h(msg)}</span>` + (action ? `<button type="button">${h(action.label)}</button>` : '');
+    if(action) t.querySelector('button').onclick = () => { t.className = 'nl-toast'; action.fn(); };
+    t.className = 'nl-toast on' + (kind ? ' ' + kind : '');
+    clearTimeout(toastTimer); toastTimer = setTimeout(() => { t.className = 'nl-toast'; }, 6000);
+  }
+
+  // ── Wiring ──
+  const form = $('nl-ask'), input = $('nl-ask-input');
+  if(form && input){
+    const grow = () => { input.style.height = 'auto'; input.style.height = Math.min(120, input.scrollHeight) + 'px'; $('nl-send').disabled = busy || !input.value.trim(); };
+    input.addEventListener('input', grow);
+    input.addEventListener('keydown', e => { if(e.key === 'Enter' && !e.shiftKey && !e.isComposing){ e.preventDefault(); form.requestSubmit ? form.requestSubmit() : form.dispatchEvent(new Event('submit', { cancelable:true })); } });
+    form.addEventListener('submit', e => { e.preventDefault(); if(busy) return; const v = input.value; if(!v.trim()) return; input.value = ''; grow(); send(v); });
+  }
+  document.addEventListener('keydown', e => {
+    if(e.key !== 'Escape' || !isOn() || e.nlDone) return;
+    if($('nl-info-back').classList.contains('on')){ nlCloseInfo(); return; }
+    if($('nl-sheet-back')?.classList.contains('on')) return;
+    const menu = $('nl-menu'); if(menu && !menu.hidden) return;
+    if(face === 'chat') nlFlip('overview');
+  });
+  // The back arrow leaves the conversation first, then goes back a page.
+  const oldBack = window.nlBack;
+  window.nlBack = function(){ if(face === 'chat') nlFlip('overview'); else if(oldBack) oldBack(); };
+  // Another page always opens on its Overview; the conversation is kept.
+  if(typeof bus !== 'undefined'){
+    bus.on('panel:changed', () => { if(face !== 'overview') nlFlip('overview'); else render(); });
+    bus.on('state:changed', () => { if(isOn() && !busy) render(); });
+  }
+  window.addEventListener('resize', () => { if(isOn()) renderLinks(); });
+  render();
+  window.nlRender = render;
+})();
+</script>
+<script>try{ if(window.NLP && NLP.boot) NLP.boot(); }catch(e){ console.warn('[nl] boot', e); }</script>
 </body>
 </html>
