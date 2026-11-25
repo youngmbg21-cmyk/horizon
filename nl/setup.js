@@ -112,7 +112,9 @@
     const a0 = pts[0].age, a1 = pts[pts.length - 1].age, span = a1 - a0;
     const step = span > 30 ? 10 : span > 12 ? 5 : span > 5 ? 2 : 1;
     const xt = [[a0, String(a0)]]; for(let a = Math.ceil((a0 + 1) / step) * step; a < a1; a += step) if(a - a0 >= step / 2 && a1 - a >= step / 2) xt.push([a, String(a)]); xt.push([a1, String(a1)]);
-    return NLP.chart({ w, h, x:[a0, a1], y:[yt.min, yt.max], yt:yt.ticks, xt, pad:{ l:58, r:20, t:22 }, label:chartTitle(pts), draw:k => {
+    return NLP.chart({ w, h, x:[a0, a1], y:[yt.min, yt.max], yt:yt.ticks, xt, pad:{ l:58, r:20, t:22 }, label:chartTitle(pts),
+      hover:{ n:pts.length, x:i => pts[i].age, title:i => `Age ${pts[i].age}`, rows:i => [{ name:'Your money', value:NLP.money(pts[i].v), color:'#087363' }], y:i => [{ v:pts[i].v, color:'#087363' }] },
+      draw:k => {
       const xy = pts.map(p => [p.age, p.v]), f = xy[0], l = xy[xy.length - 1];
       return `<path d="${k.area(xy, Math.max(yt.min, 0))}" fill="#087363" fill-opacity=".10"/><path d="${k.line(xy)}" fill="none" stroke="#087363" stroke-width="2.2"/>`
         + `<circle cx="${k.sx(f[0])}" cy="${k.sy(f[1])}" r="3.5" fill="#1D1D1F"/><circle cx="${k.sx(l[0])}" cy="${k.sy(l[1])}" r="4" fill="#087363"/>`

@@ -410,12 +410,14 @@
   // ── Forecast tab ──────────────────────────────────────────────────────
   function monthsInfo(){
     const ms = get12Months();
+    let savSum = 0;
     return ms.map((m, i) => {
+      savSum += Number(m.savings) || 0;
       const trips = m.expenseItems.filter(x => x.fromTrip);
       const carry = m.expenseItems.find(x => x.carryForward) || null;
       const carryIn = m.incomeItems.find(x => x.carryForward) || null;
       const short = (m.funFund || 0) < 0;
-      return { i, m, key:m.key, trips, carry, carryIn, short, trip:trips.length > 0, fun:m.pureFunFund, bal:m.funFund };
+      return { i, m, key:m.key, trips, carry, carryIn, short, trip:trips.length > 0, fun:m.pureFunFund, bal:m.funFund, savBal:savSum };
     });
   }
   function whyShort(x){
@@ -449,6 +451,8 @@
       const tops = info.map(x => Math.max(x.m.pureIncome, x.m.pureExpenses + x.m.savings));
       const t = NLP.ticks(0, Math.max(1, ...tops), 4, NLP.moneyShort);
       return NLP.chart({ w, h:hgt, x:[-0.5, 11.5], y:[0, t.max], yt:t.ticks, xt:info.map((x, i) => [i, monShort(x.key)]), label:'Next 12 months, stacked by costs, saved and Fun Fund',
+        hover:{ n:info.length, x:i => i, title:i => monLabel(info[i].key) + (info[i].short ? ' · short' : ''),
+          rows:i => { const m = info[i].m; return [{ name:'Comes in', value:money(m.pureIncome), color:'transparent' }, { name:'Costs', value:money(m.pureExpenses), color:'#C9CED8' }, { name:'Saved', value:money(m.savings), color:'var(--nl-accent)' }, { name:'Fun Fund', value:money(m.pureFunFund), color:'#9FD2BF' }, { name:'Fun balance', value:money(info[i].bal), color:info[i].bal < 0 ? '#E3A89F' : 'transparent' }, { name:'Savings total', value:money(info[i].savBal), color:'transparent' }]; } },
         draw:({ sx, sy }) => {
           const bw = (sx(1) - sx(0)) * 0.62; let s = '';
           info.forEach((x, i) => {
@@ -486,7 +490,7 @@
     const title = f.left < 0 ? `${name} leaves you ${money(-f.left)} short.` : `${name} leaves ${money(f.left)} for fun.`;
     const zero = lo < 0 ? `<i class="nlm-flow-zero" style="left:${pct(0)}"></i>` : '';
     const bar = (a, b, cls) => `<span class="nlm-flow-track">${zero}<i class="nlm-flow-bar ${cls}" style="left:${pct(a)};width:${(Math.max(0.4, (b - a) / (hi - lo) * 100)).toFixed(2)}%"></i></span>`;
-    let rowsH = f.rows.map(r => `<div class="nlm-flow-row"><span class="nlm-flow-l"><b>${H(r.label)}</b>${r.sub ? `<span>${H(r.sub)}</span>` : ''}</span>${bar(r.from, r.to, 'k-' + r.kind)}<span class="nlm-flow-v">${r.kind === 'in' ? '' : '−'}${H(money(r.amount))}</span></div>`).join('');
+    let rowsH = f.rows.map(r => `<div class="nlm-flow-row" data-tip="${H(r.label)}${r.sub ? '\n' + H(r.sub) + ': ' : '\nAmount: '}${H((r.kind === 'in' ? '' : '−') + money(r.amount))}"><span class="nlm-flow-l"><b>${H(r.label)}</b>${r.sub ? `<span>${H(r.sub)}</span>` : ''}</span>${bar(r.from, r.to, 'k-' + r.kind)}<span class="nlm-flow-v">${r.kind === 'in' ? '' : '−'}${H(money(r.amount))}</span></div>`).join('');
     rowsH += `<div class="nlm-flow-row nlm-flow-end"><span class="nlm-flow-l"><b>${f.left < 0 ? 'Short' : 'Left for fun'}</b></span>${bar(Math.min(0, f.left), Math.max(0, f.left), f.left < 0 ? 'k-short' : 'k-left')}<span class="nlm-flow-v${f.left < 0 ? ' neg' : ''}">${H(money(f.left))}</span></div>`;
     const chosen = x.i !== 0;
     return NLP.card(title, `${chosen ? monLabel(x.key) + ', the month you chose' : 'This month'}: what comes in, where it goes, and what is left.${chosen ? '' : ' Press a month below to see that one.'}`, `<div class="nlm-flow">${rowsH}</div>`);
@@ -499,7 +503,7 @@
     const pick = info.find(x => x.key === NLP.chosen(PANEL)) || info[0];
     let h = `<div class="nlm-fc-top">${pick ? monthFlowCard(pick) : ''}` + NLP.card(title, 'Next 12 months. Grey: costs. Green: saved. Light green: Fun Fund. Red: a short month.', forecastChart(info) +
       NLP.legend([{ label:'Costs', color:'var(--nlm-cost)' }, { label:'Saved', color:'var(--nl-accent)' }, { label:'Fun Fund', color:'var(--nlm-fun)' }, { label:'Short month', color:'var(--nlm-short)' }])) + `</div>`;
-    h += `<div class="nl-tbl-wrap" id="nlm-fc"><table class="nl-tbl"><thead><tr><th></th><th>Month</th><th>Status</th><th class="r">Costs</th><th class="r">Saved</th><th class="r">Fun Fund</th><th class="r">Fun balance</th></tr></thead><tbody>`;
+    h += `<div class="nl-tbl-wrap" id="nlm-fc"><table class="nl-tbl"><thead><tr><th></th><th>Month</th><th>Status</th><th class="r">Costs</th><th class="r">Fun Fund</th><th class="r">Fun balance</th><th class="r">Saved</th><th class="r">Savings total</th></tr></thead><tbody>`;
     info.forEach((x, i) => {
       const bits = [];
       if(x.carry && x.carry.amount > 0) bits.push(`Includes ${money(x.carry.amount)} carried over from ${monLong(x.carry.fromKey)}`);
@@ -507,7 +511,7 @@
       if(x.m.hasOverride) bits.push('This month has its own changes');
       const sub = bits.length ? bits.join('. ') : 'Same as your plan';
       const badge = x.short ? NLP.badge('Short', 'ruby') : x.trip ? NLP.badge('Trip', 'amber') : NLP.badge('OK', 'green');
-      h += `<tr data-nl-row="${x.key}"><td class="mk">${i + 1}</td><td><span class="nm">${H(monLabel(x.key))}</span><span class="sub">${H(sub)}</span></td><td>${badge}</td><td class="r">${H(money(x.m.pureExpenses))}</td><td class="r">${H(money(x.m.savings))}</td><td class="r${x.fun < 0 ? ' nlm-neg' : ''}">${H(money(x.fun))}</td><td class="r${x.bal < 0 ? ' nlm-neg' : ''}">${H(money(x.bal))}</td></tr>`;
+      h += `<tr data-nl-row="${x.key}"><td class="mk">${i + 1}</td><td><span class="nm">${H(monLabel(x.key))}</span><span class="sub">${H(sub)}</span></td><td>${badge}</td><td class="r">${H(money(x.m.pureExpenses))}</td><td class="r${x.fun < 0 ? ' nlm-neg' : ''}">${H(money(x.fun))}</td><td class="r${x.bal < 0 ? ' nlm-neg' : ''}">${H(money(x.bal))}</td><td class="r">${H(money(x.m.savings))}</td><td class="r">${H(money(x.savBal))}</td></tr>`;
     });
     h += `</tbody></table></div><p class="nlm-foot nl-note">Press a month to choose it; press again to open its lines.</p>`;
     return h;
@@ -538,6 +542,8 @@
       const step = span > 24 ? 5 : span > 12 ? 4 : span > 6 ? 2 : 1;
       const xt = rows.filter(r => (r.year - y0) % step === 0 && r.year !== retireYear).map(r => [r.year, String(r.year)]);
       return NLP.chart({ w, h:hgt, x:[y0 - 0.6, y1 + 0.6], y:[0, t.max], yt:t.ticks, xt, pad:{ r:44 }, label:'Each year until you retire',
+        hover:{ n:rows.length, x:i => rows[i].year, title:i => `${rows[i].year}${rows[i].age ? ' · age ' + rows[i].age : ''} · a month`,
+          rows:i => { const r = rows[i]; return [{ name:'Comes in', value:money(r.income / 12), color:'transparent' }, { name:'Costs', value:money((r.expenses + r.trips) / 12), color:'#C9CED8' }, { name:'Saved', value:money(r.savings / 12), color:'var(--nl-accent)' }, { name:r.net < 0 ? 'Short by' : 'Fun Fund', value:money(Math.abs(r.net) / 12), color:r.net < 0 ? '#E3A89F' : '#9FD2BF' }]; } },
         draw:({ sx, sy }) => {
           const bw = Math.max(2, (sx(1) - sx(0)) * 0.64); let s = '';
           rows.forEach(r => {

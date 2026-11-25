@@ -254,6 +254,12 @@
       });
       return NLP.chart({ w, h, x:[r.cur, r.L], y:[T.min, T.max], pad:{ l:58, r:14, t:12, b:24 }, yt:T.ticks, xt:xs,
         label:'Money over your life',
+        hover:{ n:r.pts.length, x:i => r.pts[i][0],
+          title:i => `Age ${Math.round(r.pts[i][0])}${r.pts[i][0] >= r.ret ? ' · retired' : ''}`,
+          rows:i => { const out = [{ name:'Your plan', value:NLP.money(r.pts[i][1]), color:'var(--nl-accent)' }];
+            if(alt){ const q = alt.life.pts.reduce((b, p) => Math.abs(p[0] - r.pts[i][0]) < Math.abs(b[0] - r.pts[i][0]) ? p : b, alt.life.pts[0]); if(q) out.push({ name:'What if (not saved)', value:NLP.money(q[1]), color:'#48639A' }); }
+            return out; },
+          y:i => { const out = [{ v:r.pts[i][1], color:'var(--nl-accent)' }]; if(alt){ const q = alt.life.pts.reduce((b, p) => Math.abs(p[0] - r.pts[i][0]) < Math.abs(b[0] - r.pts[i][0]) ? p : b, alt.life.pts[0]); if(q) out.push({ v:q[1], color:'#48639A' }); } return out; } },
         draw:({ sx, sy, line, area }) => {
           const acc = r.pts.slice(0, r.retStart), all2 = r.pts;
           let s = `<rect x="${sx(r.ret).toFixed(1)}" y="${sy(T.max).toFixed(1)}" width="${Math.max(0, sx(r.L) - sx(r.ret)).toFixed(1)}" height="${(sy(T.min) - sy(T.max)).toFixed(1)}" class="tdy-ret"/>`;
@@ -311,6 +317,8 @@
       const T = NLP.ticks(Math.min(0, ...lows), Math.max(1, ...tops), 3, v => v === 0 ? '0' : NLP.moneyShort(v));
       const every = w < 420 ? 2 : 1;
       return NLP.chart({ w, h, x:[0, 12], y:[T.min, T.max], pad:{ l:52, r:8, t:10, b:24 }, yt:T.ticks, label:'Next 12 months',
+        hover:{ n:ms.length, x:i => i + .5, title:i => NLP.monthLabel(ms[i].key),
+          rows:i => [{ name:'Comes in', value:NLP.money(num(ms[i].pureIncome)), color:'transparent' }, { name:'Costs', value:NLP.money(num(ms[i].pureExpenses)), color:'#C9CED8' }, { name:'Saved', value:NLP.money(num(ms[i].savings)), color:'var(--nl-accent)' }, { name:num(ms[i].funFund) < 0 ? 'Short by' : 'Fun Fund', value:NLP.money(num(ms[i].funFund) < 0 ? -num(ms[i].funFund) : num(ms[i].pureFunFund)), color:num(ms[i].funFund) < 0 ? '#E3A89F' : '#9FD2BF' }] },
         draw:({ sx, sy }) => {
           const bw = (sx(1) - sx(0)) * .62;
           let s = '';
@@ -343,6 +351,9 @@
       const every = w < 420 ? 2 : 1;
       const xt = ms.map((x, i) => [i, NLP.monthShort(x.key)]).filter((_, i) => i % every === 0);
       return NLP.chart({ w, h, x:[0, 11], y:[T.min, T.max], pad:{ l:52, r:18, t:12, b:24 }, yt:T.ticks, xt, label:'Fun Fund balance',
+        hover:{ n:ms.length, x:i => i, title:i => NLP.monthLabel(ms[i].key),
+          rows:i => { const t = m.trips.filter(q => q.key === ms[i].key); return [{ name:'Fun Fund balance', value:NLP.money(run[i]), color:'var(--nl-accent)' }, { name:'Savings so far', value:NLP.money(sav[i]), color:'#48639A' }].concat(t.length ? [{ name:'Trip: ' + t.map(q => q.trip).join(', '), value:NLP.money(t.reduce((a, q) => a + q.amount, 0)), color:'#C9A56A' }] : []); },
+          y:i => [{ v:run[i], color:'var(--nl-accent)' }, { v:sav[i], color:'#48639A' }] },
         draw:({ sx, sy, line, area }) => {
           const pts = run.map((v, i) => [i, v]);
           let s = `<line x1="${sx(0)}" x2="${sx(11)}" y1="${sy(0).toFixed(1)}" y2="${sy(0).toFixed(1)}" class="tdy-zero"/>`;
@@ -388,7 +399,7 @@
 
   // ── The page ───────────────────────────────────────────────────────────
   function render(host){
-    const m = model(), ui = st(), tab = ui.tab === 'needs' ? 'needs' : 'how';
+    const m = model(), ui = st(), tab = ui.tab === 'needs' ? 'needs' : ui.tab === 'review' && NLP.review ? 'review' : 'how';
     const wi = activeWI(), alt = wi ? { w:wi, life:runWhatIf(wi.kind, wi.val) } : null;
     const isNom = nom();
     const sw = `<div class="nl-seg" role="group" aria-label="Show money as"><button type="button" aria-pressed="${!isNom}" onclick="NLP.today.mode('real')" title="Takes out ${H(state.inflationRate)}% inflation a year">Today’s money</button><button type="button" aria-pressed="${isNom}" onclick="NLP.today.mode('nominal')" title="The amounts as they will read in the future">Future money</button></div>`;
@@ -411,6 +422,8 @@
           NLP.card(funTitle(m) + ` Savings reach ${NLP.moneyShort(savRun(m)[11])}.`, m.trips.length ? 'Fun Fund balance and your savings adding up, next 12 months. Dots: trip costs.' : 'Fun Fund balance and your savings adding up, next 12 months.',
             NLP.chartBox(funChart(m), 160, 'Fun Fund balance and savings') + NLP.legend([{ label:'Fun Fund', color:'var(--nl-accent)' }, { label:'Savings', color:'#48639A' }].concat(m.trips.length ? [{ label:'Trip cost', color:'var(--tdy-steel)' }] : []).concat(Math.min(...m.run) < 0 ? [{ label:'Below zero', color:'var(--tdy-ruby-bg)' }] : []))) +
         `</div>`;
+    } else if(tab === 'review'){
+      body = NLP.review.body(m);
     } else {
       body = m.items.length
         ? `<div class="nl-tbl-wrap"><table class="nl-tbl tdy-needs"><thead><tr><th></th><th>What needs you</th><th>Status</th></tr></thead><tbody>${m.items.map((it, i) =>
@@ -420,7 +433,8 @@
     host.innerHTML = `<div class="nl-wrap tdy">${NLP.head({ title:'Today', panel:P, tabs:[
       { key:'how', label:'How are we doing', on:tab === 'how' },
       { key:'needs', label:'Needs you', count:m.items.length, on:tab === 'needs' },
-    ], actions:sw })}${body}</div>`;
+    ].concat(NLP.review ? [{ key:'review', label:'Full review', on:tab === 'review' }] : []), actions:tab === 'review' ? NLP.review.actions() : sw })}${body}</div>`;
+    if(tab === 'review') NLP.review.wire(host);
     if(tab === 'needs') NLP.rows(host.querySelector('.tdy-needs tbody'), P, id => NLP.today.go(id));
   }
 
@@ -434,6 +448,7 @@
     return `<div class="tdy-wall"><div class="tdy-cap">Your life wall, age ${cur} to ${L} · ${m.green} of ${m.bricks.length} green</div><div class="tdy-bricks">${m.bricks.map(b => `<i class="${H(b.verdict)}${b.isCurrent ? ' now' : ''}" title="Age ${H(b.startAge)}–${H(b.endAge)}: ${H(b.verdict)}"></i>`).join('')}</div><p class="tdy-cap" style="margin:6px 0 0">${H(note)}</p></div>`;
   }
   function overview(){
+    if(st().tab === 'review' && NLP.review) return NLP.review.overview(model());
     const m = model(), ui = st(), r = m.life, L = lifeExp();
     const wi = activeWI();
     const items = m.items.filter(it => it.id !== 'pending');   // the panel lists suggestions itself
@@ -493,8 +508,10 @@
       if(i && !i.value.trim()){ i.value = 'What if '; i.dispatchEvent(new Event('input')); i.focus(); i.setSelectionRange(i.value.length, i.value.length); }
     },
     report(){
-      NLP.ask('Write me a full review of my finances: where I stand, what is going well, what needs attention, and the three things to do next.');
+      st().tab = 'review'; st().chosen = null;
+      if(state.activePanel !== P) NLP.go(P); else NLP.renderPage(P);
     },
+    model:() => model(),
   };
 
   NLP.register({ panel:P, section:'today', label:'Today', render, overview });

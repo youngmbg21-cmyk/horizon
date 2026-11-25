@@ -137,8 +137,60 @@
     const area = (pts, y0) => pts.length ? line(pts) + `L${sx(pts[pts.length-1][0]).toFixed(1)} ${sy(y0).toFixed(1)}L${sx(pts[0][0]).toFixed(1)} ${sy(y0).toFixed(1)}Z` : '';
     let g = (o.yt || []).map(t => `<line class="gl" x1="${p.l}" x2="${w - p.r}" y1="${sy(t[0]).toFixed(1)}" y2="${sy(t[0]).toFixed(1)}"/><text x="${p.l - 6}" y="${(sy(t[0]) + 4).toFixed(1)}" text-anchor="end">${H(t[1])}</text>`).join('');
     g += (o.xt || []).map(t => `<text x="${sx(t[0]).toFixed(1)}" y="${hgt - 6}" text-anchor="middle">${H(t[1])}</text>`).join('');
-    return `<svg class="nl-svg" viewBox="0 0 ${w} ${hgt}" width="${w}" height="${hgt}" role="img" aria-label="${H(o.label || 'chart')}">${g}${o.draw({ sx, sy, line, area, w, h:hgt, p })}</svg>`;
+    let hv = '';
+    if(o.hover && o.hover.n > 0){
+      const id = 'hv' + (++hoverSeq);
+      NLP._hovers[id] = { spec:o.hover, sx, sy, p, w, h:hgt }; delete NLP._hovers['hv' + (hoverSeq - 150)];
+      hv = `<rect class="nl-hv" data-hv="${id}" x="${p.l}" y="${p.t}" width="${Math.max(1, w - p.l - p.r)}" height="${Math.max(1, hgt - p.t - p.b)}" fill="transparent"/>`;
+    }
+    return `<svg class="nl-svg" viewBox="0 0 ${w} ${hgt}" width="${w}" height="${hgt}" role="img" aria-label="${H(o.label || 'chart')}">${g}${o.draw({ sx, sy, line, area, w, h:hgt, p })}${hv}</svg>`;
   };
+  // ── Hover: the name and value of whatever is under the pointer ──────────
+  // A chart passes hover:{ n, x:i=>xValue, title:i=>text, rows:i=>[{name, value, color}], y:i=>[yValues for dots] }.
+  // Any element can instead carry data-tip="Name: value" (one line per \n).
+  NLP._hovers = {}; let hoverSeq = 0;
+  function tipEl(){ let t = document.getElementById('nl-tip'); if(!t){ t = document.createElement('div'); t.id = 'nl-tip'; t.setAttribute('role', 'tooltip'); document.body.appendChild(t); } return t; }
+  function showTip(html, cx, cy){
+    const t = tipEl(); t.innerHTML = html; t.classList.add('on');
+    const r = t.getBoundingClientRect(), pad = 14;
+    let x = cx + pad, y = cy - r.height - pad;
+    if(x + r.width > window.innerWidth - 8) x = cx - r.width - pad;
+    if(y < 8) y = cy + pad;
+    t.style.transform = `translate(${Math.round(Math.max(8, x))}px, ${Math.round(y)}px)`;
+  }
+  function hideTip(){ const t = document.getElementById('nl-tip'); if(t) t.classList.remove('on'); document.querySelectorAll('svg.nl-svg .nl-guide').forEach(g => g.remove()); }
+  const tipRows = (title, rows) => `${title ? `<b>${H(title)}</b>` : ''}${(rows || []).map(r => `<span class="r"><i style="background:${r.color || 'transparent'}${r.color ? '' : ';border:1px solid var(--nl-edge)'}"></i>${H(r.name)}<em>${H(r.value)}</em></span>`).join('')}`;
+  function onHover(e){
+    if(!NLP.isOn()) return;
+    const el = e.target;
+    const hvId = el && el.getAttribute && el.getAttribute('data-hv');
+    if(hvId && NLP._hovers[hvId]){
+      const k = NLP._hovers[hvId], s = k.spec, svg = el.ownerSVGElement, box = svg.getBoundingClientRect();
+      const scale = box.width / k.w, lx = (e.clientX - box.left) / scale;
+      let best = 0, bd = Infinity;
+      for(let i = 0; i < s.n; i++){ const d = Math.abs(k.sx(s.x(i)) - lx); if(d < bd){ bd = d; best = i; } }
+      let g = svg.querySelector('.nl-guide');
+      if(!g){ g = document.createElementNS('http://www.w3.org/2000/svg', 'g'); g.setAttribute('class', 'nl-guide'); svg.insertBefore(g, el); }
+      const gx = k.sx(s.x(best)).toFixed(1);
+      const dots = (s.y ? s.y(best) : []).filter(v => v != null && isFinite(v.v != null ? v.v : v)).map(v => { const val = v.v != null ? v.v : v, c = v.color || 'var(--nl-ink)'; return `<circle cx="${gx}" cy="${k.sy(val).toFixed(1)}" r="4" fill="#fff" stroke="${c}" stroke-width="2"/>`; }).join('');
+      g.innerHTML = `<line x1="${gx}" x2="${gx}" y1="${k.p.t}" y2="${k.h - k.p.b}" stroke="var(--nl-quiet)" stroke-width="1" stroke-dasharray="3 3"/>${dots}`;
+      showTip(tipRows(s.title ? s.title(best) : '', s.rows ? s.rows(best) : []), e.clientX, e.clientY);
+      return;
+    }
+    const tipped = el && el.closest && el.closest('[data-tip]');
+    if(tipped && tipped.closest('html.nl .nl-page, html.nl .nl-side')){
+      const lines = String(tipped.getAttribute('data-tip')).split('\n');
+      const rows = lines.slice(1).map(l => { const i = l.lastIndexOf(': '); return i > 0 ? { name:l.slice(0, i), value:l.slice(i + 2) } : { name:l, value:'' }; });
+      showTip(tipRows(lines[0], rows), e.clientX, e.clientY);
+      return;
+    }
+    hideTip();
+  }
+  document.addEventListener('pointermove', onHover, { passive:true });
+  document.addEventListener('pointerdown', e => { if(e.pointerType !== 'mouse') onHover(e); }, { passive:true });
+  document.addEventListener('scroll', hideTip, { passive:true, capture:true });
+  document.addEventListener('pointerleave', hideTip);
+
   // Round tick values for an axis 0…max (or min…max).
   NLP.ticks = function(min, max, count, fmtFn){
     const span = Math.max(1, max - min), raw = span / Math.max(1, count || 4);
@@ -330,6 +382,15 @@ html.nl:not(.nl-phone) .nl-resize::after { content:''; position:absolute; left:3
 html.nl:not(.nl-phone) .nl-resize:hover::after, html.nl:not(.nl-phone) .nl-resize:focus-visible::after, html.nl.nl-resizing .nl-resize::after { background:var(--nl-accent); }
 html.nl:not(.nl-phone) .nl-resize:focus-visible { outline:0; }
 html.nl.nl-resizing, html.nl.nl-resizing * { cursor:col-resize !important; user-select:none !important; }
+/* ── Chart hover card ── */
+#nl-tip { position:fixed; left:0; top:0; z-index:1200; pointer-events:none; opacity:0; transition:opacity .08s; background:#fff; color:var(--nl-ink); border:1px solid var(--nl-line); border-radius:10px; box-shadow:0 8px 24px rgba(17,17,19,.14); padding:8px 11px; font:13px/1.4 var(--nl-sans); min-width:140px; max-width:300px; }
+#nl-tip.on { opacity:1; }
+#nl-tip b { display:block; font-weight:600; margin-bottom:3px; }
+#nl-tip .r { display:flex; align-items:center; gap:7px; white-space:nowrap; }
+#nl-tip .r i { width:9px; height:9px; border-radius:2px; flex-shrink:0; }
+#nl-tip .r em { font-style:normal; margin-left:auto; padding-left:12px; font-variant-numeric:tabular-nums; font-weight:500; }
+html.nl svg.nl-svg .nl-hv { cursor:crosshair; }
+html.nl [data-tip] { cursor:default; }
 /* ── Classic overlays that must not show in the new look ── */
 html.nl .cmdp, html.nl .cmdp-backdrop { display:none !important; }
 /* The classic sync sign-in box, dressed in the new look. */

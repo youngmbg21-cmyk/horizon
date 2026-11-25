@@ -172,6 +172,9 @@
     const n = run.length - 1;
     const xt = months.map((m, i) => [i, NLP.monthShort(m.key)]).filter((_, i) => w > 520 || i % 2 === 0);
     return NLP.chart({ w, h, x:[0, n], y:[tk.min, tk.max], yt:tk.ticks, xt, pad:{ l:58, r:22 }, label:'Fun Fund balance, next 12 months',
+      hover:{ n:run.length, x:i => i, title:i => months[i] ? NLP.monthLabel(months[i].key) : '',
+        rows:i => [{ name:'Fun Fund balance', value:NLP.money(run[i]), color:run[i] < 0 ? '#E3A89F' : 'var(--nl-accent)' }].concat(pv && pv.s[i] != null ? [{ name:pv.label + ' (not saved)', value:NLP.money(pv.s[i]), color:'#48639A' }] : []),
+        y:i => [{ v:run[i], color:'var(--nl-accent)' }].concat(pv && pv.s[i] != null ? [{ v:pv.s[i], color:'#48639A' }] : []) },
       draw:({ sx, sy, line, area }) => {
         const pts = run.map((v, i) => [i, v]);
         const neg = run.map((v, i) => [i, Math.min(0, v)]);
