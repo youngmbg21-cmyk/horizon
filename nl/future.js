@@ -27,10 +27,50 @@
   const fromDisp = v => parseNum(v) / (rate() || 1);
   const ellip = (s, n) => { s = String(s || ''); return s.length > n ? s.slice(0, n - 1) + '…' : s; };
 
+  // ── "Your plan": the saved settings what-ifs and scenario presses move away from ──
+  // Kept in state.nlPlan. Set the first time this page opens; "Make this my
+  // plan" moves it; "Back to my plan" restores it (with Undo).
+  const PLAN_FIELDS = ['retirementAge','retirementScenario','lifeExp','growthRate','retirementPostGrowth','externalAssets'];
+  function planSnap(){
+    const g = {}; (state.externalAssets || []).forEach(a => { if((a.assetType || 'investment') === 'investment') g[a.id] = a.growthRate ?? null; });
+    return { retirementAge:state.retirementAge, retirementScenario:state.retirementScenario || 'baseline', lifeExp:state.lifeExp || 90,
+      growthRate:state.growthRate ?? null, retirementPostGrowth:state.retirementPostGrowth ?? null, assetGrowth:g };
+  }
+  function ensurePlan(){ if(!state.nlPlan || typeof state.nlPlan !== 'object'){ state.nlPlan = planSnap(); save(); } return state.nlPlan; }
+  // What differs from the plan, in words.
+  function planDiffs(){
+    const p = state.nlPlan; if(!p) return [];
+    const c = planSnap(), out = [];
+    if(c.retirementScenario !== p.retirementScenario) out.push(`${SC[c.retirementScenario] || c.retirementScenario} (your plan: ${SC[p.retirementScenario] || p.retirementScenario})`);
+    if(c.retirementAge !== p.retirementAge) out.push(`retire at ${c.retirementAge} (your plan: ${p.retirementAge})`);
+    if(c.lifeExp !== p.lifeExp) out.push(`live to ${c.lifeExp} (your plan: ${p.lifeExp})`);
+    const growthMoved = c.growthRate !== p.growthRate || c.retirementPostGrowth !== p.retirementPostGrowth ||
+      Object.keys(p.assetGrowth || {}).some(id => id in c.assetGrowth && c.assetGrowth[id] !== p.assetGrowth[id]);
+    if(growthMoved) out.push('different growth rates');
+    return out;
+  }
+  window.NLF = window.NLF || {};
+  NLF.planBack = () => {
+    const p = state.nlPlan; if(!p || !planDiffs().length) return;
+    U().wif = [];
+    change('Back to your plan', PLAN_FIELDS, s => {
+      s.retirementAge = p.retirementAge; s.retirementScenario = p.retirementScenario; s.lifeExp = p.lifeExp;
+      if(p.growthRate == null) delete s.growthRate; else s.growthRate = p.growthRate;
+      if(p.retirementPostGrowth == null) delete s.retirementPostGrowth; else s.retirementPostGrowth = p.retirementPostGrowth;
+      (s.externalAssets || []).forEach(a => { if(a.id in (p.assetGrowth || {})){ if(p.assetGrowth[a.id] == null) delete a.growthRate; else a.growthRate = p.assetGrowth[a.id]; } });
+    }, true);
+  };
+  NLF.planKeep = () => {
+    const before = state.nlPlan;
+    state.nlPlan = planSnap(); save();
+    NLP.toast('This is now your plan · saved', '', { label:'Undo', fn:() => { state.nlPlan = before; save(); NLP.toast('Change undone'); } });
+  };
+
   // ── Saving a change the person makes here ───────────────────────────────
   // Retirement fields are not in the shared Undo snapshot (core only keeps
   // the budget), so this page keeps its own one-step Undo in the toast.
-  function change(label, fields, mutate){
+  function change(label, fields, mutate, isPlanReset){
+    if(!isPlanReset && fields.some(f => PLAN_FIELDS.includes(f))) ensurePlan();
     const before = {}; fields.forEach(f => { before[f] = clone(state[f]); });
     try { mutate(state); }
     catch(err){ fields.forEach(f => { if(before[f] === undefined) delete state[f]; else state[f] = before[f]; }); NLP.toast('Nothing was saved: ' + err.message, 'warn'); return false; }
@@ -85,10 +125,11 @@
   NLF.wifKeep = () => {
     const defs = activeWifs(); if(!defs.length) return;
     const fields = [...new Set(defs.flatMap(d => d.fields))];
-    if(change(defs.map(d => d.label).join(' + ') + ' is now your plan', fields, s => defs.forEach(d => d.mut(s)))) U().wif = [];
+    if(change('Now using: ' + defs.map(d => d.label).join(' + '), fields, s => defs.forEach(d => d.mut(s)))) U().wif = [];
   };
   NLF.scen = sc => {
     if(!SC[sc] || (state.retirementScenario || 'baseline') === sc) return;
+    ensurePlan();
     state.retirementScenario = sc;               // same path as the classic Retirement Plan page
     U().wif = (U().wif || []).filter(k => k !== 'comfy');
     save();
@@ -178,6 +219,7 @@
 
   // ── Drawing ─────────────────────────────────────────────────────────────
   function render(host){
+    ensurePlan();
     const tab = NLP.tabOf(P, 'runway');
     const inv = investments(), pens = pensions();
     const bricks = getLifeWallData(gran());
@@ -194,7 +236,7 @@
     let body = '';
     if(tab === 'accounts') body = accountsHtml();
     else if(tab === 'wall') body = wallHtml(bricks);
-    else body = runwayHtml();
+    else body = planBar() + runwayHtml();
     host.innerHTML = `<div class="nl-wrap nlf">${head}${body}</div>`;
     const tb = host.querySelector('#nlf-tbl'), wall = host.querySelector('#nlf-wall');
     if(tab === 'runway' && tb) NLP.rows(tb, P, id => { const st = U(); if(id === 'spend'){ st.open = st.open === 'spend' ? null : 'spend'; NLP.renderPage(P); } else if(id === 'pension'){ NLP.tab(P, 'accounts'); NLP.ui(P).chosen = pens.length ? pens[0].id : 'pen-none'; NLP.renderPage(P); } });
@@ -206,6 +248,12 @@
       st.open = st.open === id ? null : id; NLP.renderPage(P);
     });
     if(tab === 'wall' && wall) NLP.rows(wall, P, id => openBrick(id));
+  }
+
+  function planBar(){
+    const d = planDiffs(); if(!d.length) return '';
+    const txt = d.join(', ');
+    return `<div class="nlf-planbar" role="status"><div><b>You’ve moved away from your plan</b><span>Now: ${H(txt.charAt(0).toUpperCase() + txt.slice(1))}.</span></div><div class="nl-inrow"><button type="button" class="nl-black nlf-pb" onclick="NLF.planBack()">Back to my plan</button>${NLP.link('Make this my plan', 'NLF.planKeep()')}</div></div>`;
   }
 
   // ── Runway ──────────────────────────────────────────────────────────────
@@ -522,8 +570,10 @@
     if(!rx.length) miss.push({ text:'No retirement spending yet', badge:{ text:'Missing', kind:'amber' }, link:{ label:'Add spending lines', onclick:'NLF.rxOpen()' } });
     if(miss.length && chosen !== 'pension') groups.push({ title:'Missing', rows:miss });
     let button;
-    const act = activeWifs();
+    const act = activeWifs(), moved = planDiffs();
+    if(moved.length) groups.unshift({ title:'Away from your plan', rows:[{ text:`${moved.length} setting${moved.length === 1 ? '' : 's'} changed from your plan`, badge:{ text:'Changed', kind:'amber' }, link:{ label:'Make this my plan', onclick:'NLF.planKeep()' } }] });
     if(act.length) button = { label:'Use this in my plan', onclick:'NLF.wifKeep()' };
+    else if(moved.length) button = { label:'Back to my plan', onclick:'NLF.planBack()' };
     else if(defs.length) button = { label:`Preview: ${defs[0].label.toLowerCase()}`, onclick:`NLF.wif('${defs[0].key}')` };
     return { headline, graphic, groups, button,
       links:pageLinks([{ label:'Change expenses', short:'Expenses', onclick:'NLF.rxOpen()' }]) };
@@ -619,6 +669,11 @@ html.nl { --nlf-amber:#8A5A0A; --nlf-steel:#48639A; --nlf-ruby:#8F2A22; --nlf-c1
 #panel-nl-future .nlf .nl-cc { padding-bottom:12px; }
 #panel-nl-future .nlf-wif { margin:10px 0 0; align-items:center; }
 #panel-nl-future .nlf-wl { font-size:13px; color:var(--nl-detail); }
+#panel-nl-future .nlf-planbar { display:flex; align-items:center; justify-content:space-between; gap:16px; flex-wrap:wrap; margin:0 0 16px; padding:14px 18px; border:1px solid var(--nl-line); border-left:3px solid var(--nlf-amber); border-radius:12px; background:var(--nl-surface); }
+#panel-nl-future .nlf-planbar b { display:block; font-weight:600; font-size:14px; }
+#panel-nl-future .nlf-planbar span { display:block; font-size:13px; color:var(--nl-quiet); margin-top:2px; }
+#panel-nl-future .nlf-planbar .nl-inrow { display:flex; align-items:center; gap:16px; margin:0; }
+#panel-nl-future .nlf-planbar .nlf-pb { width:auto; padding:9px 18px; margin:0; }
 #panel-nl-future .nlf-wifres { margin:8px 0 0; font-size:13px; color:var(--nl-quiet); }
 #panel-nl-future .nlf-wifres i.dash { display:inline-block; width:14px; height:0; border-top:2px dashed var(--nlf-steel); vertical-align:3px; margin-right:6px; }
 #panel-nl-future .nlf-wifres .nl-link { margin-left:8px; }

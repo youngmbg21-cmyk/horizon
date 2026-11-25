@@ -25775,6 +25775,9 @@ You are Horizon, the assistant. You PREPARE, the person DECIDES.
   }
   function render(){
     if(!$('nl-side')) return;
+    // Mid-press (a box losing focus saves and redraws): wait until the press
+    // ends, so the button being pressed is not swapped out under the pointer.
+    if(window.__nlDown){ window.__nlPendSide = true; return; }
     renderOverview(); renderChat();
     const hd = $('nl-face-hd');
     hd.classList.toggle('chat', face === 'chat');
