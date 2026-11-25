@@ -4227,6 +4227,77 @@ html.nl .nl-bar .cur-btn.active, html.nl .nl-bar .mode-btn.active { background:v
 @media (prefers-reduced-motion:no-preference){ .nl-toast.on { animation:nlFade .18s ease-out; } .nl-menu:not([hidden]) { animation:nlFade .12s ease-out; } }
 @keyframes nlFade { from { opacity:0; } to { opacity:1; } }
 @media (max-width:1100px){ .nl-assist-lbl { display:none; } }
+
+/* ══ NEW LOOK (L+S) · Phase 1: one side panel, two faces ═══════════════ */
+.nl-side { display:none; }
+html.nl #ai-fab { display:none !important; }
+/* The old chat window stays usable (⌘K can open it) but its off-screen shadow must not fall on the new panel. */
+html.nl #ai-panel:not(.open) { visibility:hidden; box-shadow:none; }
+html.nl .retire-slideover:not(.open) { box-shadow:none; }
+.nl-ask textarea:focus-visible { outline:0; }
+.nl-chg .nl-badge { align-self:start; }
+html.nl .nl-side { display:flex; order:9; flex-direction:column; width:340px; flex-shrink:0; min-height:0; background:var(--nl-surface); border-left:1px solid var(--nl-line); color:var(--nl-ink); font:14px/1.5 var(--nl-sans); }
+.nl-face-hd { display:flex; justify-content:space-between; align-items:baseline; gap:8px; margin:0 16px; padding:14px 0 9px; border-bottom:1px solid var(--nl-line); }
+.nl-face-hd #nl-face-title { font:600 11.5px/1.2 var(--nl-sans); letter-spacing:.06em; text-transform:uppercase; color:var(--nl-detail); }
+.nl-face-hd.chat #nl-face-title { font:600 15px/1.2 var(--nl-sans); letter-spacing:0; text-transform:none; color:var(--nl-ink); }
+.nl-face-sub { font-size:12.5px; color:var(--nl-detail); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.nl-face { flex:1; min-height:0; overflow-y:auto; overflow-x:hidden; padding:14px 16px; display:flex; flex-direction:column; gap:14px; }
+.nl-face[hidden] { display:none; }
+.nl-hl { font:600 19px/1.3 var(--nl-serif); margin:0; }
+.nl-counts { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:6px; }
+.nl-counts div { border-top:3px solid var(--nl-edge); padding-top:5px; font-size:12.5px; color:var(--nl-detail); }
+.nl-counts div.on { border-color:#8A5A0A; color:var(--nl-ink); }
+.nl-counts div.ok { border-color:var(--nl-accent); color:var(--nl-ink); }
+.nl-counts b { display:block; font:600 17px/1.2 var(--nl-sans); color:var(--nl-ink); font-variant-numeric:tabular-nums; }
+.nl-grp h4 { margin:0 0 4px; font:600 11.5px/1.3 var(--nl-sans); letter-spacing:.06em; text-transform:uppercase; color:var(--nl-detail); }
+.nl-door { display:grid; grid-template-columns:minmax(0,1fr) auto; gap:2px 8px; padding:8px 0; border-top:1px solid var(--nl-line); font-size:13.5px; }
+.nl-door:first-of-type { border-top:0; }
+.nl-door .w { font-weight:500; overflow-wrap:anywhere; }
+.nl-door .nl-badge { align-self:start; }
+.nl-door .nl-door-acts { grid-column:1/-1; display:flex; gap:12px; flex-wrap:wrap; }
+.nl-door .nl-why { grid-column:1/-1; font-size:12.5px; color:var(--nl-detail); }
+.nl-badge { display:inline-block; padding:2px 9px; border-radius:999px; font:500 12px/1.5 var(--nl-sans); white-space:nowrap; }
+.nl-badge.amber { background:#FBEEDB; color:#8A5A0A; } .nl-badge.green { background:#DFF2E7; color:#1F4D3B; }
+.nl-badge.ruby { background:#FBE5E3; color:#8F2A22; } .nl-badge.steel { background:#E6ECF6; color:#48639A; } .nl-badge.grey { background:var(--nl-pill); color:var(--nl-quiet); }
+.nl-link { border:0; background:transparent; padding:0; font:400 13px/1.5 var(--nl-sans); color:var(--nl-accent); text-decoration:underline; text-underline-offset:2px; cursor:pointer; white-space:nowrap; }
+.nl-link:disabled { color:var(--nl-detail); text-decoration:none; cursor:default; }
+.nl-link.main { font-weight:600; }
+.nl-side .nl-black { width:100%; }
+.nl-black:disabled { background:#C9CED8; cursor:default; }
+.nl-note { font-size:12.5px; color:var(--nl-detail); margin:-6px 0 0; }
+.nl-foot { padding:8px 16px 14px; display:flex; flex-direction:column; gap:8px; }
+.nl-links { display:flex; gap:14px; white-space:nowrap; overflow:hidden; min-height:20px; }
+.nl-ask { display:flex; align-items:flex-end; gap:8px; border:1px solid var(--nl-edge); border-radius:10px; padding:7px 7px 7px 12px; background:var(--nl-surface); margin:0; }
+.nl-ask:focus-within { border-color:var(--nl-accent); }
+.nl-ask textarea { flex:1; min-width:0; border:0; outline:0; resize:none; background:transparent; font:14px/1.45 var(--nl-sans); color:var(--nl-ink); padding:4px 0; max-height:120px; }
+.nl-ask textarea::placeholder { color:var(--nl-detail); }
+.nl-send { flex-shrink:0; width:30px; height:30px; border:0; border-radius:999px; background:var(--nl-black); color:#fff; font:600 15px/1 var(--nl-sans); cursor:pointer; }
+.nl-send:disabled { background:#C9CED8; cursor:default; }
+.nl-msg { font-size:13.5px; line-height:1.5; padding:9px 11px; border-radius:10px; overflow-wrap:anywhere; }
+.nl-msg.me { background:var(--nl-pill); align-self:flex-end; max-width:88%; white-space:pre-wrap; }
+.nl-msg.ai { background:#EEF8F4; max-width:100%; }
+.nl-msg.ai p { margin:0 0 7px; } .nl-msg.ai p:last-child { margin-bottom:0; }
+.nl-msg.ai ul { margin:4px 0 7px; padding-left:18px; }
+.nl-msg.warn { background:#FBEEDB; color:#5c3d07; }
+.nl-q { font-family:var(--nl-serif); font-style:italic; color:var(--nl-quiet); }
+.nl-chg { display:grid; grid-template-columns:minmax(0,1fr) auto; gap:2px 8px; border-top:1px solid var(--nl-line); padding:7px 0; font-size:13px; }
+.nl-chg:first-child { border-top:0; }
+.nl-chg.dropped .w { color:var(--nl-detail); text-decoration:line-through; }
+.nl-chg .nl-why { grid-column:1/-1; font-size:12.5px; color:var(--nl-detail); }
+.nl-card { background:var(--nl-surface); border:1px solid var(--nl-line); border-radius:10px; padding:4px 12px; margin-top:8px; }
+.nl-card-foot { font-size:12.5px; color:var(--nl-detail); padding:6px 0 8px; border-top:1px solid var(--nl-line); }
+.nl-choices { display:flex; flex-wrap:wrap; gap:8px; }
+.nl-choices button { border:0; background:var(--nl-pill); color:var(--nl-ink); border-radius:999px; padding:6px 13px; font:500 13px var(--nl-sans); cursor:pointer; white-space:nowrap; }
+.nl-choices button:hover { background:var(--nl-chosen); }
+.nl-status { font-size:13px; color:var(--nl-detail); }
+.nl-dots i { display:inline-block; width:4px; height:4px; margin-left:3px; border-radius:50%; background:currentColor; vertical-align:middle; opacity:.35; }
+@media (prefers-reduced-motion:no-preference){ .nl-dots i { animation:nlDot 1.2s infinite; } .nl-dots i:nth-child(2){ animation-delay:.2s; } .nl-dots i:nth-child(3){ animation-delay:.4s; } }
+@keyframes nlDot { 0%,100% { opacity:.25; } 50% { opacity:1; } }
+.nl-sheet ul.nl-lines { list-style:none; margin:0; padding:0; max-height:52vh; overflow-y:auto; }
+.nl-sheet ul.nl-lines li { padding:9px 0; border-top:1px solid var(--nl-line); color:var(--nl-ink); }
+.nl-sheet ul.nl-lines li:first-child { border-top:0; }
+.nl-sheet .nl-meta { display:block; font-size:12.5px; color:var(--nl-detail); }
+.nl-side :focus-visible { outline:2px solid var(--nl-accent); outline-offset:2px; }
 </style>
 </head>
 <body>
@@ -4266,7 +4337,7 @@ html.nl .nl-bar .cur-btn.active, html.nl .nl-bar .mode-btn.active { background:v
         <button type="button" data-nl-sec="notebook">Notebook</button>
       </nav>
       <div class="nl-right" id="nl-right">
-        <button class="nl-pill" type="button" onclick="toggleAIPanel()" aria-label="Open the assistant">✦<span class="nl-assist-lbl">&nbsp;Assistant</span></button>
+        <button class="nl-pill" type="button" onclick="nlOpenAssistant()" aria-label="Open the assistant">✦<span class="nl-assist-lbl">&nbsp;Assistant</span></button>
         <button class="nl-icon" type="button" id="nl-gear" onclick="nav('settings')" aria-label="Settings" title="Settings"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg></button>
         <button class="nl-pill" type="button" id="nl-menu-btn" onclick="nlMenu()" aria-haspopup="true" aria-expanded="false" aria-controls="nl-menu">New look ▾</button>
       </div>
@@ -4310,6 +4381,20 @@ html.nl .nl-bar .cur-btn.active, html.nl .nl-bar .mode-btn.active { background:v
 
   <!-- Main Row -->
   <div class="main-row">
+    <!-- New look (L+S): ONE side panel with TWO faces (Overview / Assistant).
+         Hidden unless <html class="nl">. -->
+    <aside class="nl-side" id="nl-side" aria-label="Side panel">
+      <div class="nl-face-hd" id="nl-face-hd"><span id="nl-face-title">Overview</span><span class="nl-face-sub" id="nl-face-sub"></span></div>
+      <div class="nl-face" id="nl-ov"></div>
+      <div class="nl-face" id="nl-chat" hidden aria-live="polite"></div>
+      <div class="nl-foot">
+        <div class="nl-links" id="nl-links"></div>
+        <form class="nl-ask" id="nl-ask" autocomplete="off">
+          <textarea id="nl-ask-input" rows="1" placeholder="Ask Horizon…" aria-label="Ask Horizon"></textarea>
+          <button class="nl-send" id="nl-send" type="submit" aria-label="Send">↑</button>
+        </form>
+      </div>
+    </aside>
     <!-- Mobile nav drawer backdrop — sits UNDER the sidebar, over the page. -->
     <div class="nav-overlay" id="nav-overlay" onclick="closeNavDrawer()"></div>
     <!-- Sidebar (desktop) = nav drawer (mobile) -->
@@ -25075,8 +25160,9 @@ class HZMobile {
   });
   document.addEventListener('keydown', e => {
     if(e.key !== 'Escape') return;
-    if(document.getElementById('nl-sheet-back')?.classList.contains('on')){ nlCloseSheet(); return; }
-    closeMenu();
+    if(document.getElementById('nl-sheet-back')?.classList.contains('on')){ nlCloseSheet(); e.nlDone = true; return; }
+    const m = document.getElementById('nl-menu');
+    if(m && !m.hidden){ closeMenu(); e.nlDone = true; }
   });
 
   // ── The bar follows whatever page is open ──
@@ -25147,6 +25233,515 @@ class HZMobile {
   if(isOn()) apply(true);
   // Expose for checks.
   window.nlSyncBar = syncBar;
+})();
+</script>
+<!-- ══ NEW LOOK (L+S) · Phase 1 ══════════════════════════════════════════
+     One side panel with two faces (Overview / Assistant), one conversation
+     for the whole app, and changes the assistant PREPARES that the person
+     APPLIES with one press — with Undo and History. New look only: the old
+     chat window is untouched. Data lives in state.nl (synced like the rest). -->
+<div class="nl-sheet-back" id="nl-info-back" role="dialog" aria-modal="true" aria-labelledby="nl-info-title">
+  <div class="nl-sheet" id="nl-info"></div>
+</div>
+<script>
+(function(){
+  const $ = id => document.getElementById(id);
+  const isOn = () => document.documentElement.classList.contains('nl');
+  const h = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  const money = v => fmt(Number(v) || 0);
+  const FIELDS = ['baseIncome','baseExpenses','baseSavings','monthlyOverrides','yearlyBases','trips'];
+  const clone = v => v === undefined ? undefined : JSON.parse(JSON.stringify(v));
+  const snapshot = () => Object.fromEntries(FIELDS.map(f => [f, clone(state[f])]));
+  const signature = () => JSON.stringify(FIELDS.map(f => state[f]));
+  const monthLabel = ym => { const m = /^(\d{4})-(\d{2})$/.exec(ym || ''); if(!m) return ym || ''; return new Date(+m[1], +m[2]-1, 1).toLocaleString('en-GB', { month:'short', year:'numeric' }); };
+  const timeLabel = at => { const d = new Date(at); const today = new Date().toDateString() === d.toDateString();
+    return today ? 'today ' + d.toLocaleTimeString('en-GB', { hour:'2-digit', minute:'2-digit' }) : d.toLocaleDateString('en-GB', { day:'numeric', month:'short' }); };
+
+  // ── Saved data for the new panel ──
+  function NL(){
+    if(!state.nl || typeof state.nl !== 'object') state.nl = {};
+    const n = state.nl;
+    if(!Array.isArray(n.chat)) n.chat = [];
+    if(!n.proposals || typeof n.proposals !== 'object') n.proposals = {};
+    if(!Array.isArray(n.history)) n.history = [];
+    return n;
+  }
+  const pendingProposal = () => { const n = NL(); return Object.values(n.proposals).find(p => p.status === 'pending' && p.changes.some(c => !c.dropped)) || null; };
+  const liveChanges = p => p ? p.changes.filter(c => !c.dropped) : [];
+
+  // ── Where a change lands ──
+  const LISTS = { income:['baseIncome','income','incomeItems'], expenses:['baseExpenses','expenses','expenseItems'] };
+  function parseMonth(ym){ const m = /^(\d{4})-(\d{2})$/.exec(String(ym || '')); return m && +m[2] >= 1 && +m[2] <= 12 ? { y:+m[1], m:+m[2]-1, key:`${m[1]}-${m[2]}` } : null; }
+  function readList(c){
+    const L = LISTS[c.list];
+    if(c.where === 'plan') return state[L[0]] || [];
+    if(c.where === 'year') return resolveYearBase(c.year)[L[1]] || [];
+    const pm = parseMonth(c.month); return getEffective(pm.y, pm.m)[L[2]] || [];
+  }
+  function readSavings(c){
+    if(c.where === 'plan') return state.baseSavings;
+    if(c.where === 'year') return resolveYearBase(c.year).savings;
+    const pm = parseMonth(c.month); return getEffective(pm.y, pm.m).savings;
+  }
+  function writableList(c){
+    const L = LISTS[c.list];
+    if(c.where === 'plan'){ if(!Array.isArray(state[L[0]])) state[L[0]] = []; return state[L[0]]; }
+    if(c.where === 'year'){
+      const copy = clone(resolveYearBase(c.year)[L[1]] || []);
+      if(!state.yearlyBases) state.yearlyBases = {};
+      const b = state.yearlyBases[String(c.year)] || (state.yearlyBases[String(c.year)] = {});
+      if(!Array.isArray(b[L[1]])) b[L[1]] = copy;
+      if(!('cascade' in b)) b.cascade = true;
+      return b[L[1]];
+    }
+    const pm = parseMonth(c.month);
+    const copy = clone(getEffective(pm.y, pm.m)[L[2]] || []);
+    if(!state.monthlyOverrides) state.monthlyOverrides = {};
+    const ov = state.monthlyOverrides[pm.key] || (state.monthlyOverrides[pm.key] = {});
+    if(!Array.isArray(ov[L[1]])) ov[L[1]] = copy;
+    return ov[L[1]];
+  }
+  function writeSavings(c, amount){
+    if(c.where === 'plan'){ state.baseSavings = amount; return; }
+    if(c.where === 'year'){
+      if(!state.yearlyBases) state.yearlyBases = {};
+      const b = state.yearlyBases[String(c.year)] || (state.yearlyBases[String(c.year)] = {});
+      b.savings = amount; if(!('cascade' in b)) b.cascade = true; return;
+    }
+    const pm = parseMonth(c.month);
+    if(!state.monthlyOverrides) state.monthlyOverrides = {};
+    (state.monthlyOverrides[pm.key] || (state.monthlyOverrides[pm.key] = {})).savings = amount;
+  }
+  const norm = s => String(s || '').trim().toLowerCase();
+  function findIn(arr, name, what){
+    const exact = arr.filter(i => norm(i.name) === norm(name));
+    if(exact.length === 1) return { item:exact[0] };
+    if(exact.length > 1) return { error:`More than one ${what} is called "${name}". Ask which one with ask_choice.` };
+    const part = arr.filter(i => norm(i.name).includes(norm(name)) || norm(name).includes(norm(i.name)));
+    if(part.length === 1) return { item:part[0] };
+    if(part.length > 1) return { error:`"${name}" matches several ${what}s: ${part.map(i => i.name).join(', ')}. Ask which one with ask_choice.` };
+    return { error:`No ${what} called "${name}". Existing: ${arr.map(i => i.name).join(', ') || 'none'}.` };
+  }
+  function whereText(c){
+    if(c.where === 'plan') return 'your plan';
+    if(c.where === 'year') return 'from ' + c.year;
+    return monthLabel(c.month) + ' only';
+  }
+
+  // Check one change against today's data and describe it in plain words.
+  // Returns { change } or { error }. Used when preparing AND again on Apply.
+  function checkChange(raw){
+    const c = Object.assign({}, raw);
+    const kinds = ['set_amount','add_line','remove_line','set_savings','set_trip_cost'];
+    if(!kinds.includes(c.kind)) return { error:`kind must be one of ${kinds.join(', ')}` };
+    if(c.kind !== 'set_trip_cost'){
+      if(!['plan','year','month'].includes(c.where)) return { error:'where must be plan, year or month' };
+      if(c.where === 'year'){ c.year = Math.round(Number(c.year)); if(!(c.year >= CY && c.year <= CY + 80)) return { error:`year must be ${CY} or later` }; }
+      if(c.where === 'month'){ const pm = parseMonth(c.month); if(!pm) return { error:'month must be YYYY-MM' }; c.month = pm.key; }
+    }
+    const amt = c.amount == null ? null : Math.round(Number(c.amount));
+    if(c.amount != null && !(amt >= 0)) return { error:'amount must be a number of kronor, 0 or more' };
+    const tail = ' · ' + (c.kind === 'set_trip_cost' ? 'trip' : whereText(c));
+    if(c.kind === 'set_savings'){
+      if(amt == null) return { error:'set_savings needs amount' };
+      const old = readSavings(c); c.amount = amt;
+      c.label = `Savings target: ${money(old)} → ${money(amt)} a month${tail}`;
+      return { change:c };
+    }
+    if(c.kind === 'set_trip_cost'){
+      const t = findIn(state.trips || [], c.trip, 'trip'); if(t.error) return t;
+      const ex = findIn(t.item.expenses || [], c.cost, 'cost in that trip'); if(ex.error) return ex;
+      c.trip = t.item.name; c.cost = ex.item.name;
+      const to = c.to_month ? parseMonth(c.to_month) : null;
+      if(c.to_month && !to) return { error:'to_month must be YYYY-MM' };
+      if(amt == null && !to) return { error:'set_trip_cost needs amount and/or to_month' };
+      c.amount = amt; c.to_month = to ? to.key : null;
+      const parts = [];
+      if(amt != null) parts.push(`${money(ex.item.amount)} → ${money(amt)}`);
+      if(to) parts.push(`${monthLabel(String(ex.item.date || '').slice(0,7)) || 'no month'} → ${monthLabel(to.key)}`);
+      c.label = `${c.trip}, ${c.cost}: ${parts.join(', ')}`;
+      return { change:c };
+    }
+    if(!LISTS[c.list]) return { error:'list must be income or expenses' };
+    const what = c.list === 'income' ? 'income line' : 'expense line';
+    const arr = readList(c);
+    if(c.kind === 'add_line'){
+      if(!String(c.name || '').trim()) return { error:'add_line needs name' };
+      if(amt == null) return { error:'add_line needs amount' };
+      if(arr.some(i => norm(i.name) === norm(c.name))) return { error:`There is already a ${what} called "${c.name}". Use set_amount.` };
+      c.name = String(c.name).trim(); c.amount = amt; c.type = c.type === 'fixed' ? 'fixed' : 'variable';
+      c.label = `${c.name}: new ${c.list === 'income' ? 'income' : 'line'}, ${money(amt)} a month${tail}`;
+      return { change:c };
+    }
+    const f = findIn(arr, c.name, what); if(f.error) return f;
+    c.name = f.item.name;
+    if(c.kind === 'remove_line'){ c.label = `${c.name}: removed (was ${money(f.item.amount)} a month)${tail}`; return { change:c }; }
+    if(amt == null) return { error:'set_amount needs amount' };
+    c.amount = amt;
+    c.label = `${c.name}: ${money(f.item.amount)} → ${money(amt)} a month${tail}`;
+    return { change:c };
+  }
+  function applyChange(c){
+    if(c.kind === 'set_savings'){ writeSavings(c, c.amount); return; }
+    if(c.kind === 'set_trip_cost'){
+      const t = findIn(state.trips || [], c.trip, 'trip').item, ex = findIn(t.expenses || [], c.cost, 'cost').item;
+      if(c.amount != null) ex.amount = c.amount;
+      if(c.to_month) ex.date = c.to_month;
+      return;
+    }
+    const arr = writableList(c);
+    if(c.kind === 'add_line'){ arr.push({ id:genId(), name:c.name, amount:c.amount, type:c.type }); return; }
+    const i = arr.findIndex(x => norm(x.name) === norm(c.name));
+    if(i < 0) throw new Error(`${c.name} is no longer in the plan`);
+    if(c.kind === 'remove_line') arr.splice(i, 1); else arr[i].amount = c.amount;
+  }
+
+  // ── Prepare (assistant), Apply / Drop / Undo (person) ──
+  let currentAsk = '';
+  function prepare(input){
+    const n = NL();
+    const list = Array.isArray(input && input.changes) ? input.changes : [];
+    if(!list.length) return { error:'changes must list at least one change' };
+    const out = [], errors = [];
+    list.forEach((raw, i) => { const r = checkChange(raw); if(r.error) errors.push(`change ${i+1}: ${r.error}`); else out.push(Object.assign(r.change, { why:String(raw.why || '').slice(0, 300) })); });
+    if(errors.length) return { error:'Nothing was prepared. Fix these and call again: ' + errors.join(' | ') };
+    Object.values(n.proposals).forEach(p => { if(p.status === 'pending') p.status = 'replaced'; });
+    const id = 'p' + Date.now().toString(36) + Math.random().toString(36).slice(2,6);
+    n.proposals[id] = { id, at:Date.now(), ask:currentAsk, summary:String(input.summary || '').slice(0, 200), changes:out, status:'pending' };
+    const ids = Object.keys(n.proposals).sort((a,b) => n.proposals[b].at - n.proposals[a].at);
+    ids.slice(30).forEach(k => delete n.proposals[k]);
+    return { ok:true, id, prepared:out.map(c => c.label), note:'Shown to the person, marked Suggested, with an Apply button. Nothing is saved until they press it. Do not say it is saved or done.' };
+  }
+  function afterDataChange(){
+    if(typeof invalidateSelectors === 'function') invalidateSelectors();
+    save();
+    if(typeof renderAll === 'function') renderAll();
+  }
+  window.nlApply = function(pid){
+    const n = NL(), p = n.proposals[pid];
+    if(!p || p.status !== 'pending') return;
+    const live = liveChanges(p); if(!live.length) return;
+    const before = snapshot();
+    try {
+      live.forEach(c => { const r = checkChange(c); if(r.error) throw new Error(r.error); });
+      live.forEach(applyChange);
+    } catch(err){
+      FIELDS.forEach(f => { state[f] = before[f]; });
+      toast('Nothing was saved: ' + err.message, 'warn');
+      render(); return;
+    }
+    p.status = 'applied'; p.appliedAt = Date.now();
+    n.history.forEach(e => { delete e.undo; delete e.sig; });
+    n.history.unshift({ id:'h' + Date.now().toString(36), at:Date.now(), by:'Horizon', ask:p.ask, items:live.map(c => c.label), proposal:pid, undo:before });
+    n.history = n.history.slice(0, 50);
+    afterDataChange();
+    n.history[0].sig = signature(); save();
+    toast(`${live.length} change${live.length > 1 ? 's' : ''} saved`, '', { label:'Undo', fn:() => nlUndo() });
+    render();
+  };
+  window.nlDrop = function(pid, idx){
+    const p = NL().proposals[pid]; if(!p || p.status !== 'pending' || !p.changes[idx]) return;
+    p.changes[idx].dropped = true;
+    if(!liveChanges(p).length) p.status = 'dropped';
+    save(); render();
+  };
+  function undoState(){
+    const e = NL().history[0];
+    if(!e || !e.undo) return { ok:false, why:'Only the latest change can be undone.' };
+    if(e.sig && e.sig !== signature()) return { ok:false, why:'Your plan was changed again since, so undoing this would also remove those changes.' };
+    return { ok:true, entry:e };
+  }
+  window.nlUndo = function(){
+    const u = undoState();
+    if(!u.ok){ toast(u.why, 'warn'); return; }
+    FIELDS.forEach(f => { if(u.entry.undo[f] === undefined) delete state[f]; else state[f] = u.entry.undo[f]; });
+    const p = NL().proposals[u.entry.proposal]; if(p) p.status = 'undone';
+    u.entry.undone = Date.now(); delete u.entry.undo; delete u.entry.sig;
+    afterDataChange();
+    toast('Change undone');
+    render(); if($('nl-info-back').classList.contains('on')) nlShowHistory();
+  };
+
+  // ── Talking to Claude (reuses the advisor's key, lookups and request code) ──
+  const NL_TOOLS = [
+    { name:'propose_changes',
+      description:'Prepare changes to the plan for the person to approve. Nothing is saved: they see each change marked Suggested and press Apply. A new call replaces any earlier suggestion still waiting. Put every change for this request in one call.',
+      input_schema:{ type:'object', properties:{
+        summary:{ type:'string', description:'One short plain sentence saying what these changes do.' },
+        changes:{ type:'array', minItems:1, items:{ type:'object', properties:{
+          kind:{ type:'string', enum:['set_amount','add_line','remove_line','set_savings','set_trip_cost'] },
+          where:{ type:'string', enum:['plan','year','month'], description:'plan = the everyday plan used by every month without its own changes; year = a future calendar year (later years follow it); month = one month only. Not used for set_trip_cost.' },
+          year:{ type:'integer', description:'For where=year.' },
+          month:{ type:'string', description:'YYYY-MM, for where=month.' },
+          list:{ type:'string', enum:['income','expenses'], description:'For line changes.' },
+          name:{ type:'string', description:'The line name as it appears in the plan (or the new line name for add_line).' },
+          amount:{ type:'number', description:'SEK a month (for trips: the cost in SEK).' },
+          type:{ type:'string', enum:['fixed','variable'], description:'For add_line.' },
+          trip:{ type:'string', description:'Trip name, for set_trip_cost.' },
+          cost:{ type:'string', description:'The trip cost line name, e.g. Flights, for set_trip_cost.' },
+          to_month:{ type:'string', description:'YYYY-MM to move a trip cost to.' },
+          why:{ type:'string', description:'Short plain reason; quote the source words in quotes when a number came from their data.' }
+        }, required:['kind'] } } }, required:['summary','changes'], additionalProperties:false } },
+    { name:'ask_choice',
+      description:'When the request could mean more than one thing, show the person 2 to 4 short options to press instead of guessing. Their press comes back as their next message.',
+      input_schema:{ type:'object', properties:{ question:{ type:'string' }, options:{ type:'array', minItems:2, maxItems:4, items:{ type:'string' } } }, required:['question','options'], additionalProperties:false } },
+  ];
+  const NL_SYSTEM = `
+
+## You are in Horizon's side panel (the new look)
+You are Horizon, the assistant. You PREPARE, the person DECIDES.
+- To change anything in their plan, call propose_changes. It never saves: the person sees the changes marked Suggested and presses Apply. Never say a change is saved, applied, updated or done.
+- Put every change for one request in one call. If a call returns an error, fix it and call again.
+- If the request could mean more than one thing (for example two lines could match, or it is unclear when a change starts), call ask_choice with 2 to 4 short options instead of guessing.
+- You can prepare: changes to budget lines (income and expenses), the monthly savings target, and the amount or month of a trip cost. You cannot move or pay money, or change accounts, pensions, retirement expenses, places or settings here: say so plainly and offer what you can prepare instead.
+- where: "plan" = the everyday plan, used by every month without its own changes. "year" = a future calendar year; later years follow it. "month" = one month only. Amounts are SEK a month.
+- Write in plain, simple English for someone who is not a finance expert. Keep it short. When a number comes from their data, quote the words it came from in quotes. When you prepared changes, end by saying nothing is saved until they press Apply.
+- Do NOT include horizon-chart blocks or any other code blocks: this panel cannot show them. Never mention prices or the cost of using the assistant.`;
+  let busy = false, statusText = '', face = 'overview', pendingChoices = null;
+  function historyForApi(){
+    const n = NL(), turns = [];
+    n.chat.slice(-28).forEach(m => {
+      if(m.role !== 'user' && m.role !== 'assistant') return;
+      let text = String(m.content || '');
+      if(m.role === 'assistant' && m.proposal && n.proposals[m.proposal]){
+        const p = n.proposals[m.proposal];
+        text += `\n[Prepared changes (${p.status}): ${p.changes.map(c => c.label + (c.dropped ? ' (dropped by the person)' : '')).join('; ')}]`;
+      }
+      if(m.role === 'assistant' && m.choices) text += `\n[Offered choices: ${m.choices.options.join(' / ')}]`;
+      if(!text.trim()) return;
+      const last = turns[turns.length - 1];
+      if(last && last.role === m.role) last.content += '\n\n' + text; else turns.push({ role:m.role, content:text });
+    });
+    while(turns.length && turns[0].role !== 'user') turns.shift();
+    return turns;
+  }
+  const cleanReply = t => String(t || '').replace(/```[\s\S]*?```/g, '').trim();
+  async function send(text){
+    text = String(text || '').trim(); if(!text || busy) return;
+    const n = NL();
+    n.chat.push({ role:'user', content:text, at:Date.now(), page:state.activePanel || '' });
+    n.chat = n.chat.slice(-200);
+    pendingChoices = null; currentAsk = text;
+    save(); nlFlip('chat');
+    const key = state.aiKeys && state.aiKeys.claude;
+    if(!key){
+      n.chat.push({ role:'assistant', kind:'nokey', content:'To talk with Horizon, add your Claude key in Settings, under AI Keys. It stays on this device.', at:Date.now() });
+      save(); render(); return;
+    }
+    busy = true; statusText = 'Reading your plan'; render();
+    let reply = '', proposalId = null, choices = null, failed = null;
+    try {
+      const system = buildAIContext({ tools:true }) + NL_SYSTEM;
+      const convo = historyForApi();
+      let withFallback = true;
+      for(let step = 0; step < AI_CHAT_MAX_STEPS; step++){
+        const body = { model:AI_CHAT_MODEL, max_tokens:16000, output_config:{ effort:'medium' }, system, tools:AI_CHAT_TOOLS.concat(NL_TOOLS), messages:convo };
+        let res;
+        try { res = await _aiChatRequest(key, body, withFallback); }
+        catch(netErr){ if(!withFallback) throw netErr; withFallback = false; res = await _aiChatRequest(key, body, false); }
+        if(res.status === 401) throw new Error('Your Claude key was not accepted. Check it in Settings, under AI Keys.');
+        if(res.status === 429) throw new Error('Too many requests right now. Wait a moment and try again.');
+        if(res.status === 400 && withFallback){
+          const t = await res.text();
+          if(/fallback|beta/i.test(t)){ withFallback = false; step--; continue; }
+          throw new Error('The request was refused (400).');
+        }
+        if(!res.ok) throw new Error('Horizon could not be reached (' + res.status + ').');
+        const d = await res.json();
+        if(d.stop_reason === 'refusal'){ reply = 'Sorry, I can’t help with that. Try asking about your plan in another way.'; break; }
+        const blocks = Array.isArray(d.content) ? d.content : [];
+        const textNow = blocks.filter(b => b.type === 'text').map(b => b.text || '').join('');
+        const calls = blocks.filter(b => b.type === 'tool_use');
+        if(d.stop_reason !== 'tool_use' || !calls.length){ reply = textNow; break; }
+        convo.push({ role:'assistant', content:blocks });
+        const results = calls.map(c => {
+          let out;
+          if(c.name === 'propose_changes'){ statusText = 'Preparing changes'; out = prepare(c.input); if(out.ok) proposalId = out.id; }
+          else if(c.name === 'ask_choice'){ const o = (c.input && c.input.options || []).map(String).slice(0,4); choices = { question:String(c.input && c.input.question || ''), options:o }; out = { ok:true, note:'Shown as buttons. Stop here and wait for their answer.' }; }
+          else { statusText = _aiToolLabel(c.name, c.input).replace(/…$/, ''); const r = _aiToolResultText(c.name, c.input); return { type:'tool_result', tool_use_id:c.id, content:r.text, ...(r.isError ? { is_error:true } : {}) }; }
+          return { type:'tool_result', tool_use_id:c.id, content:JSON.stringify(out), ...(out.error ? { is_error:true } : {}) };
+        });
+        render();
+        convo.push({ role:'user', content:results });
+        if(step === AI_CHAT_MAX_STEPS - 1) reply = textNow;
+      }
+    } catch(err){ failed = err.message || String(err); }
+    busy = false; statusText = '';
+    if(failed) n.chat.push({ role:'assistant', kind:'error', content:failed, retry:text, at:Date.now() });
+    else {
+      reply = cleanReply(reply);
+      if(!reply) reply = proposalId ? 'I prepared the changes below. Nothing is saved until you press Apply.' : (choices ? choices.question : 'I couldn’t put an answer together that time. Please try again.');
+      n.chat.push({ role:'assistant', content:reply, at:Date.now(), proposal:proposalId, choices });
+    }
+    pendingChoices = choices;
+    n.chat = n.chat.slice(-200);
+    save(); render();
+  }
+  window.nlRetry = function(i){ const m = NL().chat[i]; if(m && m.retry){ NL().chat.splice(i, 1); NL().chat.splice(i - 1, 1); send(m.retry); } };
+  window.nlChoose = function(opt){ send(opt); };
+
+  // ── Drawing the two faces ──
+  function md(t){
+    const lines = h(t).replace(/\*\*(.+?)\*\*/g, '<b>$1</b>').replace(/“([^”]{2,240})”/g, '<span class="nl-q">“$1”</span>').replace(/&quot;([^&]{2,240}?)&quot;/g, '<span class="nl-q">“$1”</span>').split('\n');
+    let out = '', list = false, para = [];
+    const flush = () => { if(para.length){ out += '<p>' + para.join('<br>') + '</p>'; para = []; } };
+    lines.forEach(l => {
+      const li = /^\s*[-*•]\s+(.*)$/.exec(l);
+      if(li){ flush(); if(!list){ out += '<ul>'; list = true; } out += '<li>' + li[1] + '</li>'; return; }
+      if(list){ out += '</ul>'; list = false; }
+      if(!l.trim()){ flush(); return; }
+      para.push(l.replace(/^#+\s*/, ''));
+    });
+    flush(); if(list) out += '</ul>';
+    return out;
+  }
+  const dots = '<span class="nl-dots" aria-hidden="true"><i></i><i></i><i></i></span>';
+  function proposalCard(p){
+    const isPending = p.status === 'pending';
+    const rows = p.changes.map((c, i) => `<div class="nl-chg${c.dropped ? ' dropped' : ''}"><span class="w">${h(c.label)}</span>${isPending && !c.dropped ? `<button class="nl-link" type="button" onclick="nlDrop('${p.id}',${i})">Drop</button>` : (c.dropped ? '<span class="nl-badge grey">Dropped</span>' : '')}${c.why ? `<span class="nl-why">${md(c.why).replace(/<\/?p>/g, '')}</span>` : ''}</div>`).join('');
+    const live = liveChanges(p).length;
+    const foot = {
+      pending:`Nothing is saved until you press Apply.`,
+      applied:`Applied by you, ${timeLabel(p.appliedAt)}.`,
+      undone:`Applied, then undone.`,
+      replaced:`Replaced by a newer suggestion.`,
+      dropped:`You dropped these.`,
+    }[p.status] || '';
+    return `<div class="nl-card">${rows}<div class="nl-card-foot">${foot}</div></div>` +
+      (isPending && live ? `<button class="nl-black" type="button" onclick="nlApply('${p.id}')">Apply ${live} change${live > 1 ? 's' : ''}</button>` : '');
+  }
+  function renderChat(){
+    const box = $('nl-chat'); if(!box) return;
+    const n = NL();
+    const nearEnd = box.scrollHeight - box.scrollTop - box.clientHeight < 80;
+    let html = '';
+    if(!n.chat.length) html = `<p class="nl-status">Ask anything about your plan, or tell Horizon what to change. It prepares; you decide.</p>`;
+    n.chat.forEach((m, i) => {
+      if(m.role === 'user'){ html += `<div class="nl-msg me">${h(m.content)}</div>`; return; }
+      if(m.kind === 'error'){ html += `<div class="nl-msg warn">${h(m.content)} <button class="nl-link" type="button" onclick="nlRetry(${i})">Try again</button></div>`; return; }
+      if(m.kind === 'nokey'){ html += `<div class="nl-msg ai"><p>${h(m.content)}</p><p><button class="nl-link" type="button" onclick="nlFlip('overview');nav('settings')">Open Settings</button></p></div>`; return; }
+      html += `<div class="nl-msg ai">${md(m.content)}${m.proposal && n.proposals[m.proposal] ? proposalCard(n.proposals[m.proposal]) : ''}</div>`;
+      if(m.choices && i === n.chat.length - 1 && !busy) html += `<div class="nl-choices">${m.choices.options.map(o => `<button type="button" onclick="nlChoose(this.textContent)">${h(o)}</button>`).join('')}</div>`;
+    });
+    if(busy) html += `<div class="nl-status">${h(statusText || 'Thinking')} ${dots}</div>`;
+    box.innerHTML = html;
+    if(nearEnd || busy) box.scrollTop = box.scrollHeight;
+  }
+  function renderOverview(){
+    const box = $('nl-ov'); if(!box) return;
+    const keep = box.scrollTop, n = NL();
+    const p = pendingProposal(), live = liveChanges(p);
+    const today = n.history.filter(e => !e.undone && new Date(e.at).toDateString() === new Date().toDateString()).length;
+    const u = undoState();
+    let html = `<p class="nl-hl">${live.length ? `${live.length} change${live.length > 1 ? 's' : ''} wait${live.length > 1 ? '' : 's'} for your answer.` : 'Nothing waits for you right now.'}</p>`;
+    html += `<div class="nl-counts"><div class="${live.length ? 'on' : ''}"><b>${live.length}</b>waiting</div><div class="${today ? 'ok' : ''}"><b>${today}</b>changed today</div><div><b>${n.history.length}</b>in history</div></div>`;
+    if(live.length){
+      html += `<div class="nl-grp"><h4>Waiting for you</h4>${live.map(c => `<div class="nl-door"><span class="w">${h(c.label)}</span><span class="nl-badge amber">Suggested</span><div class="nl-door-acts"><button class="nl-link" type="button" onclick="nlFlip('chat')">See it in the conversation</button></div></div>`).join('')}</div>`;
+    }
+    const recent = n.history.slice(0, 3);
+    if(recent.length){
+      html += `<div class="nl-grp"><h4>Recent changes</h4>${recent.map((e, i) => `<div class="nl-door"><span class="w">${h(e.items[0])}${e.items.length > 1 ? ` and ${e.items.length - 1} more` : ''}</span><span class="nl-badge ${e.undone ? 'grey' : 'green'}">${e.undone ? 'Undone' : 'Saved'}</span><span class="nl-why">${h(e.by)} prepared, you applied, ${h(timeLabel(e.at))}</span>${i === 0 && !e.undone ? `<div class="nl-door-acts">${u.ok ? `<button class="nl-link" type="button" onclick="nlUndo()">Undo</button>` : `<span class="nl-why" style="grid-column:auto">${h(u.why)}</span>`}</div>` : ''}</div>`).join('')}</div>`;
+    } else if(!live.length){
+      html += `<div class="nl-grp"><h4>Try asking</h4><div class="nl-door"><span class="w nl-q">“Groceries are about 8 500 now.”</span></div><div class="nl-door"><span class="w nl-q">“Raise my savings to 30 000 from next year.”</span></div><div class="nl-door"><span class="w nl-q">“Move the Cape Town hotel to April.”</span></div></div>`;
+    }
+    if(live.length) html += `<button class="nl-black" type="button" onclick="nlApply('${p.id}')">Apply ${live.length} change${live.length > 1 ? 's' : ''}</button>`;
+    box.innerHTML = html;
+    box.scrollTop = keep;
+  }
+  // The link row: one line above the ask box, never wrapped.
+  function renderLinks(){
+    const row = $('nl-links'); if(!row) return;
+    const n = NL(), items = [];
+    if(face === 'chat') items.push({ t:'‹ Overview', s:'‹ Overview', main:true, fn:"nlFlip('overview')" });
+    else if(n.chat.length || busy) items.push({ t:busy ? 'Assistant ' + dots + ' ›' : 'Assistant ›', s:busy ? 'Assistant ' + dots + ' ›' : 'Assistant ›', main:true, fn:"nlFlip('chat')" });
+    items.push({ t:'History', s:'History', fn:'nlShowHistory()' });
+    items.push({ t:'How this works', s:'Help', fn:'nlShowHow()' });
+    if(face === 'chat' && n.chat.length) items.push({ t:'Clear the conversation', s:'Clear', fn:'nlClear()' });
+    const draw = (short, count) => { row.innerHTML = items.slice(0, count).map(i => `<button class="nl-link${i.main ? ' main' : ''}" type="button" onclick="${i.fn}">${short ? i.s : i.t}</button>`).join(''); };
+    let count = items.length; draw(false, count);
+    if(row.scrollWidth > row.clientWidth + 1){ draw(true, count); while(row.scrollWidth > row.clientWidth + 1 && count > 1){ count--; draw(true, count); } }
+  }
+  function render(){
+    if(!$('nl-side')) return;
+    renderOverview(); renderChat();
+    const hd = $('nl-face-hd');
+    hd.classList.toggle('chat', face === 'chat');
+    $('nl-face-title').textContent = face === 'chat' ? 'Horizon' : 'Overview';
+    $('nl-face-sub').textContent = face === 'chat' ? 'One conversation, every page' : '';
+    renderLinks();
+    const inp = $('nl-ask-input'); if($('nl-send')) $('nl-send').disabled = busy || !(inp && inp.value.trim());
+  }
+  // Flip the same panel between its faces. Only the person's own action
+  // flips back to the Overview; a new message flips to the chat.
+  window.nlFlip = function(to){
+    face = to === 'chat' ? 'chat' : 'overview';
+    $('nl-ov').hidden = face !== 'overview';
+    $('nl-chat').hidden = face !== 'chat';
+    render();
+    if(face === 'chat'){ const b = $('nl-chat'); b.scrollTop = b.scrollHeight; }
+  };
+  window.nlOpenAssistant = function(){ nlFlip('chat'); setTimeout(() => $('nl-ask-input')?.focus(), 0); };
+  window.nlFace = () => face;
+  window.nlClear = function(){
+    const n = NL(); const old = n.chat; n.chat = []; pendingChoices = null; save(); render();
+    toast('Conversation cleared', '', { label:'Undo', fn:() => { NL().chat = old.concat(NL().chat); save(); render(); } });
+  };
+
+  // ── Sheets: History and How this works ──
+  function openInfo(html){ $('nl-info').innerHTML = html; $('nl-info-back').classList.add('on'); setTimeout(() => $('nl-info').querySelector('button')?.focus(), 0); }
+  window.nlCloseInfo = function(){ $('nl-info-back').classList.remove('on'); };
+  window.nlShowHistory = function(){
+    const n = NL(), u = undoState();
+    const items = n.history.map((e, i) => `<li>${e.items.map(h).join('<br>')}<span class="nl-meta">${h(e.by)} prepared, you applied · ${h(timeLabel(e.at))}${e.undone ? ' · undone' : ''}</span></li>`).join('');
+    openInfo(`<h2 id="nl-info-title">History</h2>${items ? `<ul class="nl-lines">${items}</ul>` : '<p>No changes yet. Changes the assistant prepares and you apply are listed here.</p>'}
+      ${n.history.length && !u.ok && n.history[0] && !n.history[0].undone ? `<p class="nl-meta" style="border-top:1px solid var(--nl-line)">${h(u.why)}</p>` : ''}
+      <div class="nl-sheet-acts">${u.ok ? '<button class="nl-black" type="button" onclick="nlUndo()">Undo the latest change</button>' : ''}<button class="nl-grey" type="button" onclick="nlCloseInfo()">Close</button></div>`);
+  };
+  window.nlShowHow = function(){
+    openInfo(`<h2 id="nl-info-title">How Horizon's assistant works</h2>
+      <p><b>It may</b> read your whole plan, bank file and journal, prepare changes and mark them Suggested, and ask you which one you mean.</p>
+      <p><b>Only after your press</b> it changes an amount, adds or removes a line, changes a year ahead or one month, sets your savings target, or moves a trip cost.</p>
+      <p><b>Never</b> does it move or pay money, change anything without your press, or delete your history. The latest change can always be undone.</p>
+      <div class="nl-sheet-acts"><button class="nl-grey" type="button" onclick="nlCloseInfo()">Close</button></div>`);
+  };
+  document.addEventListener('click', e => { if(e.target.id === 'nl-info-back') nlCloseInfo(); });
+
+  // ── Toast (bottom-centre, with an optional action) ──
+  let toastTimer = null;
+  function toast(msg, kind, action){
+    const t = $('nl-toast'); if(!t) return;
+    t.innerHTML = `<span>${h(msg)}</span>` + (action ? `<button type="button">${h(action.label)}</button>` : '');
+    if(action) t.querySelector('button').onclick = () => { t.className = 'nl-toast'; action.fn(); };
+    t.className = 'nl-toast on' + (kind ? ' ' + kind : '');
+    clearTimeout(toastTimer); toastTimer = setTimeout(() => { t.className = 'nl-toast'; }, 6000);
+  }
+
+  // ── Wiring ──
+  const form = $('nl-ask'), input = $('nl-ask-input');
+  if(form && input){
+    const grow = () => { input.style.height = 'auto'; input.style.height = Math.min(120, input.scrollHeight) + 'px'; $('nl-send').disabled = busy || !input.value.trim(); };
+    input.addEventListener('input', grow);
+    input.addEventListener('keydown', e => { if(e.key === 'Enter' && !e.shiftKey && !e.isComposing){ e.preventDefault(); form.requestSubmit ? form.requestSubmit() : form.dispatchEvent(new Event('submit', { cancelable:true })); } });
+    form.addEventListener('submit', e => { e.preventDefault(); if(busy) return; const v = input.value; if(!v.trim()) return; input.value = ''; grow(); send(v); });
+  }
+  document.addEventListener('keydown', e => {
+    if(e.key !== 'Escape' || !isOn() || e.nlDone) return;
+    if($('nl-info-back').classList.contains('on')){ nlCloseInfo(); return; }
+    if($('nl-sheet-back')?.classList.contains('on')) return;
+    const menu = $('nl-menu'); if(menu && !menu.hidden) return;
+    if(face === 'chat') nlFlip('overview');
+  });
+  // The back arrow leaves the conversation first, then goes back a page.
+  const oldBack = window.nlBack;
+  window.nlBack = function(){ if(face === 'chat') nlFlip('overview'); else if(oldBack) oldBack(); };
+  // Another page always opens on its Overview; the conversation is kept.
+  if(typeof bus !== 'undefined'){
+    bus.on('panel:changed', () => { if(face !== 'overview') nlFlip('overview'); else render(); });
+    bus.on('state:changed', () => { if(isOn() && !busy) render(); });
+  }
+  window.addEventListener('resize', () => { if(isOn()) renderLinks(); });
+  render();
+  window.nlRender = render;
 })();
 </script>
 </body>
