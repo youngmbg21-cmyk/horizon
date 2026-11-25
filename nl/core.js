@@ -95,6 +95,8 @@
       const r = e.target.closest('[data-nl-row]'); if(r && container.contains(r)) act(r);
     });
     container.addEventListener('keydown', e => {
+      // Typing in a box inside a row (a space, Enter) is typing, not choosing the row.
+      if(e.target.closest('input,textarea,select,button,a,[contenteditable]')) return;
       const r = e.target.closest('[data-nl-row]'); if(!r) return;
       if(e.key === 'Enter' || e.key === ' '){ e.preventDefault(); act(r); }
     });
@@ -290,6 +292,27 @@
   // Re-mount charts after every page draw.
   const _render = NLP.renderPage;
   NLP.renderPage = function(panel){ _render(panel); NLP.mountCharts(document.getElementById('panel-' + panel)); };
+  // ── One press is enough ──────────────────────────────────────────────────
+  // Pressing a button while a box has focus makes the box save and redraw
+  // the page and side panel during the press; the button under the pointer was
+  // then replaced and the press was lost. Redraws asked for during a press
+  // wait until the press has finished (after its click has run).
+  const _drawNow = NLP.renderPage, waiting = new Set();
+  NLP.renderPage = function(panel){ if(window.__nlDown){ waiting.add(panel); return; } _drawNow(panel); };
+  document.addEventListener('pointerdown', e => { if(e.pointerType !== 'mouse' || e.button === 0) window.__nlDown = true; }, true);
+  const pressEnd = () => {
+    if(!window.__nlDown) return;
+    window.__nlDown = false;
+    setTimeout(() => {
+      if(window.__nlDown) return;
+      const list = [...waiting]; waiting.clear();
+      list.forEach(p => { if(NLP.activePage() && NLP.activePage().panel === p) _drawNow(p); });
+      if(window.__nlPendSide){ window.__nlPendSide = false; NLP.refreshPanel(); }
+    }, 0);
+  };
+  document.addEventListener('pointerup', pressEnd, true);
+  document.addEventListener('pointercancel', pressEnd, true);
+  window.addEventListener('blur', pressEnd);
   // Turning the new look on/off while a new page is open.
   new MutationObserver(() => {
     if(typeof state === 'undefined') return;
