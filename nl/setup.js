@@ -529,7 +529,7 @@ Amounts the person says are in ${state.currency || 'SEK'}.`;
   function renderSettings(host){
     const tab = NLP.tabOf(SETTINGS, 'general'), sg = tui().sug;
     const sugN = k => Object.keys(sg).filter(x => k.includes(x)).length;
-    const GEN = ['currency','displayMode','lang','growthRate','inflationRate','retirementPostGrowth','lifeExp'];
+    const GEN = ['currency','displayMode','lang','inflationRate','retirementPostGrowth','lifeExp'];
     let body = '';
     if(tab === 'general'){
       const curOpts = Object.keys(typeof CURRENCY_SYMBOLS !== 'undefined' ? CURRENCY_SYMBOLS : { SEK:1 }).map(c => [c, c]);
@@ -539,7 +539,8 @@ Amounts the person says are in ${state.currency || 'SEK'}.`;
       body += row('lang', 'Language', seg('lang', [['en','English'],['sv','Svenska']]) + det('Some words stay in English for now.') + sugLine('lang'));
       const ab = aboutSummary();
       body += row('about', 'About you', `<div class="nls-val">${ab || '<span class="nls-hint">Not set up yet</span>'}</div>` + det(Object.keys(words()).length ? 'From your setup chat' : 'From your setup'), `${!onboardOK() ? NLP.badge('Needed', 'amber') + ' ' : ''}${NLP.link(onboardOK() ? 'Change in Setup' : 'Finish setup', "NLP.go('nl-setup')")}`);
-      ['growthRate','inflationRate','retirementPostGrowth','lifeExp'].forEach(k => {
+      // Savings growth lives on Future → Accounts (the Savings row).
+      ['inflationRate','retirementPostGrowth','lifeExp'].forEach(k => {
         const s = SET[k];
         body += row(k, s.label, `<span class="nls-num"><input type="number" class="nl-num-in" id="nlst-${k}" data-k="${k}" data-nl-keep="no" min="${s.min}" max="${s.max}" step="${s.step}" value="${H(s.get())}"> <span>${H(s.unit)}</span></span>` + det(H(s.det)) + sugLine(k));
       });
@@ -604,13 +605,13 @@ Amounts the person says are in ${state.currency || 'SEK'}.`;
     def:{ name:'suggest_setting',
       description:'Suggest a change to one of the person\'s settings. Nothing changes: it appears marked Suggested on the Settings page and the person presses "Use it".',
       input_schema:{ type:'object', properties:{
-        setting:{ type:'string', enum:['currency','money_shown_as','language','growth','inflation','growth_after_retiring','life_expectancy'] },
-        value:{ type:'string', description:'currency: SEK, USD, EUR or KES. money_shown_as: today or future. language: en or sv. growth / inflation / growth_after_retiring: percent a year, e.g. 6. life_expectancy: age in years.' },
+        setting:{ type:'string', enum:['currency','money_shown_as','language','inflation','growth_after_retiring','life_expectancy'] },
+        value:{ type:'string', description:'currency: SEK, USD, EUR or KES. money_shown_as: today or future. language: en or sv. inflation / growth_after_retiring: percent a year, e.g. 6. life_expectancy: age in years.' },
         why:{ type:'string', description:'Short plain reason, quoting the person\'s words.' }
       }, required:['setting','value'], additionalProperties:false } },
     label:() => 'Preparing a setting',
     run(input){
-      const map = { currency:'currency', money_shown_as:'displayMode', language:'lang', growth:'growthRate', inflation:'inflationRate', growth_after_retiring:'retirementPostGrowth', life_expectancy:'lifeExp' };
+      const map = { currency:'currency', money_shown_as:'displayMode', language:'lang', inflation:'inflationRate', growth_after_retiring:'retirementPostGrowth', life_expectancy:'lifeExp' };
       const key = map[input.setting]; if(!key) return { error:'Unknown setting.' };
       let v = String(input.value || '').trim();
       if(key === 'currency'){ v = v.toUpperCase(); if(/EURO/.test(v)) v = 'EUR'; if(/DOLLAR/.test(v)) v = 'USD'; if(/KRONA|KRONOR/.test(v)) v = 'SEK'; if(/SHILLING/.test(v)) v = 'KES'; if(typeof CURRENCY_SYMBOLS !== 'undefined' && !CURRENCY_SYMBOLS[v]) return { error:'Currency must be SEK, USD, EUR or KES.' }; }
