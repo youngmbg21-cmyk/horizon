@@ -164,6 +164,8 @@
 
   // ── What-if: compute on a temporary copy of the plan, then put it back ────
   const WHATIF_FIELDS = ['baseIncome','baseExpenses','baseSavings','monthlyOverrides','yearlyBases','trips','externalAssets','retirementExpenses','retirementScenario','retirementAge','currentAge','growthRate','inflationRate','retirementPostGrowth','lifeExp'];
+  // NOTE: afterwards the listed state fields hold fresh copies — look objects up again
+  // (e.g. by id) instead of keeping references taken before calling whatIf.
   NLP.whatIf = function(mutate, compute){
     const keep = {}; WHATIF_FIELDS.forEach(f => { keep[f] = state[f] === undefined ? undefined : JSON.parse(JSON.stringify(state[f])); });
     let out;
@@ -295,8 +297,8 @@ svg.nl-svg .gl { stroke:var(--nl-line); stroke-width:1; }
 .nl-field input[type=text], .nl-field input[type=number], .nl-field input[type=password], .nl-field input[type=email], .nl-field select, .nl-field textarea { border:0; border-bottom:1px solid transparent; background:transparent; font:500 14px var(--nl-sans); color:var(--nl-ink); padding:2px 0; width:100%; outline:0; }
 .nl-field input:focus, .nl-field select:focus, .nl-field textarea:focus { border-bottom-color:var(--nl-accent); }
 .nl-field.need > .lb::after { content:' · needed'; color:#8A5A0A; }
-.nl-num-in { border:0; border-bottom:1px solid var(--nl-edge); background:transparent; font:500 14px var(--nl-sans); color:var(--nl-ink); width:110px; text-align:right; padding:2px 0; font-variant-numeric:tabular-nums; outline:0; }
-.nl-num-in:focus { border-bottom-color:var(--nl-accent); }
+.nl-page input.nl-num-in, .nl-num-in { border:0; border-bottom:1px solid var(--nl-edge); background:transparent; font:500 14px var(--nl-sans); color:var(--nl-ink); width:110px; text-align:right; padding:2px 0; font-variant-numeric:tabular-nums; outline:0; }
+.nl-page input.nl-num-in:focus, .nl-num-in:focus { border-bottom-color:var(--nl-accent); }
 .nl-page .nl-link, .nl-side .nl-link { border:0; background:transparent; padding:0; font:400 13px/1.5 var(--nl-sans); color:var(--nl-accent); text-decoration:underline; text-underline-offset:2px; cursor:pointer; white-space:nowrap; }
 .nl-page .nl-black { border:0; background:var(--nl-black); color:#fff; border-radius:999px; padding:9px 16px; font:600 14px var(--nl-sans); cursor:pointer; white-space:nowrap; }
 .nl-page .nl-black:disabled { background:#C9CED8; cursor:default; }

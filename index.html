@@ -25275,7 +25275,7 @@ class HZMobile {
   const isOn = () => document.documentElement.classList.contains('nl');
   const h = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const money = v => fmt(Number(v) || 0);
-  const FIELDS = ['baseIncome','baseExpenses','baseSavings','monthlyOverrides','yearlyBases','trips','externalAssets','retirementExpenses','retirementScenario','retirementAge','lifeExp'];
+  const FIELDS = ['baseIncome','baseExpenses','baseSavings','monthlyOverrides','yearlyBases','trips','externalAssets','retirementExpenses','retirementScenario','retirementAge','lifeExp','places'];
   const clone = v => v === undefined ? undefined : JSON.parse(JSON.stringify(v));
   const snapshot = () => Object.fromEntries(FIELDS.map(f => [f, clone(state[f])]));
   const signature = () => JSON.stringify(FIELDS.map(f => state[f]));
