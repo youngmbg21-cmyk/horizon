@@ -116,6 +116,10 @@
     addPension({ name, monthlyPayout:payout, startAge:age }, name + ' added');
   };
   NLF.penShowForm = () => { const st = U(); st.penForm = !st.penForm; st.chosen = 'pen-none'; st.open = st.penForm ? 'pen-none' : null; NLP.renderPage(P); };
+  NLF.penOpen = () => {
+    const st = U(); st.penForm = true; st.chosen = 'pen-none'; st.open = 'pen-none'; NLP.renderPage(P);
+    setTimeout(() => { const el = document.getElementById('nlf-pn-name'); if(el){ el.scrollIntoView({ block:'center' }); el.focus(); } }, 120);
+  };
   NLF.penSugAdd = () => { const s = U().penSug; if(s) addPension(s, s.name + ' added to your plan'); };
   NLF.penSugDrop = () => { U().penSug = null; NLP.renderPage(P); NLP.toast('Suggested pension dropped'); };
   NLF.askPension = () => NLP.ask('I want to add my pension');
@@ -180,7 +184,7 @@
     const sc = state.retirementScenario || 'baseline';
     let actions = '';
     if(tab === 'runway') actions = `<div class="nl-seg" role="group" aria-label="Lifestyle">${Object.keys(SC).map(k => `<button type="button" aria-pressed="${k === sc}" onclick="NLF.scen('${k}')">${SC[k]}</button>`).join('')}</div>`;
-    else if(tab === 'accounts') actions = NLP.pill('+ Add an account', 'NLF.accAdd()');
+    else if(tab === 'accounts') actions = NLP.pill('+ Account that grows', 'NLF.accAdd()') + NLP.pill('+ Pension that pays', 'NLF.penOpen()');
     else actions = `<div class="nl-seg" role="group" aria-label="Years in a brick">${[1,2,5].map(g => `<button type="button" aria-pressed="${g === gran()}" onclick="NLF.gran(${g})">${g} yr</button>`).join('')}</div>`;
     const head = NLP.head({ title:'Future', panel:P, actions, tabs:[
       { key:'runway', label:'Runway', on:tab === 'runway' },
@@ -372,13 +376,13 @@
       const s = st.penSug;
       rows.push(`<tr data-nl-row="pen-sug" class="sug"><td class="mk">·</td><td><span class="nm">${H(s.name)}</span><span class="sub">${s.quote ? NLP.quote(s.quote) + (s.source ? ' · ' + H(s.source) : '') : `Pays from age ${s.startAge}`}</span><span class="nl-inrow">${NLP.link('Add this pension', 'NLF.penSugAdd()')}${NLP.link('Drop', 'NLF.penSugDrop()')}</span></td><td class="k">${NLP.badge('Suggested', 'amber')}</td><td class="r">—</td><td class="r">—</td><td class="r">—</td><td class="r">${M(s.monthlyPayout)}<span class="sub">a month</span></td></tr>`);
     }
-    if(!pens.length && !st.penSug){
+    if((!pens.length && !st.penSug) || st.penForm){
       const form = st.penForm ? `<div class="nlf-ed nlf-acc">
         <label class="nlf-wide">Name<input type="text" id="nlf-pn-name" placeholder="e.g. Allmän pension" value=""></label>
         <label>Pays a month<input type="text" inputmode="decimal" class="nl-num-in" id="nlf-pn-pay" value=""><span class="nlf-u">${H(sym())} before tax</span></label>
         <label>From age<input type="text" inputmode="numeric" class="nl-num-in nlf-short" id="nlf-pn-age" value="${ra}"></label>
         <div class="nl-inrow">${NLP.pill('Add this pension', 'NLF.penAddForm()')}${NLP.link('Cancel', 'NLF.penShowForm()')}</div></div>` : '';
-      rows.push(`<tr data-nl-row="pen-none"><td class="mk">·</td><td><span class="nm">Pensions</span><span class="sub">None added yet</span>${form}${st.penForm ? '' : `<span class="nl-inrow">${NLP.link('Add a pension', 'NLF.penShowForm()')}${NLP.link('Tell Horizon about your pension', 'NLF.askPension()')}</span>`}</td><td class="k">${NLP.badge('Missing', 'amber')}</td><td class="r"></td><td class="r"></td><td class="r"></td><td class="r"></td></tr>`);
+      rows.push(`<tr data-nl-row="pen-none"><td class="mk">·</td><td><span class="nm">${pens.length ? 'New pension' : 'Pensions'}</span><span class="sub">${pens.length ? 'Type what it pays you each month once you retire' : 'None added yet'}</span>${form}${st.penForm ? '' : `<span class="nl-inrow">${NLP.link('Add a pension', 'NLF.penShowForm()')}${NLP.link('Tell Horizon about your pension', 'NLF.askPension()')}</span>`}</td><td class="k">${pens.length ? 'Pension' : NLP.badge('Missing', 'amber')}</td><td class="r"></td><td class="r"></td><td class="r"></td><td class="r"></td></tr>`);
     }
     const table = `<div class="nl-tbl-wrap"><table class="nl-tbl nlf-acct" id="nlf-tbl"><thead><tr><th></th><th>Account</th><th>Kind</th><th class="r">Now</th><th class="r">Added a month</th><th class="r">Growth</th><th class="r">At ${ra}</th></tr></thead><tbody>${rows.join('')}</tbody></table></div>`;
     return card + table;
@@ -546,8 +550,11 @@
       groups.push({ title:'Savings from Money plan', rows:[{ text:'Read from your monthly savings target', badge:{ text:'From Money plan', kind:'steel' }, why:'Press the row again to open the Money plan.', link:{ label:'Open the Money plan', onclick:"NLP.go('nl-money')" } }] });
     }
     if(!pens.length && !st.penSug) groups.push({ title:'Missing', rows:[{ text:'No pension added', badge:{ text:'Missing', kind:'amber' }, why:'Your state or work pension lowers what you take from savings.', link:{ label:'Add a pension here', onclick:'NLF.penShowForm()' } }] });
+    if(!st.penSug) groups.push({ title:'Two kinds of account', rows:[
+      { text:'Grows: what it holds now, what you add each month, and a % growth a year', badge:{ text:'Grows', kind:'green' }, link:{ label:'Add one', onclick:'NLF.accAdd()' } },
+      { text:'Pension: pays you a set amount each month from an age', badge:{ text:'Pays', kind:'steel' }, link:{ label:'Add one', onclick:'NLF.penOpen()' } }] });
     if(st.penSug) groups.push({ title:'Waiting for you', rows:[{ text:`${H(st.penSug.name)}, from age ${st.penSug.startAge}`, badge:{ text:'Suggested', kind:'amber' }, link:{ label:'Drop it', onclick:'NLF.penSugDrop()' } }] });
-    const button = st.penSug ? { label:'Add this pension to my plan', onclick:'NLF.penSugAdd()' } : (!pens.length ? { label:'Add a pension by chat', onclick:'NLF.askPension()' } : { label:'Add an account', onclick:'NLF.accAdd()' });
+    const button = st.penSug ? { label:'Add this pension to my plan', onclick:'NLF.penSugAdd()' } : (!pens.length ? { label:'Add a pension by chat', onclick:'NLF.askPension()' } : { label:'Add an account that grows', onclick:'NLF.accAdd()' });
     return { headline, graphic, groups, button, links:pageLinks([{ label:'Runway', short:'Runway', onclick:"NLP.tab('nl-future','runway')" }]) };
   }
   NLF.accOpen = id => { const st = U(); NLP.ui(P).tab = 'accounts'; st.chosen = id; st.open = id; NLP.renderPage(P); };
