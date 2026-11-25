@@ -461,13 +461,44 @@
         } });
     }, 200, 'Next 12 months');
   }
+  // ── This month, step by step: what comes in, where it goes, what is left ──
+  function monthFlow(x){
+    const m = x.m, sum = a => a.reduce((t, i) => t + (Number(i.amount) || 0), 0);
+    const incomeLines = (m.incomeItems || []).filter(i => !i.carryForward);
+    const carriedIn = (m.incomeItems || []).filter(i => i.carryForward);
+    const costs = (m.expenseItems || []).filter(e => !e.fromTrip && !e.carryForward && Number(e.amount) > 0).sort((a, b) => b.amount - a.amount);
+    const steps = [];
+    steps.push({ label:'Comes in', sub:incomeLines.map(i => i.name).slice(0, 3).join(' + ') || 'Income', amount:sum(incomeLines), kind:'in' });
+    carriedIn.forEach(c => steps.push({ label:`Left over from ${monLong(c.fromKey)}`, amount:Number(c.amount) || 0, kind:'in' }));
+    costs.slice(0, 4).forEach(c => steps.push({ label:c.name, amount:c.amount, kind:'cost' }));
+    if(costs.length > 4) steps.push({ label:`${costs.length - 4} other costs`, sub:costs.slice(4, 7).map(c => c.name).join(', ') + (costs.length > 7 ? '…' : ''), amount:sum(costs.slice(4)), kind:'cost' });
+    if(x.trips.length) steps.push({ label:'Trips', sub:tripNames(x.trips), amount:sum(x.trips), kind:'trip' });
+    if(x.carry && x.carry.amount > 0) steps.push({ label:`Carried over from ${monLong(x.carry.fromKey)}`, sub:'The gap from last month', amount:x.carry.amount, kind:'carry' });
+    if(m.savings > 0) steps.push({ label:'Saved', amount:m.savings, kind:'save' });
+    let run = 0; const rows = [];
+    steps.forEach(st => { const a = run; run += st.kind === 'in' ? st.amount : -st.amount; rows.push(Object.assign({ from:Math.min(a, run), to:Math.max(a, run) }, st)); });
+    return { rows, left:run };
+  }
+  function monthFlowCard(x){
+    const f = monthFlow(x), lo = Math.min(0, ...f.rows.map(r => r.from), f.left), hi = Math.max(1, ...f.rows.map(r => r.to));
+    const pct = v => ((v - lo) / (hi - lo) * 100).toFixed(2) + '%';
+    const name = monLong(x.key);
+    const title = f.left < 0 ? `${name} leaves you ${money(-f.left)} short.` : `${name} leaves ${money(f.left)} for fun.`;
+    const zero = lo < 0 ? `<i class="nlm-flow-zero" style="left:${pct(0)}"></i>` : '';
+    const bar = (a, b, cls) => `<span class="nlm-flow-track">${zero}<i class="nlm-flow-bar ${cls}" style="left:${pct(a)};width:${(Math.max(0.4, (b - a) / (hi - lo) * 100)).toFixed(2)}%"></i></span>`;
+    let rowsH = f.rows.map(r => `<div class="nlm-flow-row"><span class="nlm-flow-l"><b>${H(r.label)}</b>${r.sub ? `<span>${H(r.sub)}</span>` : ''}</span>${bar(r.from, r.to, 'k-' + r.kind)}<span class="nlm-flow-v">${r.kind === 'in' ? '' : '−'}${H(money(r.amount))}</span></div>`).join('');
+    rowsH += `<div class="nlm-flow-row nlm-flow-end"><span class="nlm-flow-l"><b>${f.left < 0 ? 'Short' : 'Left for fun'}</b></span>${bar(Math.min(0, f.left), Math.max(0, f.left), f.left < 0 ? 'k-short' : 'k-left')}<span class="nlm-flow-v${f.left < 0 ? ' neg' : ''}">${H(money(f.left))}</span></div>`;
+    const chosen = x.i !== 0;
+    return NLP.card(title, `${chosen ? monLabel(x.key) + ', the month you chose' : 'This month'}: what comes in, where it goes, and what is left.${chosen ? '' : ' Press a month below to see that one.'}`, `<div class="nlm-flow">${rowsH}</div>`);
+  }
   function renderForecast(){
     const info = monthsInfo(), shortM = info.filter(x => x.short);
     const title = !shortM.length ? 'Every month covers costs, saving and fun.'
       : shortM.length === 1 ? `Every month but ${monLong(shortM[0].key)} covers costs, saving and fun.`
       : `${shortM.length} of 12 months run short: ${shortM.map(x => monShort(x.key)).join(', ')}.`;
-    let h = NLP.card(title, 'Next 12 months. Grey: costs. Green: saved. Light green: Fun Fund. Red: a short month.', forecastChart(info) +
-      NLP.legend([{ label:'Costs', color:'var(--nlm-cost)' }, { label:'Saved', color:'var(--nl-accent)' }, { label:'Fun Fund', color:'var(--nlm-fun)' }, { label:'Short month', color:'var(--nlm-short)' }]));
+    const pick = info.find(x => x.key === NLP.chosen(PANEL)) || info[0];
+    let h = `<div class="nlm-fc-top">${pick ? monthFlowCard(pick) : ''}` + NLP.card(title, 'Next 12 months. Grey: costs. Green: saved. Light green: Fun Fund. Red: a short month.', forecastChart(info) +
+      NLP.legend([{ label:'Costs', color:'var(--nlm-cost)' }, { label:'Saved', color:'var(--nl-accent)' }, { label:'Fun Fund', color:'var(--nlm-fun)' }, { label:'Short month', color:'var(--nlm-short)' }])) + `</div>`;
     h += `<div class="nl-tbl-wrap" id="nlm-fc"><table class="nl-tbl"><thead><tr><th></th><th>Month</th><th>Status</th><th class="r">Costs</th><th class="r">Saved</th><th class="r">Fun Fund</th><th class="r">Fun balance</th></tr></thead><tbody>`;
     info.forEach((x, i) => {
       const bits = [];
@@ -806,6 +837,8 @@
     const wrap = host.querySelector('.nl-tbl-wrap');
     if(tab === 'plan') NLP.rows(wrap, PANEL, id => { const r = NLM._rows[id]; if(!r) return; if(r.kind === 'line' || r.kind === 'savings') openRow(id); else if(r.kind === 'trip') NLP.go('nl-plans'); });
     if(tab === 'forecast') NLP.rows(wrap, PANEL, id => NLM.goMonth(id));
+    // Choosing a month also shows it in the 'this month' card above.
+    if(tab === 'forecast' && wrap){ let last = NLP.chosen(PANEL); wrap.addEventListener('click', () => setTimeout(() => { const c = NLP.chosen(PANEL); if(c !== last){ last = c; NLP.renderPage(PANEL); } }, 0)); }
     if(tab === 'years') NLP.rows(wrap, PANEL, id => openRow(id));
     if(tab === 'bank' && wrap) NLP.rows(wrap, PANEL, id => openRow(id));
     if(tab === 'history' && wrap) NLP.rows(wrap, PANEL, null);
@@ -941,6 +974,29 @@
   NLP.register({ panel:PANEL, section:'money', label:'Money plan', render, overview });
 
   NLP.css('nl-money-css', `
+#panel-nl-money .nlm-fc-top { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1.7fr); gap:14px; align-items:stretch; }
+#panel-nl-money .nlm-fc-top > .nl-cc { margin-bottom:14px; }
+@container (max-width:900px){ #panel-nl-money .nlm-fc-top { grid-template-columns:minmax(0,1fr); } }
+#panel-nl-money .nlm-flow { display:flex; flex-direction:column; gap:2px; margin-top:6px; }
+#panel-nl-money .nlm-flow-row { display:grid; grid-template-columns:minmax(0,9.5em) minmax(60px,1fr) max-content; gap:10px; align-items:center; padding:4px 0; font-size:13px; }
+#panel-nl-money .nlm-flow-l { min-width:0; line-height:1.25; }
+#panel-nl-money .nlm-flow-l b { display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; font-weight:500; overflow:hidden; overflow-wrap:anywhere; }
+#panel-nl-money .nlm-flow-l span { display:block; font-size:11.5px; color:var(--nl-detail); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+#panel-nl-money .nlm-flow-track { position:relative; height:14px; border-radius:3px; background:#F4F4F6; }
+#panel-nl-money .nlm-flow-bar { position:absolute; top:0; bottom:0; border-radius:3px; }
+#panel-nl-money .nlm-flow-zero { position:absolute; top:-3px; bottom:-3px; width:1px; background:var(--nl-quiet); z-index:1; }
+#panel-nl-money .k-in { background:var(--nl-accent); opacity:.85; }
+#panel-nl-money .k-cost { background:var(--nlm-cost); }
+#panel-nl-money .k-trip { background:#C9A56A; }
+#panel-nl-money .k-carry { background:#E3A89F; }
+#panel-nl-money .k-save { background:#48639A; opacity:.85; }
+#panel-nl-money .k-left { background:var(--nlm-fun); }
+#panel-nl-money .k-short { background:var(--nlm-short); }
+#panel-nl-money .nlm-flow-v { font-variant-numeric:tabular-nums; white-space:nowrap; text-align:right; color:var(--nl-ink); }
+#panel-nl-money .nlm-flow-v.neg { color:#8F2A22; font-weight:600; }
+#panel-nl-money .nlm-flow-end { border-top:1px solid var(--nl-line); margin-top:4px; padding-top:8px; }
+#panel-nl-money .nlm-flow-end b { font-weight:600; }
+
 #panel-nl-money { --nlm-cost:#C9CED8; --nlm-fun:#9FD2BF; --nlm-short:#E3A49C; --nlm-retire:#8A5A0A; }
 #panel-nl-money .nlm-mon { display:inline-flex; align-items:center; gap:4px; }
 #panel-nl-money .nlm-mon .nl-gp { padding:6px 10px; }
