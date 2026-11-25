@@ -399,7 +399,7 @@
 
   // ── The page ───────────────────────────────────────────────────────────
   function render(host){
-    const m = model(), ui = st(), tab = ui.tab === 'needs' ? 'needs' : 'how';
+    const m = model(), ui = st(), tab = ui.tab === 'needs' ? 'needs' : ui.tab === 'review' && NLP.review ? 'review' : 'how';
     const wi = activeWI(), alt = wi ? { w:wi, life:runWhatIf(wi.kind, wi.val) } : null;
     const isNom = nom();
     const sw = `<div class="nl-seg" role="group" aria-label="Show money as"><button type="button" aria-pressed="${!isNom}" onclick="NLP.today.mode('real')" title="Takes out ${H(state.inflationRate)}% inflation a year">Today’s money</button><button type="button" aria-pressed="${isNom}" onclick="NLP.today.mode('nominal')" title="The amounts as they will read in the future">Future money</button></div>`;
@@ -422,6 +422,8 @@
           NLP.card(funTitle(m) + ` Savings reach ${NLP.moneyShort(savRun(m)[11])}.`, m.trips.length ? 'Fun Fund balance and your savings adding up, next 12 months. Dots: trip costs.' : 'Fun Fund balance and your savings adding up, next 12 months.',
             NLP.chartBox(funChart(m), 160, 'Fun Fund balance and savings') + NLP.legend([{ label:'Fun Fund', color:'var(--nl-accent)' }, { label:'Savings', color:'#48639A' }].concat(m.trips.length ? [{ label:'Trip cost', color:'var(--tdy-steel)' }] : []).concat(Math.min(...m.run) < 0 ? [{ label:'Below zero', color:'var(--tdy-ruby-bg)' }] : []))) +
         `</div>`;
+    } else if(tab === 'review'){
+      body = NLP.review.body(m);
     } else {
       body = m.items.length
         ? `<div class="nl-tbl-wrap"><table class="nl-tbl tdy-needs"><thead><tr><th></th><th>What needs you</th><th>Status</th></tr></thead><tbody>${m.items.map((it, i) =>
@@ -431,7 +433,8 @@
     host.innerHTML = `<div class="nl-wrap tdy">${NLP.head({ title:'Today', panel:P, tabs:[
       { key:'how', label:'How are we doing', on:tab === 'how' },
       { key:'needs', label:'Needs you', count:m.items.length, on:tab === 'needs' },
-    ], actions:sw })}${body}</div>`;
+    ].concat(NLP.review ? [{ key:'review', label:'Full review', on:tab === 'review' }] : []), actions:tab === 'review' ? NLP.review.actions() : sw })}${body}</div>`;
+    if(tab === 'review') NLP.review.wire(host);
     if(tab === 'needs') NLP.rows(host.querySelector('.tdy-needs tbody'), P, id => NLP.today.go(id));
   }
 
@@ -445,6 +448,7 @@
     return `<div class="tdy-wall"><div class="tdy-cap">Your life wall, age ${cur} to ${L} · ${m.green} of ${m.bricks.length} green</div><div class="tdy-bricks">${m.bricks.map(b => `<i class="${H(b.verdict)}${b.isCurrent ? ' now' : ''}" title="Age ${H(b.startAge)}–${H(b.endAge)}: ${H(b.verdict)}"></i>`).join('')}</div><p class="tdy-cap" style="margin:6px 0 0">${H(note)}</p></div>`;
   }
   function overview(){
+    if(st().tab === 'review' && NLP.review) return NLP.review.overview(model());
     const m = model(), ui = st(), r = m.life, L = lifeExp();
     const wi = activeWI();
     const items = m.items.filter(it => it.id !== 'pending');   // the panel lists suggestions itself
@@ -504,8 +508,10 @@
       if(i && !i.value.trim()){ i.value = 'What if '; i.dispatchEvent(new Event('input')); i.focus(); i.setSelectionRange(i.value.length, i.value.length); }
     },
     report(){
-      NLP.ask('Write me a full review of my finances: where I stand, what is going well, what needs attention, and the three things to do next.');
+      st().tab = 'review'; st().chosen = null;
+      if(state.activePanel !== P) NLP.go(P); else NLP.renderPage(P);
     },
+    model:() => model(),
   };
 
   NLP.register({ panel:P, section:'today', label:'Today', render, overview });
