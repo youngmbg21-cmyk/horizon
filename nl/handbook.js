@@ -118,7 +118,7 @@ window.NL_HANDBOOK = [
     ['Press the currency you want, for example **USD**.', 'USD'],
     'You can also switch currency with the buttons in the black bar at the top.'] },
   { id:'rates', title:'Update exchange rates', steps:['@go',
-    ['Press **Check today’s rates**.', 'Check today’s rates'],
+    ['Press **Check today’s rates**. If new rates are already waiting, you see **Use these rates** instead.', '#nlst-row-rates button'],
     'Press **Use these rates** to use them, or **Not now**.'] },
   { id:'money-view', title:'Show today’s money or future money', steps:['@go',
     ['Press **Today’s money** or **Future money**.', 'Future money'],

@@ -89,7 +89,7 @@ const FILE = 'file://' + path.resolve(__dirname, '../../index.html');
   console.log(`3. Head buttons: ${heads.length ? heads.length + ' not covered' : 'all covered'}`);
 
   // 4. Walk every chapter: each outlined button must exist; nav steps are pressed for real.
-  const NO_PRESS = ['Back to the old look','Restore the backup','Connect and sign in','Download a copy','Choose a bank file','+ Upload','Save to Notebook','Check today’s rates','Add this pension','Save trip','Fill a template','#nl-ask-input','[onclick="nlShowHow()"]','#nl-links [onclick="nlShowHistory()"]'];
+  const NO_PRESS = ['Back to the old look','Restore the backup','Connect and sign in','Download a copy','Choose a bank file','+ Upload','Save to Notebook','#nlst-row-rates button','Add this pension','Save trip','Fill a template','#nl-ask-input','[onclick="nlShowHow()"]','#nl-links [onclick="nlShowHistory()"]'];
   let walked = 0;
   for(const id of chapters){
     await page.evaluate(() => { NLD.stop(); document.getElementById('nl-info-back')?.classList.remove('on'); const m = document.getElementById('nl-menu'); if(m && !m.hidden) nlMenu(); ['nl-today','nl-money','nl-plans','nl-future','nl-notebook','nl-setup','nl-settings'].forEach(p => { NLP.ui(p).open = null; NLP.ui(p).chosen = null; }); nav('nl-today'); });
