@@ -79,6 +79,28 @@
         if(!q || !rows.some(r => r[1] > 0)){ errs.push(`step ${i + 1}: no expense line matches "${sh.name}"`); return; }
         const mx = Math.max(...rows.map(r => r[1]));
         out.board = lastBoard = { kind:'table', label:`${trips ? 'Trips' : clean(sh.name)}, month by month`, head:['Month', 'Amount'], rows:rows.map(r => ({ c:[r[0], r[1]], money:[false, true], hot:r[1] === mx && mx > 0 })) };
+      } else if(t === 'share'){
+        const m = monthOf(sh.month); if(!m){ errs.push(`step ${i + 1}: no month`); return; }
+        const want = (sh.names || []).map(x => String(x).toLowerCase()).slice(0, 3);
+        let slices;
+        if((sh.of || 'income') === 'costs'){
+          const lines = monthLines(m), total = sum(lines, r => r.value);
+          const pick = want.length ? lines.filter(r => want.some(w => r.name.toLowerCase().includes(w))) : lines.slice(0, 3);
+          if(want.length && !pick.length){ errs.push(`step ${i + 1}: none of ${JSON.stringify(sh.names)} is a cost line (lines: ${lines.map(r => r.name).join(', ')})`); return; }
+          slices = pick.slice(0, 4).map(r => ({ name:r.name, value:r.value })); slices.push({ name:'Other costs', value:total - sum(slices, x => x.value), rest:true });
+          out.board = lastBoard = { kind:'donut', label:`Share of costs, ${m.label || short(m.key)}`, total, slices };
+        } else {
+          const inc = m.pureIncome || 0, lines = monthLines(m), costs = m.pureExpenses || 0, sav = m.savings || 0;
+          if(!(inc > 0)){ errs.push(`step ${i + 1}: no income this month`); return; }
+          const pick = want.length ? lines.filter(r => want.some(w => r.name.toLowerCase().includes(w))).slice(0, 3) : [];
+          if(want.length && !pick.length){ errs.push(`step ${i + 1}: none of ${JSON.stringify(sh.names)} is a cost line`); return; }
+          slices = pick.map(r => ({ name:r.name, value:r.value }));
+          slices.push({ name:pick.length ? 'Other costs' : 'Costs', value:costs - sum(pick, r => r.value) });
+          slices.push({ name:'Saved', value:sav });
+          const left = inc - costs - sav; if(left > 0) slices.push({ name:'Fun Fund', value:left, rest:true });
+          out.board = lastBoard = { kind:'donut', label:`Where your income goes, ${m.label || short(m.key)}`, total:Math.max(inc, costs + sav), over:left < 0 ? -left : 0, slices };
+        }
+        out.board.slices = out.board.slices.filter(x => x.value > 0);
       } else if(t === 'months_overview'){
         out.board = lastBoard = { kind:'table', label:'The next 12 months', head:['Month', 'Costs', 'Fun balance'], rows:months().map(m => ({ c:[short(m.key), m.pureExpenses || 0, m.funFund || 0], money:[false, true, true], hot:(m.funFund || 0) < 0 })) };
       } else if(t === 'runway'){
@@ -107,6 +129,16 @@
     }
     if(b.kind === 'table'){
       return head + `<div class="nlw-tw"><table class="nlw-t"><thead><tr>${b.head.map((x, j) => `<th${j ? ' class="r"' : ''}>${H(x)}</th>`).join('')}</tr></thead><tbody>${b.rows.map((r, j) => `<tr class="${r.hot ? 'hot' : ''}"${an(id, k0, base + j * 70, 'rise')}>${r.c.map((c, q) => `<td${q ? ' class="r"' : ''}>${H(r.money[q] ? M(c) : c)}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`;
+    }
+    if(b.kind === 'donut'){
+      const cols = ['var(--nl-accent)', '#B7791F', '#5B6B8C', '#6FBFAE', '#C9CED8'];
+      let acc = 0; const tot = b.total || 1;
+      const segs = b.slices.map((x, j) => { const p = Math.max(0, x.value / tot * 100); const seg = { x, p, start:acc, col:x.rest ? '#C9CED8' : cols[j % 4] }; acc += p; return seg; });
+      const arcs = segs.map((g, j) => `<circle r="15.915" cx="18" cy="18" fill="none" stroke="${g.col}" stroke-width="5.2" stroke-dasharray="${g.p.toFixed(3)} ${(100 - g.p).toFixed(3)}" stroke-dashoffset="${(25 - g.start).toFixed(3)}"/>`).join('')
+        + `<circle r="15.915" cx="18" cy="18" fill="none" stroke="#fff" stroke-width="6.4" class="nlw-cover" stroke-dasharray="0 100" stroke-dashoffset="25"${an(id, k0, base, 'sweep')}/>`;
+      const big = segs[0] ? Math.round(segs[0].p) + '%' : '';
+      const legend = segs.map(g => `<div class="nlw-dl"><i style="background:${g.col}"></i><span class="nm">${H(g.x.name)}</span><span class="v">${Math.round(g.p)}%</span><span class="m">${H(M(g.x.value))}</span></div>`).join('') + (b.over ? `<div class="nlw-dl over"><i></i><span class="nm">Over by</span><span class="v"></span><span class="m">${H(M(b.over))}</span></div>` : '');
+      return head + `<div class="nlw-donut"><div class="nlw-dw"><svg viewBox="0 0 36 36" aria-hidden="true"><circle r="15.915" cx="18" cy="18" fill="none" stroke="#EDEDF0" stroke-width="5.2"/>${arcs}</svg><span class="nlw-dc"${an(id, k0, base + 300, 'fade')}>${big}<small>${H(segs[0] ? segs[0].x.name : '')}</small></span></div><div class="nlw-dlg">${legend}</div></div>`;
     }
     if(b.kind === 'flow'){
       // Reveal: the board's own n, raised by later "upto" steps.
@@ -182,16 +214,17 @@
   // ── The assistant's tool ─────────────────────────────────────────────────
   NLP.addTool({
     def:{ name:'walk_through',
-      description:'Show a short step-by-step lesson in the panel: each step is one sentence plus (optionally) a drawing that Horizon builds from the person\'s real numbers. ONLY use this when the person asks to be walked through something, taught, or shown step by step ("walk me through", "teach me", "explain step by step", "show me how"). Never use it for ordinary questions. 3 to 6 steps. Drawings: month_lines (a month\'s costs as bars), highlight (light up named bars from the bars just before), month_flow (a month from income to what is left; repeat it with a bigger "upto" to build it block by block), line_by_month (one expense line across the next 12 months; name "trips" for travel), months_overview (12 months: costs and Fun Fund balance), savings_growth (savings adding up over 12 months), runway (retirement money left by age; repeat with part "withdrawals" then "pensions" to add layers), runway_checkpoints (money left every 5 years), none.',
+      description:'Show a short step-by-step lesson in the panel: each step is one sentence plus (optionally) a drawing that Horizon builds from the person\'s real numbers. ONLY use this when the person asks to be walked through something, taught, or shown step by step ("walk me through", "teach me", "explain step by step", "show me how"). Never use it for ordinary questions. 3 to 6 steps. Drawings: month_lines (a month\'s costs as bars), highlight (light up named bars from the bars just before), share (a donut: what share of the month\'s income or costs goes where; names can pull out up to 3 cost lines, e.g. ["Mortgage"]), month_flow (a month from income to what is left; repeat it with a bigger "upto" to build it block by block), line_by_month (one expense line across the next 12 months; name "trips" for travel), months_overview (12 months: costs and Fun Fund balance), savings_growth (savings adding up over 12 months), runway (retirement money left by age; repeat with part "withdrawals" then "pensions" to add layers), runway_checkpoints (money left every 5 years), none.',
       input_schema:{ type:'object', properties:{
         title:{ type:'string', description:'Short lesson title, e.g. "Your expenses, step by step".' },
         steps:{ type:'array', minItems:2, maxItems:8, items:{ type:'object', properties:{
           say:{ type:'string', description:'One or two short plain sentences for this step. Use the person\'s real figures from the context.' },
           show:{ type:'object', properties:{
-            type:{ type:'string', enum:['none','month_lines','highlight','month_flow','line_by_month','months_overview','savings_growth','runway','runway_checkpoints'] },
+            type:{ type:'string', enum:['none','month_lines','highlight','share','month_flow','line_by_month','months_overview','savings_growth','runway','runway_checkpoints'] },
             month:{ type:'string', description:'YYYY-MM, for month_lines and month_flow. Leave out for the current month.' },
-            names:{ type:'array', items:{ type:'string' }, description:'For highlight: names of bars to light up.' },
+            names:{ type:'array', items:{ type:'string' }, description:'For highlight: names of bars to light up. For share: cost lines to show as their own slices.' },
             name:{ type:'string', description:'For line_by_month: the expense line, e.g. "Groceries", or "trips".' },
+            of:{ type:'string', enum:['income','costs'], description:'For share (a donut): split of the month\'s income (costs, saved, Fun Fund) or of its costs.' },
             upto:{ type:'string', enum:['income','costs','saved','trips','end'], description:'For month_flow: how far to build.' },
             part:{ type:'string', enum:['balance','withdrawals','pensions'], description:'For runway: the layer this step adds.' }
           }, required:['type'], additionalProperties:false }
@@ -242,6 +275,16 @@ html.nl .nlw-fc i.in { background:var(--nl-accent); } html.nl .nlw-fc i.out { ba
 html.nl .nlw-fc i.end { background:#6FBFAE; } html.nl .nlw-fc i.neg { background:#B4412F; }
 html.nl .nlw-fc.off i { visibility:hidden; } html.nl .nlw-fc.off .nm { color:var(--nl-edge); }
 html.nl .nlw-fc .nm { color:var(--nl-detail); line-height:1.2; overflow-wrap:normal; word-break:normal; font-size:11px; } html.nl .nlw-fc .v { font-variant-numeric:tabular-nums; min-height:1.3em; white-space:nowrap; font-size:11px; letter-spacing:-.01em; }
+html.nl .nlw-donut { display:grid; grid-template-columns:104px minmax(0,1fr); gap:12px; align-items:center; }
+html.nl .nlw-dw { position:relative; width:104px; height:104px; } html.nl .nlw-dw svg { width:100%; height:100%; transform:none; }
+html.nl .nlw-dc { position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center; font:600 18px/1 var(--nl-sans); }
+html.nl .nlw-dc small { font:400 10.5px/1.2 var(--nl-sans); color:var(--nl-detail); margin-top:3px; max-width:62px; text-align:center; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+html.nl .nlw-dl { display:grid; grid-template-columns:9px minmax(0,1fr) auto; column-gap:6px; align-items:center; font-size:12px; margin:3px 0; }
+html.nl .nlw-dl i { width:9px; height:9px; border-radius:2px; } html.nl .nlw-dl .nm { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; } html.nl .nlw-dl .v { font-weight:600; font-variant-numeric:tabular-nums; }
+html.nl .nlw-dl .m { grid-column:2 / 4; color:var(--nl-detail); font-size:11.5px; font-variant-numeric:tabular-nums; margin-top:-1px; }
+html.nl .nlw-dl.over .nm, html.nl .nlw-dl.over .m { color:#B4412F; }
+html.nl [data-a="sweep"] { animation-name:nlwSweep; animation-duration:1.1s; animation-timing-function:ease-in-out; }
+@keyframes nlwSweep { from { stroke-dasharray:100 0; stroke-dashoffset:25; } to { stroke-dasharray:0 100; stroke-dashoffset:-75; } }
 html.nl .nlw-run { position:relative; height:110px; margin:16px 0 0; }
 html.nl .nlw-run svg { position:absolute; inset:0; width:100%; height:100%; overflow:visible; }
 html.nl .nlw-run .ln { fill:none; stroke:var(--nl-accent); stroke-width:2.2; vector-effect:non-scaling-stroke; }
