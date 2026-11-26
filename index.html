@@ -25730,8 +25730,26 @@ You are Horizon, the assistant. You PREPARE, the person DECIDES.
       if(m.choices && i === n.chat.length - 1 && !busy) html += `<div class="nl-choices">${m.choices.options.map(o => `<button type="button" onclick="nlChoose(this.textContent)">${h(o)}</button>`).join('')}</div>`;
     });
     if(busy) html += `<div class="nl-status">${h(statusText || 'Thinking')} ${dots}</div>`;
-    box.innerHTML = html;
+    patchChildren(box, html);
     if(nearEnd || busy) box.scrollTop = box.scrollHeight;
+  }
+  // Redraw only the messages that changed. A message that is the same as before
+  // keeps its node, so a chart that is still building is never rebuilt mid-way
+  // (which made walk-through charts stutter). Animation timing is ignored when
+  // comparing, because it is recomputed on every redraw.
+  function patchChildren(box, html){
+    const tpl = document.createElement('template'); tpl.innerHTML = html;
+    const sig = el => (el.nodeType === 1 ? el.outerHTML : el.textContent).replace(/animation-delay:\s*-?[\d.]+ms;?/g, '').replace(/\sstyle=""/g, '');
+    const next = [...tpl.content.childNodes].filter(n => n.nodeType === 1 || n.textContent.trim());
+    const old = [...box.childNodes].filter(n => n.nodeType === 1 || n.textContent.trim());
+    if(old.length !== box.childNodes.length) [...box.childNodes].forEach(n => { if(!old.includes(n)) n.remove(); });
+    next.forEach((n, i) => {
+      const cur = old[i], ns = sig(n);
+      if(cur && cur._nlSig === ns) return;
+      n._nlSig = ns;
+      if(cur) box.replaceChild(n, cur); else box.appendChild(n);
+    });
+    old.slice(next.length).forEach(n => n.remove());
   }
   function renderOverview(){
     const box = $('nl-ov'); if(!box) return;
