@@ -25059,6 +25059,7 @@ class HZMobile {
 <script src="nl/notebook.js"></script>
 <script src="nl/setup.js"></script>
 <script src="nl/phone.js"></script>
+<script src="nl/lesson.js"></script>
 <!-- ══ NEW LOOK (L+S) · Phase 0 ══════════════════════════════════════════
      The switch, the one-time backup, and the new top bar. The choice is
      kept per device (not synced). Old pages show inside the new look until
@@ -25638,8 +25639,10 @@ You are Horizon, the assistant. You PREPARE, the person DECIDES.
     if(failed) n.chat.push({ role:'assistant', kind:'error', content:failed, retry:text, at:Date.now() });
     else {
       reply = cleanReply(reply);
-      if(!reply) reply = proposalId ? 'I prepared the changes below. Nothing is saved until you press Apply.' : (choices ? choices.question : 'I couldn’t put an answer together that time. Please try again.');
-      n.chat.push({ role:'assistant', content:reply, at:Date.now(), proposal:proposalId, choices });
+      const lessonLast = n.chat.length && n.chat[n.chat.length - 1].kind === 'lesson';
+      if(!reply && lessonLast && !proposalId && !choices) reply = null;
+      else if(!reply) reply = proposalId ? 'I prepared the changes below. Nothing is saved until you press Apply.' : (choices ? choices.question : 'I couldn’t put an answer together that time. Please try again.');
+      if(reply !== null) n.chat.push({ role:'assistant', content:reply, at:Date.now(), proposal:proposalId, choices });
     }
     pendingChoices = choices;
     n.chat = n.chat.slice(-200);
@@ -25712,6 +25715,9 @@ You are Horizon, the assistant. You PREPARE, the person DECIDES.
     if(!n.chat.length) html = `<p class="nl-status">Ask anything about your plan, or tell Horizon what to change. It prepares; you decide.</p>`;
     n.chat.forEach((m, i) => {
       if(m.role === 'user'){ html += `<div class="nl-msg me">${h(m.content)}</div>`; return; }
+      // Messages drawn by a page file (e.g. walk-through lessons, nl/lesson.js).
+      const hooked = (window.NL_MSG_RENDER || []).reduce((o, f) => { if(o != null) return o; try { return f(m, i); } catch(_){ return null; } }, null);
+      if(hooked != null){ html += hooked; return; }
       if(m.kind === 'error'){ html += `<div class="nl-msg warn">${h(m.content)} <button class="nl-link" type="button" onclick="nlRetry(${i})">Try again</button></div>`; return; }
       if(m.kind === 'nokey'){ html += `<div class="nl-msg ai"><p>${h(m.content)}</p><p><button class="nl-link" type="button" onclick="nlFlip('overview');(typeof nlSettingsKey==='function')?nlSettingsKey():nav('settings')">Open Settings</button></p></div>`; return; }
       html += `<div class="nl-msg ai">${md(m.content)}${m.proposal && n.proposals[m.proposal] ? proposalCard(n.proposals[m.proposal]) : ''}</div>`;
