@@ -25060,6 +25060,8 @@ class HZMobile {
 <script src="nl/setup.js"></script>
 <script src="nl/phone.js"></script>
 <script src="nl/lesson.js"></script>
+<script src="nl/handbook.js"></script>
+<script src="nl/directions.js"></script>
 <!-- ══ NEW LOOK (L+S) · Phase 0 ══════════════════════════════════════════
      The switch, the one-time backup, and the new top bar. The choice is
      kept per device (not synced). Old pages show inside the new look until
@@ -25580,9 +25582,12 @@ You are Horizon, the assistant. You PREPARE, the person DECIDES.
     n.chat = n.chat.slice(-200);
     pendingChoices = null; currentAsk = text;
     save(); nlFlip('chat');
+    // Directions first (nl/directions.js): places, things, tasks and "how do I" are
+    // answered without the AI, instantly and without a key.
+    if(typeof window.nlReader === 'function'){ const r = window.nlReader(text); if(r && r.handled){ n.chat = n.chat.slice(-200); save(); render(); return; } }
     const key = state.aiKeys && state.aiKeys.claude;
     if(!key){
-      n.chat.push({ role:'assistant', kind:'nokey', content:'To talk with Horizon, add your Claude key in Settings, under AI Keys. It stays on this device.', at:Date.now() });
+      n.chat.push({ role:'assistant', kind:'nokey', content:'To talk with Horizon, add your Claude key in Settings → Assistant. It stays on this device.', at:Date.now() });
       save(); render(); return;
     }
     busy = true; statusText = 'Reading your plan'; render();
@@ -25642,7 +25647,8 @@ You are Horizon, the assistant. You PREPARE, the person DECIDES.
       const lessonLast = n.chat.length && n.chat[n.chat.length - 1].kind === 'lesson';
       if(!reply && lessonLast && !proposalId && !choices) reply = null;
       else if(!reply) reply = proposalId ? 'I prepared the changes below. Nothing is saved until you press Apply.' : (choices ? choices.question : 'I couldn’t put an answer together that time. Please try again.');
-      if(reply !== null) n.chat.push({ role:'assistant', content:reply, at:Date.now(), proposal:proposalId, choices });
+      const links = typeof window.nlTakeLinks === 'function' ? window.nlTakeLinks() : null;
+      if(reply !== null) n.chat.push({ role:'assistant', content:reply, at:Date.now(), proposal:proposalId, choices, ...(links ? { links } : {}) });
     }
     pendingChoices = choices;
     n.chat = n.chat.slice(-200);
@@ -25720,7 +25726,7 @@ You are Horizon, the assistant. You PREPARE, the person DECIDES.
       if(hooked != null){ html += hooked; return; }
       if(m.kind === 'error'){ html += `<div class="nl-msg warn">${h(m.content)} <button class="nl-link" type="button" onclick="nlRetry(${i})">Try again</button></div>`; return; }
       if(m.kind === 'nokey'){ html += `<div class="nl-msg ai"><p>${h(m.content)}</p><p><button class="nl-link" type="button" onclick="nlFlip('overview');(typeof nlSettingsKey==='function')?nlSettingsKey():nav('settings')">Open Settings</button></p></div>`; return; }
-      html += `<div class="nl-msg ai">${md(m.content)}${m.proposal && n.proposals[m.proposal] ? proposalCard(n.proposals[m.proposal]) : ''}</div>`;
+      html += `<div class="nl-msg ai">${md(m.content)}${m.links && typeof window.nlLinksHtml === 'function' ? window.nlLinksHtml(m.links) : ''}${m.proposal && n.proposals[m.proposal] ? proposalCard(n.proposals[m.proposal]) : ''}</div>`;
       if(m.choices && i === n.chat.length - 1 && !busy) html += `<div class="nl-choices">${m.choices.options.map(o => `<button type="button" onclick="nlChoose(this.textContent)">${h(o)}</button>`).join('')}</div>`;
     });
     if(busy) html += `<div class="nl-status">${h(statusText || 'Thinking')} ${dots}</div>`;
@@ -25823,8 +25829,10 @@ You are Horizon, the assistant. You PREPARE, the person DECIDES.
       <p><b>It may</b> read your whole plan, bank file and journal, prepare changes and mark them Suggested, and ask you which one you mean.</p>
       <p><b>Only after your press</b> it changes an amount, adds or removes a line, changes a year ahead or one month, sets your savings target, or moves a trip cost.</p>
       <p><b>Never</b> does it move or pay money, change anything without your press, or delete your history. The latest change can always be undone.</p>
-      <div class="nl-sheet-acts"><button class="nl-grey" type="button" onclick="nlCloseInfo()">Close</button></div>`);
+      <p><b>Finding your way:</b> ask “take me to my trips” or “how do I add a pension?”. Horizon takes you there or opens the Handbook. It moves you; it never presses for you.</p>
+      <div class="nl-sheet-acts">${window.NLD ? '<button class="nl-black" type="button" onclick="NLD.openBook()">Open the Handbook</button>' : ''}<button class="nl-grey" type="button" onclick="nlCloseInfo()">Close</button></div>`);
   };
+  window.nlOpenInfo = openInfo;
   document.addEventListener('click', e => { if(e.target.id === 'nl-info-back') nlCloseInfo(); });
 
   // ── Toast (bottom-centre, with an optional action) ──
