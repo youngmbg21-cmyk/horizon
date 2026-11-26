@@ -546,6 +546,7 @@ Amounts the person says are in ${state.currency || 'SEK'}.`;
       });
     } else if(tab === 'assistant'){
       body += row('key', 'Claude key', `<input type="password" id="nlst-key" data-nl-keep="no" autocomplete="off" spellcheck="false" placeholder="sk-ant-…" value="${H((state.aiKeys && state.aiKeys.claude) || '')}">` + det('Your own key. It stays on this device and is never put in backups or synced.'), keyOk() ? NLP.badge('Key added', 'green') : NLP.badge('Needed', 'amber'), keyOk() ? '' : 'need');
+      if(window.NLD) body += row('misses', 'Words Horizon didn’t understand', NLD.missesHtml(), NLD.missesActs());
       body += row('can', 'What it can do', `<div class="nls-val">Prepares changes; you decide</div>` + det('It suggests, you press Apply. ' + NLP.link('How the assistant works', 'nlShowHow()')));
     } else {
       const si = syncInfo();

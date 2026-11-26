@@ -527,7 +527,7 @@
     return [
       { key:'files', label:'Files', count:files().length, on:tab === 'files', keep:true },
       { key:'notes', label:'Notes', count:n, on:tab === 'notes', keep:true },
-      { key:'reports', label:'Reports', count:reports().length, on:tab === 'reports' },
+      { key:'reports', label:'Reports', count:reports().length, on:tab === 'reports', keep:true },
     ];
   }
   function render(host){

@@ -1,0 +1,24 @@
+# Runs Horizon's directions tests on every pull request and on main:
+# the navigation exam, the reachability checks and a walk through every Handbook chapter.
+name: Directions tests
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  nav:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Install Playwright and Chromium
+        run: |
+          npm install --no-save --no-package-lock playwright@1.49.1
+          npx playwright install --with-deps chromium
+      - name: Navigation exam, reachability and Handbook walk
+        run: node tests/nav/run.js
