@@ -25319,7 +25319,16 @@ class HZMobile {
   document.getElementById('nl-tabs')?.addEventListener('click', e => {
     const b = e.target.closest('button[data-nl-panel]'); if(b) nav(b.dataset.nlPanel);
   });
-  window.nlBack = function(){ if(history.length > 1) history.back(); else nav('dashboard'); };
+  // ‹ goes back only through moves made INSIDE Horizon. history.length also
+  // counts pages visited before Horizon in this tab, so it could leave the app.
+  let nlMoves = 0, nlGoingBack = false, nlCounting = false;
+  window.addEventListener('load', () => setTimeout(() => { nlCounting = true; }, 1500));
+  window.addEventListener('hashchange', () => { if(nlGoingBack){ nlGoingBack = false; return; } if(nlCounting) nlMoves++; });
+  window.nlBack = function(){
+    if(nlMoves > 0){ nlMoves--; nlGoingBack = true; history.back(); return; }
+    if(typeof NLP !== 'undefined' && NLP.isOn && NLP.isOn()){ if(state.activePanel !== 'nl-today') NLP.go('nl-today'); }
+    else nav('dashboard');
+  };
 
   // ── Move the currency + money-mode selectors between the two bars ──
   function moveSelectors(toNew){

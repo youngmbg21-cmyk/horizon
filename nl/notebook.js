@@ -505,7 +505,7 @@
     const raw = Array.isArray(state.vault) ? state.vault : [];
     return raw.map(v => {
       const n = typeof _vaultNormalise === 'function' ? _vaultNormalise(v) : { id:v.id, kind:v.type, title:v.title || v.location || 'Report', when:v.date || v.generatedAt, markdown:v.markdown || '', category:v.category };
-      const kind = n.kind === 'deepdive' ? 'Deep dive' : n.kind === 'piq' ? 'Property report' : n.category === 'spend-insights' ? 'Spend insights' : n.kind === 'analysis' ? 'Monthly analysis' : 'Report';
+      const kind = n.kind === 'deepdive' ? 'Deep dive' : n.kind === 'piq' ? 'Property report' : n.category === 'spend-insights' ? 'Spend insights' : n.category === 'full-review' ? 'Full review' : n.kind === 'analysis' ? 'Monthly analysis' : 'Report';
       const when = typeof n.when === 'number' ? n.when : Date.parse(n.when) || 0;
       return { id:String(n.id), title:n.title || 'Report', kind, when, md:String(n.markdown || ''), raw:v };
     }).filter(r => !/^transient-/.test(r.id)).sort((a, b) => b.when - a.when);
@@ -849,7 +849,7 @@
       headline:list.length ? (fresh.length ? `${plural(fresh.length, 'new report')} to read.` : `${plural(list.length, 'saved report')}; the latest is ${H(cut(list[0].title, 40))}.`) : 'No saved reports yet.',
       graphic:list.length ? NLP.counts(kinds.slice(0, 3).map(k => ({ value:byKind[k], label:k.toLowerCase() + (byKind[k] === 1 ? '' : 's') }))) : NLP.counts([{ value:0, label:'deep dives' }, { value:0, label:'analyses' }, { value:0, label:'other' }]),
       groups:[{ title:'Latest', rows:list.slice(0, 3).map(x => ({ text:H(cut(x.title, 60)) + (reportFirst(x) ? `<span class="nb-pq">${pq(reportFirst(x), 80)}</span>` : ''), badge:fresh.includes(x) ? { text:'New', kind:'amber' } : null, why:H(x.kind + ', ' + dayLabel(x.when).toLowerCase()), link:{ label:'Open this report', onclick:`NBK.openReport('${H(x.id)}')` } })) }],
-      button:list.length ? { label:'Open ' + short((fresh[0] || list[0]).title, 24), onclick:`NBK.openReport('${H((fresh[0] || list[0]).id)}')` } : { label:'Open Places to retire', onclick:"NLP.go('nl-plans')" },
+      button:list.length ? { label:'Open ' + short((fresh[0] || list[0]).title, 24), onclick:`NBK.openReport('${H((fresh[0] || list[0]).id)}')` } : { label:'Open Places to retire', onclick:"(function(){var u=NLP.ui('nl-plans');u.tab='places';u.chosen=null;u.open=null;NLP.go('nl-plans');})()" },
       links:[],
     };
   }

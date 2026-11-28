@@ -96,7 +96,18 @@
         if(d.retire) st.retirementAge = Number(d.retire.value) || st.retirementAge;
         if(d.incomeLines) st.baseIncome = d.incomeLines.value.map(l => ({ id:l.id, name:l.name || 'Income', amount:Number(l.amount) || 0, type:l.type || 'fixed' }));
         else if(d.income && sumIncome() <= 0) st.baseIncome = [{ id:'nl-draft', name:'Income', amount:Number(d.income.value) || 0, type:'fixed' }];
-      }, () => getProjection().map(r => ({ age:r.age, v:(state.displayMode === 'nominal' ? r.total : r.realTotal) || 0 })));
+      }, () => {
+        // Start at what the accounts hold today (as Today does), then each
+        // year-end: year 0 ends in December, the retirement year ends this month.
+        const cur = Number(state.currentAge) || 0, ytr = Math.max(0, (Number(state.retirementAge) || 0) - cur);
+        const now = (typeof getInvestmentAssets === 'function' ? getInvestmentAssets() : []).reduce((s, a) => s + (Number(a.balance) || 0), 0);
+        const out = [{ age:cur, v:now }];
+        getProjection().forEach((r, y) => {
+          const age = y === ytr ? cur + ytr : cur + y + (12 - CM) / 12;
+          if(age > out[out.length - 1].age) out.push({ age, v:(state.displayMode === 'nominal' ? r.total : r.realTotal) || 0 });
+        });
+        return out;
+      });
     } catch(err){ return []; }
   }
   function chartTitle(pts){
@@ -113,7 +124,7 @@
     const step = span > 30 ? 10 : span > 12 ? 5 : span > 5 ? 2 : 1;
     const xt = [[a0, String(a0)]]; for(let a = Math.ceil((a0 + 1) / step) * step; a < a1; a += step) if(a - a0 >= step / 2 && a1 - a >= step / 2) xt.push([a, String(a)]); xt.push([a1, String(a1)]);
     return NLP.chart({ w, h, x:[a0, a1], y:[yt.min, yt.max], yt:yt.ticks, xt, pad:{ l:58, r:20, t:22 }, label:chartTitle(pts),
-      hover:{ n:pts.length, x:i => pts[i].age, title:i => `Age ${pts[i].age}`, rows:i => [{ name:'Your money', value:NLP.money(pts[i].v), color:'#087363' }], y:i => [{ v:pts[i].v, color:'#087363' }] },
+      hover:{ n:pts.length, x:i => pts[i].age, title:i => `Age ${Math.round(pts[i].age)}`, rows:i => [{ name:'Your money', value:NLP.money(pts[i].v), color:'#087363' }], y:i => [{ v:pts[i].v, color:'#087363' }] },
       draw:k => {
       const xy = pts.map(p => [p.age, p.v]), f = xy[0], l = xy[xy.length - 1];
       return `<path d="${k.area(xy, Math.max(yt.min, 0))}" fill="#087363" fill-opacity=".10"/><path d="${k.line(xy)}" fill="none" stroke="#087363" stroke-width="2.2"/>`

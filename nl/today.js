@@ -149,10 +149,12 @@
   }
 
   // ── Needs you: each item says what, why, and where it is fixed ────────
+  // Open a page on a given tab (a link lands on ONE target, not the last tab used).
+  const goTab = (panel, tab) => { const u = NLP.ui(panel); u.tab = tab; u.chosen = null; u.open = null; NLP.go(panel); };
   const GO = {
     pending:() => { if(typeof window.nlFlip === 'function') window.nlFlip('chat'); },
-    short:() => NLP.go('nl-money'), trips:() => NLP.go('nl-plans'),
-    runout:() => NLP.go('nl-future'), pension:() => NLP.go('nl-future'), profile:() => NLP.go('nl-setup'),
+    short:() => goTab('nl-money', 'forecast'), trips:() => goTab('nl-plans', 'trips'),
+    runout:() => goTab('nl-future', 'runway'), pension:() => goTab('nl-future', 'accounts'), profile:() => NLP.go('nl-setup'),
     rates:() => { NLP.ui('nl-settings').tab = 'general'; NLP.go('nl-settings'); setTimeout(() => document.getElementById('nlst-row-rates')?.scrollIntoView({ block:'center' }), 80); },
   };
   function needs(d){
@@ -310,6 +312,7 @@
     };
   }
   function lifeTitle(r){
+    if(!(num(r.now) > 0) && !(num(r.atRet) > 0) && !(num(r.atEnd) > 0)) return 'Add your savings and accounts to see your money over your life.';
     const grow = r.ret > r.cur ? `Your money grows to about ${NLP.moneyShort(r.atRet)} by ${r.ret}` : `You have about ${NLP.moneyShort(r.atRet)} now`;
     if(r.runout && r.runout < r.L) return `${grow}, but runs out at ${r.runout}, ${r.L - r.runout} ${plural(r.L - r.runout, 'year', 'years')} before ${r.L}.`;
     if(r.runout) return `${grow}, and lasts until about ${r.runout}.`;
