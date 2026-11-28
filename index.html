@@ -32,21 +32,33 @@
 <!-- Inline favicon (brand ✦ on the dark shell) — no /favicon.ico request/404. -->
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%2305080f'/%3E%3Ctext x='32' y='46' font-size='40' text-anchor='middle' fill='%2300e8a0'%3E%E2%9C%A6%3C/text%3E%3C/svg%3E">
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700&family=JetBrains+Mono:wght@400;500&family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,600;1,9..144,400&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"/>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
-<!-- CDN fallback: if cdnjs is unreachable, pull the SAME pinned versions from
-     jsdelivr, then unpkg. document.write keeps them parser-blocking so app
-     code below still sees window.Chart / window.L on first run. If every CDN
-     fails, chart/map code no-ops (newChart / createWorldMap) instead of
-     throwing, and renderAll() re-runs if a library shows up late. -->
+<!-- Chart.js and Leaflet (charts and maps of the old look and the phone app;
+     the new look draws its own SVG charts) load IN THE BACKGROUND so they never
+     hold up the first paint. Each tries cdnjs, then jsdelivr, then unpkg, same
+     pinned versions. Code that needs them already waits for them: newChart()
+     and createWorldMap() call whenChartLibs(), which repaints once they arrive,
+     and the phone app waits with whenLib(). -->
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" media="print" onload="this.media='all'"/>
 <script>
-if(!window.L){document.write('<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css"/><script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js"><\/script>');}
-if(!window.Chart){document.write('<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.js"><\/script>');}
-</script>
-<script>
-if(!window.L){document.write('<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/><script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"><\/script>');}
-if(!window.Chart){document.write('<script src="https://unpkg.com/chart.js@4.4.1/dist/chart.umd.js"><\/script>');}
+(function(){
+  function load(urls, ready){
+    if(ready() || !urls.length) return;
+    var s = document.createElement('script');
+    s.src = urls[0]; s.async = true;
+    s.onerror = function(){
+      // Leaflet's stylesheet follows its script to the backup CDN.
+      if(/leaflet/.test(urls[1] || '')){ var l = document.createElement('link'); l.rel = 'stylesheet'; l.href = urls[1].replace(/leaflet\.js$/, 'leaflet.css'); document.head.appendChild(l); }
+      load(urls.slice(1), ready);
+    };
+    document.head.appendChild(s);
+  }
+  load(['https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js',
+        'https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.js',
+        'https://unpkg.com/chart.js@4.4.1/dist/chart.umd.js'], function(){ return typeof window.Chart === 'function'; });
+  load(['https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js',
+        'https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js',
+        'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js'], function(){ return typeof window.L !== 'undefined'; });
+})();
 </script>
 <style>
 /* ═══════════════════════════════════════════════════════════════
@@ -20698,15 +20710,14 @@ function toggleAIExpand(){
 async function callClaude(prompt, maxTokens, key, system) {
   const apiKey=key||(state.aiKeys?.claude);
   if(!apiKey) throw new Error('No Claude API key. Add one in Settings → AI Keys.');
-  const res=await fetch('https://api.anthropic.com/v1/messages',{
-    method:'POST',
-    headers:{'Content-Type':'application/json','x-api-key':apiKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
-    body:JSON.stringify({model:'claude-opus-4-6',max_tokens:maxTokens||600,system:system||buildAIContext(),messages:[{role:'user',content:prompt}]})
-  });
+  // maxTokens is the size of the answer; room is added for the model's thinking.
+  const want = maxTokens || 600;
+  const res = await hzClaude(apiKey, { max_tokens: want + 6000, output_config:{ effort: want <= 1000 ? 'low' : 'medium' },
+    system: system || buildAIContext(), messages:[{ role:'user', content:prompt }] });
   if(res.status===401) throw new Error('Invalid API key');
   if(!res.ok) throw new Error('API error '+res.status);
   const d=await res.json();
-  return d.content?.map(c=>c.text||'').join('')||'No response';
+  return hzClaudeText(d)||'No response';
 }
 
 // ─── IN-CHAT CHART PIPELINE ─────────────────────────────────────────────────
@@ -22048,6 +22059,19 @@ async function _aiChatRequest(key, body, withFallback){
   return fetch('https://api.anthropic.com/v1/messages', { method:'POST', headers,
     body: JSON.stringify(withFallback ? { ...body, fallbacks:'default' } : body) });
 }
+// One way to call Claude for the smaller AI features (deep dives, place
+// search, friend chat, quick answers): the same current model as the chat
+// (AI_CHAT_MODEL), with the server-side fallback if a reply is declined, and
+// a retry without it if that request can't be sent. Thinking can't be turned
+// off on this model and counts toward max_tokens, so callers give room for it
+// and set how hard it should think with effort.
+async function hzClaude(key, body){
+  body = Object.assign({ model:AI_CHAT_MODEL }, body);
+  try { return await _aiChatRequest(key, body, true); }
+  catch(_){ return await _aiChatRequest(key, body, false); }
+}
+// The reply's words: text blocks only (thinking and tool blocks are skipped).
+function hzClaudeText(d){ return ((d && d.content) || []).filter(b => b && b.type === 'text').map(b => b.text || '').join(''); }
 
 async function sendToAI(thread, msg){
   thread.messages.push({ role:'user', content:msg, at: Date.now() });
@@ -22248,29 +22272,20 @@ async function sendToFriend(thread, msg){
   // chats will stay well within the context window.
   const messages = _threadToClaudeMessages(thread);
   try {
-    const res = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': key,
-        'anthropic-version': '2023-06-01',
-        'anthropic-dangerous-direct-browser-access': 'true',
-      },
-      // max_tokens capped low because friend replies should text-like
-      // in length. The persona prompt already asks for ≤80 words.
-      body: JSON.stringify({
-        model: 'claude-opus-4-6',
-        max_tokens: 220,
-        system: systemPrompt,
-        messages,
-      }),
+    // Friend replies are short (the persona asks for ≤80 words); max_tokens
+    // leaves room for the model's thinking, kept light with low effort.
+    const res = await hzClaude(key, {
+      max_tokens: 3000,
+      output_config: { effort: 'low' },
+      system: systemPrompt,
+      messages,
     });
     if(!res.ok){
       const txt = await res.text().catch(() => '');
       throw new Error(`API ${res.status}${txt ? ' · ' + txt.slice(0,120) : ''}`);
     }
     const d = await res.json();
-    let reply = (d.content || []).map(c => c.text || '').join('').trim() || '…';
+    let reply = hzClaudeText(d).trim() || '…';
     // Belt-and-braces persona enforcement: strip any fenced code
     // blocks, horizon-chart blocks, or meta-references that slip
     // through despite the prompt.
@@ -23069,8 +23084,8 @@ async function piq_fetchSignals(query,cfg){
     }catch(e){}
   }
   const key=piq_getAnthropicKey();
-  const res=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'x-api-key':key,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true','Content-Type':'application/json'},body:JSON.stringify({model:'claude-sonnet-4-6',max_tokens:1500,tools:[{type:'web_search_20250305',name:'web_search'}],messages:[{role:'user',content:prompt}]})});
-  if(!res.ok){const e=await res.json();throw new Error(e.error?.message||'API error '+res.status);}
+  const res=await hzClaude(key,{max_tokens:12000,output_config:{effort:'medium'},tools:[{type:'web_search_20260209',name:'web_search'}],messages:[{role:'user',content:prompt}]});
+  if(!res.ok){const e=await res.json().catch(()=>({}));throw new Error(e.error?.message||'API error '+res.status);}
   const d=await res.json();
   return d.content.filter(b=>b.type==='text').map(b=>b.text).join('\n');
 }
@@ -23078,10 +23093,11 @@ async function piq_fetchSignals(query,cfg){
 async function piq_fetchAnalysis(query,signals,cfg){
   const key=piq_getAnthropicKey();
   const prompt=cfg.analysisPrompt.replace('{q}',query).replace('{signals}',signals);
-  const res=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'x-api-key':key,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true','Content-Type':'application/json'},body:JSON.stringify({model:'claude-sonnet-4-6',max_tokens:2500,messages:[{role:'user',content:prompt}]})});
-  if(!res.ok){const e=await res.json();throw new Error(e.error?.message||'Claude error '+res.status);}
+  const res=await hzClaude(key,{max_tokens:10000,output_config:{effort:'medium'},messages:[{role:'user',content:prompt}]});
+  if(!res.ok){const e=await res.json().catch(()=>({}));throw new Error(e.error?.message||'Claude error '+res.status);}
   const d=await res.json();
-  const text=d.content[0].text.trim().replace(/^```json\n?/,'').replace(/\n?```$/,'');
+  // The reply opens with a thinking block, so read the text blocks, not content[0].
+  const text=hzClaudeText(d).trim().replace(/^```json\n?/,'').replace(/\n?```$/,'');
   return JSON.parse(text);
 }
 
@@ -24181,7 +24197,7 @@ class HZMobile {
   fmtC(v){v=this.n(v,0);const r=Object.assign({SEK:1},this.data.exchangeRates);const cur=this.data.currency;const sym={SEK:'SEK',USD:'$',EUR:'€',KES:'KSh'}[cur]||'SEK';const c=v*(this.n(r[cur],1)||1);const a=Math.abs(c);const n=a>=999.5e3?`${(a/1e6).toFixed(1)}M`:a>=999.5?`${Math.round(a/1e3)}K`:Math.round(a).toLocaleString();const m=(c<0&&n!=='0')?'−':'';return cur==='SEK'?`${m}${n} SEK`:`${m}${sym}${n}`;}
   esc(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
   addMonths(b,n){return new Date(b.getFullYear(),b.getMonth()+n,1);}
-  whenLib(check,cb){if(check()){cb();return;}let n=0;const t=setInterval(()=>{if(check()||n++>50){clearInterval(t);if(check())cb();}},100);}
+  whenLib(check,cb){if(check()){cb();return;}let n=0;const t=setInterval(()=>{if(check()||n++>200){clearInterval(t);if(check())cb();}},100);}
   // The app's notion of "now" (CY/CM, refreshed on month rollover) so the
   // phone views flip month/year in step with the desktop engine.
   today(){return (typeof CY==='number'&&typeof CM==='number')?new Date(CY,CM,1):new Date();}
@@ -25985,7 +26001,9 @@ You are Horizon, the assistant. You PREPARE, the person DECIDES.
   // Another page always opens on its Overview; the conversation is kept.
   if(typeof bus !== 'undefined'){
     bus.on('panel:changed', () => { if(face !== 'overview') nlFlip('overview'); else render(); });
-    bus.on('state:changed', () => { if(isOn() && !busy) render(); });
+    // Same pacing as the page: wait for a pause in typing before redrawing the panel.
+    let panelT = null;
+    bus.on('state:changed', () => { clearTimeout(panelT); panelT = setTimeout(() => { if(isOn() && !busy) render(); }, (typeof NLP !== 'undefined' && NLP.typingDelay) ? NLP.typingDelay() : 60); });
   }
   window.addEventListener('resize', () => { if(isOn()) renderLinks(); });
   render();

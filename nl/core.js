@@ -68,6 +68,9 @@
     if(content) content.scrollTop = keep;
     NLP.refreshPanel();
   };
+  // How long to wait before redrawing after a change: short normally, longer
+  // while a text box has the focus (the person is still typing).
+  NLP.typingDelay = () => { const a = document.activeElement; return a && (a.tagName === 'TEXTAREA' || (a.tagName === 'INPUT' && !/^(checkbox|radio|button|submit|range|file)$/i.test(a.type))) ? 600 : 60; };
   NLP.rerender = () => { const p = NLP.activePage(); if(p) NLP.renderPage(p.panel); };
   NLP.go = function(panel){ if(pages[panel] && NLP.isOn()) nav(panel); else nav(NLP.OLD_FOR[panel] || panel); };
   // The page the top bar should open for a section.
@@ -270,8 +273,11 @@
       NLP.renderPage(panel);
       setTimeout(() => NLP.mountCharts(document.getElementById('panel-' + panel)), 0);
     });
+    // Redraw after a change. While the person is typing in a box, wait until
+    // they pause (each key restarts the wait), so ten keys make one redraw,
+    // not ten.
     let t = null;
-    bus.on('state:changed', () => { clearTimeout(t); t = setTimeout(() => { if(NLP.isOn() && !NLP._busy) NLP.rerender(); }, 60); });
+    bus.on('state:changed', () => { clearTimeout(t); t = setTimeout(() => { if(NLP.isOn() && !NLP._busy) NLP.rerender(); }, NLP.typingDelay()); });
   }
   // The app's own redraw (currency, money view, imports, theme…) only knows the
   // classic pages. Send a redraw of a new page to that page.
