@@ -145,7 +145,7 @@
       const runNoTrips = NLP.whatIf(s => { s.trips = []; }, () => get12Months().map(m => num(m.funFund)));
       tripCause = Math.min(...runNoTrips) >= 0;
     }
-    return { nums, life, months, ti12, sv12, savePct, bricks, green, amber, red, run, short, trips, tripCause, items:needs({ nums, life, months, short, trips, tripCause }) };
+    return { nums, life, months, ti12, sv12, savePct, bricks, green, amber, red, run, short, trips, tripCause, items:needs({ nums, life, months, short, trips, tripCause }).concat(reminders()) };
   }
 
   // ── Needs you: each item says what, why, and where it is fixed ────────
@@ -222,6 +222,74 @@
     return out;
   }
 
+
+  // ── Reminders: shown on Needs you only when due ────────────────────────
+  // Kept per household in state.nlReminders: done (id → the period it was
+  // done for), later (id → hidden until), off (id → turned off for good).
+  const RS = () => { if(!state.nlReminders || typeof state.nlReminders !== 'object') state.nlReminders = {}; const r = state.nlReminders; r.done = r.done || {}; r.later = r.later || {}; r.off = r.off || {}; return r; };
+  const ymKey = d => d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
+  const REM_KINDS = { bank:'Every month', backup:'Every month', trip:'Trip', pension:'Every year', tax:'Every year', insurance:'Every year', report:'Every year' };
+  const REM_NAMES = { bank:'Bank file', backup:'Backup file', trip:'Trip payments', pension:'Pensions', tax:'Tax return', insurance:'Insurance and beneficiaries', report:'Old place reports' };
+  function reminders(){
+    const r = RS(), now = new Date(), out = [];
+    const prev = new Date(now.getFullYear(), now.getMonth() - 1, 1), prevKey = ymKey(prev), yr = String(now.getFullYear());
+    const add = (type, o) => {
+      if(r.off[type]) return;
+      const id = 'rem:' + type + (o.sub ? ':' + o.sub : '');
+      if(r.done[id] === o.period) return;
+      if(r.later[id] && Date.parse(r.later[id]) > Date.now()) return;
+      out.push(Object.assign({ id, rem:true, type, every:REM_KINDS[type] }, o));
+    };
+    // 1. Last month's bank file (clears by itself once a file covers that month).
+    const txs = Array.isArray(state.transactions) ? state.transactions : [];
+    if(!txs.some(t => String(t.date || '').slice(0, 7) === prevKey))
+      add('bank', { period:prevKey, text:`Add ${prev.toLocaleDateString('en-GB', { month:'long' })}’s bank file`, detail:'So the Money plan can compare your plan with what really went out', why:'Each month, Horizon compares your plan with the bank.', badge:{ text:'Due', kind:'amber' }, act:'Add a bank file', run:() => goTab('nl-money', 'bank') });
+    // 2. A copy saved as a file in the last month (clears by itself after a download).
+    const lf = Date.parse((typeof window.nlAutoInfo === 'function' && window.nlAutoInfo().lastFile) || '');
+    if(!lf || Date.now() - lf > 30 * 864e5)
+      add('backup', { period:ymKey(now), text:'Save a backup file', detail:lf ? 'No file saved in the last month' : 'No file saved yet; copies in this browser go if it is cleared', why:'A file kept somewhere safe survives a cleared browser or a lost computer.', badge:{ text:'Due', kind:'amber' }, act:'Download a copy', run:() => { if(typeof exportSlice === 'function') exportSlice('all'); } });
+    // 3. Trip costs due in the next 14 days.
+    (state.trips || []).forEach(t => (t.expenses || []).forEach(e => {
+      const d = Date.parse(e.date || ''); if(!d) return;
+      const days = Math.ceil((d - Date.now()) / 864e5); if(days < 0 || days > 14) return;
+      add('trip', { sub:String(t.id) + ':' + String(e.id || e.name), period:String(e.date), text:`${t.name}: ${e.name}, ${NLP.money(e.amount)}`, detail:`Due ${new Date(d).toLocaleDateString('en-GB', { day:'numeric', month:'short' })}, from Plans › Trips`, why:'A trip cost is coming up soon.', badge:{ text:days === 0 ? 'Today' : `In ${days} ${plural(days, 'day', 'days')}`, kind:'steel' }, act:'Open the trip', run:() => goTab('nl-plans', 'trips') });
+    }));
+    // 4. Pensions: each April, when the yearly statements arrive.
+    if(now.getMonth() === 3)
+      add('pension', { period:yr, text:'Check your pensions', detail:'The yearly statements have arrived. Update the amounts on Future › Accounts', why:'Pension amounts change every year.', badge:{ text:'Due', kind:'amber' }, act:'Open Future › Accounts', run:() => goTab('nl-future', 'accounts') });
+    // 5. Tax return: from 15 March to the early-May deadline.
+    const md = (now.getMonth() + 1) * 100 + now.getDate();
+    if(md >= 315 && md <= 504)
+      add('tax', { period:yr, text:'File your tax return (deklaration)', detail:'Due 4 May. The form is usually ready from mid-March', why:'Once a year, every spring.', badge:{ text:'Due', kind:'amber' }, act:'Ask what to check', run:() => NLP.ask('What should we check before filing our tax return?') });
+    // 6. Insurance and beneficiaries: each September.
+    if(now.getMonth() === 8)
+      add('insurance', { period:yr, text:'Check insurance and beneficiaries', detail:'Life insurance, group life (TGL) and who gets the money', why:'Once a year, so cover and beneficiaries stay right.', badge:{ text:'Due', kind:'amber' }, act:'Check my files', run:() => NLP.ask('Check our insurance and beneficiaries in my files. Is anything missing or out of date?') });
+    // 7. Place reports more than a year old.
+    (Array.isArray(state.vault) ? state.vault : []).filter(v => v && v.type === 'deepdive').forEach(v => {
+      const d = Date.parse(v.date || ''); if(!d || Date.now() - d < 365 * 864e5) return;
+      const months = Math.round((Date.now() - d) / (30.44 * 864e5));
+      add('report', { sub:String(v.id), period:String(v.date), text:`${v.location || 'A place'} report is ${months} months old`, detail:`Deep dive saved ${new Date(d).toLocaleDateString('en-GB', { month:'short', year:'numeric' })}`, why:'Costs, taxes and rules change. A new deep dive brings it up to date.', badge:{ text:'Worth a look', kind:'grey' }, act:'Open the report', run:() => { if(window.NBK) NBK.openReport(String(v.id)); } });
+    });
+    return out;
+  }
+  // What a reminder looks like in its row: its action, Done, Later, Not for us.
+  const remLinks = it => `<span class="nl-inrow">${NLP.link(it.act, `NLP.today.remAct('${it.id}')`)}${NLP.link('Done', `NLP.today.remDone('${it.id}')`)}${NLP.link('Later', `NLP.today.remLater('${it.id}')`)}${NLP.link('Not for us', `NLP.today.remOff('${it.type}')`)}</span>`;
+  // The year at a glance for the side panel.
+  function remYear(){
+    const r = RS(), m = new Date().getMonth();
+    const yearly = { 2:!r.off.tax, 3:!r.off.pension || !r.off.tax, 4:!r.off.tax, 8:!r.off.insurance };
+    const monthly = !r.off.bank || !r.off.backup;
+    const cells = ['J','F','M','A','M','J','J','A','S','O','N','D'].map((l, i) => `<span><i class="${yearly[i] ? 'y' : monthly ? 'm' : ''}${i === m ? ' n' : ''}"></i>${l}</span>`).join('');
+    const parts = [monthly ? 'Light: every month (bank file, backup)' : '', Object.values(yearly).some(Boolean) ? 'Dark: ' + [!r.off.tax ? 'tax return Mar–May' : '', !r.off.pension ? 'pensions Apr' : '', !r.off.insurance ? 'insurance Sep' : ''].filter(Boolean).join(', ') : ''].filter(Boolean).join('. ');
+    return `<div class="tdy-cap">Reminders this year</div><div class="tdy-cal">${cells}</div><div class="nlp-small tdy-cal-t">${H(parts)}.</div>`;
+  }
+  function comingUp(){
+    const r = RS(), now = new Date(), y = now.getFullYear();
+    const list = [['tax', new Date(y, 2, 15), 'Tax return opens'], ['pension', new Date(y, 3, 1), 'Check pensions'], ['insurance', new Date(y, 8, 1), 'Check insurance']]
+      .filter(x => !r.off[x[0]]).map(x => { if(x[1] < now && !(x[0] === 'tax' && now < new Date(y, 4, 5)) && !(x[0] !== 'tax' && now.getMonth() === x[1].getMonth())) x[1] = new Date(y + 1, x[1].getMonth(), x[1].getDate()); return x; })
+      .filter(x => x[1] > now).sort((a, b) => a[1] - b[1]).slice(0, 2);
+    return list.map(x => ({ text:H(x[2]), badge:{ text:x[1].toLocaleDateString('en-GB', x[0] === 'tax' ? { day:'numeric', month:'short' } : { month:'long' }), kind:'grey' } }));
+  }
   // ── Figure cards: status, not big money ────────────────────────────────
   function figureCards(m){
     const L = lifeExp(), r = m.life;
@@ -436,9 +504,11 @@
     } else if(tab === 'review'){
       body = NLP.review.body(m);
     } else {
+      const plan = m.items.filter(it => !it.rem), rems = m.items.filter(it => it.rem);
+      const trow = (it, i) => `<tr data-nl-row="${it.id}"><td class="mk">${i + 1}</td><td><span class="nm">${H(it.text)}</span><span class="sub">${H(it.detail)}</span>${it.rem ? remLinks(it) : ''}</td><td class="tdy-kind">${H(it.rem ? it.every : 'Plan')}</td><td class="tdy-st">${NLP.badge(it.badge.text, it.badge.kind)}</td></tr>`;
+      const grp = t => `<tr class="tdy-grp"><td colspan="4">${H(t)}</td></tr>`;
       body = m.items.length
-        ? `<div class="nl-tbl-wrap"><table class="nl-tbl tdy-needs"><thead><tr><th></th><th>What needs you</th><th>Status</th></tr></thead><tbody>${m.items.map((it, i) =>
-            `<tr data-nl-row="${it.id}"><td class="mk">${i + 1}</td><td><span class="nm">${H(it.text)}</span><span class="sub">${H(it.detail)}</span></td><td class="tdy-st">${NLP.badge(it.badge.text, it.badge.kind)}</td></tr>`).join('')}</tbody></table></div>`
+        ? `<div class="nl-tbl-wrap"><table class="nl-tbl tdy-needs"><thead><tr><th></th><th>What needs you</th><th>Kind</th><th>Status</th></tr></thead><tbody>${(plan.length && rems.length ? grp('From your plan') : '') + plan.map(trow).join('') + (rems.length ? (plan.length ? grp('Reminders') : '') + rems.map((it, i) => trow(it, plan.length + i)).join('') : '')}</tbody></table></div>`
         : NLP.empty('Nothing needs you right now.');
     }
     host.innerHTML = `<div class="nl-wrap tdy">${NLP.head({ title:'Today', panel:P, tabs:[
@@ -446,7 +516,7 @@
       { key:'needs', label:'Needs you', count:m.items.length, on:tab === 'needs' },
     ].concat(NLP.review ? [{ key:'review', label:'Full review', on:tab === 'review' }] : []), actions:tab === 'review' ? NLP.review.actions() : sw })}${body}</div>`;
     if(tab === 'review') NLP.review.wire(host);
-    if(tab === 'needs') NLP.rows(host.querySelector('.tdy-needs tbody'), P, id => NLP.today.go(id));
+    if(tab === 'needs') NLP.rows(host.querySelector('.tdy-needs tbody'), P, id => String(id).startsWith('rem:') ? NLP.today.remAct(id) : NLP.today.go(id));
   }
 
   // ── The side panel's Overview ──────────────────────────────────────────
@@ -466,6 +536,14 @@
     const links = [{ label:'Full review', short:'Review', onclick:'NLP.today.report()' }];
     // A chosen row on the Needs you tab.
     const chosen = ui.tab === 'needs' && ui.chosen != null ? m.items.find(it => it.id === String(ui.chosen)) : null;
+    if(chosen && chosen.rem){
+      return {
+        headline:H(chosen.text) + '.',
+        graphic:`<p class="tdy-why">${H(chosen.why)}</p>`,
+        groups:[{ title:'This reminder', rows:[{ text:H(chosen.detail), badge:chosen.badge, link:{ label:chosen.act, onclick:`NLP.today.remAct('${chosen.id}')` } }, { text:'Done for now, or hide it for a week', badge:{ text:chosen.every, kind:'grey' }, link:{ label:'Done', onclick:`NLP.today.remDone('${chosen.id}')` } }] }],
+        button:{ label:chosen.act, onclick:`NLP.today.remAct('${chosen.id}')` }, links,
+      };
+    }
     if(chosen){
       return {
         headline:H(chosen.text) + '.',
@@ -474,8 +552,8 @@
         button:{ label:chosen.act, onclick:`NLP.today.go('${chosen.id}')` }, links,
       };
     }
-    const n = items.length;
-    const waits = n ? `${n} ${plural(n, 'thing waits', 'things wait')} for you.` : 'Nothing waits for you.';
+    const n = items.length, nRem = items.filter(it => it.rem).length;
+    const waits = n ? `${n} ${plural(n, 'thing waits', 'things wait')} for you${nRem && nRem < n ? `: ${n - nRem} from your plan, ${nRem} ${plural(nRem, 'reminder', 'reminders')}` : ''}.` : 'Nothing waits for you.';
     let lead;
     if(r.verdictKey === 'empty') lead = 'Add what you’ll spend in retirement, so Horizon can tell whether your plan holds.';
     else if(r.verdictKey === 'wellFunded' || r.verdictKey === 'fullyFunded') lead = 'You’re on track.';
@@ -493,8 +571,10 @@
       }
       groups.unshift({ title:'What if, prepared not saved', rows:[row] });
     }
+    const up = comingUp();
+    if(up.length) groups.push({ title:'Coming up', rows:up });
     if(!button) button = { label:'Open your retirement plan', onclick:"NLP.go('nl-future')" };
-    return { headline:`${lead} ${waits}`, graphic:wallGraphic(m), groups, button, links };
+    return { headline:`${lead} ${waits}`, graphic:wallGraphic(m) + remYear(), groups, button, links };
   }
 
   // ── Actions (called from the page and the panel) ──────────────────────
@@ -506,6 +586,12 @@
       NLP.renderPage(P);
     },
     go(id){ const f = GO[String(id)]; if(f) f(); },
+    remAct(id){ const it = reminders().find(x => x.id === id); if(it && it.run) it.run(); },
+    remDone(id){ const it = reminders().find(x => x.id === id); if(!it) return; RS().done[id] = it.period; st().chosen = null; save(); NLP.toast(`${it.text}: done`, '', { label:'Undo', fn:() => { delete RS().done[id]; save(); } }); },
+    remLater(id){ RS().later[id] = new Date(Date.now() + 7 * 864e5).toISOString(); st().chosen = null; save(); NLP.toast('Hidden for a week', '', { label:'Undo', fn:() => { delete RS().later[id]; save(); } }); },
+    remOff(type){ RS().off[type] = true; st().chosen = null; save(); NLP.toast(`${REM_NAMES[type] || 'This'} reminder is off. Turn it back on in Settings.`, '', { label:'Undo', fn:() => { delete RS().off[type]; save(); } }); },
+    remOn(type){ delete RS().off[type]; save(); NLP.toast(`${REM_NAMES[type] || 'This'} reminder is on`); },
+    remNames:REM_NAMES,
     prepare(){
       const w = activeWI(); if(!w || w.kind !== 'save_more') return;
       const to = Math.round(num(state.baseSavings) + w.val);
@@ -600,5 +686,12 @@ html.nl .tdy-bricks i.amber { background:var(--tdy-wall-amber); }
 html.nl .tdy-bricks i.red { background:var(--tdy-wall-red); }
 html.nl .tdy-bricks i.now { outline:2px solid var(--nl-ink); outline-offset:1px; }
 html.nl .tdy-why { margin:0; color:var(--nl-quiet); font-size:13.5px; }
+#panel-nl-today .tdy-needs tr.tdy-grp td { background:#FAFAFB; color:var(--nl-detail); font-size:11.5px; letter-spacing:.07em; text-transform:uppercase; font-weight:600; padding:7px 8px; cursor:default; }
+#panel-nl-today .tdy-needs td.tdy-kind { color:var(--nl-detail); white-space:nowrap; }
+#panel-nl-today .tdy-needs .nl-inrow { display:flex; flex-wrap:wrap; gap:4px 14px; margin-top:4px; }
+html.nl .tdy-cal { display:grid; grid-template-columns:repeat(12,minmax(0,1fr)); gap:4px; font-size:11px; color:var(--nl-detail); text-align:center; margin-top:4px; }
+html.nl .tdy-cal i { display:block; height:20px; border-radius:4px; background:#EDEDF0; margin-bottom:2px; }
+html.nl .tdy-cal i.m { background:#A9D7CB; } html.nl .tdy-cal i.y { background:var(--nl-accent); } html.nl .tdy-cal i.n { outline:2px solid var(--nl-ink); outline-offset:-1px; }
+html.nl .tdy-cal-t { margin-top:4px; }
 `);
 })();
