@@ -285,7 +285,7 @@
       const v = VERDICT[p.verdict] || VERDICT.infeasible;
       return `<div class="nlp-share" data-place="${H(p.id)}"><b title="${H(p.name)}">${H(p.name)}</b><span class="nlp-track"><i class="${v.cls}" style="width:${Math.min(100, Math.max(1, p.ratio * 100)).toFixed(1)}%"></i><s style="left:70%"></s></span><span class="nlp-pct">${p.netIncome > 0 ? pct(p.ratio) + '%' : '—'}</span></div>`;
     }).join('');
-    return `<section class="nl-cc"><h2 class="nl-ct">${H(title)}</h2><p class="nl-cs">Living costs each month as a share of your retirement income after each place’s tax (${H(NLP.money(income))} a month before tax, today’s money).</p>${bars}
+    return `<section class="nl-cc"><h2 class="nl-ct">${H(title)}</h2><p class="nl-cs">Living costs each month as a share of what your savings and pensions are expected to pay you, after each place’s tax (${H(NLP.money(income))} a month before tax, today’s money).</p>${bars}
       ${NLP.legend([{ label:'Fits: up to 70%', color:'var(--nl-accent)' }, { label:'Tight: 70 to 90%', color:'#C98A1B' }, { label:'Doesn’t fit: over 90%', color:'#B5483E' }])}</section>`;
   }
   function placeRow(p, i){
@@ -546,7 +546,7 @@
     const dd = deepDiveOf(p.id), run = isRunning(p.id);
     const rows = [];
     if(run) rows.push({ text:'Deep dive running <span class="nl-dots" aria-hidden="true"><i></i><i></i><i></i></span>', badge:{ text:'Running', kind:'steel' }, why:'It is saved to your reports when done.' });
-    else if(dd) rows.push({ text:`Deep dive saved, ${H(new Date(dd.date).toLocaleDateString('en-GB', { day:'numeric', month:'short' }))}`, badge:{ text:'Deep dive', kind:'green' }, link:{ label:'Read it in Notebook', onclick:"NLP.go('nl-notebook')" } });
+    else if(dd) rows.push({ text:`Deep dive saved, ${H(new Date(dd.date).toLocaleDateString('en-GB', { day:'numeric', month:'short' }))}`, badge:{ text:'Deep dive', kind:'green' }, link:{ label:'Read it in Notebook', onclick:`NBK.openReport('${js(String(dd.id))}')` } });
     else rows.push({ text:'Estimate only, no deep dive yet', badge:{ text:'Estimate', kind:'grey' }, link:{ label:'What a deep dive covers', onclick:`NLP.ask('${js(`What would a deep dive on ${p.name} cover?`)}')` } });
     if(p.notes) rows.push({ text:`Your note: ${NLP.quote(p.notes)}`, badge:{ text:'Check', kind:'steel' }, link:{ label:'Ask if it still applies', onclick:`NLP.ask('${js(`Does this still apply for retiring in ${p.name}: "${p.notes}"?`)}')` } });
     rows.push({ text:'Cost, tax and note', badge:{ text:p.colSource === 'ai' ? 'From deep dive' : 'Your estimate', kind:'grey' }, link:{ label:String(st.open) === String(p.id) ? 'Close the editor' : 'Open to edit', onclick:`NLPplans.open('${js(p.id)}')` } });
