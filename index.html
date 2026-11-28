@@ -7230,7 +7230,7 @@ function defaultState() {
         bio:'Friend from Stockholm · co-planning the Paris trip', persona:'sara' },
     ],
     // Chatbot: "simple" (plain language) or "expert" (technical depth).
-    aiMode:'expert',
+    aiMode:'simple',
     // Whether the chat panel is widened leftwards.
     aiExpanded:false,
     // Monthly "bill paid" flags: {monthKey: {lineItemId: true}}.
@@ -7398,6 +7398,8 @@ function migrate(s) {
   // push old-shape trips (budget/date, no expenses[]) into current-version
   // state, which the v9 step below never revisits.
   normalizeTrips(s);
+  // 'expert' was the old default, not a choice: answers start short and plain.
+  if(!s.aiModePicked && s.aiMode === 'expert') s.aiMode = 'simple';
   if(from >= STATE_VERSION) { s.version = STATE_VERSION; return s; }
   // v1 → v2: ensure every location has a lat/lng, and external assets have
   //          an assetType. These fields were added mid-flight; old saves
@@ -10432,7 +10434,7 @@ Every figure in CONTEXT is in TODAY'S MONEY (real, inflation-adjusted). Quote al
 CURRENCY: Quote EVERY monetary figure in the report in ${curCode} (${curSym}) ONLY — a single currency. Do NOT show a second currency, conversions, or amounts in parentheses. One currency, ${curCode}, everywhere.
 
 REQUIREMENTS
-Return a single markdown document. Do NOT add a title, heading, or any preamble before the first section — begin the document directly with "## Executive Summary". Use H2 headings for each section and markdown tables where numbers help. Keep tables to at most 3 columns so they fit a narrow screen. Every section must be grounded in 2024–2025 reality and the user's specific personal context (citizenship, home base, household). Be honest — flag red flags, visa traps, and tax gotchas.
+Write the whole report in plain, everyday English for a couple who are not finance experts: short sentences, no jargon, and any tax, visa or money term explained in a few words the first time. Return a single markdown document. Do NOT add a title, heading, or any preamble before the first section — begin the document directly with "## Executive Summary". Use H2 headings for each section and markdown tables where numbers help. Keep tables to at most 3 columns so they fit a narrow screen. Every section must be grounded in 2024–2025 reality and the user's specific personal context (citizenship, home base, household). Be honest — flag red flags, visa traps, and tax gotchas.
 
 Structure EXACTLY as follows (first line of your reply must be "## Executive Summary"):
 
@@ -20285,9 +20287,19 @@ function buildAIContext(opts) {
   const dispSym  = (typeof sym==='function') ? sym(dispCur) : (dispCur==='SEK'?'kr':dispCur);
   const dispRate = (typeof rate==='function') ? (rate(dispCur)||1) : 1;
   const mode = state.aiMode || 'expert';
-  const modeInstruction = mode === 'simple'
-    ? `RESPONSE STYLE: SIMPLE. Explain like you're talking to a smart friend who is new to personal finance. Avoid jargon (or define it in 4–6 words when unavoidable). Short sentences. No bullet soup; write in plain paragraphs. Skip hedging. Use at most one number per idea and round generously. If the user asks something technical, answer it in everyday language first, then add ONE optional sentence of detail at the end.`
-    : `RESPONSE STYLE: EXPERT. The user is financially literate. Use domain vocabulary (sequence-of-returns risk, real vs nominal, withdrawal rate, tax drag, basis points) without over-explaining. Be direct, reference specific numbers from their snapshot, and quote percentages to one decimal. Prefer a short narrative plus a bulleted breakdown. Call out assumptions you're making.`;
+  // Plain language is ALWAYS on: the owners are not finance experts. The
+  // old look's Simple / Expert switch only changes how much detail is given,
+  // never the words.
+  const plainRule = `PLAIN LANGUAGE — ALWAYS, IN EVERY ANSWER (the people using Horizon are not finance experts)
+- Write in plain, everyday English (or plain, everyday Swedish when the language rule says Swedish). Short sentences of about 15 words. Common words.
+- Start with the answer in one sentence. Then, only if needed, a few short points.
+- No jargon. If a money or tax term cannot be avoided, explain it in a few words the first time, in brackets: "withdrawal rate (the share of your savings you take out each year)". The same for abbreviations such as ISK, ITP1 or TGL.
+- Say what each number means for them ("about 9 000 kr left each month after tax"). Round sensibly. One number per idea.
+- No long tables or walls of bullet points unless they ask. No hedging or filler.
+- This applies to every reply, report and summary you write, whatever was asked before.`;
+  const modeInstruction = plainRule + (mode === 'simple'
+    ? `\nDETAIL: keep it brief. Give the answer and the one or two things that matter most.`
+    : `\nDETAIL: they asked for more detail. Give the full picture and the assumptions behind it, still in the same plain words.`);
   const ctx = buildPersonalContext();
   // Uploaded Spend-tab statement, if any: hand the chatbot the SAME
   // all-transactions summary the Spend tab's analysis card is built from,
@@ -20701,6 +20713,7 @@ Be concise, direct, insightful. Reference specific numbers from THIS snapshot${w
 // ─── CHAT MODE + EXPAND (Simple / Expert, widen leftwards) ──────────────────
 function setAIMode(mode){
   state.aiMode = (mode === 'simple') ? 'simple' : 'expert';
+  state.aiModePicked = true;
   save();
   syncAIModeUI();
 }
@@ -20713,8 +20726,8 @@ function syncAIModeUI(){
   });
   const hint = document.getElementById('aip-mode-hint');
   if(hint) hint.textContent = mode === 'simple'
-    ? 'Plain-language answers, no jargon.'
-    : 'Full technical depth + assumptions.';
+    ? 'Plain-language answers, short.'
+    : 'Plain-language answers, with more detail.';
 }
 function toggleAIExpand(){
   const panel = document.getElementById('ai-panel'); if(!panel) return;
@@ -22285,7 +22298,7 @@ async function sendToFriend(thread, msg){
   const personaLangBit = state.lang === 'sv'
     ? '\n\nLANGUAGE: Reply in Swedish (svenska) when the user writes in Swedish, while preserving your persona voice. If the user switches back to English, follow them.'
     : '\n\nLANGUAGE: Reply in the same language the user is writing in. Default to English. Preserve your persona voice in any language.';
-  const systemPrompt = personaBase + personaLangBit;
+  const systemPrompt = personaBase + personaLangBit + '\n\nPLAIN WORDS: always use plain, everyday words and short sentences; no money or tax jargon, or explain it in a few words.';
   // Build the full conversation history for Claude. We deliberately
   // send the ENTIRE thread (not a last-N slice) so the character
   // retains full continuity across the conversation. If a thread ever
