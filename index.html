@@ -20168,6 +20168,27 @@ function _catalogDynamicListing(){
   return sections.length ? (sections.join('\n\n') + '\n\n') : '';
 }
 
+// Hide personal identity numbers, account numbers, policy numbers and codes
+// before any file text reaches the assistant. The owners asked that the
+// assistant names institutions and what to ask them, never the numbers.
+// Amounts and dates are left alone.
+const HZ_ID_HIDDEN = '[number hidden]';
+function hzMaskIds(text){
+  if(typeof text !== 'string' || !text) return text;
+  let t = text;
+  // Swedish personal identity / coordination number: (19|20)YYMMDD-XXXX, also without the dash.
+  t = t.replace(/\b(?:19|20)?\d{2}(?:0[1-9]|1[0-2])(?:0[1-9]|[12]\d|3[01]|6[1-9]|[78]\d|9[01])[-+]?\d{4}\b/g, HZ_ID_HIDDEN);
+  // IBAN (two letters, two digits, then groups).
+  t = t.replace(/\b[A-Z]{2}\d{2}(?:[ ]?[A-Z0-9]{4}){2,7}(?:[ ]?[A-Z0-9]{1,4})?\b/g, HZ_ID_HIDDEN);
+  // Card numbers: 16 digits in one run or in dashed groups of four; long digit runs (12+).
+  t = t.replace(/\b\d{4}(-?)\d{4}\1\d{4}\1\d{4}\d{0,3}\b/g, HZ_ID_HIDDEN);
+  t = t.replace(/\b\d{12,19}\b/g, HZ_ID_HIDDEN);
+  // Any number that follows a word naming an account, policy, customer or reference number, or a code.
+  t = t.replace(/((?:person(?:nummer|nr)|personal (?:id(?:entity)? )?number|samordningsnummer|konto(?:nummer|nr)?|account(?: no\.?| number| nr)?|clearing(?:nummer|nr)?|bankgiro|plusgiro|iban|bic|swift|policy(?: no\.?| number)?|försäkringsnummer|försäkringsnr|avtalsnummer|avtalsnr|kundnummer|kundnr|customer(?: no\.?| number)|medlemsnummer|member(?:ship)? number|referensnummer|reference(?: no\.?| number)?|ocr(?:-nummer)?|pin(?:-kod)?|lösenord|password|passcode|säkerhetskod|security code|cvc|cvv)\s*[:#.]?\s*)([A-Z]{0,4}[- ]?\d[\d \-\/.,]{2,}\d)/gi, '$1' + HZ_ID_HIDDEN);
+  return t;
+}
+if(typeof window !== 'undefined') window.hzMaskIds = hzMaskIds;
+
 function buildAIContext(opts) {
   const withTools = !!(opts && opts.tools);
   // Every number in this prompt is routed through FinancialEngine
@@ -20226,7 +20247,7 @@ ${facts.block}`;
     const usesGlobal = (a.growthRate == null || a.growthRate === (state.growthRate || 7));
     const at = a.accountType || 'standard';
     const taxDesc = at === 'isk' ? `ISK/KF annual drag ${a.taxRate ?? 0.88}%` : at === 'notax' ? 'no tax' : `exit tax on gains ${a.taxRate ?? 30}%`;
-    return `    · ${a.name}: balance ${Math.round(a.balance).toLocaleString()} kr | contrib ${Math.round(a.monthlyContribution || 0).toLocaleString()} kr/mo | growth ${gr}%${usesGlobal ? ' (global default)' : ' (custom)'} | ${taxDesc}`;
+    return `    · ${a.name} (owner: ${a.owner === 'spouse' ? 'spouse' : 'me'}): balance ${Math.round(a.balance).toLocaleString()} kr | contrib ${Math.round(a.monthlyContribution || 0).toLocaleString()} kr/mo | growth ${gr}%${usesGlobal ? ' (global default)' : ' (custom)'} | ${taxDesc}`;
   }).join('\n');
   // Per-pension detail for AI context (Bug 6)
   const pensionAccounts = (state.externalAssets || []).filter(a => a.assetType === 'pension');
@@ -20234,7 +20255,7 @@ ${facts.block}`;
     const pStart = p.startAge ?? state.retirementAge;
     const pEnd = p.endAge ? `age ${p.endAge}` : 'no end';
     const gapYears = pStart > state.retirementAge ? ` ← STARTS ${pStart - state.retirementAge} YRS AFTER RETIREMENT` : ' ← active at retirement';
-    return `    · ${p.name}: ${Math.round(p.monthlyPayout || 0).toLocaleString()} kr/mo gross | starts age ${pStart} | ends ${pEnd}${gapYears}`;
+    return `    · ${p.name} (owner: ${p.owner === 'spouse' ? 'spouse' : 'me'}): ${Math.round(p.monthlyPayout || 0).toLocaleString()} kr/mo gross | starts age ${pStart} | ends ${pEnd}${gapYears}`;
   }).join('\n');
   // Compute all three retirement-expense scenarios so the AI can quote any
   // of them accurately and never has to multiply manually. The active
@@ -20285,6 +20306,18 @@ CURRENT VIEW: The user is looking at the "${viewLabel}" panel${section}. Tailor 
 ${spendContext}
 ${toolsSection}
 ${modeInstruction}
+
+WHAT-IF AND CONTINGENCY QUESTIONS (death, serious illness, disability, job loss, divorce, one partner left alone)
+When either partner asks what would happen if one of them died, fell ill, could not work, or lost income, give a CLEAR, CALM PICTURE in this order:
+1. What stops: the income, pensions and accounts owned by that person (each account and pension says its owner: me or spouse). Say which money stops, which continues, and which may pass to the survivor.
+2. What continues: costs that keep running (mortgage, avgift, insurance, bills, children) and income that remains for the survivor.
+3. The new month: income left vs costs left, in numbers from this snapshot and the tools, and how long the savings would cover any gap.
+4. Retirement: how the survivor's retirement picture changes (one pension instead of two, one household instead of two).
+5. Who to contact, and what to ask each one: name the institution (bank, mortgage lender, pension provider, insurer, employer, and in Sweden Pensionsmyndigheten, Försäkringskassan, Skatteverket) and the exact question to ask (for example "Is there survivor cover (efterlevandeskydd) on this pension, and who is the beneficiary?").
+6. QUESTIONS for the person: when the picture depends on facts not in Horizon, ASK them, in a short numbered list at the end. Typical ones: Is there life insurance, and for how much? Who is named as beneficiary? Is the home owned jointly and is there mortgage insurance? Does each pension have survivor cover? Is there a will, a prenuptial agreement (äktenskapsförord), or children from earlier relationships? Is there a cash buffer, and whose name is it in? Ask only what changes the answer.
+Use the Notebook tools (search_files, read_file) to look for insurance letters, pension statements and loan papers before asking, and quote what they say about cover and beneficiaries.
+NEVER write personal identity numbers (personnummer), account or clearing numbers, IBANs, card numbers, policy, customer, member or reference numbers, OCR numbers, PINs, passwords, BankID details or any other code, even if the person or a file shows them. Name the institution and the product instead ("your life policy with Folksam", "the joint account at SEB"). Text shown as "[number hidden]" was hidden on purpose; never try to rebuild it.
+Be gentle and practical. This is a planning picture, not legal or tax advice: say when a lawyer, the bank or the insurer must confirm.
 
 VALUE BASIS — IMPORTANT
 Every monetary retirement figure below is in TODAY'S MONEY (real, inflation-adjusted). When you quote retirement income, portfolio balance, withdrawals, or pension payouts in your response, use these real figures as the headline value. If you want to mention nominal/future kr for context, label it explicitly as "nominal" or "future value". Never present a nominal figure as the headline.
