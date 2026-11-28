@@ -852,10 +852,43 @@
 
   // ── The side panel's Overview (never money: counts, %, words) ─────────
   const door = (text, badge, link, why) => ({ text, badge, link, why });
+
+  // The month's expenses as a pie. The chosen row's slice comes out; every
+  // slice has a tooltip (name, amount, share of the month's costs).
+  const PIE_COLS = ['#2F7F6F','#5FA595','#8FC3B6','#48639A','#7C93BE','#A9B8D6','#B9A77E','#D4C6A3','#9A9AA2','#C4C4CA','#6B7F8F','#A3B1BB'];
+  function expensePie(rows, v, chosenId){
+    const items = rows.filter(r => r.list === 'expenses' && Number(r.amount) > 0).map(r => ({ id:r.id, name:r.name, amount:Number(r.amount) }));
+    if(items.length < 1) return '';
+    items.sort((a, b) => b.amount - a.amount);
+    const total = items.reduce((t, x) => t + x.amount, 0);
+    const W = 220, Rr = 88, Ri = 54, cx = W / 2, cy = W / 2, pull = 10;
+    const chosen = items.find(x => x.id === chosenId) || null;
+    let a0 = -Math.PI / 2;
+    const pt = (r, a) => [cx + r * Math.cos(a), cy + r * Math.sin(a)];
+    const slices = items.map((x, i) => {
+      const share = x.amount / total, a1 = a0 + share * Math.PI * 2, mid = (a0 + a1) / 2;
+      const on = chosen && chosen.id === x.id, dx = on ? Math.cos(mid) * pull : 0, dy = on ? Math.sin(mid) * pull : 0;
+      // A ring piece: outer arc forward, inner arc back (a donut, not a full pie).
+      const big = share > 0.5 ? 1 : 0, e = share >= 0.9999 ? 0.0001 : 0, b1 = a1 - e;
+      const [x0, y0] = pt(Rr, a0), [x1, y1] = pt(Rr, b1), [x2, y2] = pt(Ri, b1), [x3, y3] = pt(Ri, a0);
+      const d = `M${x0.toFixed(2)} ${y0.toFixed(2)}A${Rr} ${Rr} 0 ${big} 1 ${x1.toFixed(2)} ${y1.toFixed(2)}L${x2.toFixed(2)} ${y2.toFixed(2)}A${Ri} ${Ri} 0 ${big} 0 ${x3.toFixed(2)} ${y3.toFixed(2)}Z`;
+      const pctTxt = Math.round(share * 100) || '<1';
+      const tip = `${x.name}\nThis month: ${money(x.amount)}\nShare of costs: ${pctTxt}%`;
+      a0 = a1;
+      return `<path d="${d}" transform="translate(${dx.toFixed(2)} ${dy.toFixed(2)})" fill="${on ? 'var(--nl-accent)' : PIE_COLS[i % PIE_COLS.length]}" stroke="#fff" stroke-width="1.5"${chosen && !on ? ' opacity=".55"' : ''} data-tip="${H(tip)}"/>`;
+    }).join('');
+    const top = items.slice(0, 3).map(x => `${H(x.name)} ${Math.round(x.amount / total * 100)}%`).join(' · ');
+    const say = chosen ? `${H(chosen.name)}: ${H(money(chosen.amount))}, ${Math.round(chosen.amount / total * 100) || '<1'}% of ${H(monLong(v.key))}’s costs.` : `Biggest: ${top}.`;
+    return `<div class="nlm-gl">Expenses in ${H(NLP.monthLabel(v.key))}: ${H(money(total))} across ${items.length} line${items.length > 1 ? 's' : ''}</div>
+      <div class="nlm-pie"><svg viewBox="0 0 ${W} ${W}" width="${W}" height="${W}" role="img" aria-label="Expenses in ${H(monLong(v.key))} as a donut">${slices}${chosen
+        ? `<text x="${cx}" y="${cy - 2}" text-anchor="middle" class="nlm-pie-big">${Math.round(chosen.amount / total * 100) || '<1'}%</text><text x="${cx}" y="${cy + 16}" text-anchor="middle" class="nlm-pie-sm">${H(chosen.name.length > 16 ? chosen.name.slice(0, 15) + '…' : chosen.name)}</text>`
+        : `<text x="${cx}" y="${cy - 2}" text-anchor="middle" class="nlm-pie-big">${H(NLP.moneyShort(total))}</text><text x="${cx}" y="${cy + 16}" text-anchor="middle" class="nlm-pie-sm">costs in ${H(monShort(v.key))}</text>`}</svg></div>
+      <div class="nlp-small nlm-pie-t">${say}</div>`;
+  }
   function overviewPlan(){
     const st = ui(), { v, rows } = planRows(), info = monthsInfo();
     const bal = info.map(x => x.bal);
-    const graphic = `<div class="nlm-gl">Fun Fund balance, next 12 months</div>${NLP.minibars(bal, [monShort(info[0].key), monShort(info[info.length - 1].key)])}`;
+    const graphic = expensePie(rows, v, st.chosen) || `<div class="nlm-gl">Fun Fund balance, next 12 months</div>${NLP.minibars(bal, [monShort(info[0].key), monShort(info[info.length - 1].key)])}`;
     const r = st.chosen && (NLM._rows || {})[st.chosen];
     const diffs = bankDiffs();
     const me = info.find(x => x.key === v.key);
@@ -1080,6 +1113,13 @@
 #panel-nl-money .nlm-cbt i { display:block; height:100%; background:var(--nl-accent); opacity:.8; }
 #panel-nl-money .nlm-cbv { text-align:right; font-variant-numeric:tabular-nums; white-space:nowrap; min-width:80px; }
 #panel-nl-money .nlm-emptybank { max-width:760px; margin:0 auto; padding:18px 0; }
+html.nl .nlm-pie { display:flex; justify-content:center; margin:6px 0 2px; }
+html.nl .nlm-pie svg { max-width:100%; height:auto; overflow:visible; }
+html.nl .nlm-pie path { transition:transform .18s ease, opacity .18s ease; cursor:default; }
+html.nl .nlm-pie-t { text-align:center; }
+html.nl .nlm-pie .nlm-pie-big { font:600 20px var(--nl-serif); fill:var(--nl-ink); }
+html.nl .nlm-pie .nlm-pie-sm { font:12px var(--nl-sans); fill:var(--nl-detail); }
+@media (prefers-reduced-motion: reduce){ html.nl .nlm-pie path { transition:none; } }
 #panel-nl-money .nlm-emptybank .nl-cs { font-size:13.5px; margin:6px 0 4px; }
 #panel-nl-money .nlm-paste { margin-top:18px; align-items:start; }
 #panel-nl-money .nlm-paste textarea { border:0; border-bottom:1px solid var(--nl-edge); font:13px/1.5 ui-monospace,Menlo,monospace; resize:vertical; min-height:72px; }
