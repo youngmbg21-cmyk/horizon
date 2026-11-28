@@ -9053,7 +9053,8 @@ function _simulateRetirementYears({nestEgg, totalExp, taxRate, realRateMonthly, 
       }
     }
   }
-  const runoutAgeRounded = runoutAge !== null ? Math.round(runoutAge) : null;
+  // The money runs out during this year of age: 89.6 means at 89, not 90.
+  const runoutAgeRounded = runoutAge !== null ? Math.floor(runoutAge) : null;
   // A year is "funded" iff its actual income meets the gross need — i.e.
   // shortfall is zero. Before depletion the portfolio fills any pension
   // gap; after depletion a year only stays funded if pension alone covers
@@ -10537,7 +10538,7 @@ Two short markdown bullet lists. Specific and concrete — no filler.
 ## Final Verdict
 One paragraph. Recommendation: "proceed", "proceed with caveats", or "reconsider". State the single biggest risk and the single biggest opportunity.
 
-After the Final Verdict, on its own FINAL line, append EXACTLY this machine-readable line and nothing after it. For col_household_sek use SEK (Swedish kronor) — the app's base unit — regardless of the ${curCode} display currency used in the prose; the app converts it for display. It is an integer monthly amount, in today's money, for the HOUSEHOLD above. eff_tax_pct is the EFFECTIVE percentage of this retiree's income actually paid in local tax at this income level and household (progressive brackets, pension treatment and any special regime already accounted for — NOT the headline top band). tax_note names the basis in a few words (e.g. "assumes NHR pensioner regime — must qualify"):
+After the Final Verdict, on its own FINAL line, append EXACTLY this machine-readable line and nothing after it. For col_household_sek use SEK (Swedish kronor) — the app's base unit — regardless of the ${curCode} display currency used in the prose; the app converts it for display. It is an integer monthly amount, in today's money, for the HOUSEHOLD above. eff_tax_pct is the EFFECTIVE percentage of this household's income actually paid in tax at this income level (progressive brackets, pension treatment and any special regime already accounted for — NOT the headline top band). For a couple, tax them as two people with the income split between them, not as one person on the whole amount. INCLUDE any tax the home country keeps taking after the move (for example Swedish SINK tax on Swedish pensions paid abroad, or the 10-year rule on capital gains), so it is the total tax paid in both countries. tax_note names the basis in a few words (e.g. "assumes NHR pensioner regime — must qualify"):
 HORIZON_STATS: {"col_household_sek": <int>, "eff_tax_pct": <number>, "median_income_usd": <int>, "qol_score": <number 0-10>, "tax_note": "<short string>"}${suf}`;
 }
 // Parse the model reply → { markdown (stats line stripped), stats|null }.
@@ -10716,7 +10717,8 @@ function scoreLocation(loc) {
     // "Income rank · locally" line renders on every card, not just the
     // ones the user has deep-dived.
     const medianIncome = locMedianIncomeSEK(loc);
-    const incomePercentile = topIncomePercentile(monthlyIncome, medianIncome);
+    // The local median is per person: for a couple, compare each one's half.
+    const incomePercentile = topIncomePercentile(hh === 2 ? monthlyIncome / 2 : monthlyIncome, medianIncome);
     return { ...loc, verdict, label, ratio, surplus, affordabilityScore,
              monthlyIncome, netIncome, incomePercentile,
              effCostOfLiving, effTaxPct, analysed, colSource, taxSource,

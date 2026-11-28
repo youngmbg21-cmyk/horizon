@@ -569,7 +569,7 @@
     addPlace(){ const st = S(); if(NLP.tabOf(PANEL, 'trips') !== 'places') st.tab = 'places';
       if(st.adding === 'place'){ st.adding = null; NLP.rerender(); return; }
       st.adding = 'place'; st.pdraftTried = false; st.chosen = null; st.open = null; if(!st.pdraft) st.pdraft = { name:'', country:'', cost:'' };
-      NLP.rerender(); },
+      NLP.rerender(); setTimeout(() => { const i = document.getElementById('nlp-pdname'); if(i){ i.focus(); i.scrollIntoView({ block:'nearest' }); } }, 90); },
     clearFilters(){ const st = S(); st.filters = {}; st.chipOpen = null; NLP.rerender(); },
     preview(kind, to){ const st = S(); st.preview = kind ? { tripId:st.chosen, kind, to:to || null } : null; NLP.rerender(); },
     prepare(kind){

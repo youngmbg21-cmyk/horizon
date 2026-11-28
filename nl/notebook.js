@@ -415,6 +415,8 @@
     if(ready && !local[id] && m.remotePath) fetchRemote(id);
   };
   NBK.cite = function(n){ const r = refInfo(+n); if(!r || !fileById(r.f)){ NLP.toast('That file is no longer in your Notebook.', 'warn'); return; } NBK.openFile(r.f, r.c); };
+  // No template yet: say so plainly and offer to add one, instead of a dead grey button.
+  NBK.fillFirst = function(){ NLP.toast('To fill a template, first add a spreadsheet or CSV. Choose one now.'); NBK.pick(); };
   NBK.back = function(){ const st = ui(); st.open = null; st.focus = null; NLP.renderPage(P); };
   NBK.sheet = function(name){ const st = ui(); st.sheet = name; st.scroll = true; NLP.renderPage(P); };
   NBK.retry = async function(id){ const m = fileById(id); if(!m) return; const b = await blobOf(id); if(b) readFile(m, b); };
@@ -572,7 +574,7 @@
     const chips = (Object.keys(kinds).length > 1 || nTpl) && all.length > 1
       ? `<div class="nl-chips">${Object.keys(kinds).map(k => `<button type="button" class="nl-chip${filt === k ? ' on' : ''}" onclick="NBK.filter('${k}')">${filt === k ? '' : '+ '}${H(KIND_LABEL[k])} ${kinds[k]}</button>`).join('')}${nTpl ? `<button type="button" class="nl-chip${filt === 'template' ? ' on' : ''}" onclick="NBK.filter('template')">${filt === 'template' ? '' : '+ '}Templates ${nTpl}</button>` : ''}</div>` : '';
     const anyTpl = all.some(f => f.kind === 'sheet' || f.kind === 'csv');
-    const actions = (anyTpl ? NLP.pill('Fill a template', 'NBK.fillAny()') : `<button type="button" class="nl-gp" disabled title="Add a spreadsheet or CSV template first">Fill a template</button>`) + NLP.pill('+ Upload', 'NBK.pick()');
+    const actions = (anyTpl ? NLP.pill('Fill a template', 'NBK.fillAny()') : NLP.pill('Fill a template', 'NBK.fillFirst()', 'title="First add a spreadsheet or CSV template"')) + NLP.pill('+ Upload', 'NBK.pick()');
     const drop = `<div class="nb-drop"><span>Drop files here: PDF, Word, Excel, CSV, text, photos of letters</span><button type="button" class="nl-link" onclick="NBK.pick()">Choose files</button></div>`;
     const rows = list.map((m, i) => {
       const s = statusOf(m);
