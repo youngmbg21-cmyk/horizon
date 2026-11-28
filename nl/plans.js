@@ -285,7 +285,7 @@
       const v = VERDICT[p.verdict] || VERDICT.infeasible;
       return `<div class="nlp-share" data-place="${H(p.id)}"><b title="${H(p.name)}">${H(p.name)}</b><span class="nlp-track"><i class="${v.cls}" style="width:${Math.min(100, Math.max(1, p.ratio * 100)).toFixed(1)}%"></i><s style="left:70%"></s></span><span class="nlp-pct">${p.netIncome > 0 ? pct(p.ratio) + '%' : '—'}</span></div>`;
     }).join('');
-    return `<section class="nl-cc"><h2 class="nl-ct">${H(title)}</h2><p class="nl-cs">Living costs each month as a share of your retirement income after each place’s tax (${H(NLP.money(income))} a month before tax, today’s money).</p>${bars}
+    return `<section class="nl-cc"><h2 class="nl-ct">${H(title)}</h2><p class="nl-cs">Living costs each month as a share of what your savings and pensions are expected to pay you, after each place’s tax (${H(NLP.money(income))} a month before tax, today’s money).</p>${bars}
       ${NLP.legend([{ label:'Fits: up to 70%', color:'var(--nl-accent)' }, { label:'Tight: 70 to 90%', color:'#C98A1B' }, { label:'Doesn’t fit: over 90%', color:'#B5483E' }])}</section>`;
   }
   function placeRow(p, i){

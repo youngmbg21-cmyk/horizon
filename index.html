@@ -5704,8 +5704,8 @@ const STRINGS = {
   'ra.page.title':          { en:'Where Can You Retire?', sv:'Var kan du gå i pension?' },
   'ra.page.sub':            { en:'Where in the world does your <strong>{income}/mo</strong> live well?',
                               sv:'Var i världen räcker dina <strong>{income}/mån</strong> till ett gott liv?' },
-  'ra.callout':             { en:'<strong>Your Target Retirement Income: {income}/mo</strong> — the pre-tax income your plan needs to sustain your chosen lifestyle, shown in <strong>{lens}</strong>. This is the same figure as “Total income needed · pre-tax” on your Retirement Plan.<br>Destinations are rated by whether this income can comfortably cover local cost of living, after accounting for local tax.',
-                              sv:'<strong>Din målpensionsinkomst: {income}/mån</strong> — den inkomst före skatt som din plan behöver för att upprätthålla din valda livsstil, visad i <strong>{lens}</strong>. Detta är samma siffra som ”Total inkomst som behövs · före skatt” i din Pensionsplan.<br>Destinationer rankas efter om denna inkomst bekvämt kan täcka lokala levnadskostnader, efter att lokal skatt räknats av.' },
+  'ra.callout':             { en:'<strong>Your Expected Retirement Income: {income}/mo before tax</strong> — what your savings and pensions are expected to pay you each month (average over your retirement), shown in <strong>{lens}</strong>.<br>Each destination takes off its local tax first, then its cost of living; what is left is your real spare money.',
+                              sv:'<strong>Din förväntade pensionsinkomst: {income}/mån före skatt</strong> — vad ditt sparande och dina pensioner väntas betala dig varje månad (snitt över pensionen), visad i <strong>{lens}</strong>.<br>Varje destination drar först av lokal skatt och sedan levnadskostnaden; det som blir kvar är dina verkliga pengar över.' },
   'ra.lens.today':          { en:'today’s money', sv:'dagens penningvärde' },
   'ra.lens.nominal':        { en:'nominal · future kr', sv:'nominellt · framtida kr' },
   // KPI row
@@ -5767,7 +5767,7 @@ const STRINGS = {
   'ra.btn.deepDiveAll':     { en:'🔬 Deep Dive all',      sv:'🔬 Deep Dive för alla' },
   'ra.map.cost':            { en:'Cost{couple}: {amt}/mo', sv:'Kostnad{couple}: {amt}/mån' },
   'ra.map.disc':            { en:'Discretionary: {amt}/mo', sv:'Disponibelt: {amt}/mån' },
-  'ra.so.facts.target':     { en:'Target income · pre-tax', sv:'Målinkomst · före skatt' },
+  'ra.so.facts.target':     { en:'Expected income · before tax', sv:'Förväntad inkomst · före skatt' },
   'ra.so.facts.net':        { en:'Net income · after {pct}% tax', sv:'Nettoinkomst · efter {pct}% skatt' },
   'ra.so.facts.disc':       { en:'Discretionary · after costs', sv:'Disponibelt · efter kostnader' },
   'ra.so.hh.couple':        { en:'two-person household',  sv:'tvåpersonershushåll' },
@@ -9055,10 +9055,9 @@ function getRetirementNumbers() {
     const totalRetirementIncome = sustainableAfterTax + pensionAvgMonthlyAfterTax;
     // grossRetirementIncome: the income the plan will actually GENERATE before
     // any tax (portfolio drawdown + average pension). Used by the general AI
-    // advisor context and the mobile retirement verdict card. NOTE: the Retire
-    // Anywhere tab deliberately does NOT use this — it scores destinations
-    // against totalGross (the pre-tax "income needed" target) so it matches the
-    // Retirement Plan tab's headline figure.
+    // advisor context, the mobile retirement verdict card and (via raIncome)
+    // every place-to-retire score and deep dive: places are judged against
+    // what the plan will actually pay, after each place's local tax.
     const grossRetirementIncome = sustainableMonthly + pensionAvgMonthly;
     const gap = totalRetirementIncome - totalExp;
     const coveragePct = simResult.totalYears > 0
@@ -10348,7 +10347,7 @@ Generate a comprehensive, professional DEEP DIVE retirement relocation report fo
 CONTEXT
 - Prospective retiree holds ${cz.name||'?'}${cz.code?` (${cz.code})`:''} citizenship, currently based in ${hb.name||'?'}${hb.code?` (${hb.code})`:''}.
 - Household: ${household}. Size every cost-of-living and tax figure to THIS household, not a single person unless it is one.
-- Projected monthly retirement income for the household: ${money(o.income||0)} a month BEFORE TAX (gross, in today's money), from portfolio draw-down and pensions. This is NOT spendable money: local income tax comes off it first.${o.estTaxPct!=null ? `
+- Projected monthly retirement income for the household: ${money(o.income||0)} a month BEFORE TAX (gross, in today's money), from portfolio draw-down and pensions (what the plan is expected to pay, averaged over retirement). This is NOT spendable money: local income tax comes off it first.${o.estTaxPct!=null ? `
 - Horizon's current estimate of the effective local tax on this income in ${loc.country}: about ${Math.round(o.estTaxPct)}%, so roughly ${money((o.income||0)*(1-o.estTaxPct/100))} a month after tax. Use your own, better-researched effective rate if it differs, and say which rate you used.` : ''}
 
 AFTER-TAX RULE (most important)
@@ -10525,19 +10524,24 @@ function ddReportMarkdown(md){
   return md.trim();
 }
 
+// The income a place to retire is judged against: what your savings and
+// pensions are expected to PAY you each month (portfolio draw-down + average
+// pension, before any tax, today's money). Not the "income needed" target
+// (totalGross), which is worked out from the home spending budget and so
+// says nothing about whether the plan can actually pay it.
+function raIncome(nums){ nums = nums || getRetirementNumbers(); return Math.max(0, nums.grossRetirementIncome || 0); }
+
 function scoreLocation(loc) {
   // Keyed memo: the retirement numbers are shared across locations, so we
   // only recompute per-location fields and cache per id. Cache is keyed on
   // household size too so toggling single/couple re-scores correctly.
   return memoSelect('loc:'+(loc.id||loc.name)+':hh'+raHouseholdSize(), () => {
     const nums = getRetirementNumbers();
-    // Income = the plan's pre-tax "income needed" figure (totalGross), the
-    // SAME number the Retirement Plan tab shows as "Total income needed ·
-    // pre-tax". It is pre-tax, so the destination's effective tax applies
-    // cleanly below without double-counting home-country tax. Kept in real
-    // (today's money) here so verdicts never shift with the display lens;
-    // renderRetireAnywhere scales the DISPLAY to nominal when needed.
-    const monthlyIncome = nums.totalGross;
+    // Income = what the plan is expected to PAY each month before tax
+    // (raIncome). The destination's effective tax comes off below, then
+    // living costs. Kept in real (today's money) here so verdicts never shift
+    // with the display lens; renderRetireAnywhere scales the DISPLAY.
+    const monthlyIncome = raIncome(nums);
     const hh = raHouseholdSize();
     const ai = loc.aiStats || null;
     // HYBRID: the app owns YOUR income; the AI owns the DESTINATION's facts.
@@ -17293,7 +17297,7 @@ function renderRetireAnywhere() {
   const isNom = FE.display.isNominal();
   const raD = (v)=>Math.round(FE.display.scaleReal(v||0, nums.ytr));
   const lensLbl = isNom ? t('ra.lens.nominal') : t('ra.lens.today');
-  const monthlyIncome = raD(nums.totalGross);
+  const monthlyIncome = raD(raIncome(nums));
   // KPI counts include not-yet-analysed destinations at their quick
   // estimate; the sub-line says how many of the count are estimates.
   const raKpiSub = (v) => {
@@ -17471,7 +17475,7 @@ function renderLocAnalysisSlideover(opts){
   if(!loc) return;
   const r = rate(); const s = sym();
   const nums = getRetirementNumbers();
-  const monthlyIncome = nums.totalGross; // pre-tax "income needed" — matches Retirement Plan tab
+  const monthlyIncome = raIncome(nums); // what the plan pays, before tax
   const cached = (state.vault||[]).find(v => v.type==='deepdive' && v.locationId===id);
 
   // Header
@@ -17604,7 +17608,7 @@ window.runLocAnalysis = function(id, opts){
   const cz = countryInfo(state.citizenship);
   const hb = countryInfo(state.homeBase);
   const nums = getRetirementNumbers();
-  const income = nums.totalGross; // pre-tax "income needed" — matches Retirement Plan tab
+  const income = raIncome(nums); // what the plan pays, before tax
   // If rerun, strip the previous cached entry so the new one replaces it
   if(opts && opts.force){
     state.vault = (state.vault||[]).filter(v => !(v.type==='deepdive' && v.locationId===id));
@@ -18339,7 +18343,7 @@ window.aiAnalyzeLocations=function(){
   const key=state.aiKeys?.claude;
   if(!key){toggleAIPanel();return;}
   const nums=getRetirementNumbers();
-  const income=nums.totalGross; // pre-tax "income needed" — matches Retirement Plan tab
+  const income=raIncome(nums); // what the plan pays, before tax
   const ctx = (typeof buildPersonalContext==='function') ? buildPersonalContext() : '';
   const prompt=`${ctx}\n\nThe user is planning to retire with a monthly income of ${fmt(income)} (this is TODAY'S MONEY — real, inflation-adjusted purchasing power, not nominal future kr). Recommend the BEST retirement destinations globally based on this real income. Consider: cost of living, healthcare quality, climate, expat communities, visa/residency requirements, and lifestyle. Tailor visa and tax-treaty advice to the user's citizenship and home base. Give 5 specific recommendations with monthly cost estimates (also in today's money / local-currency-equivalent), an estimated monthly surplus, and a viability score. Format as a structured list. End the reply with ONE fenced \`\`\`horizon-chart\`\`\` block of kind "quoted" plotting the estimated monthly surplus for each of your 5 recommendations, using EXACTLY the surplus figures you stated in the text (same currency, monthly).${langSuffix()}`;
   // Kick off in the background (fire-and-forget); the UI is driven by the
@@ -18354,7 +18358,7 @@ window.aiAnalyzeLoc=async function(id){
   const key=state.aiKeys?.claude;
   if(!key){alert('Add your Claude API key in Settings first.');return;}
   const nums=getRetirementNumbers();
-  const income=nums.totalGross; // pre-tax "income needed" — matches Retirement Plan tab
+  const income=raIncome(nums); // what the plan pays, before tax
   const el=document.getElementById('loc-ai-out'); el.innerHTML='<span class="pulse">🤖 Analyzing…</span>';
   const ctx = buildPersonalContext();
   const prompt=`${ctx}\n\nDetailed retirement feasibility analysis for ${loc.name}, ${loc.country}. The retiree has a monthly income of ${fmt(income)} (in today's money). Local cost of living: ${fmt(loc.costOfLiving)}/mo. Local income tax: ${loc.taxRate}%. Cover: actual cost of living breakdown, healthcare quality, visa/residency for the user's citizenship, quality of life, pros/cons, and an overall verdict. Be specific and practical. Under 250 words.${langSuffix()}`;
@@ -18381,7 +18385,7 @@ window.aiDeepDive = function(id){
   const cz = countryInfo(state.citizenship);
   const hb = countryInfo(state.homeBase);
   const nums = getRetirementNumbers();
-  const income = nums.totalGross; // pre-tax "income needed" — matches Retirement Plan tab
+  const income = raIncome(nums); // what the plan pays, before tax
   const el = document.getElementById('loc-ai-out');
   if(el) el.innerHTML = '<div class="card" style="padding:16px"><div class="state-spinner" style="display:inline-block;vertical-align:middle;margin-right:10px;width:16px;height:16px;border-width:2px"></div><span style="color:var(--accent-positive);font-family:var(--fm);font-size:12px">Generating Deep Dive report… this takes 20–40 seconds.</span></div>';
   const ctx = buildPersonalContext();
@@ -24629,7 +24633,7 @@ class HZMobile {
     this.sheet(`${this.esc(loc.flag||'📍')} ${this.esc(loc.name)} · Deep Dive`,`<div style="display:flex;align-items:center;gap:10px;color:var(--text2);font-size:13px;padding:10px 0"><span style="width:16px;height:16px;border:2px solid var(--border2);border-top-color:var(--green);border-radius:50%;display:inline-block;animation:hzspin .8s linear infinite;flex-shrink:0"></span><span>Generating your Deep Dive report… this takes 20–40 seconds. You can close this and keep using the app — the card shows progress.</span></div>`,'Tailored to your citizenship, home base and retirement income.');
     try{
       const nums=(typeof getRetirementNumbers==='function')?getRetirementNumbers():null;
-      const income=nums?this.n(nums.totalGross,0):this.retIncome();
+      const income=nums?this.n(raIncome(nums),0):this.retIncome();
       const cz=(typeof countryInfo==='function')?countryInfo(state.citizenship):{name:state.citizenship};
       const hb=(typeof countryInfo==='function')?countryInfo(state.homeBase):{name:state.homeBase};
       // Shared, household-aware Deep Dive contract — identical prompt and
@@ -24652,7 +24656,7 @@ class HZMobile {
   }
   vAnywhere(){
     const nums=this.raNums();
-    const income=nums?this.n(nums.totalGross,0):this.retIncome();
+    const income=nums?this.n(raIncome(nums),0):this.retIncome();
     const scored=this.raScored();
     // Counts include not-yet-analysed destinations at their quick local estimate.
     const feas=scored.filter(l=>l.verdict==='feasible').length;
