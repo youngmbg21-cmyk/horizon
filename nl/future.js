@@ -921,8 +921,11 @@
   NLF.chooseBrick = id => { NLP.ui(P).tab = 'wall'; NLP.choose(P, String(id)); };
   function openBrick(id){
     const b = getLifeWallData(gran()).find(x => String(x.startYear) === String(id)); if(!b) return;
-    if(b.inRetirement || brickWhy(b).isRet){ NLP.tab(P, 'runway'); }
-    else NLP.go('nl-money');
+    if(b.inRetirement || brickWhy(b).isRet){ NLP.tab(P, 'runway'); return; }
+    // Amber because of trip spending: the trips are on Plans › Trips.
+    const tripCause = b.verdict === 'amber' && brickWhy(b).key === 'spend' && brickWhy(b).trips.length > 0;
+    if(tripCause){ const u = NLP.ui('nl-plans'); u.tab = 'trips'; u.chosen = null; u.open = null; NLP.go('nl-plans'); return; }
+    NLP.go('nl-money');
   }
   NLF.openBrick = openBrick;
 

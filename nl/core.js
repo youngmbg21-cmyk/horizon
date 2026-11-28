@@ -18,7 +18,11 @@
   NLP.monthLabel = ym => { const m = /^(\d{4})-(\d{2})/.exec(ym || ''); return m ? new Date(+m[1], +m[2]-1, 1).toLocaleString('en-GB', { month:'short', year:'numeric' }) : String(ym || ''); };
   NLP.monthShort = ym => { const m = /^(\d{4})-(\d{2})/.exec(ym || ''); return m ? new Date(+m[1], +m[2]-1, 1).toLocaleString('en-GB', { month:'short' }) : ''; };
   NLP.css = (id, text) => { if(document.getElementById(id)) return; const s = document.createElement('style'); s.id = id; s.textContent = text; document.head.appendChild(s); };
-  NLP.ui = panel => ui[panel] || (ui[panel] = {});
+  // Each page's tab is remembered on this device, so a reload opens the same tab.
+  const TABS_KEY = 'horizon-finance-os-v1:nl-tabs';
+  const savedTabs = (() => { try { return JSON.parse(localStorage.getItem(TABS_KEY) || '{}') || {}; } catch(_){ return {}; } })();
+  NLP.ui = panel => ui[panel] || (ui[panel] = savedTabs[panel] ? { tab:savedTabs[panel] } : {});
+  const rememberTab = panel => { const t = ui[panel] && ui[panel].tab; if(!t || savedTabs[panel] === t) return; savedTabs[panel] = t; try { localStorage.setItem(TABS_KEY, JSON.stringify(savedTabs)); } catch(_){} };
   NLP.refreshPanel = () => { if(typeof window.nlRender === 'function') window.nlRender(); };
   NLP.toast = (msg, kind, action) => { if(typeof window.nlToast === 'function') window.nlToast(msg, kind, action); };
 
@@ -300,7 +304,7 @@
   }
   // Re-mount charts after every page draw.
   const _render = NLP.renderPage;
-  NLP.renderPage = function(panel){ _render(panel); NLP.mountCharts(document.getElementById('panel-' + panel)); };
+  NLP.renderPage = function(panel){ _render(panel); NLP.mountCharts(document.getElementById('panel-' + panel)); rememberTab(panel); };
   // ── One press is enough ──────────────────────────────────────────────────
   // Pressing a button while a box has focus makes the box save and redraw
   // the page and side panel during the press; the button under the pointer was

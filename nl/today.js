@@ -556,7 +556,7 @@
     const waits = n ? `${n} ${plural(n, 'thing waits', 'things wait')} for you${nRem && nRem < n ? `: ${n - nRem} from your plan, ${nRem} ${plural(nRem, 'reminder', 'reminders')}` : ''}.` : 'Nothing waits for you.';
     let lead;
     if(r.verdictKey === 'empty') lead = 'Add what you’ll spend in retirement, so Horizon can tell whether your plan holds.';
-    else if(r.verdictKey === 'wellFunded' || r.verdictKey === 'fullyFunded') lead = 'You’re on track.';
+    else if(r.verdictKey === 'wellFunded' || r.verdictKey === 'fullyFunded') lead = m.short.length ? `Retirement is on track, but ${m.short.length === 1 ? NLP.monthLabel(m.short[0].key) + ' runs' : m.short.length + ' months run'} short.` : 'You’re on track.';
     else if(r.verdictKey === 'borderline') lead = `You’re nearly on track: your money lasts to about ${r.runout}.`;
     else lead = `Your money runs out at ${r.runout}, before ${L}.`;
     const groups = [];
