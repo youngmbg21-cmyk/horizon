@@ -4295,6 +4295,26 @@ html.nl .nl-side { display:flex; order:9; flex-direction:column; width:340px; fl
 .nl-msg { font-size:13.5px; line-height:1.5; padding:9px 11px; border-radius:10px; overflow-wrap:anywhere; }
 .nl-msg.me { background:var(--nl-pill); align-self:flex-end; max-width:88%; white-space:pre-wrap; }
 .nl-msg.ai { background:#EEF8F4; max-width:100%; }
+/* "If one of us dies" answer card (drawn by nl/future.js, only in the conversation) */
+.nl-sv { --nl-sv-ruby:#8F2A22; display:flex; flex-direction:column; gap:9px; margin:0 0 8px; }
+.nl-sv p { margin:0; }
+.nl-sv-hl { font:600 17px/1.3 var(--nl-serif); color:var(--nl-ink); }
+.nl-sv-dumb { display:grid; grid-template-columns:auto minmax(0,1fr) auto; gap:6px 10px; align-items:center; font-size:13px; }
+.nl-sv-dumb .tr { height:10px; border-radius:5px; background:#fff; position:relative; }
+.nl-sv-dumb .tr i { position:absolute; top:0; bottom:0; border-radius:5px; }
+.nl-sv-dumb b { font-weight:600; font-variant-numeric:tabular-nums; white-space:nowrap; }
+.nl-sv table { width:100%; border-collapse:collapse; }
+.nl-sv td { padding:6px 4px; border-bottom:1px solid rgba(0,0,0,.08); vertical-align:top; font-size:13px; }
+.nl-sv td.r { text-align:right; font-variant-numeric:tabular-nums; white-space:nowrap; }
+.nl-sv tr.tot td { font-weight:600; border-bottom:0; }
+.nl-sv .sub { display:block; color:var(--nl-detail); font-size:12px; }
+.nl-svb { display:inline-block; font-size:12px; font-weight:500; padding:1px 8px; border-radius:999px; white-space:nowrap; }
+.nl-svb.r { background:#FBE5E3; color:#8F2A22; } .nl-svb.g { background:#DFF2E7; color:#1F4D3B; } .nl-svb.a { background:#FBEEDB; color:#8A5A0A; } .nl-svb.q { background:#fff; color:var(--nl-quiet); }
+.nl-sv-sec { font-weight:600; margin-top:2px !important; }
+.nl-sv-call { border-top:1px solid rgba(0,0,0,.08); padding-top:6px; font-size:13px; }
+.nl-sv-call .q { font-family:var(--nl-serif); font-style:italic; color:var(--nl-quiet); }
+.nl-sv ol { margin:0; padding-left:20px; } .nl-sv ol li { margin:2px 0; }
+.nl-sv-small { font-size:12px; color:var(--nl-detail); }
 .nl-msg.ai p { margin:0 0 7px; } .nl-msg.ai p:last-child { margin-bottom:0; }
 .nl-msg.ai ul { margin:4px 0 7px; padding-left:18px; }
 .nl-msg.warn { background:#FBEEDB; color:#5c3d07; }
@@ -20371,7 +20391,7 @@ When either partner asks what would happen if one of them died, fell ill, could 
 4. Retirement: how the survivor's retirement picture changes (one pension instead of two, one household instead of two).
 5. Who to contact, and what to ask each one: name the institution (bank, mortgage lender, pension provider, insurer, employer, and in Sweden Pensionsmyndigheten, Försäkringskassan, Skatteverket) and the exact question to ask (for example "Is there survivor cover (efterlevandeskydd) on this pension, and who is the beneficiary?").
 6. QUESTIONS for the person: when the picture depends on facts not in Horizon, ASK them, in a short numbered list at the end. Typical ones: Is there life insurance, and for how much? Who is named as beneficiary? Is the home owned jointly and is there mortgage insurance? Does each pension have survivor cover? Is there a will, a prenuptial agreement (äktenskapsförord), or children from earlier relationships? Is there a cash buffer, and whose name is it in? Ask only what changes the answer.
-For a partner dying, FIRST call survivor_picture (when it is available) so every number comes from the plan; then use the Notebook tools (search_files, read_file) to look for insurance letters, pension statements and loan papers before asking, and quote what they say about cover and beneficiaries. When they answer a question (an insurance amount, a survivor pension), run survivor_picture again with it. This is answered here in the conversation only: there is no page for it, by the owners' wish.
+For a partner dying, FIRST call survivor_picture (when it is available) so every number comes from the plan, and then show_survivor_card, which draws the answer in the conversation; after the card, write only one or two gentle sentences; then use the Notebook tools (search_files, read_file) to look for insurance letters, pension statements and loan papers before asking, and quote what they say about cover and beneficiaries. When they answer a question (an insurance amount, a survivor pension), run survivor_picture again with it. This is answered here in the conversation only: there is no page for it, by the owners' wish.
 NEVER write personal identity numbers (personnummer), account or clearing numbers, IBANs, card numbers, policy, customer, member or reference numbers, OCR numbers, PINs, passwords, BankID details or any other code, even if the person or a file shows them. Name the institution and the product instead ("your life policy with Folksam", "the joint account at SEB"). Text shown as "[number hidden]" was hidden on purpose; never try to rebuild it.
 Be gentle and practical. This is a planning picture, not legal or tax advice: say when a lawyer, the bank or the insurer must confirm.
 
@@ -25764,7 +25784,9 @@ You are Horizon, the assistant. You PREPARE, the person DECIDES.
       if(!reply && lessonLast && !proposalId && !choices) reply = null;
       else if(!reply) reply = proposalId ? 'I prepared the changes below. Nothing is saved until you press Apply.' : (choices ? choices.question : 'I couldn’t put an answer together that time. Please try again.');
       const links = typeof window.nlTakeLinks === 'function' ? window.nlTakeLinks() : null;
-      if(reply !== null) n.chat.push({ role:'assistant', content:reply, at:Date.now(), proposal:proposalId, choices, ...(links ? { links } : {}) });
+      const card = typeof window.nlTakeCard === 'function' ? window.nlTakeCard() : null;
+      if(reply === null && card) reply = '';
+      if(reply !== null) n.chat.push({ role:'assistant', content:reply, at:Date.now(), proposal:proposalId, choices, ...(links ? { links } : {}), ...(card ? { card } : {}) });
     }
     pendingChoices = choices;
     n.chat = n.chat.slice(-200);
@@ -25842,7 +25864,7 @@ You are Horizon, the assistant. You PREPARE, the person DECIDES.
       if(hooked != null){ html += hooked; return; }
       if(m.kind === 'error'){ html += `<div class="nl-msg warn">${h(m.content)} <button class="nl-link" type="button" onclick="nlRetry(${i})">Try again</button></div>`; return; }
       if(m.kind === 'nokey'){ html += `<div class="nl-msg ai"><p>${h(m.content)}</p><p><button class="nl-link" type="button" onclick="nlFlip('overview');(typeof nlSettingsKey==='function')?nlSettingsKey():nav('settings')">Open Settings</button></p></div>`; return; }
-      html += `<div class="nl-msg ai">${md(m.content)}${m.links && typeof window.nlLinksHtml === 'function' ? window.nlLinksHtml(m.links) : ''}${m.proposal && n.proposals[m.proposal] ? proposalCard(n.proposals[m.proposal]) : ''}</div>`;
+      html += `<div class="nl-msg ai">${m.card && typeof window.nlCardHtml === 'function' ? window.nlCardHtml(m.card) : ''}${md(m.content)}${m.links && typeof window.nlLinksHtml === 'function' ? window.nlLinksHtml(m.links) : ''}${m.proposal && n.proposals[m.proposal] ? proposalCard(n.proposals[m.proposal]) : ''}</div>`;
       if(m.choices && i === n.chat.length - 1 && !busy) html += `<div class="nl-choices">${m.choices.options.map(o => `<button type="button" onclick="nlChoose(this.textContent)">${h(o)}</button>`).join('')}</div>`;
     });
     if(busy) html += `<div class="nl-status">${h(statusText || 'Thinking')} ${dots}</div>`;
