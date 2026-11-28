@@ -657,8 +657,75 @@
   }
 
   // ── Accounts ────────────────────────────────────────────────────────────
+
+  // ── Net worth over time ────────────────────────────────────────────────
+  // state.home = { value, mortgage } in SEK (what the home is worth, what is
+  // still owed). state.nwHistory = [{ m:'YYYY-MM', total, savings, invest,
+  // home, mortgage, parts:{ id: balance } }]: the current month's entry
+  // follows the latest values; once the month is over it stays as it was.
+  // Months added by hand carry manual:true and only a total.
+  const homeOf = () => { const h = state.home && typeof state.home === 'object' ? state.home : {}; return { value:Math.max(0, Number(h.value) || 0), mortgage:Math.max(0, Number(h.mortgage) || 0) }; };
+  const ymOf = d => d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
+  const monthWords = m => { const [y, mo] = String(m).split('-').map(Number); return new Date(y, mo - 1, 1).toLocaleDateString('en-GB', { month:'short', year:'numeric' }); };
+  function nwNow(){
+    const parts = {}, inv = investments();
+    const savings = Math.max(0, Number(FE.projection.savingsYearToDate()) || 0);
+    parts.sav = savings;
+    inv.forEach(a => { parts[a.id] = Math.max(0, Number(a.balance) || 0); });
+    const invest = inv.reduce((t, a) => t + parts[a.id], 0), h = homeOf();
+    if(h.value) parts.home = h.value; if(h.mortgage) parts.mortgage = -h.mortgage;
+    return { total:Math.round(savings + invest + h.value - h.mortgage), savings:Math.round(savings), invest:Math.round(invest), home:Math.round(h.value), mortgage:Math.round(h.mortgage), parts };
+  }
+  function nwHist(){ return (Array.isArray(state.nwHistory) ? state.nwHistory : []).filter(e => e && /^\d{4}-\d{2}$/.test(e.m) && Number.isFinite(+e.total)).sort((a, b) => a.m.localeCompare(b.m)); }
+  // Write this month's entry (only if something changed, so a save is not needed every time).
+  function nwSnapshot(){
+    if(typeof FE === 'undefined' || !FE.projection) return;
+    const m = ymOf(new Date()), now = nwNow();
+    if(!Array.isArray(state.nwHistory)) state.nwHistory = [];
+    const i = state.nwHistory.findIndex(e => e && e.m === m && !e.manual);
+    const entry = Object.assign({ m }, now);
+    if(i >= 0){ if(JSON.stringify(state.nwHistory[i]) === JSON.stringify(entry)) return; state.nwHistory[i] = entry; }
+    else { state.nwHistory = state.nwHistory.filter(e => !(e && e.m === m)); state.nwHistory.push(entry); }
+    state.nwHistory.sort((a, b) => a.m.localeCompare(b.m));
+    save();
+  }
+  setTimeout(() => { try { nwSnapshot(); } catch(_){} }, 3000);
+  // The entry to compare with: the earliest one in the last 12 months, before this month.
+  function nwBase(){
+    const h = nwHist(), cut = ymOf(new Date(new Date().getFullYear(), new Date().getMonth() - 12, 1)), cur = ymOf(new Date());
+    return h.find(e => e.m >= cut && e.m < cur) || null;
+  }
+  function nwChart(w, h, hist){
+    const pts = hist.map((e, i) => [i, +e.total]);
+    const lo = Math.min(0, ...pts.map(p => p[1])), hi = Math.max(1, ...pts.map(p => p[1]));
+    const tk = NLP.ticks(lo >= 0 ? Math.max(0, lo - (hi - lo) * 0.15) : lo, hi * 1.06, 3, v => v ? MS(v) : '0');
+    const n = pts.length, step = n > 18 ? 6 : n > 8 ? 3 : 1;
+    // Month names only; the first label also says the year. The right margin holds the latest value.
+    const xt = hist.map((e, i) => (i % step === 0 && n - 1 - i >= Math.max(1, step / 2)) || i === n - 1 ? [i, i === 0 ? monthWords(e.m) : monthWords(e.m).replace(/ \d{4}$/, '')] : null).filter(Boolean);
+    return NLP.chart({ w, h, x:[0, Math.max(1, n - 1)], y:[tk.min, tk.max], yt:tk.ticks, xt, pad:{ l:58, r:64, t:12, b:24 }, label:'Net worth, month by month',
+      hover:{ n, x:i => i, title:i => monthWords(hist[i].m) + (hist[i].manual ? ' (added by hand)' : ''), rows:i => [{ name:'Net worth', value:M(hist[i].total), color:'var(--nl-accent)' }], y:i => [{ v:hist[i].total, color:'var(--nl-accent)' }] },
+      draw:k => (n > 1 ? `<path d="${k.area(pts, tk.min)}" fill="var(--nl-accent)" fill-opacity=".10"/><path d="${k.line(pts)}" fill="none" stroke="var(--nl-accent)" stroke-width="2.2"/>` : '')
+        + pts.map((p, i) => `<circle cx="${k.sx(p[0]).toFixed(1)}" cy="${k.sy(p[1]).toFixed(1)}" r="3.2" fill="#fff" stroke="var(--nl-accent)" stroke-width="2"${hist[i].manual ? ' stroke-dasharray="2 2"' : ''}/>`).join('')
+        + `<text class="lab" x="${(k.sx(pts[n - 1][0]) + 8).toFixed(1)}" y="${(k.sy(pts[n - 1][1]) + 4).toFixed(1)}">${H(MS(pts[n - 1][1]))}</text>` });
+  }
+  function nwCard(){
+    const hist = nwHist(), st = U();
+    const first = hist[0], last = hist[hist.length - 1];
+    let title = 'Where you’ve been: the line starts this month.';
+    if(hist.length > 1){ const d = last.total - first.total; title = `Where you’ve been: ${d >= 0 ? 'up' : 'down'} ${MS(Math.abs(d))} since ${monthWords(first.m)}.`; }
+    const h = homeOf();
+    const what = h.value || h.mortgage ? 'Savings, investments and your home, minus the mortgage' : 'Savings and investments (add your home and mortgage below)';
+    const form = st.nwAdd ? `<div class="nlf-ed nlf-acc nlf-nwadd">
+        <label>Month<input type="month" id="nlf-nw-m" max="${ymOf(new Date(new Date().getFullYear(), new Date().getMonth() - 1, 1))}"></label>
+        <label>Net worth then<input type="text" inputmode="decimal" class="nl-num-in" id="nlf-nw-v"><span class="nlf-u">${H(sym())}</span></label>
+        <div class="nl-inrow">${NLP.pill('Add this month', 'NLF.nwAdd()')}${NLP.link('Cancel', 'NLF.nwForm()')}</div></div>` : '';
+    return NLP.card(null, null, `<h2 class="nl-ct">${H(title)}</h2><p class="nl-cs">${H(what)}, kept each month. ${hist.length ? `${hist.length} month${hist.length > 1 ? 's' : ''} so far.` : ''}</p>${hist.length ? NLP.chartBox((w, hh) => nwChart(w, hh, hist), 240, 'Net worth, month by month') : NLP.empty('The first month is kept a few seconds after Horizon opens.')}<div class="nl-inrow nlf-nw-links">${st.nwAdd ? '' : NLP.link('Add an earlier month', 'NLF.nwForm()')}</div>${form}`);
+  }
+
   function accountsHtml(){
     const st = U(), inv = investments(), pens = pensions(), proj = getProjection();
+    const base = nwBase(), nowNw = nwNow();
+    const chg = id => { if(!base) return ''; const was = base.parts && base.parts[id]; if(was == null) return '<td class="r nlf-chg">—</td>'; const d = (nowNw.parts[id] || 0) - was; return `<td class="r nlf-chg ${d >= 0 ? 'up' : 'dn'}">${d >= 0 ? '+' : '−'}${M(Math.abs(d))}<span class="sub">since ${H(monthWords(base.m))}</span></td>`; };
     const ra = state.retirementAge, last = proj[proj.length - 1] || null, ytr = proj.length ? proj.length - 1 : 0;
     const colours = ['var(--nlf-c1)','var(--nlf-c2)','var(--nlf-c3)','var(--nlf-c4)','var(--nlf-c5)','var(--nlf-c6)','var(--nlf-c7)'];
     const series = [{ id:'sav', name:'Savings', col:colours[1], vals:proj.map((p, y) => fromNom(p.appSavings, y)) }]
@@ -680,7 +747,7 @@
         <label>Growth<input type="text" inputmode="decimal" class="nl-num-in nlf-short" id="nlf-sv-g" value="${state.growthRate ?? 0}" onchange="NLF.savGrowth(this.value)"><span class="nlf-u">% a year</span></label>
         <p class="nlf-sv-note">What you save each month comes from your Money plan.</p>
         <div class="nl-inrow">${NLP.link('Done', 'NLF.accClose()')}</div></div>` : '';
-        rows.push(`<tr data-nl-row="sav"><td class="mk">${sw(s.col)}</td><td><span class="nm">Savings from Money plan</span><span class="sub">Read from your Money plan savings target</span>${edS}</td><td class="k">Savings</td><td class="r">${M(FE.projection.savingsYearToDate())}</td><td class="r">${M(savMonthly)}</td><td class="r">${pct(state.growthRate || 0)}</td><td class="r">${M(atRet('sav'))}</td></tr>`);
+        rows.push(`<tr data-nl-row="sav"><td class="mk">${sw(s.col)}</td><td><span class="nm">Savings from Money plan</span><span class="sub">Read from your Money plan savings target</span>${edS}</td><td class="k">Savings</td><td class="r">${M(FE.projection.savingsYearToDate())}</td><td class="r">${M(savMonthly)}</td><td class="r">${pct(state.growthRate || 0)}</td>${chg('sav')}<td class="r">${M(atRet('sav'))}</td></tr>`);
         return;
       }
       const a = inv.find(x => x.id === s.id); if(!a) return;
@@ -691,7 +758,18 @@
         <label>Added a month<input type="text" inputmode="decimal" class="nl-num-in" id="nlf-ac-c-${H(a.id)}" value="${toDisp(a.monthlyContribution)}" onchange="NLF.accSet('${H(a.id)}','monthlyContribution',this.value)"><span class="nlf-u">${H(sym())}</span></label>
         <label>Growth<input type="text" inputmode="decimal" class="nl-num-in nlf-short" id="nlf-ac-g-${H(a.id)}" value="${a.growthRate ?? state.growthRate}" onchange="NLF.accSet('${H(a.id)}','growthRate',this.value)"><span class="nlf-u">% a year</span></label>
         <div class="nl-inrow">${NLP.link('Remove this account', `NLF.accDel('${H(a.id)}')`)}${NLP.link('Done', 'NLF.accClose()')}</div></div>` : '';
-      rows.push(`<tr data-nl-row="${H(a.id)}"><td class="mk">${sw(s.col)}</td><td><span class="nm">${H(a.name)}</span><span class="sub">${a.accountType === 'isk' ? 'Investment, taxed each year as ISK' : `Investment, ${Math.round(a.taxRate ?? 30)}% tax when taken out`}</span>${ed}</td><td class="k">${kindOf(a)}</td><td class="r">${M(a.balance)}</td><td class="r">${M(a.monthlyContribution)}</td><td class="r">${pct(a.growthRate ?? state.growthRate)}</td><td class="r">${M(atRet(a.id))}</td></tr>`);
+      rows.push(`<tr data-nl-row="${H(a.id)}"><td class="mk">${sw(s.col)}</td><td><span class="nm">${H(a.name)}</span><span class="sub">${a.accountType === 'isk' ? 'Investment, taxed each year as ISK' : `Investment, ${Math.round(a.taxRate ?? 30)}% tax when taken out`}</span>${ed}</td><td class="k">${kindOf(a)}</td><td class="r">${M(a.balance)}</td><td class="r">${M(a.monthlyContribution)}</td><td class="r">${pct(a.growthRate ?? state.growthRate)}</td>${chg(a.id)}<td class="r">${M(atRet(a.id))}</td></tr>`);
+    });
+    // Home and mortgage: part of net worth, not of the money for retirement.
+    const hm = homeOf(), blank = base ? '<td class="r"></td>' : '';
+    [['home', 'Home', 'What it is worth today', hm.value, 'Home', 'value'], ['mortgage', 'Mortgage', 'Still owed', hm.mortgage, 'Debt', 'mortgage']].forEach(([id, name, label, v, kind, field]) => {
+      const open = st.open === id;
+      const ed = open ? `<div class="nlf-ed nlf-acc">
+        <label>${label}<input type="text" inputmode="decimal" class="nl-num-in" id="nlf-hm-${id}" value="${v ? toDisp(v) : ''}" onchange="NLF.homeSet('${field}',this.value)"><span class="nlf-u">${H(sym())}</span></label>
+        <p class="nlf-sv-note">${id === 'home' ? 'Counts in net worth only, not in the money for retirement.' : 'What is left to pay on the loan, from your bank.'}</p>
+        <div class="nl-inrow">${NLP.link('Done', 'NLF.accClose()')}</div></div>` : '';
+      const now = v ? (id === 'mortgage' ? '−' : '') + M(v) : '<span class="nlf-na">Not set</span>';
+      rows.push(`<tr data-nl-row="${id}"><td class="mk">${sw(id === 'home' ? '#B9A77E' : '#C77B70')}</td><td><span class="nm">${name}</span><span class="sub">${id === 'home' ? 'Net worth only' : 'Taken off net worth'}</span>${v || open ? '' : `<span class="nl-inrow">${NLP.link(id === 'home' ? 'Add what your home is worth' : 'Add what is still owed', `NLF.accOpen('${id}')`)}</span>`}${ed}</td><td class="k">${kind}</td><td class="r">${now}</td><td class="r">—</td><td class="r">—</td>${base ? chg(id).replace('<td class="r nlf-chg', '<td class="r nlf-chg' + (id === 'mortgage' ? ' inv' : '')) || blank : ''}<td class="r">—</td></tr>`);
     });
     pens.forEach(p => {
       const open = st.open === p.id;
@@ -701,11 +779,11 @@
         <label>From age<input type="text" inputmode="numeric" class="nl-num-in nlf-short" id="nlf-pe-a-${H(p.id)}" value="${p.startAge ?? ra}" onchange="NLF.accSet('${H(p.id)}','startAge',this.value)"></label>
         <label>Income tax<input type="text" inputmode="decimal" class="nl-num-in nlf-short" id="nlf-pe-t-${H(p.id)}" value="${state.pensionTaxRate ?? 25}" onchange="NLF.penTax(this.value)"><span class="nlf-u">% on all pensions</span></label>
         <div class="nl-inrow">${NLP.link('Remove this pension', `NLF.accDel('${H(p.id)}')`)}${NLP.link('Done', 'NLF.accClose()')}</div></div>` : '';
-      rows.push(`<tr data-nl-row="${H(p.id)}"><td class="mk">${sw('var(--nlf-amber)')}</td><td><span class="nm">${H(p.name)}</span><span class="sub">Pays from age ${p.startAge ?? ra}${p.endAge ? ` to ${p.endAge}` : ', for life'}, about ${pct(state.pensionTaxRate ?? 25)} income tax</span>${ed}</td><td class="k">Pension</td><td class="r">—</td><td class="r">—</td><td class="r">—</td><td class="r">${M(p.monthlyPayout)}<span class="sub">a month</span></td></tr>`);
+      rows.push(`<tr data-nl-row="${H(p.id)}"><td class="mk">${sw('var(--nlf-amber)')}</td><td><span class="nm">${H(p.name)}</span><span class="sub">Pays from age ${p.startAge ?? ra}${p.endAge ? ` to ${p.endAge}` : ', for life'}, about ${pct(state.pensionTaxRate ?? 25)} income tax</span>${ed}</td><td class="k">Pension</td><td class="r">—</td><td class="r">—</td><td class="r">—</td>${base ? '<td class="r"></td>' : ''}<td class="r">${M(p.monthlyPayout)}<span class="sub">a month</span></td></tr>`);
     });
     if(st.penSug){
       const s = st.penSug;
-      rows.push(`<tr data-nl-row="pen-sug" class="sug"><td class="mk">·</td><td><span class="nm">${H(s.name)}</span><span class="sub">${s.quote ? NLP.quote(s.quote) + (s.source ? ' · ' + H(s.source) : '') : `Pays from age ${s.startAge}`}</span><span class="nl-inrow">${NLP.link('Add this pension', 'NLF.penSugAdd()')}${NLP.link('Drop', 'NLF.penSugDrop()')}</span></td><td class="k">${NLP.badge('Suggested', 'amber')}</td><td class="r">—</td><td class="r">—</td><td class="r">—</td><td class="r">${M(s.monthlyPayout)}<span class="sub">a month</span></td></tr>`);
+      rows.push(`<tr data-nl-row="pen-sug" class="sug"><td class="mk">·</td><td><span class="nm">${H(s.name)}</span><span class="sub">${s.quote ? NLP.quote(s.quote) + (s.source ? ' · ' + H(s.source) : '') : `Pays from age ${s.startAge}`}</span><span class="nl-inrow">${NLP.link('Add this pension', 'NLF.penSugAdd()')}${NLP.link('Drop', 'NLF.penSugDrop()')}</span></td><td class="k">${NLP.badge('Suggested', 'amber')}</td><td class="r">—</td><td class="r">—</td><td class="r">—</td>${base ? '<td class="r"></td>' : ''}<td class="r">${M(s.monthlyPayout)}<span class="sub">a month</span></td></tr>`);
     }
     if((!pens.length && !st.penSug) || st.penForm){
       const form = st.penForm ? `<div class="nlf-ed nlf-acc">
@@ -713,10 +791,10 @@
         <label>Pays a month<input type="text" inputmode="decimal" class="nl-num-in" id="nlf-pn-pay" value=""><span class="nlf-u">${H(sym())} before tax</span></label>
         <label>From age<input type="text" inputmode="numeric" class="nl-num-in nlf-short" id="nlf-pn-age" value="${ra}"></label>
         <div class="nl-inrow">${NLP.pill('Add this pension', 'NLF.penAddForm()')}${NLP.link('Cancel', 'NLF.penShowForm()')}</div></div>` : '';
-      rows.push(`<tr data-nl-row="pen-none"><td class="mk">·</td><td><span class="nm">${pens.length ? 'New pension' : 'Pensions'}</span><span class="sub">${pens.length ? 'Type what it pays you each month once you retire' : 'None added yet'}</span>${form}${st.penForm ? '' : `<span class="nl-inrow">${NLP.link('Add a pension', 'NLF.penShowForm()')}${NLP.link('Tell Horizon about your pension', 'NLF.askPension()')}</span>`}</td><td class="k">${pens.length ? 'Pension' : NLP.badge('Missing', 'amber')}</td><td class="r"></td><td class="r"></td><td class="r"></td><td class="r"></td></tr>`);
+      rows.push(`<tr data-nl-row="pen-none"><td class="mk">·</td><td><span class="nm">${pens.length ? 'New pension' : 'Pensions'}</span><span class="sub">${pens.length ? 'Type what it pays you each month once you retire' : 'None added yet'}</span>${form}${st.penForm ? '' : `<span class="nl-inrow">${NLP.link('Add a pension', 'NLF.penShowForm()')}${NLP.link('Tell Horizon about your pension', 'NLF.askPension()')}</span>`}</td><td class="k">${pens.length ? 'Pension' : NLP.badge('Missing', 'amber')}</td><td class="r"></td><td class="r"></td><td class="r"></td>${base ? '<td class="r"></td>' : ''}<td class="r"></td></tr>`);
     }
-    const table = `<div class="nl-tbl-wrap"><table class="nl-tbl nlf-acct" id="nlf-tbl"><thead><tr><th></th><th>Account</th><th>Kind</th><th class="r">Now</th><th class="r">Added a month</th><th class="r">Growth</th><th class="r">At ${ra}</th></tr></thead><tbody>${rows.join('')}</tbody></table></div>`;
-    return card + table;
+    const table = `<div class="nl-tbl-wrap"><table class="nl-tbl nlf-acct" id="nlf-tbl"><thead><tr><th></th><th>Account</th><th>Kind</th><th class="r">Now</th><th class="r">Added a month</th><th class="r">Growth</th>${base ? `<th class="r" title="Since ${H(monthWords(base.m))}">Change</th>` : ''}<th class="r">At ${ra}</th></tr></thead><tbody>${rows.join('')}</tbody></table></div>`;
+    return `<div class="nl-two nlf-two">${nwCard()}${card}</div>` + table;
   }
   function accChart(w, h, proj, series){
     const n = proj.length, ages = proj.map(p => p.age);
@@ -878,6 +956,19 @@
     const nAcc = inv.length + 1;
     const headline = `${nAcc} account${nAcc > 1 ? 's' : ''} grow${nAcc > 1 ? '' : 's'} steadily to ${ra}. ${pens.length ? `${pens.length} pension${pens.length > 1 ? 's are' : ' is'} counted.` : 'No pension is counted yet.'}`;
     const top = inv.slice().sort((a, b) => (b.balance || 0) - (a.balance || 0))[0];
+    // Net worth over time leads the panel once there are two months to compare.
+    const hist = nwHist(), first = hist[0], last = hist[hist.length - 1];
+    if(hist.length > 1 && !NLP.chosen(P)){
+      const d = last.total - first.total, pc = first.total ? Math.round(d / Math.abs(first.total) * 100) : null;
+      const ch = hist.slice(-13).map((e, i, a) => i ? e.total - a[i - 1].total : null).slice(1);
+      const mx = Math.max(1, ...ch.map(Math.abs));
+      const bars = `<div class="nlf-nwbars" aria-label="Change each month">${ch.map(c => `<i class="${c < 0 ? 'd' : ''}" style="height:${Math.max(3, Math.round(Math.abs(c) / mx * 52))}px" title="${H((c < 0 ? '−' : '+') + MS(Math.abs(c)))}"></i>`).join('')}</div><div class="nlp-small">Change each month. Red: a month that went down.</div>`;
+      const groups = [{ title:'Going further back', rows:[{ text:`History starts ${H(monthWords(first.m))}`, badge:{ text:`${hist.length} months`, kind:'grey' }, link:{ label:'Add an earlier month', onclick:'NLF.nwForm()' } }] }];
+      const h = homeOf();
+      if(!h.value) groups.push({ title:'Missing', rows:[{ text:'Your home is not counted yet', badge:{ text:'Missing', kind:'amber' }, why:'Add what it is worth and what is still owed, for your full net worth.', link:{ label:'Add your home', onclick:"NLF.accOpen('home')" } }] });
+      return { headline:`Your net worth ${d >= 0 ? 'grew' : 'fell'} by about ${MS(Math.abs(d))}${pc != null ? ` (${d >= 0 ? '+' : '−'}${Math.abs(pc)}%)` : ''} since ${monthWords(first.m)}.`, graphic:bars, groups,
+        button:{ label:'Add an earlier month', onclick:'NLF.nwForm()' }, links:[{ label:'Runway', onclick:"NLP.tab('nl-future','runway')" }] };
+    }
     const graphic = steps([{ label:top ? ellip(top.name, 14) : 'Accounts', kind:inv.length ? 'ok' : 'on' }, { label:'Savings', kind:'ok' }, { label:pens.length ? 'Pension' : 'Pension', kind:pens.length ? 'ok' : 'on' }]);
     const groups = [];
     const chosen = NLP.chosen(P);
@@ -904,6 +995,22 @@
     const button = st.penSug ? { label:'Add this pension to my plan', onclick:'NLF.penSugAdd()' } : (!pens.length ? { label:'Add a pension by chat', onclick:'NLF.askPension()' } : { label:'Add an account that grows', onclick:'NLF.accAdd()' });
     return { headline, graphic, groups, button, links:pageLinks([{ label:'Runway', short:'Runway', onclick:"NLP.tab('nl-future','runway')" }]) };
   }
+  NLF.homeSet = (field, v) => {
+    const nv = Math.max(0, Math.round(fromDisp(v)));
+    const was = homeOf()[field];
+    if(nv === was) return;
+    change(`${field === 'value' ? 'Home value' : 'Mortgage still owed'} ${was ? M(was) + ' → ' : ''}${M(nv)}`, ['home'], s => { s.home = Object.assign({}, homeOf(), { [field]:nv }); });
+    setTimeout(() => { try { nwSnapshot(); } catch(_){} }, 0);
+  };
+  NLF.nwForm = () => { const st = U(); st.nwAdd = !st.nwAdd; NLP.renderPage(P); if(st.nwAdd) setTimeout(() => document.getElementById('nlf-nw-m')?.focus(), 60); };
+  NLF.nwAdd = () => {
+    const m = (document.getElementById('nlf-nw-m') || {}).value || '', v = (document.getElementById('nlf-nw-v') || {}).value || '';
+    if(!/^\d{4}-\d{2}$/.test(m) || m >= ymOf(new Date())){ NLP.toast('Choose a month before this one.', 'warn'); return; }
+    if(!/\d/.test(v)){ NLP.toast('Type what you had then.', 'warn'); return; }
+    const total = Math.round(fromDisp(v));
+    U().nwAdd = false;
+    change(`Net worth for ${monthWords(m)}: ${M(total)}`, ['nwHistory'], s => { s.nwHistory = (Array.isArray(s.nwHistory) ? s.nwHistory : []).filter(e => !(e && e.m === m)).concat([{ m, total, manual:true }]).sort((a, b) => a.m.localeCompare(b.m)); });
+  };
   NLF.accOpen = id => { const st = U(); NLP.ui(P).tab = 'accounts'; st.chosen = id; st.open = id; NLP.renderPage(P); };
   function ovWall(){
     const bricks = getLifeWallData(gran()), chosen = NLP.chosen(P);
@@ -989,6 +1096,15 @@ html.nl { --nlf-amber:#8A5A0A; --nlf-steel:#48639A; --nlf-ruby:#8F2A22; --nlf-c1
 #panel-nl-future .nlf-acc .nl-num-in { width:100%; }
 #panel-nl-future .nlf-acc label.nlf-wide { grid-template-columns:120px minmax(0,1fr); justify-content:stretch; }
 #panel-nl-future .nlf-acc .nl-num-in.nlf-short { max-width:70px; }
+#panel-nl-future .nlf-chg .sub { display:block; color:var(--nl-detail); font-size:12px; }
+#panel-nl-future .nlf-chg.up { color:#1F4D3B; } #panel-nl-future .nlf-chg.dn { color:#8F2A22; }
+#panel-nl-future .nlf-na { color:var(--nl-detail); }
+#panel-nl-future .nlf-two { margin-bottom:12px; } #panel-nl-future .nlf-two .nl-cc { margin:0; min-width:0; }
+#panel-nl-future .nlf-nw-links { margin-top:6px; }
+#panel-nl-future .nlf-nwadd { margin-top:8px; }
+html.nl .nlf-nwbars { display:grid; grid-auto-flow:column; grid-auto-columns:minmax(0,1fr); gap:3px; align-items:end; height:56px; margin:4px 0 4px; }
+html.nl .nlf-nwbars i { display:block; border-radius:2px 2px 0 0; background:var(--nl-accent); }
+html.nl .nlf-nwbars i.d { background:#C77B70; }
 #panel-nl-future .nlf-ed .nl-inrow { margin-top:8px; align-items:center; }
 #panel-nl-future .nlf-wall { display:grid; grid-template-columns:repeat(auto-fill,minmax(122px,1fr)); gap:8px; margin-top:8px; }
 #panel-nl-future .nlf-wall.g1 { grid-template-columns:repeat(auto-fill,minmax(98px,1fr)); gap:6px; }
