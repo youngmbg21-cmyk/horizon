@@ -93,7 +93,7 @@
     if(sc !== 'comfortable') list.push({ key:'comfy', label:'Comfortable lifestyle', long:'Comfortable lifestyle (×1.3)', fields:['retirementScenario'], mut:s => { s.retirementScenario = 'comfortable'; } });
     list.push({ key:'weak', label:'Markets 2% weaker', long:'Markets grow 2% a year less', fields:['growthRate','retirementPostGrowth','externalAssets'], mut:s => {
       s.growthRate = Math.max(0, (s.growthRate || 0) - 2);
-      s.retirementPostGrowth = Math.max(0, (s.retirementPostGrowth || 4) - 2);
+      s.retirementPostGrowth = (s.retirementPostGrowth ?? 4) - 2;
       (s.externalAssets || []).forEach(a => { if((a.assetType || 'investment') === 'investment' && a.growthRate != null) a.growthRate = Math.max(0, a.growthRate - 2); });
     } });
     if(le < 95) list.push({ key:'live95', label:'Live to 95', long:'Live to 95', fields:['lifeExp'], mut:s => { s.lifeExp = 95; } });
@@ -421,8 +421,9 @@
         <label class="nlf-wide">Name<input type="text" id="nlf-pe-n-${H(p.id)}" value="${H(p.name)}" onchange="NLF.accSet('${H(p.id)}','name',this.value)"></label>
         <label>Pays a month<input type="text" inputmode="decimal" class="nl-num-in" id="nlf-pe-p-${H(p.id)}" value="${toDisp(p.monthlyPayout)}" onchange="NLF.accSet('${H(p.id)}','monthlyPayout',this.value)"><span class="nlf-u">${H(sym())} before tax</span></label>
         <label>From age<input type="text" inputmode="numeric" class="nl-num-in nlf-short" id="nlf-pe-a-${H(p.id)}" value="${p.startAge ?? ra}" onchange="NLF.accSet('${H(p.id)}','startAge',this.value)"></label>
+        <label>Income tax<input type="text" inputmode="decimal" class="nl-num-in nlf-short" id="nlf-pe-t-${H(p.id)}" value="${state.pensionTaxRate ?? 25}" onchange="NLF.penTax(this.value)"><span class="nlf-u">% on all pensions</span></label>
         <div class="nl-inrow">${NLP.link('Remove this pension', `NLF.accDel('${H(p.id)}')`)}${NLP.link('Done', 'NLF.accClose()')}</div></div>` : '';
-      rows.push(`<tr data-nl-row="${H(p.id)}"><td class="mk">${sw('var(--nlf-amber)')}</td><td><span class="nm">${H(p.name)}</span><span class="sub">Pays from age ${p.startAge ?? ra}${p.endAge ? ` to ${p.endAge}` : ', for life'}</span>${ed}</td><td class="k">Pension</td><td class="r">—</td><td class="r">—</td><td class="r">—</td><td class="r">${M(p.monthlyPayout)}<span class="sub">a month</span></td></tr>`);
+      rows.push(`<tr data-nl-row="${H(p.id)}"><td class="mk">${sw('var(--nlf-amber)')}</td><td><span class="nm">${H(p.name)}</span><span class="sub">Pays from age ${p.startAge ?? ra}${p.endAge ? ` to ${p.endAge}` : ', for life'}, about ${pct(state.pensionTaxRate ?? 25)} income tax</span>${ed}</td><td class="k">Pension</td><td class="r">—</td><td class="r">—</td><td class="r">—</td><td class="r">${M(p.monthlyPayout)}<span class="sub">a month</span></td></tr>`);
     });
     if(st.penSug){
       const s = st.penSug;
@@ -483,6 +484,12 @@
     if(!(nv >= 0 && nv <= 30)){ NLP.toast('Growth must be between 0% and 30% a year.', 'warn'); return; }
     if(nv === Number(state.growthRate)) return;
     change(`Savings growth ${pct(state.growthRate || 0)} → ${pct(nv)}`, ['growthRate'], s => { s.growthRate = nv; });
+  };
+  NLF.penTax = v => {
+    const nv = Math.round(parseNum(v) * 10) / 10;
+    if(!(nv >= 0 && nv <= 90)){ NLP.toast('Pension tax must be between 0% and 90%.', 'warn'); return; }
+    if(nv === Number(state.pensionTaxRate ?? 25)) return;
+    change(`Income tax on pensions ${pct(state.pensionTaxRate ?? 25)} → ${pct(nv)}`, ['pensionTaxRate'], s => { s.pensionTaxRate = nv; });
   };
   NLF.accClose = () => { U().open = null; NLP.renderPage(P); };
   NLF.accSet = (id, f, v) => {

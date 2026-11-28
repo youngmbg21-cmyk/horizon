@@ -42,7 +42,8 @@
       savePct:m.savePct, saveNow:num(cm.savings), saveBase:num(state.baseSavings), monthKey:cm.key, monthWords:cm.key ? NLP.monthLabel(cm.key) : 'this month',
       shortMonths:(m.short || []).map(x => x.key), tripCause:!!m.tripCause, bigTrip:lowTrip,
       pensions:pens.length, penMonthly, penStart, penGap:penStart != null && penStart > ret ? penStart - ret : 0,
-      retSpend, penShare:retSpend > 0 ? penMonthly / retSpend * 100 : 0, travel, travelShare:retSpend > 0 ? travel / retSpend * 100 : 0,
+      // Pensions are before tax; spending is after tax, so compare like with like.
+      retSpend, penShare:retSpend > 0 ? penMonthly * (1 - (typeof getPensionTaxRate === 'function' ? getPensionTaxRate() : 0)) / retSpend * 100 : 0, travel, travelShare:retSpend > 0 ? travel / retSpend * 100 : 0,
       atRet:atRet ? atRet[1] : 0, atEnd:atEnd[1], incomeM, leftAvg, leftShare:incomeM > 0 ? leftAvg / incomeM * 100 : 0,
       bricks:(m.bricks || []).length, green:m.green, amber:m.amber, red:m.red,
     };
@@ -51,12 +52,13 @@
   // ── The findings (exact, from the facts) ───────────────────────────────
   function findings(f){
     const out = [], add = o => out.push(Object.assign({ id:'f' + out.length }, o));
-    // Going well
-    if(f.coverage >= 100) add({ g:'well', title:'Retirement is fully covered', quote:`${pct(f.coverage)} of your retirement years are covered, to age ${f.L}`, page:'runway', fig:pct(f.coverage), badge:['Going well','green'] });
-    if(!f.runout || f.runout >= f.L) add({ g:'well', title:`Your money lasts past ${f.L}`, quote:`About ${M(f.atRet)} at ${f.ret}, still ${M(f.atEnd)} at ${f.L}`, page:'runway', fig:NLP.moneyShort(f.atEnd), badge:['Going well','green'] });
+    // Going well (nothing about retirement can be "well" before its costs are in)
+    if(!(f.retSpend > 0)) add({ g:'care', title:'Add what you’ll spend in retirement', quote:'Without it Horizon cannot tell whether your savings and pensions are enough', page:'runway', fig:'', badge:['Missing','amber'] });
+    if(f.retSpend > 0 && f.coverage >= 100) add({ g:'well', title:'Retirement is fully covered', quote:`${pct(f.coverage)} of your retirement years are covered, to age ${f.L}`, page:'runway', fig:pct(f.coverage), badge:['Going well','green'] });
+    if(f.retSpend > 0 && (!f.runout || f.runout >= f.L)) add({ g:'well', title:`Your money lasts past ${f.L}`, quote:`About ${M(f.atRet)} at ${f.ret}, still ${M(f.atEnd)} at ${f.L}`, page:'runway', fig:NLP.moneyShort(f.atEnd), badge:['Going well','green'] });
     if(f.savePct >= 15) add({ g:'well', title:`You save ${pct(f.savePct)} of your income`, quote:`Over the next 12 months, ${pct(f.savePct)} of what comes in is saved`, page:'forecast', fig:pct(f.savePct), badge:['Going well','green'] });
-    if(f.pensions && f.penShare >= 40) add({ g:'well', title:'Pensions carry a big part of retirement', quote:`${M(f.penMonthly)} a month from pensions, about ${pct(f.penShare)} of your planned retirement spending`, page:'accounts', fig:pct(f.penShare), badge:['Going well','green'] });
-    if(f.bricks && f.green / f.bricks >= 0.85) add({ g:'well', title:`${f.green} of ${f.bricks} life-wall bricks hold`, quote:f.red ? `${f.red} red, ${f.amber} amber` : `No red bricks${f.amber ? `; ${f.amber} amber` : ''}`, page:'wall', fig:`${f.green}/${f.bricks}`, badge:['Going well','green'] });
+    if(f.pensions && f.penShare >= 40) add({ g:'well', title:'Pensions carry a big part of retirement', quote:`${M(f.penMonthly)} a month from pensions before tax, after tax about ${pct(f.penShare)} of your planned retirement spending`, page:'accounts', fig:pct(f.penShare), badge:['Going well','green'] });
+    if(f.retSpend > 0 && f.bricks && f.green / f.bricks >= 0.85) add({ g:'well', title:`${f.green} of ${f.bricks} life-wall bricks hold`, quote:f.red ? `${f.red} red, ${f.amber} amber` : `No red bricks${f.amber ? `; ${f.amber} amber` : ''}`, page:'wall', fig:`${f.green}/${f.bricks}`, badge:['Going well','green'] });
     if(!f.shortMonths.length && f.bigTrip) add({ g:'well', title:'This year’s trips fit the Fun Fund', quote:`${f.bigTrip.trip} and the others are paid without going below zero`, page:'trips', fig:'Fits', badge:['Going well','green'] });
     // Needs care
     if(f.saveBase > 0 && f.saveNow === 0) add({ g:'care', title:`Saving is paused in ${f.monthWords}`, short:'Saving is paused this month', quote:`Saving this month: ${M(0)}; your plan saves ${M(f.saveBase)} a month`, page:'plan', fig:M(0), badge:['Needs you','ruby'] });
@@ -79,7 +81,7 @@
   }
   function headlineFor(f, list){
     const care = list.filter(x => x.g === 'care');
-    const strength = f.coverage >= 100 && (!f.runout || f.runout >= f.L) ? 'A strong plan' : f.coverage >= 90 ? 'A workable plan' : 'A plan that needs work';
+    const strength = !(f.retSpend > 0) ? 'Your plan has no retirement costs yet' : f.coverage >= 100 && (!f.runout || f.runout >= f.L) ? 'A strong plan' : f.coverage >= 90 ? 'A workable plan' : 'A plan that needs work';
     if(!care.length) return `${strength}. Nothing needs care right now.`;
     const words = care.slice(0, 2).map(x => x.title.charAt(0).toLowerCase() + x.title.slice(1));
     return `${strength}. ${care.length === 1 ? 'One thing needs' : care.length + ' things need'} care: ${words.join(', and ')}${care.length > 2 ? ', and more' : ''}.`;

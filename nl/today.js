@@ -60,7 +60,9 @@
     const end = pts[pts.length - 1];
     return {
       pts, retStart, cur, ret, L, now:nowV, atRet, atEnd:end[1], endAge:end[0],
-      runout: nums.runoutAge || null, verdict: nums.verdict, verdictKey: nums.verdictKey,
+      // With no retirement spending there is nothing to fund, so no verdict:
+      // 'empty' asks for the numbers instead of saying "Well funded".
+      runout: nums.runoutAge || null, verdict: nums.verdict, verdictKey: num(nums.totalExp) > 0 ? nums.verdictKey : 'empty',
       coverage: num(nums.coveragePct),
     };
   }
@@ -230,6 +232,12 @@
     const spB = m.ti12 <= 0 ? NLP.badge('No income yet', 'grey') : sp >= 20 ? NLP.badge('Strong', 'green') : sp >= 10 ? NLP.badge('Fair', 'amber') : NLP.badge('Low', 'ruby');
     const wallB = m.red ? NLP.badge(`${m.red} red`, 'ruby') : m.amber ? NLP.badge(`${m.amber} amber`, 'amber') : NLP.badge('All green', 'green');
     const card = (label, value, badge, title) => `<div title="${H(title || '')}"><span>${H(label)}</span><b>${H(value)}</b>${badge}</div>`;
+    if(r.verdictKey === 'empty') return `<div class="nl-fcards tdy-fc">${
+      card(`Retire at ${state.retirementAge}`, 'Not set yet', NLP.badge('Add retirement costs', 'amber'), 'Add what you will spend in retirement, in Future') +
+      card('Your money lasts', '—', NLP.badge('Not worked out', 'grey'), 'Worked out once retirement costs are added') +
+      card('Saving each month', m.ti12 > 0 ? `${sp}% of income` : '—', spB, 'Savings as a share of income, next 12 months') +
+      card('Life wall', '—', NLP.badge('Not worked out', 'grey'), 'Worked out once retirement costs are added')
+    }</div>`;
     return `<div class="nl-fcards tdy-fc">${
       card(`Retire at ${state.retirementAge}`, vWords, NLP.badge(`${pct(cov)} covered`, covKind), 'Share of retirement years your income covers, to age ' + L) +
       card('Your money lasts', lasts, lastsB, r.runout ? `Savings are used up at about ${r.runout}` : `Savings last beyond ${L}`) +
@@ -466,7 +474,8 @@
     const n = items.length;
     const waits = n ? `${n} ${plural(n, 'thing waits', 'things wait')} for you.` : 'Nothing waits for you.';
     let lead;
-    if(r.verdictKey === 'wellFunded' || r.verdictKey === 'fullyFunded') lead = 'You’re on track.';
+    if(r.verdictKey === 'empty') lead = 'Add what you’ll spend in retirement, so Horizon can tell whether your plan holds.';
+    else if(r.verdictKey === 'wellFunded' || r.verdictKey === 'fullyFunded') lead = 'You’re on track.';
     else if(r.verdictKey === 'borderline') lead = `You’re nearly on track: your money lasts to about ${r.runout}.`;
     else lead = `Your money runs out at ${r.runout}, before ${L}.`;
     const groups = [];
