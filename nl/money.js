@@ -1049,7 +1049,7 @@
 #panel-nl-money .nlm-cbt { height:10px; background:var(--nl-pill); border-radius:3px; overflow:hidden; }
 #panel-nl-money .nlm-cbt i { display:block; height:100%; background:var(--nl-accent); opacity:.8; }
 #panel-nl-money .nlm-cbv { text-align:right; font-variant-numeric:tabular-nums; white-space:nowrap; min-width:80px; }
-#panel-nl-money .nlm-emptybank { max-width:640px; padding:18px 0; }
+#panel-nl-money .nlm-emptybank { max-width:760px; margin:0 auto; padding:18px 0; }
 #panel-nl-money .nlm-emptybank .nl-cs { font-size:13.5px; margin:6px 0 4px; }
 #panel-nl-money .nlm-paste { margin-top:18px; align-items:start; }
 #panel-nl-money .nlm-paste textarea { border:0; border-bottom:1px solid var(--nl-edge); font:13px/1.5 ui-monospace,Menlo,monospace; resize:vertical; min-height:72px; }

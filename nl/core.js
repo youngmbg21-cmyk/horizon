@@ -202,7 +202,10 @@
   // Round tick values for an axis 0…max (or min…max).
   NLP.ticks = function(min, max, count, fmtFn){
     const span = Math.max(1, max - min), raw = span / Math.max(1, count || 4);
-    const mag = Math.pow(10, Math.floor(Math.log10(raw))), step = [1, 2, 2.5, 5, 10].map(m => m * mag).find(s => s >= raw) || raw;
+    // All these charts show money: one with nothing in it (under 10 either way)
+    // gets a single 0 line, not "2, 1, 1, 0". Steps are whole amounts.
+    if(!(max > min) || (max < 10 && min > -10)) return { min:0, max:1, ticks:[[0, fmtFn ? fmtFn(0) : '0']] };
+    const mag = Math.pow(10, Math.floor(Math.log10(raw))), step = Math.max(1, [1, 2, 2.5, 5, 10].map(m => m * mag).find(s => s >= raw) || raw);
     const lo = Math.floor(min / step) * step, hi = Math.ceil(max / step) * step, out = [];
     for(let v = lo; v <= hi + step / 2; v += step) out.push([v, fmtFn ? fmtFn(v) : String(v)]);
     return { min:lo, max:hi, ticks:out };
