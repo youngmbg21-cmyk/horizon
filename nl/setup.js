@@ -594,6 +594,11 @@ Amounts the person says are in ${state.currency || 'SEK'}.`;
       body += ratesRow();
       body += row('displayMode', 'Show money as', seg('displayMode', [['real','Today’s money'],['nominal','Future money']]) + det(state.displayMode === 'nominal' ? 'Future money shows the amounts as they will be on the day.' : `Today’s money takes out ${H(Number(state.inflationRate) || 0)}% inflation a year.`) + sugLine('displayMode'));
       body += row('lang', 'Language', seg('lang', [['en','English'],['sv','Svenska']]) + det('Some words stay in English for now.') + sugLine('lang'));
+      // Reminders on Today › Needs you: which are on, and turning any back on.
+      const offR = Object.keys((state.nlReminders && state.nlReminders.off) || {}).filter(k => state.nlReminders.off[k]);
+      const RN = (NLP.today && NLP.today.remNames) || {};
+      body += row('reminders', 'Reminders', `<div class="nls-val">${offR.length ? `${7 - offR.length} of 7 on` : 'All 7 on'}</div>` + det(offR.length ? 'Off: ' + offR.map(k => H(RN[k] || k)).join(', ') : 'Shown on Today › Needs you only when something is due.'),
+        offR.map(k => NLP.link('Turn on ' + (RN[k] || k).toLowerCase(), `NLP.today.remOn('${k}')`)).join(' '));
       const ab = aboutSummary();
       body += row('about', 'About you', `<div class="nls-val">${ab || '<span class="nls-hint">Not set up yet</span>'}</div>` + det(Object.keys(words()).length ? 'From your setup chat' : 'From your setup'), `${!onboardOK() ? NLP.badge('Needed', 'amber') + ' ' : ''}${NLP.link(onboardOK() ? 'Change in Setup' : 'Finish setup', "NLP.go('nl-setup')")}`);
       // Savings growth lives on Future → Accounts (the Savings row).
