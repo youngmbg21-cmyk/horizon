@@ -865,11 +865,13 @@
     if(m.remotePath) return fetchRemote(m.id);
     return false;
   }
+  // File text goes to the assistant with ID numbers, account numbers and codes hidden.
+  const mask = t => typeof window.hzMaskIds === 'function' ? window.hzMaskIds(t) : t;
   const STOP = new Set('the a an and or of to in on for is are was be my me i it at by with from this that what how much does do our we your you any about there which'.split(' '));
   NLP.addTool({
     def:{ name:'list_files', description:'List the files the person keeps in Horizon’s Notebook (statements, letters, budget templates), with their kind, size, status and the key words read in each.', input_schema:{ type:'object', properties:{}, additionalProperties:false } },
     label:() => 'Looking at your files',
-    run:() => ({ files:files().map(m => { const s = statusOf(m); return { file:m.name, kind:KIND_LABEL[m.kind] || 'File', size:sizeWords(m), status:s.text + (m.why && s.key === 'cant' ? ' (' + m.why + ')' : ''), template:!!m.template, key_words:m.keyLine || '', added:new Date(m.addedAt).toISOString().slice(0, 10), on_this_device:!!local[m.id] }; }), note:files().length ? 'Use search_files or read_file to read them. Quote the words with their [ref].' : 'The Notebook has no files yet. The person can add files on the Notebook page.' }),
+    run:() => ({ files:files().map(m => { const s = statusOf(m); return { file:m.name, kind:KIND_LABEL[m.kind] || 'File', size:sizeWords(m), status:s.text + (m.why && s.key === 'cant' ? ' (' + m.why + ')' : ''), template:!!m.template, key_words:mask(m.keyLine || ''), added:new Date(m.addedAt).toISOString().slice(0, 10), on_this_device:!!local[m.id] }; }), note:files().length ? 'Use search_files or read_file to read them. Quote the words with their [ref].' : 'The Notebook has no files yet. The person can add files on the Notebook page.' }),
   });
   NLP.addTool({
     def:{ name:'search_files', description:'Search the words read from the person’s Notebook files. Returns matching passages, each with a ref number, the file name and where it is (page or row). Quote the passage’s own words and add [ref].', input_schema:{ type:'object', properties:{ query:{ type:'string', description:'Words to look for, e.g. "pension from 65" or "interest rate".' } }, required:['query'], additionalProperties:false } },
@@ -892,7 +894,7 @@
         });
       }
       hits.sort((a, b) => b.sc - a.sc);
-      const out = hits.slice(0, 10).map(x => ({ ref:refFor(x.m.id, x.i), file:x.m.name, where:x.c.w, text:cut(x.c.t, 420) }));
+      const out = hits.slice(0, 10).map(x => ({ ref:refFor(x.m.id, x.i), file:x.m.name, where:x.c.w, text:mask(cut(x.c.t, 420)) }));
       const away = files().filter(m => !local[m.id]).map(m => m.name);
       return { results:out, ...(out.length ? {} : { note:'Nothing matched. Try other words, or list_files.' }), ...(away.length ? { not_on_this_device:away } : {}) };
     },
@@ -910,8 +912,8 @@
       const sel = L.chunks.map((c, i) => ({ c, i })).filter(x => x.c.n >= from && x.c.n <= to && (!input.sheet || String(x.c.s || '').toLowerCase() === String(input.sheet).toLowerCase()));
       const out = []; let size = 0, more = null;
       for(const x of sel){
-        const p = { ref:refFor(m.id, x.i), where:x.c.w, text:cut(x.c.t, 600) };
-        if(x.c.cells){ p.row = x.c.n; p.cells = {}; x.c.cells.forEach((v, k) => { p.cells[colLetter(k)] = v; }); if(x.c.s && L.sheets && L.sheets.length > 1) p.sheet = x.c.s; }
+        const p = { ref:refFor(m.id, x.i), where:x.c.w, text:mask(cut(x.c.t, 600)) };
+        if(x.c.cells){ p.row = x.c.n; p.cells = {}; x.c.cells.forEach((v, k) => { p.cells[colLetter(k)] = typeof v === 'string' ? mask(v) : v; }); if(x.c.s && L.sheets && L.sheets.length > 1) p.sheet = x.c.s; }
         size += JSON.stringify(p).length;
         if(size > 26000 || out.length >= 160){ more = x.c.n; break; }
         out.push(p);

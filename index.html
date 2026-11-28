@@ -6946,8 +6946,11 @@ function parseNum(v){
     // Period dominates — treat comma as a thousand separator.
     s = s.replace(/,/g, '');
   } else if(hasComma){
-    // Pure Swedish-style decimal — swap comma to period.
-    s = s.replace(/,/g, '.');
+    // "27,500" or "1,250,000": commas before groups of exactly three digits
+    // are thousand separators (English style), not a decimal point.
+    // Otherwise ("27,5") it is the Swedish decimal comma.
+    if(/^[-+]?\d{1,3}(,\d{3})+$/.test(s)) s = s.replace(/,/g, '');
+    else s = s.replace(/,/g, '.');
   }
   const n = parseFloat(s);
   return isFinite(n) ? n : 0;
@@ -7021,7 +7024,7 @@ function defaultState() {
     currency:'SEK', darkMode:true, lang:'en', activePanel:'dashboard',
     currentAge:44, retirementAge:69, growthRate:7, inflationRate:2,
     retirementPostGrowth:4, lifeExp:90,
-    savingsTaxRate:30, savingsAccountType:'standard',
+    savingsTaxRate:30, savingsAccountType:'standard', pensionTaxRate:25,
     retirementScenario:'baseline',
     // Global money-display mode. 'real' = every future-dated figure is
     // discounted back to today's purchasing power using inflationRate.
@@ -7533,6 +7536,7 @@ function migrate(s) {
   // existing users see no numeric change on first load.
   if(from < 20) {
     if(typeof s.savingsTaxRate !== 'number') s.savingsTaxRate = 30;
+    if(typeof s.pensionTaxRate !== 'number') s.pensionTaxRate = 25;
     if(!s.savingsTaxType) s.savingsTaxType = 'withdrawal';
   }
   // v20 → v21: replace taxType ('withdrawal'/'annual') + taxRate with
@@ -8817,7 +8821,12 @@ function getProjection() {
       let totalSav=0;
       for (let m=startMo; m<endMo; m++) totalSav+=getEffective(year,m).savings;
       const ms=months>0?totalSav/months:0;
-      const rApp=state.growthRate/100/12;
+      // ISK savings pay the yearly schablon tax, modelled (as for ISK
+      // investment accounts below) as a drag on the growth rate.
+      const appRate = (state.savingsAccountType === 'isk')
+        ? Math.max(0, (state.growthRate ?? 0) - (Number.isFinite(state.savingsTaxRate) ? state.savingsTaxRate : 0.88))
+        : (state.growthRate ?? 0);
+      const rApp=appRate/100/12;
       if(y===0) appAcc=ms*months;
       else appAcc=appAcc*Math.pow(1+rApp,months)+ms*_annuityFactor(rApp,months);
       let ext=0;
@@ -8850,6 +8859,14 @@ function getProjection() {
   });
 }
 
+// Income tax on pensions (they are entered before tax). Separate from the
+// tax on taking money out of savings, which is 0% for ISK. Default 25%: a
+// typical effective Swedish rate on a pension once the higher basic
+// allowance for over-66s applies. The person can change it on Future.
+function getPensionTaxRate(){
+  const v = Number(state.pensionTaxRate);
+  return Math.min(0.99, Math.max(0, (Number.isFinite(v) ? v : 25) / 100));
+}
 function getPensionAssets() { return state.externalAssets.filter(a=>a.assetType==='pension'); }
 function getInvestmentAssets() { return state.externalAssets.filter(a=>(a.assetType||'investment')==='investment'); }
 // Tax on portfolio withdrawals is now per-investment. For surfaces that
@@ -8860,9 +8877,15 @@ function getInvestmentAssets() { return state.externalAssets.filter(a=>(a.assetT
 // investments (e.g. pension-only user).
 function getEffectiveWithdrawTaxRate() {
   const inv = getInvestmentAssets();
+  // Weight every account by what it holds AT RETIREMENT (when the money is
+  // taken out), the same basis as the in-app savings below. Weighting by
+  // today's balance let a small account today with big monthly additions
+  // count for almost nothing.
+  const savProj = getProjection();
+  const atRet = savProj.length ? (savProj[savProj.length-1].perAccount || {}) : {};
   let wSum = 0, bSum = 0;
   inv.forEach(a => {
-    const b = Math.max(0, Number(a.balance) || 0);
+    const b = Math.max(0, Number(atRet[a.id] != null ? atRet[a.id] : a.balance) || 0);
     const at = a.accountType || 'standard';
     // ISK and no-tax accounts carry 0% exit tax (ISK tax is baked into
     // growth drag; no-tax accounts are already net).
@@ -8871,7 +8894,6 @@ function getEffectiveWithdrawTaxRate() {
     bSum += b;
   });
   // Include in-app savings projection in the balance-weighted average.
-  const savProj = getProjection();
   const savBal = Math.max(0, savProj.length ? (savProj[savProj.length-1].appSavings || 0) : 0);
   const savAt = state.savingsAccountType || 'standard';
   const savTr = (savAt === 'isk' || savAt === 'notax') ? 0 : (typeof state.savingsTaxRate === 'number' ? state.savingsTaxRate : 30);
@@ -8917,8 +8939,14 @@ const RET_SCENARIOS = {lean:0.75,baseline:1.0,comfortable:1.3};
 // so delayed pensions correctly reduce the portfolio draw only AFTER they
 // start — no more "portfolio depletes at 75 according to the card but
 // 81 according to the chart" split.
-function _simulateRetirementYears({nestEgg, totalExp, taxRate, realRateMonthly, startAge, endAge, pensions}) {
-  const annualGrossNeeded = (totalExp / Math.max(0.001, 1 - taxRate)) * 12;
+function _simulateRetirementYears({nestEgg, totalExp, taxRate, realRateMonthly, startAge, endAge, pensions, pensionTaxRate}) {
+  // Spending (totalExp) is after tax. Pensions are before tax and taxed at
+  // the pension rate; the rest comes from savings, taxed at the withdrawal
+  // rate. annualGrossNeeded = the before-tax need with no pension at all.
+  const wNet = Math.max(0.001, 1 - taxRate);
+  const pNet = 1 - (pensionTaxRate == null ? taxRate : pensionTaxRate);
+  const annualNetNeeded = totalExp * 12;
+  const annualGrossNeeded = annualNetNeeded / wNet;
   const pensionAtAge = (age) => pensions.reduce((s, p) => {
     const pStart = p.startAge ?? startAge;
     const pEnd   = p.endAge   || 999;
@@ -8936,14 +8964,15 @@ function _simulateRetirementYears({nestEgg, totalExp, taxRate, realRateMonthly, 
   //   start of the year (i.e. age > runoutAge in whole-year terms).
   //   actualIncome[i] is the real gross income actually available that year.
   const labels = [], balData = [], portWithdrawal = [], pensionData = [];
-  const shortfall = [], depletedFlag = [], actualIncome = [], needed = [];
+  const shortfall = [], depletedFlag = [], actualIncome = [], needed = [], netIncome = [], pensionNet = [];
   let balance = nestEgg;
   let runoutAge = null;
   for (let age = startAge; age <= endAge; age++) {
     labels.push(age);
     balData.push(Math.max(0, Math.round(balance)));
     const annualPen  = pensionAtAge(age) * 12;
-    const gapVsPension = Math.max(0, annualGrossNeeded - annualPen);
+    // What savings must pay, before tax, to fill the after-tax gap the pension leaves.
+    const gapVsPension = Math.max(0, annualNetNeeded - annualPen * pNet) / wNet;
     const depleted = balance <= 0;
     // In solvent years the portfolio covers the full gap. Once depleted,
     // portfolio withdrawal is zero regardless of what would have been
@@ -8952,11 +8981,13 @@ function _simulateRetirementYears({nestEgg, totalExp, taxRate, realRateMonthly, 
     const annualPort = depleted ? 0 : gapVsPension;
     portWithdrawal.push(Math.round(annualPort));
     pensionData.push(Math.round(annualPen));
-    needed.push(Math.round(annualGrossNeeded));
-    const yearShortfall = depleted ? Math.max(0, annualGrossNeeded - annualPen) : 0;
+    needed.push(Math.round(annualPen + gapVsPension));
+    const yearShortfall = depleted ? gapVsPension : 0;
     shortfall.push(Math.round(yearShortfall));
     depletedFlag.push(depleted);
     actualIncome.push(Math.round(annualPen + annualPort));
+    netIncome.push(Math.round(annualPen * pNet + annualPort * wNet));
+    pensionNet.push(Math.round(annualPen * pNet));
     // Evolve balance over 12 monthly steps using the annual draw.
     if (!depleted) {
       const portMonthly = annualPort / 12;
@@ -8979,7 +9010,7 @@ function _simulateRetirementYears({nestEgg, totalExp, taxRate, realRateMonthly, 
   const totalYears  = labels.length;
   return {
     labels, balData, portWithdrawal, pensionData, earliestPension,
-    shortfall, depletedFlag, actualIncome, needed, annualGrossNeeded,
+    shortfall, depletedFlag, actualIncome, needed, annualGrossNeeded, netIncome, pensionNet,
     fundedYears, totalYears,
     runoutAge: runoutAgeRounded,
     lifeExpIdx: labels.indexOf(endAge),
@@ -9003,13 +9034,13 @@ function getRetirementNumbers() {
     const totalGross = taxRate>0?totalExp/(1-taxRate):totalExp;
     const proj = getProjection();
     const nestEgg = proj.length?proj[proj.length-1].realTotal:0;
-    const realRate = Math.max(0.001,(state.retirementPostGrowth||4)-state.inflationRate)/100/12;
+    const realRate = ((state.retirementPostGrowth ?? 4) - (state.inflationRate ?? 0))/100/12;
     const retMonths = Math.max(1,(state.lifeExp-state.retirementAge)*12);
     // When retirementAge >= lifeExp the user has set nonsensical ages;
     // clamp sustainableMonthly to 0 rather than dividing nestEgg by 1 month.
     const sustainableMonthly = retMonths <= 1 && state.lifeExp <= state.retirementAge
       ? 0
-      : realRate>0?nestEgg*realRate/(1-Math.pow(1+realRate,-retMonths)):nestEgg/retMonths;
+      : realRate!==0?nestEgg*realRate/(1-Math.pow(1+realRate,-retMonths)):nestEgg/retMonths;
     const sustainableAfterTax = sustainableMonthly*(1-taxRate);
 
     // Run the pension-aware simulation once. runoutAge is taken from it
@@ -9022,6 +9053,7 @@ function getRetirementNumbers() {
       totalExp,
       taxRate,
       realRateMonthly: realRate,
+      pensionTaxRate: getPensionTaxRate(),
       startAge: state.retirementAge,
       endAge: state.lifeExp || 90,
       pensions: getPensionAssets(),
@@ -9038,7 +9070,11 @@ function getRetirementNumbers() {
     const yearsCount = Math.max(1, simResult.pensionData.length);
     const totalAnnualPension = simResult.pensionData.reduce((s, v) => s + v, 0);
     const pensionAvgMonthly = (totalAnnualPension / yearsCount) / 12;
-    const grossNeeded = Math.max(0, totalGross - pensionAvgMonthly);
+    const pensionTaxRate = getPensionTaxRate();
+    // Before-tax amount taken from savings each month, on average: the
+    // after-tax spending the (after-tax) pension does not cover, grossed up
+    // at the withdrawal rate.
+    const grossNeeded = Math.max(0, totalExp - pensionAvgMonthly * (1 - pensionTaxRate)) / Math.max(0.001, 1 - taxRate);
 
     // Coverage = funded years / total retirement years (see Issue 3).
     // A year is funded iff the simulation's actual income meets gross
@@ -9049,7 +9085,7 @@ function getRetirementNumbers() {
     // pensionAvgMonthlyAfterTax: pension weighted avg after applying the same
     // home-country effective tax rate as the portfolio withdrawal, so both
     // income sources are on the same after-tax basis.
-    const pensionAvgMonthlyAfterTax = pensionAvgMonthly * (1 - taxRate);
+    const pensionAvgMonthlyAfterTax = pensionAvgMonthly * (1 - pensionTaxRate);
     // totalRetirementIncome: consistently after home-country tax so the gap
     // vs totalExp (also after-tax) is a meaningful net surplus/shortfall.
     const totalRetirementIncome = sustainableAfterTax + pensionAvgMonthlyAfterTax;
@@ -9098,7 +9134,7 @@ function getRetirementNumbers() {
     // pensionMaterial is a simple "should we mention pensions in the
     // summary?" flag — true once pension covers at least 5% of need.
     const pensionShareOfNeed = totalExp > 0
-      ? Math.min(100, (pensionAvgMonthly / totalExp) * 100)
+      ? Math.min(100, (pensionAvgMonthlyAfterTax / totalExp) * 100)
       : 0;
     const portfolioShareOfNeed = totalExp > 0
       ? Math.max(0, Math.min(
@@ -9113,7 +9149,7 @@ function getRetirementNumbers() {
       nestEgg, sustainableMonthly, sustainableAfterTax, totalRetirementIncome, grossRetirementIncome,
       gap, coveragePct, verdict, verdictIcon, verdictClass, verdictKey,
       pensionShareOfNeed, portfolioShareOfNeed, pensionMaterial,
-      ytr, runoutAge, taxRate, sc, mult, _simResult: simResult,
+      ytr, runoutAge, taxRate, pensionTaxRate, sc, mult, _simResult: simResult,
     };
   });
 }
@@ -9171,7 +9207,7 @@ function getLifeWallData(gran) {
     const sim     = nums._simResult;
     const retAge  = state.retirementAge;
     const lifeExp = state.lifeExp || 90;
-    const inf     = (state.inflationRate || 2) / 100;
+    const inf     = (state.inflationRate ?? 0) / 100;
     const retYear = CY + Math.max(0, retAge - state.currentAge);
 
     // ── Events from real state ──────────────────────────────────────────
@@ -9235,7 +9271,8 @@ function getLifeWallData(gran) {
           netWorth: Math.round(sim.balData[i] * realFactor),
           realNetWorth: sim.balData[i],
           inRetirement: true, depleted: sim.depletedFlag[i], shortfall: sim.shortfall[i],
-          actualIncome: sim.actualIncome[i], annualExpenses: Math.round(nums.totalExp * 12),
+          actualIncome: sim.actualIncome[i], netIncome: sim.netIncome ? sim.netIncome[i] : sim.actualIncome[i],
+          pensionNet: sim.pensionNet ? sim.pensionNet[i] : 0, annualExpenses: Math.round(nums.totalExp * 12),
           annualContrib: 0 };
       });
     }
@@ -9269,14 +9306,19 @@ function getLifeWallData(gran) {
       const avgContrib  = Math.round(avgAnnualContrib);
       const savingsRate = avgIncome > 0 ? Math.round(avgContrib / avgIncome * 100) : 0;
 
-      const pensionAnnual     = (nums.pensionAvgMonthly || 0) * 12;
+      // Coverage compares AFTER-TAX income with after-tax spending, using
+      // the pension actually paid in these years (not the lifetime average).
+      const pensionAnnual     = allRetired
+        ? slice.reduce((s, y) => s + (y.pensionNet || 0), 0) / slice.length
+        : (nums.pensionAvgMonthlyAfterTax || 0) * 12;
       // Pension-only coverage — used for verdict logic (is depletion softened by pension?)
       const pensionCoversPct  = avgExpenses > 0
         ? Math.min(100, Math.round(pensionAnnual / avgExpenses * 100))
         : 0;
-      // Combined coverage: pension + portfolio withdrawal vs expenses
+      // Combined coverage: pension + portfolio withdrawal (after tax) vs expenses
+      const avgNetIncome      = slice.reduce((s, y) => s + (y.netIncome != null ? y.netIncome : y.actualIncome), 0) / slice.length;
       const totalCoversPct    = allRetired && avgExpenses > 0
-        ? Math.min(100, Math.round(avgIncome / avgExpenses * 100))
+        ? Math.min(100, Math.round(avgNetIncome / avgExpenses * 100))
         : 0;
 
       // Shortfall is checked first: it means total income (pension + portfolio)
@@ -14804,7 +14846,8 @@ function buildRunwayChartData(nums) {
     nestEgg: nums.nestEgg,
     totalExp: nums.totalExp,
     taxRate: nums.taxRate,
-    realRateMonthly: Math.max(0.001, (state.retirementPostGrowth||4) - state.inflationRate) / 100 / 12,
+    realRateMonthly: ((state.retirementPostGrowth ?? 4) - (state.inflationRate ?? 0)) / 100 / 12,
+    pensionTaxRate: getPensionTaxRate(),
     startAge: state.retirementAge,
     endAge: state.lifeExp || 90,
     pensions: getPensionAssets(),
@@ -14947,6 +14990,7 @@ function clampRetirementInputs(){
   state.inflationRate        = cl(state.inflationRate, 0, 30, 2);
   state.retirementPostGrowth = cl(state.retirementPostGrowth, 0, 30, 4);
   if(state.savingsTaxRate != null) state.savingsTaxRate = cl(state.savingsTaxRate, 0, 100, 30);
+  if(state.pensionTaxRate != null) state.pensionTaxRate = cl(state.pensionTaxRate, 0, 90, 25);
   (state.externalAssets || []).forEach(a => {
     if(!a) return;
     ['balance','monthlyContribution','monthlyPayout'].forEach(k => { if(a[k] != null) a[k] = cl(a[k], 0, Infinity, 0); });
@@ -16098,7 +16142,7 @@ function _runwayUpdateChrome(cdata, nums, lifeExp, lineColor){
   const pensions = getPensionAssets();
   const sub = document.getElementById('runway-subtitle');
   if(sub){
-    const realRate = Math.max(0, (state.retirementPostGrowth || 4) - state.inflationRate);
+    const realRate = Math.max(0, (state.retirementPostGrowth ?? 4) - state.inflationRate);
     const hasPenGap = pensions.length > 0 && cdata.earliestPension !== null && cdata.earliestPension > state.retirementAge;
     const sR = (v) => FE.display.scaleReal(v);
     const lens = FE.display.label();
@@ -20168,6 +20212,27 @@ function _catalogDynamicListing(){
   return sections.length ? (sections.join('\n\n') + '\n\n') : '';
 }
 
+// Hide personal identity numbers, account numbers, policy numbers and codes
+// before any file text reaches the assistant. The owners asked that the
+// assistant names institutions and what to ask them, never the numbers.
+// Amounts and dates are left alone.
+const HZ_ID_HIDDEN = '[number hidden]';
+function hzMaskIds(text){
+  if(typeof text !== 'string' || !text) return text;
+  let t = text;
+  // Swedish personal identity / coordination number: (19|20)YYMMDD-XXXX, also without the dash.
+  t = t.replace(/\b(?:19|20)?\d{2}(?:0[1-9]|1[0-2])(?:0[1-9]|[12]\d|3[01]|6[1-9]|[78]\d|9[01])[-+]?\d{4}\b/g, HZ_ID_HIDDEN);
+  // IBAN (two letters, two digits, then groups).
+  t = t.replace(/\b[A-Z]{2}\d{2}(?:[ ]?[A-Z0-9]{4}){2,7}(?:[ ]?[A-Z0-9]{1,4})?\b/g, HZ_ID_HIDDEN);
+  // Card numbers: 16 digits in one run or in dashed groups of four; long digit runs (12+).
+  t = t.replace(/\b\d{4}(-?)\d{4}\1\d{4}\1\d{4}\d{0,3}\b/g, HZ_ID_HIDDEN);
+  t = t.replace(/\b\d{12,19}\b/g, HZ_ID_HIDDEN);
+  // Any number that follows a word naming an account, policy, customer or reference number, or a code.
+  t = t.replace(/((?:person(?:nummer|nr)|personal (?:id(?:entity)? )?number|samordningsnummer|konto(?:nummer|nr)?|account(?: no\.?| number| nr)?|clearing(?:nummer|nr)?|bankgiro|plusgiro|iban|bic|swift|policy(?: no\.?| number)?|försäkringsnummer|försäkringsnr|avtalsnummer|avtalsnr|kundnummer|kundnr|customer(?: no\.?| number)|medlemsnummer|member(?:ship)? number|referensnummer|reference(?: no\.?| number)?|ocr(?:-nummer)?|pin(?:-kod)?|lösenord|password|passcode|säkerhetskod|security code|cvc|cvv)\s*[:#.]?\s*)([A-Z]{0,4}[- ]?\d[\d \-\/.,]{2,}\d)/gi, '$1' + HZ_ID_HIDDEN);
+  return t;
+}
+if(typeof window !== 'undefined') window.hzMaskIds = hzMaskIds;
+
 function buildAIContext(opts) {
   const withTools = !!(opts && opts.tools);
   // Every number in this prompt is routed through FinancialEngine
@@ -20217,7 +20282,7 @@ ${facts.block}`;
   const realNestEgg          = FE.retirement.nestEggTodayMoney();
   const nominalNestEgg       = FE.projection.totalNominal();
   const realRetirementIncome = nums.grossRetirementIncome;
-  const realRate = Math.max(0, (state.retirementPostGrowth || 4) - state.inflationRate);
+  const realRate = (state.retirementPostGrowth ?? 4) - (state.inflationRate ?? 0);
   const effectiveTaxPct = (nums.taxRate * 100).toFixed(1);
   // Per-investment-account detail for AI context (Bug 2 & 10)
   const investmentAccounts = (state.externalAssets || []).filter(a => (a.assetType || 'investment') === 'investment');
@@ -20226,7 +20291,7 @@ ${facts.block}`;
     const usesGlobal = (a.growthRate == null || a.growthRate === (state.growthRate || 7));
     const at = a.accountType || 'standard';
     const taxDesc = at === 'isk' ? `ISK/KF annual drag ${a.taxRate ?? 0.88}%` : at === 'notax' ? 'no tax' : `exit tax on gains ${a.taxRate ?? 30}%`;
-    return `    · ${a.name}: balance ${Math.round(a.balance).toLocaleString()} kr | contrib ${Math.round(a.monthlyContribution || 0).toLocaleString()} kr/mo | growth ${gr}%${usesGlobal ? ' (global default)' : ' (custom)'} | ${taxDesc}`;
+    return `    · ${a.name} (owner: ${a.owner === 'spouse' ? 'spouse' : 'me'}): balance ${Math.round(a.balance).toLocaleString()} kr | contrib ${Math.round(a.monthlyContribution || 0).toLocaleString()} kr/mo | growth ${gr}%${usesGlobal ? ' (global default)' : ' (custom)'} | ${taxDesc}`;
   }).join('\n');
   // Per-pension detail for AI context (Bug 6)
   const pensionAccounts = (state.externalAssets || []).filter(a => a.assetType === 'pension');
@@ -20234,7 +20299,7 @@ ${facts.block}`;
     const pStart = p.startAge ?? state.retirementAge;
     const pEnd = p.endAge ? `age ${p.endAge}` : 'no end';
     const gapYears = pStart > state.retirementAge ? ` ← STARTS ${pStart - state.retirementAge} YRS AFTER RETIREMENT` : ' ← active at retirement';
-    return `    · ${p.name}: ${Math.round(p.monthlyPayout || 0).toLocaleString()} kr/mo gross | starts age ${pStart} | ends ${pEnd}${gapYears}`;
+    return `    · ${p.name} (owner: ${p.owner === 'spouse' ? 'spouse' : 'me'}): ${Math.round(p.monthlyPayout || 0).toLocaleString()} kr/mo gross | starts age ${pStart} | ends ${pEnd}${gapYears}`;
   }).join('\n');
   // Compute all three retirement-expense scenarios so the AI can quote any
   // of them accurately and never has to multiply manually. The active
@@ -20285,6 +20350,18 @@ CURRENT VIEW: The user is looking at the "${viewLabel}" panel${section}. Tailor 
 ${spendContext}
 ${toolsSection}
 ${modeInstruction}
+
+WHAT-IF AND CONTINGENCY QUESTIONS (death, serious illness, disability, job loss, divorce, one partner left alone)
+When either partner asks what would happen if one of them died, fell ill, could not work, or lost income, give a CLEAR, CALM PICTURE in this order:
+1. What stops: the income, pensions and accounts owned by that person (each account and pension says its owner: me or spouse). Say which money stops, which continues, and which may pass to the survivor.
+2. What continues: costs that keep running (mortgage, avgift, insurance, bills, children) and income that remains for the survivor.
+3. The new month: income left vs costs left, in numbers from this snapshot and the tools, and how long the savings would cover any gap.
+4. Retirement: how the survivor's retirement picture changes (one pension instead of two, one household instead of two).
+5. Who to contact, and what to ask each one: name the institution (bank, mortgage lender, pension provider, insurer, employer, and in Sweden Pensionsmyndigheten, Försäkringskassan, Skatteverket) and the exact question to ask (for example "Is there survivor cover (efterlevandeskydd) on this pension, and who is the beneficiary?").
+6. QUESTIONS for the person: when the picture depends on facts not in Horizon, ASK them, in a short numbered list at the end. Typical ones: Is there life insurance, and for how much? Who is named as beneficiary? Is the home owned jointly and is there mortgage insurance? Does each pension have survivor cover? Is there a will, a prenuptial agreement (äktenskapsförord), or children from earlier relationships? Is there a cash buffer, and whose name is it in? Ask only what changes the answer.
+Use the Notebook tools (search_files, read_file) to look for insurance letters, pension statements and loan papers before asking, and quote what they say about cover and beneficiaries.
+NEVER write personal identity numbers (personnummer), account or clearing numbers, IBANs, card numbers, policy, customer, member or reference numbers, OCR numbers, PINs, passwords, BankID details or any other code, even if the person or a file shows them. Name the institution and the product instead ("your life policy with Folksam", "the joint account at SEB"). Text shown as "[number hidden]" was hidden on purpose; never try to rebuild it.
+Be gentle and practical. This is a planning picture, not legal or tax advice: say when a lawyer, the bank or the insurer must confirm.
 
 VALUE BASIS — IMPORTANT
 Every monetary retirement figure below is in TODAY'S MONEY (real, inflation-adjusted). When you quote retirement income, portfolio balance, withdrawals, or pension payouts in your response, use these real figures as the headline value. If you want to mention nominal/future kr for context, label it explicitly as "nominal" or "future value". Never present a nominal figure as the headline.
@@ -20345,10 +20422,10 @@ Retirement plan figures — computed under the ACTIVE ${scenLabelMap[activeScen]
 - Nest egg at retirement: ${Math.round(realNestEgg).toLocaleString()} kr (today's money) — equivalent to ${Math.round(nominalNestEgg).toLocaleString()} kr nominal/future kr at retirement
 - Effective portfolio withdrawal tax rate: ${effectiveTaxPct}% (balance-weighted across accounts — planning estimate, not exact; actual depends on withdrawal order).
 - Gross monthly retirement income: ${Math.round(realRetirementIncome).toLocaleString()} kr/mo (today's money, before any tax) — ${Math.round(nums.sustainableMonthly).toLocaleString()} kr gross from portfolio + ${Math.round(nums.pensionAvgMonthly).toLocaleString()} kr gross avg pension (weighted avg across full retirement period), all real
-- Net monthly retirement income (after home-country tax at ${Math.round(nums.taxRate*100)}%): ${Math.round(nums.totalRetirementIncome).toLocaleString()} kr/mo — ${Math.round(nums.sustainableAfterTax).toLocaleString()} kr net from portfolio + ${Math.round(nums.pensionAvgMonthlyAfterTax).toLocaleString()} kr net avg pension
+- Net monthly retirement income (after home-country tax: ${Math.round(nums.taxRate*100)}% on savings withdrawals, ${Math.round((nums.pensionTaxRate||0)*100)}% income tax on pensions): ${Math.round(nums.totalRetirementIncome).toLocaleString()} kr/mo — ${Math.round(nums.sustainableAfterTax).toLocaleString()} kr net from portfolio + ${Math.round(nums.pensionAvgMonthlyAfterTax).toLocaleString()} kr net avg pension
 - Coverage: ${nums.coveragePct.toFixed(0)}% · Verdict: ${nums.verdict}${nums.pensionMaterial ? ` (pension covers ${nums.pensionShareOfNeed.toFixed(0)}% of need)` : ''}
 - Pre-retirement (accumulation) growth rate: ${state.growthRate||7}% nominal / ${Math.max(0,(state.growthRate||7)-state.inflationRate).toFixed(1)}% real — use this for savings growth projections before retirement
-- Post-retirement growth rate: ${state.retirementPostGrowth||4}% nominal / ${realRate.toFixed(1)}% real — use this only for portfolio drawdown after retirement
+- Post-retirement growth rate: ${state.retirementPostGrowth ?? 4}% nominal / ${realRate.toFixed(1)}% real — use this only for portfolio drawdown after retirement
 - Portfolio depletion age (from shared simulation): ${nums.runoutAge ? 'Age ' + nums.runoutAge : 'never depletes'}
 - Investment accounts (${investmentAccounts.length} total, balances in today's kr):
 ${investmentAccountLines || '    (none)'}
@@ -20360,7 +20437,7 @@ ${(()=>{
   const savAvg=sp.length?Math.round(sp.reduce((s,p)=>s+(p.appYearlyContrib||0),0)/(12*sp.length)):0;
   const savFinalNom=sp.length?(sp[sp.length-1].appSavings||0):0;
   const ytr=Math.max(0,state.retirementAge-state.currentAge);
-  const inflFactor=Math.pow(1+(state.inflationRate||2)/100,ytr);
+  const inflFactor=Math.pow(1+(state.inflationRate ?? 0)/100,ytr);
   const savFinalReal=Math.round(savFinalNom/inflFactor);
   const at=state.savingsAccountType||'standard';
   const tr=typeof state.savingsTaxRate==='number'?state.savingsTaxRate:(at==='isk'?0.88:30);

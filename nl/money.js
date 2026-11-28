@@ -23,7 +23,7 @@
   const rateNow = () => (typeof rate === 'function' ? rate() : 1) || 1;
   const curSym = () => (typeof CURRENCY_SYMBOLS !== 'undefined' && CURRENCY_SYMBOLS[state.currency]) || state.currency || 'kr';
   const toShown = v => Math.round((Number(v) || 0) * rateNow());
-  const fromShown = v => Math.round((Number(String(v).replace(/\s/g, '').replace(',', '.')) || 0) / rateNow());
+  const fromShown = v => Math.round(parseNum(v) / rateNow());
   const nlHistory = () => (state.nl && Array.isArray(state.nl.history)) ? state.nl.history : [];
   const txs = () => Array.isArray(state.transactions) ? state.transactions : [];
   const LISTF = { expenses:{ base:'baseExpenses', eff:'expenseItems' }, income:{ base:'baseIncome', eff:'incomeItems' } };
@@ -300,7 +300,7 @@
     const st = ui(), v = viewMonth(), ed = st.edit || {};
     const amtEl = document.getElementById('nlm-amt');
     const raw = amtEl ? amtEl.value.trim() : '';
-    if(raw === '' || !(Number(raw.replace(/\s/g, '').replace(',', '.')) >= 0)){ NLP.toast('Type an amount of 0 or more.', 'warn'); amtEl && amtEl.focus(); return; }
+    if(raw === '' || !(/\d/.test(raw) && parseNum(raw) >= 0)){ NLP.toast('Type an amount of 0 or more.', 'warn'); amtEl && amtEl.focus(); return; }
     const amount = fromShown(raw);
     if(st.open === 'add'){
       const nameEl = document.getElementById('nlm-name'), name = nameEl ? nameEl.value.trim() : '';
@@ -594,7 +594,7 @@
   NLM.saveYear = function(year){
     const st = ui(), ed = st.edit || {}, line = ed.yLine || 'sav', only = ed.yScope === 'only';
     const el = document.getElementById('nlm-yamt-' + line), raw = el ? el.value.trim() : '';
-    if(raw === '' || !(Number(raw.replace(/\s/g, '').replace(',', '.')) >= 0)){ NLP.toast('Type an amount of 0 or more.', 'warn'); return; }
+    if(raw === '' || !(/\d/.test(raw) && parseNum(raw) >= 0)){ NLP.toast('Type an amount of 0 or more.', 'warn'); return; }
     const amount = fromShown(raw), base = resolveYearBase(year);
     let label;
     const when = only ? `${year} only` : `from ${year}`;
