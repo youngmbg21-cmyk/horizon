@@ -201,15 +201,15 @@
   const isMortgage = n => /mortgage|bolån|huslån|bostadslån|\blån\b/i.test(String(n || ''));
   // Each budget line's average over the next 12 months of the plan (not just today).
   function planLines(){
-    const inc = new Map(), exp = new Map(), now = new Map(); let sav = 0;
+    const inc = new Map(), exp = new Map(), now = new Map(), months = new Map(), max = new Map(); let sav = 0;
     for(let i = 0; i < 12; i++){
       const d = new Date(CY, CM + i, 1), e = getEffective(d.getFullYear(), d.getMonth());
       (e.incomeItems || []).forEach(x => { inc.set(x.name, (inc.get(x.name) || 0) + (Number(x.amount) || 0)); if(i === 0) now.set('i:' + x.name, Number(x.amount) || 0); });
-      (e.expenseItems || []).forEach(x => exp.set(x.name, (exp.get(x.name) || 0) + (Number(x.amount) || 0)));
+      (e.expenseItems || []).forEach(x => { const v = Number(x.amount) || 0; exp.set(x.name, (exp.get(x.name) || 0) + v); if(v){ months.set(x.name, (months.get(x.name) || 0) + 1); max.set(x.name, Math.max(max.get(x.name) || 0, v)); } });
       sav += Number(e.savings) || 0;
     }
     const avg = m => [...m.entries()].map(([name, t]) => ({ name, amount:t / 12 })).filter(x => x.amount > 0 || true);
-    return { inc:avg(inc).map(x => Object.assign(x, { thisMonth:now.get('i:' + x.name) ?? 0 })), exp:avg(exp), sav:sav / 12 };
+    return { inc:avg(inc).map(x => Object.assign(x, { thisMonth:now.get('i:' + x.name) ?? 0 })), exp:avg(exp).map(x => Object.assign(x, { months:months.get(x.name) || 0, max:max.get(x.name) || 0 })), sav:sav / 12 };
   }
   const r0 = v => Math.round(Number(v) || 0);
   const ownerOf = a => a.owner === 'spouse' ? 'spouse' : 'me';
@@ -311,6 +311,8 @@
         income_stops:incStops.map(i => ({ line:i.name, monthly:r0(i.amount) })),
         survivor_income:{ used:r0(survIncome), plan_average:r0(survPlan), this_month:r0(survNow), source:lastSurv.survSource },
         costs_end:ends.map(x => ({ line:x.name, monthly:r0(x.amount), why:x.why })), costs_continue_total:r0(expAfter),
+        // Every cost line in the next 12 months, including one-month lines (e.g. a card bill in one month only), so nothing is called "not in the budget" by mistake.
+        all_cost_lines:pl.exp.map(x => ({ line:x.name, average_a_month:r0(x.amount), months_with_it:x.months, biggest_month:r0(x.max) })),
         left_each_month_now:r0(leftNow), phases:phases.map(p => ({ years:p.open ? `${p.from}+` : (p.from === p.to ? String(p.from) : `${p.from}-${p.to}`), left_each_month:r0(p.left) })),
         months_savings_cover_gap:monthsCover, savings_available:r0(accounts.reduce((t, a) => t + a.balance, 0) + toSurvivor),
         pension_tax_rate_used_for_before_tax_payments:Math.round(ptax * 100) + '%',
