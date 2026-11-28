@@ -10348,7 +10348,11 @@ Generate a comprehensive, professional DEEP DIVE retirement relocation report fo
 CONTEXT
 - Prospective retiree holds ${cz.name||'?'}${cz.code?` (${cz.code})`:''} citizenship, currently based in ${hb.name||'?'}${hb.code?` (${hb.code})`:''}.
 - Household: ${household}. Size every cost-of-living and tax figure to THIS household, not a single person unless it is one.
-- Projected monthly retirement income for the household: ${money(o.income||0)} (in today's money), from portfolio draw-down and pensions.
+- Projected monthly retirement income for the household: ${money(o.income||0)} a month BEFORE TAX (gross, in today's money), from portfolio draw-down and pensions. This is NOT spendable money: local income tax comes off it first.${o.estTaxPct!=null ? `
+- Horizon's current estimate of the effective local tax on this income in ${loc.country}: about ${Math.round(o.estTaxPct)}%, so roughly ${money((o.income||0)*(1-o.estTaxPct/100))} a month after tax. Use your own, better-researched effective rate if it differs, and say which rate you used.` : ''}
+
+AFTER-TAX RULE (most important)
+Every surplus, shortfall, "left over", "cushion" or "discretionary" figure MUST be: income AFTER local tax − household living costs. NEVER subtract living costs from the before-tax income. Whenever you give a surplus, show the steps: income before tax → effective local tax (% and amount) → income after tax → living costs → left over.
 
 VALUE BASIS
 Every figure in CONTEXT is in TODAY'S MONEY (real, inflation-adjusted). Quote all destination figures in today's money too; if you must give a nominal figure label it "nominal".
@@ -10360,7 +10364,7 @@ Return a single markdown document. Do NOT add a title, heading, or any preamble 
 Structure EXACTLY as follows (first line of your reply must be "## Executive Summary"):
 
 ## Executive Summary
-One punchy paragraph: is this destination viable for THIS household? Headline numbers, discretionary surplus/shortfall for the household, one-sentence verdict.
+One punchy paragraph: is this destination viable for THIS household? Headline numbers in this order: income before tax, effective local tax, income after tax, household living costs, and the monthly amount left over AFTER tax and living costs. One-sentence verdict.
 
 ## Cost of Living
 A markdown table with rows for Housing, Groceries, Utilities, Transport, Healthcare, Dining, Leisure — typical monthly amounts in ${curCode} only, sized to the ${hh===2?'two-person household':'single person'}. One paragraph on how realistic the household total is.
@@ -10373,6 +10377,7 @@ Specifically for ${cz.name||'the retiree’s'} citizens${hh===2?' and an accompa
 
 ## Tax Implications
 Tailored to a ${cz.name||'?'} citizen currently tax-resident in ${hb.name||'?'} moving to ${loc.country}. Cover: double-tax treaty; treatment of pension income, portfolio withdrawals and capital gains; the EFFECTIVE local rate at this income level and household; exit-tax from ${hb.name||'home base'}; and any special regime (NHR, Beckham, foreign-source exemption). Be explicit when a headline rate does NOT apply.
+Then a 3-column markdown table (Item | Monthly | Note) with exactly these rows: Income before tax; Local tax (effective %); Income after tax; Household living costs; Left over each month (= income after tax − living costs). The left-over figure here and in the Executive Summary must be the same number.
 
 ## Climate & Lifestyle
 Month-by-month climate, air quality, walkability, expat community size, language requirements, cultural notes.
@@ -17619,7 +17624,8 @@ window.runLocAnalysis = function(id, opts){
       <span class="state-spinner" style="width:18px;height:18px;border-width:2px"></span>
       <span>${t('ra.so.analysis.loading', { name: esc(loc.name) })}</span>
     </div>`;
-  const prompt = buildDeepDivePrompt(loc, { income, cz, hb, household: raHouseholdSize() });
+  let estTaxPct = null; try { estTaxPct = scoreLocation(loc).effTaxPct; } catch(_){}
+  const prompt = buildDeepDivePrompt(loc, { income, cz, hb, household: raHouseholdSize(), estTaxPct });
   (async () => {
     try {
       const reply = await callClaude(prompt, 3000, key);
@@ -17646,6 +17652,9 @@ window.runLocAnalysis = function(id, opts){
         lang: state.lang,
         citizenship: state.citizenship,
         homeBase: state.homeBase,
+        // Spare money in this report is measured after local tax (reports
+        // without this flag compared living costs with income BEFORE tax).
+        afterTax: true,
         markdown: cleanReply,
       };
       if(!Array.isArray(state.vault)) state.vault = [];
@@ -24626,14 +24635,15 @@ class HZMobile {
       // Shared, household-aware Deep Dive contract — identical prompt and
       // structured-stats parsing as desktop, so a report run on either side
       // makes the numbers couple-aware everywhere.
-      const prompt=buildDeepDivePrompt(loc,{income,cz,hb,household:(typeof raHouseholdSize==='function'?raHouseholdSize():1)});
+      let estTaxPct=null;try{if(typeof scoreLocation==='function')estTaxPct=scoreLocation(loc).effTaxPct;}catch(_){}
+      const prompt=buildDeepDivePrompt(loc,{income,cz,hb,household:(typeof raHouseholdSize==='function'?raHouseholdSize():1),estTaxPct});
       const reply=await callClaude(prompt,3000,key);
       // Reliable KPI extraction — falls back to a focused follow-up call if the
       // inline stats line didn't come through (see ensureDeepDiveStats).
       const parsed=(typeof ensureDeepDiveStats==='function')?await ensureDeepDiveStats(reply,key):((typeof parseDeepDiveStats==='function')?parseDeepDiveStats(reply):{markdown:reply,stats:null});
       if(typeof applyDeepDiveResult==='function')applyDeepDiveResult(id,parsed);
       const clean=parsed.markdown;
-      const entry={id:'dd-'+Date.now(),type:'deepdive',locationId:id,location:loc.name,country:loc.country,flag:loc.flag||'🌍',date:new Date().toISOString(),lang:state.lang,citizenship:state.citizenship,homeBase:state.homeBase,markdown:clean};
+      const entry={id:'dd-'+Date.now(),type:'deepdive',locationId:id,location:loc.name,country:loc.country,flag:loc.flag||'🌍',date:new Date().toISOString(),lang:state.lang,citizenship:state.citizenship,homeBase:state.homeBase,afterTax:true,markdown:clean};
       if(!Array.isArray(state.vault))state.vault=[];state.vault.unshift(entry);if(state.vault.length>50)state.vault=state.vault.slice(0,50);
       if(typeof saveVault==='function')saveVault();if(typeof save==='function')save();
       if(this._ddRunning)this._ddRunning.delete(id);

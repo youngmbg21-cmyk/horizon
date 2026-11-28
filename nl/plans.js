@@ -546,7 +546,7 @@
     const dd = deepDiveOf(p.id), run = isRunning(p.id);
     const rows = [];
     if(run) rows.push({ text:'Deep dive running <span class="nl-dots" aria-hidden="true"><i></i><i></i><i></i></span>', badge:{ text:'Running', kind:'steel' }, why:'It is saved to your reports when done.' });
-    else if(dd) rows.push({ text:`Deep dive saved, ${H(new Date(dd.date).toLocaleDateString('en-GB', { day:'numeric', month:'short' }))}`, badge:{ text:'Deep dive', kind:'green' }, link:{ label:'Read it in Notebook', onclick:"NLP.go('nl-notebook')" } });
+    else if(dd) rows.push({ text:`Deep dive saved, ${H(new Date(dd.date).toLocaleDateString('en-GB', { day:'numeric', month:'short' }))}`, badge:{ text:'Deep dive', kind:'green' }, link:{ label:'Read it in Notebook', onclick:`NBK.openReport('${js(String(dd.id))}')` } });
     else rows.push({ text:'Estimate only, no deep dive yet', badge:{ text:'Estimate', kind:'grey' }, link:{ label:'What a deep dive covers', onclick:`NLP.ask('${js(`What would a deep dive on ${p.name} cover?`)}')` } });
     if(p.notes) rows.push({ text:`Your note: ${NLP.quote(p.notes)}`, badge:{ text:'Check', kind:'steel' }, link:{ label:'Ask if it still applies', onclick:`NLP.ask('${js(`Does this still apply for retiring in ${p.name}: "${p.notes}"?`)}')` } });
     rows.push({ text:'Cost, tax and note', badge:{ text:p.colSource === 'ai' ? 'From deep dive' : 'Your estimate', kind:'grey' }, link:{ label:String(st.open) === String(p.id) ? 'Close the editor' : 'Open to edit', onclick:`NLPplans.open('${js(p.id)}')` } });

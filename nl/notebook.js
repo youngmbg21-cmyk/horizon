@@ -667,10 +667,31 @@
       : NLP.empty('No saved reports yet. Deep dives on places and analyses of your plan are kept here when you save them.');
     return NLP.head({ title:'Notebook', tabs:tabs('reports'), panel:P }) + table;
   }
+  // A deep dive's money check, worked out by Horizon (not the AI): income
+  // before tax → the place's tax → after tax → living costs → left over.
+  // Older deep dives (no afterTax flag) compared living costs with income
+  // BEFORE tax, so they overstate what is left; say so plainly.
+  function afterTaxBox(r){
+    if(!r.raw || r.raw.type !== 'deepdive' || typeof scoreLocation !== 'function') return '';
+    const loc = (typeof retirePlaces === 'function' ? retirePlaces() : []).find(p => String(p.id) === String(r.raw.locationId));
+    if(!loc) return '';
+    let x; try { x = scoreLocation(loc); } catch(_){ return ''; }
+    if(!x || !(x.monthlyIncome > 0)) return '';
+    const M = v => NLP.money(v), tax = x.monthlyIncome - x.netIncome, left = x.surplus;
+    const row = (a, b, cls) => `<tr${cls ? ` class="${cls}"` : ''}><td>${a}</td><td class="r">${b}</td></tr>`;
+    const old = r.raw.afterTax ? '' : `<p class="nb-at-warn">This report was written before a fix. Its “surplus” compares living costs with your income <b>before</b> tax, so it looks bigger than it is. Use the figures above. Run a new deep dive on ${H(loc.name)} to refresh the report.</p>`;
+    return `<div class="nb-at"><p class="nb-at-h">What is left each month in ${H(loc.name)}, after tax</p><table><tbody>
+      ${row('Retirement income before tax', M(x.monthlyIncome))}
+      ${row(`Local tax, about ${Math.round(x.effTaxPct)}%`, '− ' + M(tax))}
+      ${row('Income after tax', M(x.netIncome), 'sum')}
+      ${row('Living costs', '− ' + M(x.effCostOfLiving))}
+      ${row(left >= 0 ? 'Left over each month' : 'Short each month', M(Math.abs(left)), 'sum')}
+    </tbody></table><p class="nb-at-n">Horizon’s own numbers, today’s money. They update when your plan changes.</p>${old}</div>`;
+  }
   function reportView(r){
     let body = typeof mdParse === 'function' ? mdParse(r.md) : r.md.split('\n').map(l => `<p>${H(l)}</p>`).join('');
     let k = 0; body = body.replace(/<h([1-4])(\s[^>]*)?>/g, (_, n, a) => `<h${n}${a || ''} id="nb-h-${k++}">`);
-    return NLP.head({ title:r.title, tabs:[], actions:NLP.pill('‹ Reports', 'NBK.back()') }) + `<div class="nl-sheet-page"><div class="nl-paper nb-report"><p class="nb-meta">${H(r.kind)} · saved ${H(dayLabel(r.when))}</p>${body || '<p>This report is empty.</p>'}</div></div>`;
+    return NLP.head({ title:r.title, tabs:[], actions:NLP.pill('‹ Reports', 'NBK.back()') }) + `<div class="nl-sheet-page"><div class="nl-paper nb-report"><p class="nb-meta">${H(r.kind)} · saved ${H(dayLabel(r.when))}</p>${afterTaxBox(r)}${body || '<p>This report is empty.</p>'}</div></div>`;
   }
 
   // ── The side panel's Overview ─────────────────────────────────────────────
@@ -1009,6 +1030,13 @@
 #panel-nl-notebook .nb-report th, #panel-nl-notebook .nb-report td { border-bottom:1px solid var(--nl-line); padding:4px 6px; text-align:left; overflow-wrap:anywhere; }
 #panel-nl-notebook .nb-report pre { white-space:pre-wrap; font-size:13px; }
 #panel-nl-notebook .nb-report a { color:var(--nl-accent); }
+#panel-nl-notebook .nb-at { border:1px solid var(--nl-line); border-radius:12px; padding:14px 16px 10px; margin:0 0 18px; }
+#panel-nl-notebook .nb-at-h { font:600 15px/1.35 var(--nl-sans); color:var(--nl-ink); margin:0 0 6px; }
+#panel-nl-notebook .nb-report .nb-at table { margin:0 0 6px; }
+#panel-nl-notebook .nb-at td.r { text-align:right; font-variant-numeric:tabular-nums; white-space:nowrap; }
+#panel-nl-notebook .nb-at tr.sum td { font-weight:600; color:var(--nl-ink); }
+#panel-nl-notebook .nb-at-n { font-size:12.5px; color:var(--nl-detail); margin:0; }
+#panel-nl-notebook .nb-at-warn { font-size:13px; color:var(--nl-ink); background:#FBF1DE; border-radius:8px; padding:8px 10px; margin:8px 0 2px; }
 #panel-nl-notebook .nb-editor { max-width:760px; }
 #panel-nl-notebook .nb-editor .nl-field textarea { resize:vertical; font:400 15px/1.6 var(--nl-serif); min-height:180px; }
 #panel-nl-notebook .nb-editor .nl-field input[type=date] { border:0; background:transparent; font:500 14px var(--nl-sans); color:var(--nl-ink); outline:0; padding:2px 0; }
