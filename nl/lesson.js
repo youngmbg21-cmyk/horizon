@@ -214,7 +214,7 @@
   // ── The assistant's tool ─────────────────────────────────────────────────
   NLP.addTool({
     def:{ name:'walk_through',
-      description:'Show a short step-by-step lesson in the panel: each step is one sentence plus (optionally) a drawing that Horizon builds from the person\'s real numbers. ONLY use this when the person asks to be walked through something, taught, or shown step by step ("walk me through", "teach me", "explain step by step", "show me how"). Never use it for ordinary questions. 3 to 6 steps. Drawings: month_lines (a month\'s costs as bars), highlight (light up named bars from the bars just before), share (a donut: what share of the month\'s income or costs goes where; names can pull out up to 3 cost lines, e.g. ["Mortgage"]), month_flow (a month from income to what is left; repeat it with a bigger "upto" to build it block by block), line_by_month (one expense line across the next 12 months; name "trips" for travel), months_overview (12 months: costs and Fun Fund balance), savings_growth (savings adding up over 12 months), runway (retirement money left by age; repeat with part "withdrawals" then "pensions" to add layers), runway_checkpoints (money left every 5 years), none.',
+      description:'Show a short step-by-step lesson in the panel: each step is one sentence plus (optionally) a drawing that Horizon builds from the person\'s real numbers. ONLY use this when the person asks to be walked through something, taught, or shown step by step ("walk me through", "teach me", "explain step by step", "show me how"). Never use it for ordinary questions, and never for a what-if (it draws the plan exactly as it is; nothing can be removed or changed in it). 3 to 6 steps. Drawings: month_lines (a month\'s costs as bars), highlight (light up named bars from the bars just before), share (a donut: what share of the month\'s income or costs goes where; names can pull out up to 3 cost lines, e.g. ["Mortgage"]), month_flow (a month from income to what is left; repeat it with a bigger "upto" to build it block by block), line_by_month (one expense line across the next 12 months; name "trips" for travel), months_overview (12 months: costs and Fun Fund balance), savings_growth (savings adding up over 12 months), runway (retirement money left by age; repeat with part "withdrawals" then "pensions" to add layers), runway_checkpoints (money left every 5 years), none.',
       input_schema:{ type:'object', properties:{
         title:{ type:'string', description:'Short lesson title, e.g. "Your expenses, step by step".' },
         steps:{ type:'array', minItems:2, maxItems:8, items:{ type:'object', properties:{
@@ -232,6 +232,12 @@
       }, required:['title','steps'], additionalProperties:false } },
     label:() => 'Drawing a walk-through',
     run(input){
+      // A lesson draws the plan AS IT IS. It can never show a what-if, so it
+      // is refused while the conversation is about one of the couple dying.
+      const recent = ((state.nl && state.nl.chat) || []).filter(m => m.role === 'user').slice(-6).map(m => String(m.content || '')).join(' ');
+      const death = /\b(die|dies|died|dead|death|pass(es|ed)? away|passing|widow|survivor|efterlevande|dör|död|avlider)\b/i;
+      const surv = ((state.nl && state.nl.chat) || []).slice(-12).some(m => m.card && /^survivor/.test(m.card.type || ''));
+      if(death.test(recent) || surv || death.test(JSON.stringify(input || {}))) return { error:'Do not use walk_through for what happens if one of them dies: it can only draw the plan as it is, so it cannot show any what-if. Use survivor_picture, then show_survivor_questions or show_survivor_card.' };
       const { steps, errs } = build(input || {});
       if(steps.length < 2) return { error:'Not enough steps could be drawn. ' + errs.join('; ') };
       const n = state.nl; if(!n || !Array.isArray(n.chat)) return { error:'Chat not ready.' };
