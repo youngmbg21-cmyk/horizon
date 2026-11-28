@@ -892,10 +892,40 @@
     const button = fix ? { label:`Prepare a fix for ${monLong(v.key)}`, onclick:`NLM.proposeFix('${v.key}')` } : diffs.length ? { label:`Prepare ${diffs.length} change${diffs.length > 1 ? 's' : ''} from the bank`, onclick:'NLM.proposeBank()' } : { label:'Add a line', onclick:'NLM.addLine()' };
     return { headline, graphic, groups, button };
   }
+  // Fun Fund balance and savings adding up, 12 months on from a month (the
+  // same picture as Today's chart). The engine's chain runs 23 months ahead,
+  // so any month of the forecast can be projected a full 12 months.
+  function aheadChart(start){
+    const chain = (typeof _get13MonthChain === 'function' ? _get13MonthChain() : get12Months());
+    const ms = chain.slice(start, start + 12); if(ms.length < 2) return '';
+    const run = ms.map(m => Number(m.funFund) || 0);
+    let c = 0; const sav = ms.map(m => (c += Number(m.savings) || 0));
+    const n = ms.length - 1, lo = run.indexOf(Math.min(...run));
+    const fn = (w, h) => {
+      const T = NLP.ticks(Math.min(0, ...run), Math.max(1, ...run, ...sav), 3, v => v === 0 ? '0' : NLP.moneyShort(v));
+      const xt = ms.map((x, i) => [i, monShort(x.key)]).filter((_, i) => i === 0 || i === n || i % 3 === 0 && n - i >= 2);
+      return NLP.chart({ w, h, x:[0, n], y:[T.min, T.max], pad:{ l:56, r:10, t:16, b:22 }, yt:T.ticks, xt, label:'Fun Fund balance and savings, 12 months ahead',
+        hover:{ n:ms.length, x:i => i, title:i => monLong(ms[i].key), rows:i => [{ name:'Fun Fund balance', value:money(run[i]), color:'var(--nl-accent)' }, { name:'Savings so far', value:money(sav[i]), color:'#48639A' }],
+          y:i => [{ v:run[i], color:'var(--nl-accent)' }, { v:sav[i], color:'#48639A' }] },
+        draw:({ sx, sy, line, area }) => {
+          let g = `<line x1="${sx(0)}" x2="${sx(n)}" y1="${sy(0).toFixed(1)}" y2="${sy(0).toFixed(1)}" stroke="var(--nl-quiet)" stroke-width="1"/>`;
+          if(Math.min(...run) < 0) g += `<path d="${area(run.map((v, i) => [i, Math.min(0, v)]), 0)}" fill="#B73A2E" opacity=".16"/>`;
+          g += `<path d="${line(run.map((v, i) => [i, v]))}" fill="none" stroke="var(--nl-accent)" stroke-width="2.4" stroke-linejoin="round"/>`;
+          g += `<path d="${line(sav.map((v, i) => [i, v]))}" fill="none" stroke="#48639A" stroke-width="2.1" stroke-linejoin="round"/>`;
+          g += `<circle cx="${sx(n).toFixed(1)}" cy="${sy(sav[n]).toFixed(1)}" r="3.2" fill="#48639A"/>`;
+          g += `<circle cx="${sx(lo).toFixed(1)}" cy="${sy(run[lo]).toFixed(1)}" r="3.6" fill="${run[lo] < 0 ? '#B73A2E' : 'var(--nl-accent)'}"/>`;
+          g += `<text class="lab" x="${(sx(n) - 4).toFixed(1)}" y="${Math.max(11, sy(sav[n]) - 8).toFixed(1)}" text-anchor="end">Saved ${H(NLP.moneyShort(sav[n]))}</text>`;
+          return g;
+        } });
+    };
+    const neg = run.some(v => v < 0);
+    const head = `${neg ? 'Fun Fund dips below zero' : 'Fun Fund stays above zero'}, lowest ${NLP.moneyShort(run[lo])} in ${monShort(ms[lo].key)}; savings reach ${NLP.moneyShort(sav[n])}.`;
+    return `<div class="nlm-gl">${H(head)} 12 months from ${H(NLP.monthLabel(ms[0].key))}.</div>${NLP.chartBox(fn, 150, 'Fun Fund balance and savings, 12 months ahead')}${NLP.legend([{ label:'Fun Fund', color:'var(--nl-accent)' }, { label:'Savings', color:'#48639A' }])}`;
+  }
   function overviewForecast(){
     const st = ui(), info = monthsInfo(), shorts = info.filter(x => x.short);
-    const graphic = `<div class="nlm-gl">Fun Fund balance, next 12 months</div>${NLP.minibars(info.map(x => x.bal), [monShort(info[0].key), monShort(info[11].key)])}`;
     const chosen = st.chosen && info.find(x => x.key === st.chosen);
+    const graphic = aheadChart(chosen ? chosen.i : 0) || `<div class="nlm-gl">Fun Fund balance, next 12 months</div>${NLP.minibars(info.map(x => x.bal), [monShort(info[0].key), monShort(info[11].key)])}`;
     const fixRows = list => list.map(x => { const f = savingsFix(x); return f ? door(H(`Save less in ${monLong(x.key)} only`), f.fixesIt ? (f.still.length ? { text:`${f.still.length} still short`, kind:'amber' } : { text:'No short month', kind:'green' }) : { text:'Helps', kind:'amber' }, { label:'Prepare this', onclick:`NLM.proposeFix('${x.key}')` }) : null; }).filter(Boolean);
     if(chosen){
       const groups = [];
