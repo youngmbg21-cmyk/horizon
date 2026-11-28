@@ -4315,6 +4315,24 @@ html.nl .nl-side { display:flex; order:9; flex-direction:column; width:340px; fl
 .nl-sv-call .q { font-family:var(--nl-serif); font-style:italic; color:var(--nl-quiet); }
 .nl-sv ol { margin:0; padding-left:20px; } .nl-sv ol li { margin:2px 0; }
 .nl-sv-small { font-size:12px; color:var(--nl-detail); }
+.nl-sv-ph { display:grid; grid-template-columns:repeat(auto-fit,minmax(90px,1fr)); gap:6px; }
+.nl-sv-ph div { background:#fff; border-radius:8px; padding:7px 8px; }
+.nl-sv-ph span { display:block; font-size:12px; color:var(--nl-detail); }
+.nl-sv-ph b { display:block; font-variant-numeric:tabular-nums; white-space:nowrap; }
+.nl-sv-ph b.neg { color:#8F2A22; } .nl-sv-ph b.pos { color:#1F4D3B; }
+.nl-svq { display:flex; flex-direction:column; gap:10px; margin:0 0 8px; }
+.nl-svq p { margin:0; }
+.nl-svq-found { font-size:12.5px; color:#1F4D3B; background:#DFF2E7; border-radius:8px; padding:6px 9px; }
+.nl-svq-q { border-top:1px solid rgba(0,0,0,.08); padding-top:8px; display:flex; flex-direction:column; gap:6px; }
+.nl-svq-q .t { font-weight:500; }
+.nl-svq-q .w { font-family:var(--nl-serif); font-style:italic; font-size:12.5px; color:var(--nl-quiet); }
+.nl-svq-chips { display:flex; flex-wrap:wrap; gap:6px; }
+.nl-svq-chip { border:1px solid var(--nl-edge); background:#fff; border-radius:999px; padding:4px 11px; font:500 13px var(--nl-sans); color:var(--nl-ink); cursor:pointer; }
+.nl-svq-chip[aria-pressed="true"] { background:var(--nl-accent); border-color:var(--nl-accent); color:#fff; }
+.nl-svq-in { display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+.nl-svq-in input { border:0; border-bottom:1px solid var(--nl-edge); background:#fff; padding:4px 6px; font:14px var(--nl-sans); min-width:0; width:150px; }
+.nl-svq-in span { font-size:12px; color:var(--nl-detail); }
+.nl-svq-go { width:100%; }
 .nl-msg.ai p { margin:0 0 7px; } .nl-msg.ai p:last-child { margin-bottom:0; }
 .nl-msg.ai ul { margin:4px 0 7px; padding-left:18px; }
 .nl-msg.warn { background:#FBEEDB; color:#5c3d07; }
@@ -20403,8 +20421,8 @@ When either partner asks what would happen if one of them died, fell ill, could 
 3. The new month: income left vs costs left, in numbers from this snapshot and the tools, and how long the savings would cover any gap.
 4. Retirement: how the survivor's retirement picture changes (one pension instead of two, one household instead of two).
 5. Who to contact, and what to ask each one: name the institution (bank, mortgage lender, pension provider, insurer, employer, and in Sweden Pensionsmyndigheten, Försäkringskassan, Skatteverket) and the exact question to ask (for example "Is there survivor cover (efterlevandeskydd) on this pension, and who is the beneficiary?").
-6. QUESTIONS for the person: when the picture depends on facts not in Horizon, ASK them, in a short numbered list at the end. Typical ones: Is there life insurance, and for how much? Who is named as beneficiary? Is the home owned jointly and is there mortgage insurance? Does each pension have survivor cover? Is there a will, a prenuptial agreement (äktenskapsförord), or children from earlier relationships? Is there a cash buffer, and whose name is it in? Ask only what changes the answer.
-For a partner dying, FIRST call survivor_picture (when it is available): it ALWAYS searches every Notebook file for insurance, survivor cover, beneficiaries and pensions and returns the passages. Read the passages that matter with read_file, and if a file states a payout or a survivor pension, run survivor_picture again with that amount and its [ref] as the source. Never estimate cover amounts and never ask for what a file already says. Then call show_survivor_card, which draws the answer in the conversation; after the card, write only one or two gentle sentences; then use the Notebook tools (search_files, read_file) to look for insurance letters, pension statements and loan papers before asking, and quote what they say about cover and beneficiaries. When they answer a question (an insurance amount, a survivor pension), run survivor_picture again with it. This is answered here in the conversation only: there is no page for it, by the owners' wish.
+6. QUESTIONS come FIRST, before the picture: when it depends on facts not in Horizon or the files, ask them before answering (for a partner dying, with show_survivor_questions), never in the middle or at the end. Typical ones: Is there life insurance, and for how much? Who is named as beneficiary? Is the home owned jointly and is there mortgage insurance? Does each pension have survivor cover? Is there a will, a prenuptial agreement (äktenskapsförord), or children from earlier relationships? Is there a cash buffer, and whose name is it in? Ask only what changes the answer.
+For a partner dying, use the two steps, in this order, every time. STEP 1: call survivor_picture with person_name, owner and survivor_name only. It reads the plan (12-month averages, never just this month) and ALWAYS searches every Notebook file. Then call show_survivor_questions: must_ask first, then only questions that change the numbers and that the files and saved_answers do not already answer; choices where possible. Reply with one sentence and stop. STEP 2 (after "My answers:"): call survivor_picture again with every payout the files state (each monthly payment with how many years it pays and whether it is before tax; each one-off payout with who receives it: the survivor, the mortgage lender or a debt), the survivor's income if they answered it, costs that end, and not_counted for cover without an amount. Then call show_survivor_card. The card refuses until every payout with an amount in the files is counted or listed as not counted. After the card, write at most two short, gentle sentences. Never estimate cover amounts and never ask for what a file already says.
 NEVER write personal identity numbers (personnummer), account or clearing numbers, IBANs, card numbers, policy, customer, member or reference numbers, OCR numbers, PINs, passwords, BankID details or any other code, even if the person or a file shows them. Name the institution and the product instead ("your life policy with Folksam", "the joint account at SEB"). Text shown as "[number hidden]" was hidden on purpose; never try to rebuild it.
 Be gentle and practical. This is a planning picture, not legal or tax advice: say when a lawyer, the bank or the insurer must confirm.
 
@@ -25975,7 +25993,9 @@ You are Horizon, the assistant. You PREPARE, the person DECIDES.
       if(hooked != null){ html += hooked; return; }
       if(m.kind === 'error'){ html += `<div class="nl-msg warn">${h(m.content)} <button class="nl-link" type="button" onclick="nlRetry(${i})">Try again</button></div>`; return; }
       if(m.kind === 'nokey'){ html += `<div class="nl-msg ai"><p>${h(m.content)}</p><p><button class="nl-link" type="button" onclick="nlFlip('overview');(typeof nlSettingsKey==='function')?nlSettingsKey():nav('settings')">Open Settings</button></p></div>`; return; }
-      html += `<div class="nl-msg ai">${m.card && typeof window.nlCardHtml === 'function' ? window.nlCardHtml(m.card) : ''}${md(m.content)}${m.links && typeof window.nlLinksHtml === 'function' ? window.nlLinksHtml(m.links) : ''}${m.proposal && n.proposals[m.proposal] ? proposalCard(n.proposals[m.proposal]) : ''}</div>`;
+      // After a drawn answer the card says it all: the words are capped at two sentences.
+      const words = m.card ? (String(m.content || '').replace(/\s+/g, ' ').match(/[^.!?]+[.!?]+/g) || [String(m.content || '')]).slice(0, 2).join(' ').trim() : m.content;
+      html += `<div class="nl-msg ai">${m.card && typeof window.nlCardHtml === 'function' ? window.nlCardHtml(m.card) : ''}${md(words)}${m.links && typeof window.nlLinksHtml === 'function' ? window.nlLinksHtml(m.links) : ''}${m.proposal && n.proposals[m.proposal] ? proposalCard(n.proposals[m.proposal]) : ''}</div>`;
       if(m.choices && i === n.chat.length - 1 && !busy) html += `<div class="nl-choices">${m.choices.options.map(o => `<button type="button" onclick="nlChoose(this.textContent)">${h(o)}</button>`).join('')}</div>`;
     });
     if(busy) html += `<div class="nl-status">${h(statusText || 'Thinking')} ${dots}</div>`;

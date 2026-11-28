@@ -166,13 +166,20 @@
   NLF.askPension = () => NLP.ask('I want to add my pension');
 
   // ── What if one of us dies (asked of the assistant, never a page) ─────
-  // Works out, from the plan itself, what stops, what keeps running, the new
-  // month and the survivor's retirement. It changes nothing.
+  // Two steps, both drawn in the conversation only:
+  //   1. survivor_picture reads the plan (next 12 months, not just today),
+  //      ALWAYS searches every Notebook file for cover, and returns what it
+  //      found, the answers saved before and the questions that must be asked.
+  //      show_survivor_questions then shows those questions as a small form.
+  //   2. With the answers, survivor_picture works out the money over time
+  //      (each payment for as many years as it pays, payouts that clear the
+  //      mortgage or a debt) and show_survivor_card draws the answer. The card
+  //      is refused until every payout found in the files is counted or
+  //      listed as not counted, with the reason.
+  // Nothing is ever saved to the plan.
   let lastSurv = null;
-  // Search every Notebook file for cover and contingency papers. Runs inside
-  // survivor_picture, so the files are ALWAYS read; the passages arrive with
-  // ID and account numbers already hidden (search_files masks them).
-  const COVER_QUERIES = ['life insurance livförsäkring', 'efterlevandeskydd familjeskydd survivor', 'tgl grupplivförsäkring group life', 'förmånstagare beneficiary', 'återbetalningsskydd', 'försäkring insurance cover', 'pension pensionsbesked', 'bolån låneskydd mortgage', 'testamente will äktenskapsförord'];
+  const SV = () => { if(!state.nlSurvivor || typeof state.nlSurvivor !== 'object') state.nlSurvivor = {}; const s = state.nlSurvivor; s.answers = s.answers || {}; return s; };
+  const COVER_QUERIES = ['life insurance livförsäkring', 'efterlevandeskydd familjeskydd survivor', 'tgl grupplivförsäkring group life', 'förmånstagare beneficiary', 'återbetalningsskydd refund', 'inkomstförsäkring income insurance', 'family protection familjeskydd per month', 'barnpension child', 'försäkring insurance cover one time payment', 'pension pensionsbesked', 'bolån låneskydd mortgage insurance', 'testamente will äktenskapsförord'];
   async function notebookCover(){
     const tools = window.NL_EXTRA_TOOLS || [], sf = tools.find(t => t.def.name === 'search_files'), lf = tools.find(t => t.def.name === 'list_files');
     let list = null; try { list = lf ? await lf.run({}) : null; } catch(_){}
@@ -183,159 +190,259 @@
       let r = null; try { r = await sf.run({ query:q }); } catch(_){}
       ((r && r.results) || []).forEach((x, i) => { if(!seen.has(x.ref)) seen.set(x.ref, Object.assign({ hits:0, rank:99 }, x)); const e = seen.get(x.ref); e.hits++; e.rank = Math.min(e.rank, i); });
     }
-    const passages = [...seen.values()].sort((a, b) => b.hits - a.hits || a.rank - b.rank).slice(0, 12).map(x => ({ ref:x.ref, file:x.file, where:x.where, text:String(x.text || '').slice(0, 300) }));
+    const passages = [...seen.values()].sort((a, b) => strongAmt(b.text) - strongAmt(a.text) || b.hits - a.hits || a.rank - b.rank).slice(0, 24)
+      .map(x => ({ ref:x.ref, file:x.file, where:x.where, text:String(x.text || '').slice(0, 320), states_an_amount:!!strongAmt(x.text) }));
     return { files_checked:names.length, file_names:names, passages };
   }
+  // A passage that states a payout: an amount next to cover words.
+  const strongAmt = t => { t = String(t || ''); return /\d[\d\s.,]{3,}\s?(kr|sek|:-)|\bsek\s?\d|price base amount|prisbasbelopp/i.test(t) && /insur|försäkr|cover|skydd|protection|pension|tgl|payment|utbetal|lump|engångs/i.test(t) && !/\[number hidden\]/.test(t) ? 1 : 0; };
+  const refsIn = t => (String(t || '').match(/\[(\d+)\]|\bref\s*(\d+)/gi) || []).map(x => +x.replace(/\D/g, ''));
   const wordIn = (name, who) => { const w = String(who || '').trim().toLowerCase(); return !!w && new RegExp('(^|[^\\p{L}])' + w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '([^\\p{L}]|$)', 'iu').test(String(name || '')); };
+  const isMortgage = n => /mortgage|bolån|huslån|bostadslån|\blån\b/i.test(String(n || ''));
+  // Each budget line's average over the next 12 months of the plan (not just today).
+  function planLines(){
+    const inc = new Map(), exp = new Map(), now = new Map(); let sav = 0;
+    for(let i = 0; i < 12; i++){
+      const d = new Date(CY, CM + i, 1), e = getEffective(d.getFullYear(), d.getMonth());
+      (e.incomeItems || []).forEach(x => { inc.set(x.name, (inc.get(x.name) || 0) + (Number(x.amount) || 0)); if(i === 0) now.set('i:' + x.name, Number(x.amount) || 0); });
+      (e.expenseItems || []).forEach(x => exp.set(x.name, (exp.get(x.name) || 0) + (Number(x.amount) || 0)));
+      sav += Number(e.savings) || 0;
+    }
+    const avg = m => [...m.entries()].map(([name, t]) => ({ name, amount:t / 12 })).filter(x => x.amount > 0 || true);
+    return { inc:avg(inc).map(x => Object.assign(x, { thisMonth:now.get('i:' + x.name) ?? 0 })), exp:avg(exp), sav:sav / 12 };
+  }
+  const r0 = v => Math.round(Number(v) || 0);
+  const ownerOf = a => a.owner === 'spouse' ? 'spouse' : 'me';
+
   NLP.addTool({
     def:{ name:'survivor_picture',
-      description:'Work out what happens to the household if one partner dies: whose income stops, which of their own costs end, what keeps running, the money left each month (with saving kept or paused), how long savings and any life insurance cover a gap, and the survivor\'s retirement. Read-only: nothing is saved. Amounts are SEK, a month. Use it for any question about a partner dying; ask the person for the optional facts afterwards and run it again with their answers.',
+      description:'Work out what happens to the household if one partner dies. Read-only; nothing is saved. Call it FIRST with only person_name, owner and survivor_name: it reads the plan (12-month averages), searches every Notebook file for cover and returns the passages, saved_answers and must_ask. Then ask with show_survivor_questions. Once answered, call it again with every payout from the files (payments, lump_sums), costs that end and not_counted, then call show_survivor_card. Amounts are SEK.',
       input_schema:{ type:'object', properties:{
-        person_name:{ type:'string', description:'The partner who dies, as their name appears in the budget lines (e.g. the income line "Young"). Lines containing this name are treated as theirs.' },
-        owner:{ type:'string', enum:['me','spouse'], description:'Which owner their accounts and pensions are filed under in Horizon (accounts say owner: me or spouse).' },
-        life_insurance_lump_sum:{ type:'number', description:'One-off payout to the survivor, SEK. Only from a Notebook passage or what the person said; never an estimate. Give life_insurance_source with it.' },
-        life_insurance_source:{ type:'string', description:'Where the life insurance amount comes from: the file and [ref], or "you told me".' },
-        survivor_pension_monthly:{ type:'number', description:'Survivor or family pension paid to the survivor, SEK a month after tax. Only from a Notebook passage or what the person said; never an estimate. Give survivor_pension_source with it.' },
-        survivor_pension_source:{ type:'string', description:'Where the survivor pension amount comes from: the file and [ref], or "you told me".' },
-        survivor_pension_years:{ type:'number', description:'How many years that survivor pension is paid; leave out if unknown.' },
-        retirement_spending_share:{ type:'number', description:'Share of the couple\'s planned retirement spending one person needs. Default 0.65.' },
-        pause_saving:{ type:'boolean', description:'Whether the survivor stops the monthly saving. Default true.' },
-        survivor_age:{ type:'integer', description:'The survivor\'s age now, if not the age in Horizon.' }
-      }, required:['person_name','owner'], additionalProperties:false } },
-    label:() => 'Working out the picture',
+        person_name:{ type:'string', description:'The partner who dies, as named in the budget lines.' },
+        owner:{ type:'string', enum:['me','spouse'], description:'Owner their accounts and pensions are filed under.' },
+        survivor_name:{ type:'string', description:'The partner who is left, as named in the budget lines.' },
+        survivor_income_monthly:{ type:'number', description:'Survivor\'s own income, SEK a month after tax, only if the person answered it. Otherwise the plan\'s 12-month average is used.' },
+        payments:{ type:'array', description:'Every monthly payment to the survivor found in the files or given by the person.', items:{ type:'object', properties:{
+          name:{ type:'string' }, monthly:{ type:'number', description:'SEK a month.' }, years:{ type:'number', description:'How many years it pays; leave out for life.' },
+          before_tax:{ type:'boolean', description:'true if the amount is before tax; leave out if unknown (then it is treated as before tax).' },
+          source:{ type:'string', description:'The file and [ref], or "your answer".' } }, required:['name','monthly','source'], additionalProperties:false } },
+        lump_sums:{ type:'array', description:'Every one-off payout found in the files or given by the person.', items:{ type:'object', properties:{
+          name:{ type:'string' }, amount:{ type:'number', description:'SEK.' },
+          pays:{ type:'string', enum:['survivor','mortgage','debt'], description:'Who gets it: the survivor, the mortgage lender (the mortgage cost stops), or a debt (that cost stops).' },
+          debt_line:{ type:'string', description:'For pays=debt: the budget line it clears, e.g. "Chase".' },
+          source:{ type:'string', description:'The file and [ref], or "your answer".' } }, required:['name','amount','pays','source'], additionalProperties:false } },
+        costs_that_end:{ type:'array', items:{ type:'string' }, description:'Budget lines that would end for another reason the person gave (e.g. a debt they said is paid off).' },
+        not_counted:{ type:'array', description:'Cover found in the files that is NOT counted, with why (e.g. no amount stated).', items:{ type:'object', properties:{ what:{ type:'string' }, why:{ type:'string' }, source:{ type:'string' } }, required:['what','why','source'], additionalProperties:false } },
+        retirement_spending_share:{ type:'number', description:'Share of the couple\'s retirement spending one person needs. Default 0.65.' },
+        pause_saving:{ type:'boolean', description:'Default true.' },
+        survivor_age:{ type:'integer' }
+      }, required:['person_name','owner','survivor_name'], additionalProperties:false } },
+    label:() => 'Reading your plan and files',
     async run(input){
-      const who = String(input.person_name || '').trim(); if(!who) return { error:'person_name is needed' };
-      // Amounts for cover must say where they come from: a file, or the person.
-      if(Number(input.life_insurance_lump_sum) > 0 && !String(input.life_insurance_source || '').trim()) return { error:'Say where the life insurance amount comes from (a Notebook passage with its [ref], or "you told me"). Never estimate it; leave it out if unknown.' };
-      if(Number(input.survivor_pension_monthly) > 0 && !String(input.survivor_pension_source || '').trim()) return { error:'Say where the survivor pension amount comes from (a Notebook passage with its [ref], or "you told me"). Never estimate it; leave it out if unknown.' };
-      // ALWAYS read the Notebook first: insurance letters, pension statements
-      // and loan papers often state cover, amounts and beneficiaries.
-      const files = await notebookCover();
+      const who = String(input.person_name || '').trim(), surv = String(input.survivor_name || '').trim();
+      if(!who || !surv) return { error:'person_name and survivor_name are needed' };
       const own = input.owner === 'spouse' ? 'spouse' : 'me';
       const share = Number.isFinite(+input.retirement_spending_share) && +input.retirement_spending_share > 0 && +input.retirement_spending_share <= 1.2 ? +input.retirement_spending_share : 0.65;
       const pause = input.pause_saving !== false;
-      const lump = Math.max(0, Number(input.life_insurance_lump_sum) || 0);
-      const survPen = Math.max(0, Number(input.survivor_pension_monthly) || 0);
-      const e = getEffective(CY, CM);
-      const inc = e.incomeItems || [], exp = e.expenseItems || [], sav = Number(e.savings) || 0;
-      const r0 = v => Math.round(Number(v) || 0);
-      const incStops = inc.filter(i => wordIn(i.name, who)), incStays = inc.filter(i => !wordIn(i.name, who));
-      const expEnds = exp.filter(x => wordIn(x.name, who)), expStays = exp.filter(x => !wordIn(x.name, who));
-      const sum = a => a.reduce((t, x) => t + (Number(x.amount) || 0), 0);
-      const incNow = sum(inc), expNow = sum(exp);
-      const incAfter = sum(incStays) + survPen, expAfter = sum(expStays);
-      const leftNow = incNow - expNow - sav;
-      const leftKeep = incAfter - expAfter - sav, leftPaused = incAfter - expAfter;
-      const gap = Math.max(0, -(pause ? leftPaused : leftKeep));
-      const accounts = (getInvestmentAssets() || []).map(a => ({ name:a.name, owner:a.owner === 'spouse' ? 'spouse' : 'me', balance:r0(a.balance) }));
-      const cash = accounts.reduce((t, a) => t + a.balance, 0) + lump;
+      const payments = (input.payments || []).filter(p => Number(p.monthly) > 0);
+      const lumps = (input.lump_sums || []).filter(l => Number(l.amount) > 0);
+      for(const x of payments.concat(lumps)) if(!String(x.source || '').trim()) return { error:`Say where "${x.name}" comes from (a file and [ref], or "your answer"). Never estimate cover.` };
+      const files = await notebookCover();
+      const pl = planLines();
+      const incStops = pl.inc.filter(i => wordIn(i.name, who)), survLines = pl.inc.filter(i => wordIn(i.name, surv)), incOther = pl.inc.filter(i => !wordIn(i.name, who) && !wordIn(i.name, surv) && i.amount > 0);
+      const survPlan = survLines.reduce((t, x) => t + x.amount, 0), survNow = survLines.reduce((t, x) => t + x.thisMonth, 0);
+      const survIncome = Number.isFinite(+input.survivor_income_monthly) && +input.survivor_income_monthly >= 0 ? +input.survivor_income_monthly : survPlan;
+      // Costs: the person's own lines end; a mortgage or debt paid off by a payout ends; lines the person said end.
+      const ptax = typeof getPensionTaxRate === 'function' ? getPensionTaxRate() : 0.25;
+      const paysMortgage = lumps.some(l => l.pays === 'mortgage');
+      const debtLines = lumps.filter(l => l.pays === 'debt' && l.debt_line).map(l => l.debt_line.toLowerCase());
+      const endNames = (input.costs_that_end || []).map(x => String(x).toLowerCase());
+      const ends = [], stays = [];
+      pl.exp.forEach(x => {
+        const why = wordIn(x.name, who) ? 'their own cost' : (paysMortgage && isMortgage(x.name)) ? 'paid off by the mortgage insurance' : debtLines.some(d => x.name.toLowerCase().includes(d)) ? 'paid off by insurance' : endNames.some(d => x.name.toLowerCase().includes(d)) ? 'your answer' : '';
+        (why ? ends : stays).push(Object.assign({ why }, x));
+      });
+      const expAfter = stays.reduce((t, x) => t + x.amount, 0), expNow = pl.exp.reduce((t, x) => t + x.amount, 0);
+      const incNow = pl.inc.reduce((t, x) => t + x.amount, 0);
+      const leftNow = incNow - expNow - pl.sav;
+      const net = p => (Number(p.monthly) || 0) * (p.before_tax === false ? 1 : 1 - ptax);
+      // Year by year until the last payment ends (at least 1 year, at most 30).
+      const lastYear = Math.min(30, Math.max(1, ...payments.map(p => Number(p.years) > 0 ? Math.ceil(+p.years) : 1)));
+      const yearLeft = y => survIncome + incOther.reduce((t, x) => t + x.amount, 0) + payments.filter(p => !(Number(p.years) > 0) || y <= +p.years).reduce((t, p) => t + net(p), 0) - expAfter - (pause ? 0 : pl.sav);
+      const phases = []; for(let y = 1; y <= lastYear + 1; y++){ const v = yearLeft(y), last = phases[phases.length - 1]; if(last && Math.round(last.left) === Math.round(v)) last.to = y; else phases.push({ from:y, to:y, left:v }); }
+      if(phases.length) phases[phases.length - 1].open = true;
+      const accounts = (getInvestmentAssets() || []).map(a => ({ name:a.name, owner:ownerOf(a), balance:r0(a.balance) }));
+      const toSurvivor = lumps.filter(l => l.pays === 'survivor').reduce((t, l) => t + (+l.amount), 0);
+      let cash = accounts.reduce((t, a) => t + a.balance, 0) + toSurvivor, months = 0, short = false;
+      for(let m = 0; m < 12 * 60; m++){ const v = yearLeft(Math.floor(m / 12) + 1); if(v < 0){ short = true; cash += v; if(cash < 0) break; } months++; }
+      const monthsCover = short ? (cash < 0 ? months : null) : null;
       const pens = getPensionAssets() || [];
-      const pensStop = pens.filter(p => (p.owner === 'spouse' ? 'spouse' : 'me') === own);
-      const pensStay = pens.filter(p => (p.owner === 'spouse' ? 'spouse' : 'me') !== own);
+      const pensStop = pens.filter(p => ownerOf(p) === own);
       const before = getRetirementNumbers();
       const after = NLP.whatIf(st => {
-        st.externalAssets = (st.externalAssets || []).filter(a => !(a.assetType === 'pension' && (a.owner === 'spouse' ? 'spouse' : 'me') === own));
-        if(lump > 0) st.externalAssets.push({ id:'whatif-life-ins', name:'Life insurance payout', assetType:'investment', accountType:'standard', taxRate:0, balance:lump, monthlyContribution:0, growthRate:st.growthRate });
+        st.externalAssets = (st.externalAssets || []).filter(a => !(a.assetType === 'pension' && ownerOf(a) === own));
+        if(toSurvivor > 0) st.externalAssets.push({ id:'whatif-lumps', name:'Insurance payouts', assetType:'investment', accountType:'standard', taxRate:0, balance:toSurvivor, monthlyContribution:0, growthRate:st.growthRate });
+        payments.filter(p => !(Number(p.years) > 0)).forEach((p, i) => st.externalAssets.push({ id:'whatif-pay-' + i, name:p.name, assetType:'pension', monthlyPayout:Number(p.monthly) || 0, startAge:st.currentAge }));
         st.baseIncome = (st.baseIncome || []).filter(i => !wordIn(i.name, who));
-        st.baseExpenses = (st.baseExpenses || []).filter(x => !wordIn(x.name, who));
+        st.baseExpenses = (st.baseExpenses || []).filter(x => !ends.some(e => e.name === x.name));
         if(pause){ st.baseSavings = 0; Object.values(st.yearlyBases || {}).forEach(b => { if(b && b.savings != null) b.savings = 0; }); Object.values(st.monthlyOverrides || {}).forEach(o => { if(o && o.savings != null) o.savings = 0; }); }
         st.retirementExpenses = (st.retirementExpenses || []).map(x => Object.assign({}, x, { amount:(Number(x.amount) || 0) * share }));
         if(Number.isFinite(+input.survivor_age) && +input.survivor_age >= 18 && +input.survivor_age < (st.retirementAge || 65)) st.currentAge = Math.round(+input.survivor_age);
-      }, () => { const n = getRetirementNumbers(); return { runout:n.runoutAge || null, verdict:n.verdict, nestEgg:r0(n.nestEgg), incomeAfterTax:r0(n.totalRetirementIncome), spending:r0(n.totalExp) }; });
-      lastSurv = { who, own, share, pause, sav, leftNow, leftAfter:pause ? leftPaused : leftKeep, files,
-        lumpSum:lump, lumpSource:String(input.life_insurance_source || '').slice(0, 120), penSource:String(input.survivor_pension_source || '').slice(0, 120),
-        incStops:incStops.map(i => ({ name:i.name, amount:Number(i.amount) || 0 })), incStays:incStays.map(i => ({ name:i.name, amount:Number(i.amount) || 0 })).concat(survPen ? [{ name:'Survivor pension', amount:survPen, source:String(input.survivor_pension_source || '').slice(0, 120) }] : []),
-        ends:expEnds.map(x => ({ name:x.name, amount:Number(x.amount) || 0 })), contSum:expAfter, contNames:expStays.slice().sort((a, b) => b.amount - a.amount).slice(0, 2).map(x => x.name),
-        monthsCover:gap > 0 ? Math.floor(cash / gap) : null, pensStop:pensStop.length, lastsTo:after.runout || null, lifeExp:state.lifeExp || 90 };
-      const unknowns = [];
-      if(!lump) unknowns.push('life insurance: is there a policy or group life cover (TGL) through work, how much does it pay, and who is the beneficiary');
-      if(!survPen) unknowns.push('survivor or family pension: does any pension have survivor cover (efterlevandeskydd / familjeskydd), and what does it pay');
-      unknowns.push('the home: is it owned jointly, and is there mortgage life insurance');
-      unknowns.push('a will, a prenuptial agreement (äktenskapsförord), and any children who would inherit');
-      if(!incStops.length) unknowns.push(`no income line contains "${who}": which income lines are theirs`);
+      }, () => { const n = getRetirementNumbers(); return { runout:n.runoutAge || null, verdict:n.verdict }; });
+      // What must be asked before the answer (unless already answered).
+      const sv = SV(), must = [];
+      if(survLines.length && Math.round(survNow) !== Math.round(survPlan) && !sv.answers['survivor_income'])
+        must.push({ id:'survivor_income', why:`${surv}'s income is ${r0(survNow)} SEK this month but ${r0(survPlan)} SEK a month on average over the next 12 months`, suggest:{ kind:'amount', prefill_sek:r0(survPlan) } });
+      if(!survLines.length && !sv.answers['survivor_income'])
+        must.push({ id:'survivor_income', why:`No income line named "${surv}"`, suggest:{ kind:'amount' } });
+      const cited = new Set(payments.concat(lumps).map(x => refsIn(x.source)).flat().concat((input.not_counted || []).map(x => refsIn(x.source + ' ' + x.what)).flat()));
+      const amountPassages = files.passages.filter(p => p.states_an_amount);
+      const uncounted = amountPassages.filter(p => !cited.has(+p.ref));
+      lastSurv = { who, surv, own, share, pause, sav:pl.sav, leftNow, phases, monthsCover, files, uncounted:uncounted.map(p => p.ref), mustOpen:must.map(m => m.id), asked:false,
+        incStops:incStops.filter(i => i.amount > 0), survIncome, survSource:Number.isFinite(+input.survivor_income_monthly) ? 'Your answer' : (survLines.length ? 'Average of the next 12 months in your plan' : ''), incOther,
+        payments:payments.map(p => ({ name:p.name, monthly:+p.monthly, years:Number(p.years) > 0 ? +p.years : null, before_tax:p.before_tax, source:String(p.source).slice(0, 140) })),
+        lumps:lumps.map(l => ({ name:l.name, amount:+l.amount, pays:l.pays, debt_line:l.debt_line || '', source:String(l.source).slice(0, 140) })),
+        ends:ends.map(x => ({ name:x.name, amount:x.amount, why:x.why })), contSum:expAfter, contNames:stays.slice().sort((a, b) => b.amount - a.amount).slice(0, 2).map(x => x.name),
+        notCounted:(input.not_counted || []).map(x => ({ what:String(x.what).slice(0, 100), why:String(x.why).slice(0, 160), source:String(x.source).slice(0, 120) })),
+        pensStop:pensStop.length, lastsTo:after.runout || null, lifeExp:state.lifeExp || 90 };
       return {
         currency_note:'All amounts SEK; convert to the display currency before quoting.',
-        from_your_files:files,
-        person:who,
+        plan_basis:'12-month averages of the plan, not only this month',
         income_stops:incStops.map(i => ({ line:i.name, monthly:r0(i.amount) })),
-        income_continues:incStays.map(i => ({ line:i.name, monthly:r0(i.amount) })).concat(survPen ? [{ line:'Survivor pension (given)', monthly:r0(survPen) }] : []),
-        own_costs_end:expEnds.map(x => ({ line:x.name, monthly:r0(x.amount) })),
-        costs_continue_total:r0(expAfter), costs_continue_biggest:expStays.slice().sort((a, b) => b.amount - a.amount).slice(0, 4).map(x => ({ line:x.name, monthly:r0(x.amount) })),
-        saving_now:r0(sav),
-        left_each_month:{ now:r0(leftNow), after_keep_saving:r0(leftKeep), after_pause_saving:r0(leftPaused) },
-        savings_available:r0(cash), accounts,
-        months_savings_cover_gap: gap > 0 ? Math.floor(cash / gap) : null,
-        pensions_that_stop:pensStop.map(p => ({ name:p.name, monthly_before_tax:r0(p.monthlyPayout), from_age:p.startAge ?? state.retirementAge })),
-        pensions_that_continue:pensStay.map(p => ({ name:p.name, monthly_before_tax:r0(p.monthlyPayout), from_age:p.startAge ?? state.retirementAge })),
-        retirement:{ couple_now:{ money_lasts_to:before.runoutAge || 'past ' + (state.lifeExp || 90), verdict:before.verdict, spending:r0(before.totalExp) },
-          survivor_alone:{ money_lasts_to:after.runout || 'past ' + (state.lifeExp || 90), verdict:after.verdict, spending:after.spending, spending_share:share, income_after_tax:after.incomeAfterTax } },
-        assumptions:[`Lines whose name contains "${who}" are theirs`, `Accounts and pensions with owner "${own}" are theirs; their accounts pass to the survivor; their pensions stop`, `Retirement spending for one person is ${Math.round(share * 100)}% of the couple's`, pause ? 'Monthly saving is paused' : 'Monthly saving continues', 'Only today\'s plan month is used for the monthly picture'],
-        still_unknown:unknowns,
-        files_rule:files.files_checked ? 'from_your_files lists every Notebook passage about insurance, survivor cover, beneficiaries and pensions. Read the ones that matter in full with read_file. If they state a life insurance payout or a survivor pension, run survivor_picture again with that amount and its source [ref] BEFORE showing the card. Do not ask the person for anything the files already answer.' : 'There are no Notebook files to read; say so, and ask.',
-        note:'Next, follow files_rule, then call show_survivor_card with the survivor\'s name, who to contact (institution + the exact question) and the still_unknown items as short questions. The card shows all the numbers; your written reply is then one or two gentle sentences only, without repeating numbers. Never write ID, account, policy or reference numbers.',
+        survivor_income:{ used:r0(survIncome), plan_average:r0(survPlan), this_month:r0(survNow), source:lastSurv.survSource },
+        costs_end:ends.map(x => ({ line:x.name, monthly:r0(x.amount), why:x.why })), costs_continue_total:r0(expAfter),
+        left_each_month_now:r0(leftNow), phases:phases.map(p => ({ years:p.open ? `${p.from}+` : (p.from === p.to ? String(p.from) : `${p.from}-${p.to}`), left_each_month:r0(p.left) })),
+        months_savings_cover_gap:monthsCover, savings_available:r0(accounts.reduce((t, a) => t + a.balance, 0) + toSurvivor),
+        pension_tax_rate_used_for_before_tax_payments:Math.round(ptax * 100) + '%',
+        retirement:{ couple_now:before.runoutAge || 'past ' + (state.lifeExp || 90), survivor_alone:after.runout || 'past ' + (state.lifeExp || 90) },
+        from_your_files:files,
+        saved_answers:sv.answers,
+        must_ask:must,
+        payouts_not_yet_counted:uncounted.map(p => ({ ref:p.ref, file:p.file, text:p.text })),
+        next:must.length || !Object.keys(sv.answers).length
+          ? 'STEP 1: call show_survivor_questions now. Put must_ask first, then only questions that change the numbers and that neither the files nor saved_answers already answer (who receives each payout, whether a cost such as a debt would end, whether payments are before or after tax). Use choices where you can. Then reply with ONE short sentence and stop.'
+          : (uncounted.length ? 'Count every payout in payouts_not_yet_counted: run survivor_picture again with each one in payments or lump_sums (source with its [ref]) or in not_counted with why. Then call show_survivor_card.' : 'Call show_survivor_card, then reply with at most two short sentences.'),
       };
     }
   });
 
-  // The answer card in the conversation, drawn exactly like the agreed
-  // drawing: headline, before/after bar, what stops and continues, the new
-  // month, retirement, who to contact, questions. Numbers come from
-  // survivor_picture (the plan), never from the model's words.
+  NLP.addTool({
+    def:{ name:'show_survivor_questions',
+      description:'Step 1 of "if one of us dies": show the questions as a small form in the conversation, BEFORE the answer. Each question has choices or a box for an amount or words. Answers are saved and come back in survivor_picture.saved_answers. Ask at most 6. Never ask for ID, account or policy numbers.',
+      input_schema:{ type:'object', properties:{
+        intro:{ type:'string', description:'One sentence, e.g. "Before I work it out, 4 quick questions."' },
+        found:{ type:'array', items:{ type:'string' }, description:'Short names of the cover found in the files, e.g. "Nordea life cover".' },
+        questions:{ type:'array', maxItems:6, items:{ type:'object', properties:{
+          id:{ type:'string', description:'Short stable id, e.g. "survivor_income", "nordea_payee", "chase".' },
+          text:{ type:'string' }, kind:{ type:'string', enum:['choice','amount','text'] },
+          options:{ type:'array', items:{ type:'string' }, description:'For choice: 2 to 4 options; add "Not sure" when useful.' },
+          prefill_sek:{ type:'number', description:'For amount: a suggested value in SEK (e.g. the plan average).' },
+          hint:{ type:'string', description:'Where the suggestion comes from.' },
+          quote:{ type:'string', description:'The file passage the question is about, with its [ref].' }
+        }, required:['id','text','kind'], additionalProperties:false } }
+      }, required:['questions'], additionalProperties:false } },
+    label:() => 'Preparing a few questions',
+    run(input){
+      const clean = t => (typeof window.hzMaskIds === 'function' ? window.hzMaskIds(String(t || '')) : String(t || '')).slice(0, 240);
+      const qs = (input.questions || []).slice(0, 6).map(q => ({ id:String(q.id || '').replace(/[^\w-]/g, '').slice(0, 40) || 'q', text:clean(q.text), kind:['choice','amount','text'].includes(q.kind) ? q.kind : 'text',
+        options:(q.options || []).slice(0, 5).map(o => clean(o).slice(0, 60)), prefill:Number.isFinite(+q.prefill_sek) ? +q.prefill_sek : null, hint:clean(q.hint).slice(0, 100), quote:clean(q.quote).slice(0, 200) }));
+      if(lastSurv) lastSurv.asked = true;
+      window.__nlCard = { type:'survivorQ', intro:clean(input.intro) || `Before I work it out, ${qs.length} quick ${qs.length === 1 ? 'question' : 'questions'}.`, files:lastSurv ? lastSurv.files.files_checked : 0, found:(input.found || []).slice(0, 8).map(f => clean(f).slice(0, 60)), questions:qs };
+      return { ok:true, note:'The questions are shown as a form above your reply. Reply with ONE short sentence and stop; the person answers in the form and Horizon sends you the answers.' };
+    }
+  });
+
   NLP.addTool({
     def:{ name:'show_survivor_card',
-      description:'Show the "if one of us dies" answer card in the conversation, built from the last survivor_picture. Call it once after survivor_picture. You give only names and words: the survivor\'s name, who to contact with the exact question to ask each, and short questions for the person. No ID, account, policy or reference numbers anywhere.',
+      description:'Step 2: draw the answer card from the last survivor_picture. Call it only after the questions are answered and every payout in the files is counted or listed as not counted. You give only names and words: who to contact with the exact question for each.',
       input_schema:{ type:'object', properties:{
-        survivor_name:{ type:'string', description:'The partner who would be left, as named in the budget (e.g. "Guliz").' },
-        contacts:{ type:'array', maxItems:6, items:{ type:'object', properties:{ institution:{ type:'string' }, question:{ type:'string', description:'The exact question to ask them, in one sentence.' } }, required:['institution','question'], additionalProperties:false } },
-        questions:{ type:'array', maxItems:6, items:{ type:'string' }, description:'Short questions for the person, so the picture can be made exact.' }
-      }, required:['survivor_name','contacts','questions'], additionalProperties:false } },
+        contacts:{ type:'array', maxItems:6, items:{ type:'object', properties:{ institution:{ type:'string' }, question:{ type:'string' } }, required:['institution','question'], additionalProperties:false } }
+      }, required:['contacts'], additionalProperties:false } },
     label:() => 'Drawing the picture',
     run(input){
       if(!lastSurv) return { error:'Call survivor_picture first.' };
+      const open = lastSurv.mustOpen.filter(id => !SV().answers[id]);
+      if(open.length) return { error:`Ask first: call show_survivor_questions with ${open.join(', ')}, then wait for the answers.` };
+      if(lastSurv.uncounted.length) return { error:`Not every payout in the files is counted. For each of these refs, add it to payments or lump_sums (with the [ref] in source) or to not_counted with why, by calling survivor_picture again: ${lastSurv.uncounted.join(', ')}.` };
       const clean = t => (typeof window.hzMaskIds === 'function' ? window.hzMaskIds(String(t || '')) : String(t || '')).slice(0, 220);
-      window.__nlCard = Object.assign({ type:'survivor', survivor:clean(input.survivor_name).slice(0, 40) || 'The survivor' }, lastSurv, {
-        contacts:(input.contacts || []).slice(0, 6).map(c => ({ institution:clean(c.institution).slice(0, 80), question:clean(c.question) })),
-        questions:(input.questions || []).slice(0, 6).map(clean) });
-      return { ok:true, note:'The card is shown above your reply. Write one or two gentle sentences only; do not repeat the numbers, contacts or questions.' };
+      window.__nlCard = Object.assign({ type:'survivor2' }, lastSurv, { contacts:(input.contacts || []).slice(0, 6).map(c => ({ institution:clean(c.institution).slice(0, 80), question:clean(c.question) })) });
+      return { ok:true, note:'The card is shown above your reply. Write at most two short, gentle sentences. Do not repeat numbers.' };
     }
   });
   window.nlTakeCard = () => { const c = window.__nlCard || null; window.__nlCard = null; return c; };
-  // Passages that state an amount, a beneficiary or survivor cover come first on the card.
-  const strong = t => /\d[\d\s.,]{2,}\s?(kr|sek|%)|förmånstagare|beneficiar|efterlevande|familjeskydd|survivor/i.test(String(t || '')) ? 1 : 0;
-  window.nlCardHtml = function(c){
-    if(!c || c.type !== 'survivor') return '';
-    const Mo = v => NLP.money(Math.abs(v)), sign = v => (v < 0 ? '−' : ''), b = (t, k) => `<span class="nl-svb ${k}">${H(t)}</span>`;
+
+  // The questions form: choices are buttons, amounts and words are boxes.
+  window.nlSvPick = btn => { const q = btn.closest('.nl-svq-q'); q.querySelectorAll('.nl-svq-chip').forEach(b => b.setAttribute('aria-pressed', b === btn ? 'true' : 'false')); };
+  window.nlSvSave = btn => {
+    const box = btn.closest('.nl-svq'), sv = SV(), lines = [];
+    box.querySelectorAll('.nl-svq-q').forEach((q, i) => {
+      const id = q.dataset.id, text = q.dataset.text;
+      const pick = q.querySelector('.nl-svq-chip[aria-pressed="true"]'), inp = q.querySelector('input');
+      const v = pick ? pick.textContent.trim() : inp ? inp.value.trim() : '';
+      if(!v) return;
+      const shown = inp && q.dataset.kind === 'amount' ? `${v} a month` : v;
+      sv.answers[id] = { q:text, a:shown, at:new Date().toISOString() };
+      lines.push(`${i + 1}. ${text} ${shown}`);
+    });
+    if(!lines.length){ NLP.toast('Answer at least one question first.', 'warn'); return; }
+    save();
+    NLP.ask('My answers:\n' + lines.join('\n') + '\nPlease work it out.');
+  };
+  function questionsHtml(c){
+    const sv = SV().answers;
+    const qh = (q, i) => {
+      const saved = sv[q.id] ? sv[q.id].a : '';
+      let ctl = '';
+      if(q.kind === 'choice' && q.options.length) ctl = `<div class="nl-svq-chips">${q.options.map(o => `<button type="button" class="nl-svq-chip" aria-pressed="${saved === o}" onclick="nlSvPick(this)">${H(o)}</button>`).join('')}</div>`;
+      else if(q.kind === 'amount') ctl = `<div class="nl-svq-in"><input type="text" inputmode="decimal" value="${H(saved ? saved.replace(/ a month$/, '') : (q.prefill != null ? NLP.money(q.prefill) : ''))}" aria-label="${H(q.text)}">${q.hint ? `<span>${H(q.hint)}</span>` : ''}</div>`;
+      else ctl = `<div class="nl-svq-in"><input type="text" value="${H(saved)}" aria-label="${H(q.text)}"></div>`;
+      return `<div class="nl-svq-q" data-id="${H(q.id)}" data-kind="${H(q.kind)}" data-text="${H(q.text)}"><span class="t">${i + 1}. ${H(q.text)}</span>${q.quote ? `<span class="w">${H(q.quote)}</span>` : ''}${ctl}</div>`;
+    };
+    return `<div class="nl-svq"><p class="nl-sv-hl">${H(c.intro)}${c.files ? ` I read your ${c.files} Notebook file${c.files > 1 ? 's' : ''} first.` : ''}</p>
+      ${c.found && c.found.length ? `<div class="nl-svq-found">Found in your files: ${H(c.found.join(', '))}.</div>` : ''}
+      ${c.questions.map(qh).join('')}
+      <button type="button" class="nl-black nl-svq-go" onclick="nlSvSave(this)">Save answers and work it out</button>
+      <p class="nl-sv-small">Answers are saved. Next time I only ask what is new.</p></div>`;
+  }
+  function answerHtml(c){
+    const Mo = v => NLP.money(Math.abs(v)), sg = v => (v < 0 ? '−' : '+'), b = (t, k) => `<span class="nl-svb ${k}">${H(t)}</span>`;
     const yrs = m => m < 24 ? `${m} months` : (() => { const y = Math.round(m / 6) / 2; return `${Math.floor(y)}${y % 1 ? '½' : ''} years`; })();
-    const head = c.leftAfter < 0
-      ? `${H(c.survivor)} would be about ${Mo(c.leftAfter)} short each month${c.pause ? ', even with saving paused' : ''}.${c.monthsCover != null ? ` Your savings could cover that for about ${yrs(c.monthsCover)}.` : ''}`
-      : `${H(c.survivor)} would still have about ${Mo(c.leftAfter)} left each month${c.pause ? ' with saving paused' : ''}.`;
-    const mx = Math.max(1, Math.abs(c.leftNow), Math.abs(c.leftAfter));
-    const bar = v => `<div class="tr"><i style="${v < 0 ? 'right' : 'left'}:0;width:${(Math.abs(v) / mx * 100).toFixed(1)}%;background:${v < 0 ? 'var(--nl-sv-ruby)' : 'var(--nl-accent)'}"></i></div>`;
+    const ph = c.phases || [], label = p => p.open ? (p.from === 1 ? 'Each month' : `After ${p.from - 1} years`) : p.from === p.to ? `Year ${p.from}` : `Years ${p.from}–${p.to}`;
+    const first = ph[0] || { left:0 };
+    let head;
+    if(ph.length > 1) head = `${H(c.surv)} would be ${first.left < 0 ? `about ${Mo(first.left)} short` : `about ${Mo(first.left)} ahead`} each month in the first ${first.to === 1 ? 'year' : first.to + ' years'}, then ${ph[1].left < 0 ? `about ${Mo(ph[1].left)} short` : `about ${Mo(ph[1].left)} ahead`}.`;
+    else head = first.left < 0 ? `${H(c.surv)} would be about ${Mo(first.left)} short each month${c.pause ? ', with saving paused' : ''}.` : `${H(c.surv)} would still have about ${Mo(first.left)} left each month${c.pause ? ' with saving paused' : ''}.`;
+    head += c.monthsCover != null ? ` Your savings${c.lumps.some(l => l.pays === 'survivor') ? ' and the payouts' : ''} cover that for about ${yrs(c.monthsCover)}.` : ph.some(p => p.left < 0) ? ' Your savings cover the gap for good.' : '';
     const row = (name, sub, badge, amt) => `<tr><td>${name}${sub ? `<span class="sub">${sub}</span>` : ''}</td><td>${badge}</td><td class="r">${amt}</td></tr>`;
-    const ends = c.ends.reduce((t, x) => t + x.amount, 0);
     const lasts = c.lastsTo && c.lastsTo < c.lifeExp ? `runs out at about ${c.lastsTo}` : `still lasts past ${c.lifeExp}`;
+    const otherEnds = c.ends.filter(e => e.why !== 'their own cost'), ownEnds = c.ends.filter(e => e.why === 'their own cost');
     return `<div class="nl-sv">
       <p class="nl-sv-hl">${head}</p>
-      <div class="nl-sv-dumb"><span>Now</span>${bar(c.leftNow)}<b>${c.leftNow < 0 ? '−' : '+'}${Mo(c.leftNow)}</b><span>After</span>${bar(c.leftAfter)}<b>${c.leftAfter < 0 ? '−' : '+'}${Mo(c.leftAfter)}</b></div>
+      <div class="nl-sv-ph">${ph.slice(0, 3).map(p => `<div><span>${H(label(p))}</span><b class="${p.left < 0 ? 'neg' : 'pos'}">${sg(p.left)}${Mo(p.left)}</b></div>`).join('')}</div>
       <table><tbody>
         ${c.incStops.map(i => row(`${H(i.name)}’s income`, `Money plan line “${H(i.name)}”`, b('Stops', 'r'), '−' + Mo(i.amount))).join('')}
-        ${c.incStays.map(i => row(`${H(i.name)}${i.name === 'Survivor pension' ? '' : '’s income'}`, i.source ? 'From ' + H(i.source) : '', b('Continues', 'g'), Mo(i.amount))).join('')}
-        ${c.ends.length ? row(H(c.ends.map(x => x.name).join(', ')), '', b('End', 'q'), '−' + Mo(ends)) : ''}
+        ${row(`${H(c.surv)}’s income`, H(c.survSource || ''), b('Continues', 'g'), Mo(c.survIncome))}
+        ${c.incOther.map(i => row(H(i.name), 'Money plan', b('Continues', 'g'), Mo(i.amount))).join('')}
+        ${c.payments.map(p => row(H(p.name) + (p.years ? `, ${p.years} years` : ', for life'), `${H(p.source)} · ${p.before_tax === false ? 'after tax' : p.before_tax === true ? 'before tax' : 'tax not stated, counted as before tax'}`, b('Pays', 'g'), Mo(p.monthly))).join('')}
+        ${ownEnds.length ? row(H(ownEnds.map(x => x.name).join(', ')), `${H(c.who)}’s own costs`, b('End', 'q'), '−' + Mo(ownEnds.reduce((t, x) => t + x.amount, 0))) : ''}
+        ${otherEnds.map(e => row(H(e.name), H(e.why[0].toUpperCase() + e.why.slice(1)), b('Ends', 'q'), '−' + Mo(e.amount))).join('')}
         ${row(H(c.contNames.length ? c.contNames.join(', ') + ' and other costs' : 'Other costs'), '', b('Continue', 'g'), Mo(c.contSum))}
         ${row('Monthly saving', '', c.pause ? b('Paused', 'q') : b('Continues', 'g'), c.pause ? Mo(0) : Mo(c.sav))}
-        <tr class="tot"><td>Left each month</td><td></td><td class="r">${sign(c.leftAfter)}${Mo(c.leftAfter)}</td></tr>
       </tbody></table>
-      <p><b>Retirement for ${H(c.survivor)} alone:</b> with ${c.pensStop ? `${H(c.who)}’s pension${c.pensStop > 1 ? 's' : ''} stopped` : 'the pensions you have'} and spending at ${Math.round(c.share * 100)}% of what you planned together, the money ${lasts}.</p>
-      ${c.lumpSum ? `<p><b>Life insurance:</b> about ${Mo(c.lumpSum)} once, added to the savings above${c.lumpSource ? ` (from ${H(c.lumpSource)})` : ''}.</p>` : ''}
-      <p class="nl-sv-sec">What your files say</p>
-      ${!c.files || !c.files.files_checked ? `<p class="nl-sv-small">There are no files in your Notebook yet. Add insurance letters, pension statements and loan papers, and I will read them.</p>`
-        : c.files.passages.length ? c.files.passages.filter(x => !/\[number hidden\]/.test(x.text)).sort((a, b) => strong(b.text) - strong(a.text)).slice(0, 5).map(x => `<div class="nl-sv-call"><span class="q">“${H(String(x.text).slice(0, 180))}${String(x.text).length > 180 ? '…' : ''}”</span><br><span class="sub">${H(x.file)}${x.where ? ' · ' + H(x.where) : ''} [${H(x.ref)}]</span></div>`).join('') + (c.files.passages.length > 5 ? `<p class="nl-sv-small">And ${c.files.passages.length - 5} more passages, read for this answer.</p>` : '')
-        : `<p class="nl-sv-small">I read all ${c.files.files_checked} file${c.files.files_checked > 1 ? 's' : ''} in your Notebook and found nothing about life insurance, survivor cover or beneficiaries.</p>`}
+      ${c.lumps.length ? `<p><b>Paid once:</b> ${c.lumps.map(l => `${H(l.name)}, about ${Mo(l.amount)}, ${l.pays === 'mortgage' ? 'pays off the mortgage' : l.pays === 'debt' ? `pays off ${H(l.debt_line || 'a debt')}` : `to ${H(c.surv)}, added to savings`} (${H(l.source)})`).join('; ')}.</p>` : ''}
+      ${c.notCounted.length ? `<p><b>Not counted, and why:</b> ${c.notCounted.map(n => `${H(n.what)}: ${H(n.why)} (${H(n.source)})`).join('; ')}.</p>` : ''}
+      <p><b>Retirement for ${H(c.surv)} alone:</b> with ${c.pensStop ? `${H(c.who)}’s pension${c.pensStop > 1 ? 's' : ''} stopped` : 'the pensions you have'} and spending at ${Math.round(c.share * 100)}% of what you planned together, the money ${lasts}.</p>
       ${c.contacts.length ? `<p class="nl-sv-sec">Who to contact, and what to ask</p>${c.contacts.map(x => `<div class="nl-sv-call">${H(x.institution)} ${b('Ask', 'a')}<br><span class="q">“${H(x.question.replace(/^["“]|["”]$/g, ''))}”</span></div>`).join('')}` : ''}
-      ${c.questions.length ? `<p class="nl-sv-sec">A few questions, so I can make this exact</p><ol>${c.questions.map(q => `<li>${H(q)}</li>`).join('')}</ol>` : ''}
-      <p class="nl-sv-small">A planning picture from your numbers, not legal advice. No ID, account or policy numbers are shown.</p>
+      <p class="nl-sv-small">I read ${c.files && c.files.files_checked ? `all ${c.files.files_checked} Notebook file${c.files.files_checked > 1 ? 's' : ''}` : 'your Notebook (it has no files yet)'}. A planning picture from your numbers, not legal advice. No ID, account or policy numbers are shown.</p>
     </div>`;
+  }
+  window.nlCardHtml = function(c){
+    if(!c) return '';
+    if(c.type === 'survivorQ') return questionsHtml(c);
+    if(c.type === 'survivor2') return answerHtml(c);
+    return '';
   };
+
   // The assistant may PREPARE a pension; the person adds it with one press.
   NLP.addTool({
     def:{ name:'prepare_pension',
