@@ -9206,6 +9206,58 @@ function getRetirementNumbers() {
   });
 }
 
+// ─── HOW SURE ARE WE: 1,000 FUTURES ─────────────────────────────────────────
+// The plan run 1,000 times with market years that go up and down around the
+// growth the person set, instead of the same growth every year. Everything is
+// in today's money. The accumulation is scaled so the middle of the runs
+// before retirement matches the plan's own nest egg, and the yearly amounts
+// taken out are the plan's (the simulation's gap after pensions), so the
+// single estimate and the 1,000 futures describe the same plan.
+// Seeded, so the same plan always gives the same answer.
+const MC_RUNS = 1000, MC_VOL_BEFORE = 0.13, MC_VOL_AFTER = 0.10;
+function getMonteCarlo(){
+  return memoSelect('mc', () => {
+    const nums = getRetirementNumbers(), sim = nums._simResult || {}, ages = sim.labels || [];
+    if(!ages.length || !(nums.totalExp > 0)) return null;
+    const infl = (state.inflationRate ?? 0) / 100;
+    const muPre = ((state.growthRate ?? 7) / 100 + 1) / (1 + infl) - 1;
+    const muPost = ((state.retirementPostGrowth ?? 4) / 100 + 1) / (1 + infl) - 1;
+    const proj = getProjection(), ytr = Math.max(0, proj.length - 1);
+    const contrib = proj.map((p, y) => (Number(p.yearlyContrib) || 0) / Math.pow(1 + infl, y));
+    const start = (getInvestmentAssets() || []).reduce((t, a) => t + (Number(a.balance) || 0), 0);
+    // Deterministic accumulation at the mean, to scale the random runs to the plan.
+    let det = start; for(let y = 0; y < ytr; y++) det = det * (1 + muPre) + contrib[y];
+    const k = det > 0 && nums.nestEgg > 0 ? nums.nestEgg / det : 1;
+    const gap = ages.map((a, i) => Math.max(0, (Number(sim.needed && sim.needed[i]) || 0) - (Number(sim.pensionData && sim.pensionData[i]) || 0)));
+    let seed = 20261128;
+    const rnd = () => { seed |= 0; seed = seed + 0x6D2B79F5 | 0; let t = Math.imul(seed ^ seed >>> 15, 1 | seed); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
+    const gauss = () => { let u = 0, v = 0; while(!u) u = rnd(); while(!v) v = rnd(); return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v); };
+    const paths = ages.map(() => new Float64Array(MC_RUNS));
+    const atRet = new Float64Array(MC_RUNS);
+    let lasts = 0;
+    const runouts = [];
+    for(let r = 0; r < MC_RUNS; r++){
+      let b = start;
+      for(let y = 0; y < ytr; y++) b = Math.max(0, b * (1 + muPre + MC_VOL_BEFORE * gauss()) + contrib[y]);
+      b *= k; atRet[r] = b;
+      let out = null;
+      for(let i = 0; i < ages.length; i++){
+        paths[i][r] = Math.max(0, b);
+        if(b > 0){ b = b * (1 + muPost + MC_VOL_AFTER * gauss()) - gap[i]; if(b <= 0){ b = 0; if(gap[i] > 0 && out == null) out = ages[i]; } }
+        else if(gap[i] > 0 && out == null) out = ages[i];
+      }
+      if(out == null) lasts++; else runouts.push(out);
+    }
+    const q = (arr, p) => { const s = Array.from(arr).sort((a, b) => a - b); return s[Math.min(s.length - 1, Math.max(0, Math.floor(p * (s.length - 1))))]; };
+    const p10 = paths.map(x => q(x, 0.1)), p50 = paths.map(x => q(x, 0.5)), p90 = paths.map(x => q(x, 0.9));
+    const badI = p10.findIndex((v, i) => v <= 0 && gap[i] > 0);
+    return { runs:MC_RUNS, pct:Math.round(lasts / MC_RUNS * 100), lasts, ages, p10, p50, p90,
+      atRet:{ p10:q(atRet, 0.1), p50:q(atRet, 0.5), p90:q(atRet, 0.9) },
+      atEnd:{ p10:p10[p10.length - 1], p50:p50[p50.length - 1], p90:p90[p90.length - 1] },
+      badRunout:badI >= 0 ? ages[badI] : null, lifeExp:ages[ages.length - 1] };
+  });
+}
+
 // ─── LIFE WALL DATA LAYER ────────────────────────────────────────────────────
 // Builds the array of 2-year brick objects that drives the Life Wall panel.
 // Chains getProjection() for accumulation years and getRetirementNumbers()
@@ -9562,6 +9614,7 @@ const FinancialEngine = (() => {
   // ── retirement · high-level numbers + runway simulation ────────────
   const retirement = {
     numbers:             () => getRetirementNumbers(),
+    monteCarlo:          () => getMonteCarlo(),
     nestEggTodayMoney:   () => getRetirementNumbers().nestEgg,
     runwayData:          () => buildRunwayChartData(getRetirementNumbers()),
     yearsToRetirement:   _yearsToRetirement,
@@ -20486,6 +20539,7 @@ Retirement plan figures — computed under the ACTIVE ${scenLabelMap[activeScen]
 - Effective portfolio withdrawal tax rate: ${effectiveTaxPct}% (balance-weighted across accounts — planning estimate, not exact; actual depends on withdrawal order).
 - Gross monthly retirement income: ${Math.round(realRetirementIncome).toLocaleString()} kr/mo (today's money, before any tax) — ${Math.round(nums.sustainableMonthly).toLocaleString()} kr gross from portfolio + ${Math.round(nums.pensionAvgMonthly).toLocaleString()} kr gross avg pension (weighted avg across full retirement period), all real
 - Net monthly retirement income (after home-country tax: ${Math.round(nums.taxRate*100)}% on savings withdrawals, ${Math.round((nums.pensionTaxRate||0)*100)}% income tax on pensions): ${Math.round(nums.totalRetirementIncome).toLocaleString()} kr/mo — ${Math.round(nums.sustainableAfterTax).toLocaleString()} kr net from portfolio + ${Math.round(nums.pensionAvgMonthlyAfterTax).toLocaleString()} kr net avg pension
+- How sure (the plan run 1,000 times with good and bad market years): ${(() => { try { const mc = getMonteCarlo(); return mc ? `${mc.pct}% of futures last to ${mc.lifeExp}; in a bad run (worse than 9 in 10) the money ${mc.badRunout ? 'runs out at about ' + mc.badRunout : 'still lasts'}; likely ${Math.round(mc.atEnd.p50).toLocaleString()} kr left at the end (today's money)` : 'not worked out (no retirement spending yet)'; } catch(_){ return 'not available'; } })()}
 - Coverage: ${nums.coveragePct.toFixed(0)}% · Verdict: ${nums.verdict}${nums.pensionMaterial ? ` (pension covers ${nums.pensionShareOfNeed.toFixed(0)}% of need)` : ''}
 - Pre-retirement (accumulation) growth rate: ${state.growthRate||7}% nominal / ${Math.max(0,(state.growthRate||7)-state.inflationRate).toFixed(1)}% real — use this for savings growth projections before retirement
 - Post-retirement growth rate: ${state.retirementPostGrowth ?? 4}% nominal / ${realRate.toFixed(1)}% real — use this only for portfolio drawdown after retirement

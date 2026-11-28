@@ -97,7 +97,24 @@
       (s.externalAssets || []).forEach(a => { if((a.assetType || 'investment') === 'investment' && a.growthRate != null) a.growthRate = Math.max(0, a.growthRate - 2); });
     } });
     if(le < 95) list.push({ key:'live95', label:'Live to 95', long:'Live to 95', fields:['lifeExp'], mut:s => { s.lifeExp = 95; } });
+    // "What would make it surer" (How sure are we): drawn dashed like the others, not shown as chips.
+    list.push({ key:'save3k', mc:true, label:`Save ${M(3000)} more a month`, long:`Save ${M(3000)} more a month`, fields:['baseSavings','yearlyBases','monthlyOverrides'], mut:s => {
+      s.baseSavings = (Number(s.baseSavings) || 0) + 3000;
+      Object.values(s.yearlyBases || {}).forEach(b => { if(b && b.savings != null) b.savings = (Number(b.savings) || 0) + 3000; });
+      Object.values(s.monthlyOverrides || {}).forEach(o => { if(o && o.savings != null) o.savings = (Number(o.savings) || 0) + 3000; });
+    } });
+    if(ra + 1 < le) list.push({ key:'later1', mc:true, label:'Retire one year later', long:`Retire one year later, at ${ra + 1}`, fields:['retirementAge'], mut:s => { s.retirementAge = (s.retirementAge || 65) + 1; } });
+    list.push({ key:'spend5', mc:true, label:'Spend 5% less in retirement', long:'Spend 5% less in retirement', fields:['retirementExpenses'], mut:s => { s.retirementExpenses = (s.retirementExpenses || []).map(x => Object.assign({}, x, { amount:Math.round((Number(x.amount) || 0) * 0.95) })); } });
     return list;
+  }
+  // ── How sure are we: the 1,000 futures (engine: getMonteCarlo) ──────
+  // Cached by the plan's numbers, because what-ifs reset the engine's memo.
+  const mcCache = new Map();
+  const mcKey = () => JSON.stringify([state.baseSavings, state.yearlyBases, state.monthlyOverrides, state.retirementAge, state.currentAge, state.retirementExpenses, state.retirementScenario, state.externalAssets, state.growthRate, state.inflationRate, state.retirementPostGrowth, state.lifeExp, state.pensionTaxRate, state.savingsAccountType, state.savingsTaxRate]);
+  function mcNow(){ if(!FE.retirement.monteCarlo) return null; const k = mcKey(); if(!mcCache.has(k)){ if(mcCache.size > 30) mcCache.clear(); mcCache.set(k, FE.retirement.monteCarlo()); } return mcCache.get(k); }
+  function mcSurer(){
+    const base = mcNow(); if(!base) return [];
+    return wifDefs().filter(d => d.mc).map(d => { const r = NLP.whatIf(st => d.mut(st), () => mcNow()); return { d, pct:r ? r.pct : null }; }).filter(x => x.pct != null);
   }
   const activeWifs = () => { const on = U().wif || []; return wifDefs().filter(d => on.includes(d.key)); };
   // NLP.whatIf restores its own list of fields; lifeExp and
@@ -120,6 +137,12 @@
     const st = U(); const on = new Set(st.wif || []);
     if(on.has(key)) on.delete(key); else on.add(key);
     st.wif = [...on]; NLP.renderPage(P);
+  };
+  // Prepared, not saved: the person presses Apply in the conversation.
+  NLF.prepareSaveMore = () => {
+    const to = Math.round((Number(state.baseSavings) || 0) + 3000);
+    const r = NLP.propose(`Save ${M(3000)} more a month in your plan`, [{ kind:'set_savings', where:'plan', amount:to, why:'From Future › Runway: “What would make it surer”. Years or months with their own savings amount keep it.' }]);
+    if(r && r.error) NLP.toast('That couldn’t be prepared: ' + r.error, 'warn'); else { NLP.toast('Prepared. Nothing is saved until you press Apply.'); NLP.refreshPanel(); }
   };
   NLF.wifClear = () => { U().wif = []; NLP.renderPage(P); };
   NLF.wifKeep = () => {
@@ -541,7 +564,7 @@
     const n = FE.retirement.numbers(), s = n._simResult, st = U();
     const ra = state.retirementAge, le = state.lifeExp || 90;
     const { rx, mult, taxPct, drawPct, pens } = runwayRows(n);
-    const defs = wifDefs(), on = activeWifs();
+    const defs = wifDefs().filter(d => !d.mc), on = activeWifs();
     st.wif = on.map(d => d.key);
     const wif = on.length ? whatIf(stt => on.forEach(d => d.mut(stt))) : null;
     const sug = st.penSug;
@@ -554,6 +577,8 @@
     else if(n.runoutAge >= le) title = `On ${scName()} your money lasts to ${le}, with nothing to spare.`;
     else title = `On ${scName()} your money runs out at ${n.runoutAge}, ${le - n.runoutAge} year${le - n.runoutAge === 1 ? '' : 's'} before ${le}.`;
     if(sug && !pens.length) title = n.runoutAge && n.runoutAge < le ? title + ' Your pension would change that.' : `Your money lasts past ${le} already. Your pension would mean taking out less each year.`;
+    const mc = (rx.length && n.totalExp) ? mcNow() : null;
+    if(mc) title = `${mc.pct}% sure: in ${mc.lasts.toLocaleString('en-GB')} of ${mc.runs.toLocaleString('en-GB')} futures your money lasts to ${le}.`;
     let wifLine = '';
     if(wif){
       const w = wif.n, wl = wif.sim.balData.length ? wif.sim.balData[wif.sim.balData.length - 1] : 0;
@@ -563,9 +588,9 @@
     }
     const chips = `<div class="nl-chips nlf-wif"><span class="nlf-wl">What if:</span>${defs.map(d => `<button type="button" class="nl-chip${st.wif.includes(d.key) ? ' on' : ''}" aria-pressed="${st.wif.includes(d.key)}" onclick="NLF.wif('${d.key}')">${st.wif.includes(d.key) ? '✓ ' : '+ '}${H(d.label)}</button>`).join('')}</div>`;
     const hasPenBars = s.pensionData.some(v => v > 0);
-    const legend = NLP.legend([{ label:'Money left', color:'var(--nl-accent)' }, { label:'Taken out each year', color:'var(--nlf-amber)' }].concat(hasPenBars ? [{ label:'From pensions', color:'var(--nlf-steel)' }] : []).concat(wif ? [{ label:'What-if', dash:true }] : []).concat(sug && !wif ? [{ label:'With the pension', dash:true }] : []));
-    const chartBox = (rx.length && n.totalExp) ? NLP.chartBox((w, h) => runwayChart(w, h, n, wif, sugRes), 250, 'Money in retirement, by age') : NLP.empty('No retirement spending yet.', NLP.link('Add your first spending line', "NLF.rxOpen()"));
-    const card = NLP.card(null, null, `<h2 class="nl-ct">${H(title)}</h2><p class="nl-cs">Everything you own from retirement at ${ra}, ${lens()}. Amber bars: what you take out each year.</p>${chartBox}${(rx.length && n.totalExp) ? legend : ''}${chips}${wifLine}`);
+    const legend = mc ? NLP.legend([{ label:'Likely', color:'var(--nl-accent)' }, { label:'Good to bad markets (middle 80%)', color:'#CFEAE2' }, { label:'Single estimate', dash:true }, { label:'Taken out each year', color:'var(--nlf-amber)' }].concat(wif ? [{ label:'What-if', dash:true }] : [])) : NLP.legend([{ label:'Money left', color:'var(--nl-accent)' }, { label:'Taken out each year', color:'var(--nlf-amber)' }].concat(hasPenBars ? [{ label:'From pensions', color:'var(--nlf-steel)' }] : []).concat(wif ? [{ label:'What-if', dash:true }] : []).concat(sug && !wif ? [{ label:'With the pension', dash:true }] : []));
+    const chartBox = (rx.length && n.totalExp) ? NLP.chartBox((w, h) => runwayChart(w, h, n, wif, sugRes, mc), 250, 'Money in retirement, by age') : NLP.empty('No retirement spending yet.', NLP.link('Add your first spending line', "NLF.rxOpen()"));
+    const card = NLP.card(null, null, `<h2 class="nl-ct">${H(title)}</h2><p class="nl-cs">${mc ? `Your plan run ${mc.runs.toLocaleString('en-GB')} times with good and bad market years. Shaded: the middle 80% of futures. Line: the likely one. Dashed: the single estimate. From retirement at ${ra}, ${lens()}.` : `Everything you own from retirement at ${ra}, ${lens()}. Amber bars: what you take out each year.`}</p>${chartBox}${(rx.length && n.totalExp) ? legend : ''}${chips}${wifLine}`);
 
     // The sum, step by step (each month, at retirement).
     const sv = v => atAge(v, ra);
@@ -586,7 +611,14 @@
         : `<tr data-nl-row="draw"><td class="mk">4</td><td><span class="nm">Taken from your savings</span><span class="sub">${drawPct == null ? 'No savings counted yet' : `${pct(drawPct)} of ${H(MS(sv(n.nestEgg)))} a year, ${drawPct <= 4 ? 'under' : 'over'} the 4% rule of thumb`}</span></td><td>${drawBadge}</td><td class="r">${M(sv(n.grossNeeded))}</td></tr>`,
     ];
     const table = `<div class="nl-tbl-wrap"><table class="nl-tbl" id="nlf-tbl"><thead><tr><th></th><th>The sum, step by step</th><th></th><th class="r">Each month</th></tr></thead><tbody>${rows.join('')}</tbody></table></div>`;
-    return card + table;
+    const fut = mc ? (() => {
+      const rr = (name, sub, a, b, lasts) => `<tr><td><span class="nm">${name}</span><span class="sub">${sub}</span></td><td class="r">${M(atAge(a, ra))}</td><td class="r">${M(atAge(b, le))}</td><td>${lasts}</td></tr>`;
+      return `<div class="nl-tbl-wrap nlf-fut"><table class="nl-tbl"><thead><tr><th>If markets are…</th><th class="r">Money at ${ra}</th><th class="r">Money at ${le}</th><th>Lasts?</th></tr></thead><tbody>
+        ${rr('Kind', 'Better than 9 in 10 futures', mc.atRet.p90, mc.atEnd.p90, NLP.badge('Yes', 'green'))}
+        ${rr('Likely', 'The middle future', mc.atRet.p50, mc.atEnd.p50, mc.atEnd.p50 > 0 ? NLP.badge('Yes', 'green') : NLP.badge('Runs out', 'ruby'))}
+        ${rr('Unkind', 'Worse than 9 in 10 futures', mc.atRet.p10, mc.atEnd.p10, mc.badRunout ? NLP.badge(`Runs out at ${mc.badRunout}`, 'amber') : NLP.badge('Yes', 'green'))}
+      </tbody></table></div>`; })() : '';
+    return card + fut + table;
   }
   function rxEditor(rx, mult){
     const r = rx.map((e, i) => `<div class="nlf-rx"><input type="text" id="nlf-rx-n-${i}" value="${H(e.name)}" aria-label="Line name" onchange="NLF.rxSet(${i},'name',this.value)"><input type="text" inputmode="decimal" class="nl-num-in" id="nlf-rx-a-${i}" value="${toDisp(e.amount)}" aria-label="${H(e.name)}, ${H(sym())} a month" onchange="NLF.rxSet(${i},'amount',this.value)"><span class="nlf-u">${H(sym())} a month</span>${NLP.link('Remove', `NLF.rxDel(${i})`)}</div>`).join('');
@@ -608,7 +640,7 @@
     setTimeout(() => { const i = (state.retirementExpenses || []).length - 1; const el = document.getElementById('nlf-rx-n-' + i); if(el){ el.focus(); el.select(); } }, 120);
   };
 
-  function runwayChart(w, h, n, wif, sugRes){
+  function runwayChart(w, h, n, wif, sugRes, mc){
     const s = n._simResult, ages = s.labels;
     if(!ages.length) return '';
     const sc = (v, a) => atAge(v, a);
@@ -618,23 +650,27 @@
     const wb = wif ? wif.sim.labels.map((a, i) => [a, sc(wif.sim.balData[i], a)]) : null;
     const sb = sugRes ? sugRes.sim.labels.map((a, i) => [a, sc(sugRes.sim.balData[i], a)]) : null;
     const x0 = Math.min(ages[0], wb ? wb[0][0] : Infinity), x1 = Math.max(ages[ages.length - 1], wb ? wb[wb.length - 1][0] : -Infinity);
-    const ymax = Math.max(1, ...bal.map(q => q[1]), ...(wb || []).map(q => q[1]), ...(sb || []).map(q => q[1]), ...wd.map((q, i) => q[1] + pen[i][1]));
+    const band = mc ? { lo:mc.ages.map((a, i) => [a, sc(mc.p10[i], a)]), mid:mc.ages.map((a, i) => [a, sc(mc.p50[i], a)]), hi:mc.ages.map((a, i) => [a, sc(mc.p90[i], a)]) } : null;
+    const ymax = Math.max(1, ...bal.map(q => q[1]), ...(wb || []).map(q => q[1]), ...(sb || []).map(q => q[1]), ...wd.map((q, i) => q[1] + pen[i][1]), ...(band ? band.hi.map(q => q[1]) : []));
     const tk = NLP.ticks(0, ymax * 1.08, 4, v => v ? MS(v) : '0');
     const span = x1 - x0, step = span > 30 ? 5 : span > 14 ? (w < 520 ? 4 : 2) : (w < 420 ? 2 : 1);
     const xt = []; for(let a = x0; a <= x1; a++) if((a - x0) % step === 0 || a === x1) xt.push([a, String(a)]);
     if(xt.length > 1 && xt[xt.length - 1][0] - xt[xt.length - 2][0] < step / 2) xt.splice(xt.length - 2, 1);
     return NLP.chart({ w, h, x:[x0 - 0.6, x1 + 0.6], y:[tk.min, tk.max], yt:tk.ticks, xt, pad:{ l:58, r:14, t:16, b:24 }, label:'Money in retirement, by age',
       hover:{ n:ages.length, x:i => ages[i], title:i => `Age ${ages[i]}`,
-        rows:i => [{ name:'Money left', value:M(bal[i][1]), color:'var(--nl-accent)' }, { name:'Taken out this year', value:M(wd[i][1]), color:'var(--nlf-amber)' }].concat(pen[i][1] > 0 ? [{ name:'From pensions this year', value:M(pen[i][1]), color:'var(--nlf-steel)' }] : []).concat(wb && wb[i] ? [{ name:'What if (not saved)', value:M(wb[i][1]), color:'var(--nlf-steel)' }] : []).concat(sb && sb[i] ? [{ name:'With the suggested pension', value:M(sb[i][1]), color:'var(--nlf-steel)' }] : []),
+        rows:i => (band ? [{ name:'Likely', value:M(band.mid[i][1]), color:'var(--nl-accent)' }, { name:'Good markets', value:M(band.hi[i][1]), color:'#9ED3C4' }, { name:'Bad markets', value:M(band.lo[i][1]), color:'var(--nlf-amber)' }] : []).concat([{ name:band ? 'Single estimate' : 'Money left', value:M(bal[i][1]), color:band ? 'var(--nl-ink)' : 'var(--nl-accent)' }, { name:'Taken out this year', value:M(wd[i][1]), color:'var(--nlf-amber)' }].concat(pen[i][1] > 0 ? [{ name:'From pensions this year', value:M(pen[i][1]), color:'var(--nlf-steel)' }] : []).concat(wb && wb[i] ? [{ name:'What if (not saved)', value:M(wb[i][1]), color:'var(--nlf-steel)' }] : []).concat(sb && sb[i] ? [{ name:'With the suggested pension', value:M(sb[i][1]), color:'var(--nlf-steel)' }] : [])),
         y:i => [{ v:bal[i][1], color:'var(--nl-accent)' }].concat(wb && wb[i] ? [{ v:wb[i][1], color:'var(--nlf-steel)' }] : []) },
       draw:({ sx, sy, line, area }) => {
         const bw = Math.max(2, Math.min(12, (sx(1) - sx(0)) * 0.55));
-        let g = `<path d="${area(bal, 0)}" fill="var(--nl-accent)" opacity=".13"/>`;
+        let g = band ? `<path d="${line(band.hi)}${band.lo.slice().reverse().map(q => `L${sx(q[0]).toFixed(1)} ${sy(q[1]).toFixed(1)}`).join('')}Z" fill="#CFEAE2" opacity=".85"/>` : `<path d="${area(bal, 0)}" fill="var(--nl-accent)" opacity=".13"/>`;
         g += wd.map((q, i) => { const p = pen[i][1], x = sx(q[0]) - bw / 2; let r = '';
           if(q[1] > 0) r += `<rect x="${x.toFixed(1)}" y="${sy(q[1]).toFixed(1)}" width="${bw.toFixed(1)}" height="${(sy(0) - sy(q[1])).toFixed(1)}" fill="var(--nlf-amber)" opacity=".6"/>`;
           if(p > 0) r += `<rect x="${x.toFixed(1)}" y="${sy(q[1] + p).toFixed(1)}" width="${bw.toFixed(1)}" height="${(sy(q[1]) - sy(q[1] + p)).toFixed(1)}" fill="var(--nlf-steel)" opacity=".55"/>`;
           return r; }).join('');
-        g += `<path d="${line(bal)}" fill="none" stroke="var(--nl-accent)" stroke-width="2.5"/>`;
+        if(band){
+          g += `<path d="${line(band.mid)}" fill="none" stroke="var(--nl-accent)" stroke-width="2.6"/>`;
+          g += `<path d="${line(bal)}" fill="none" stroke="var(--nl-ink)" stroke-width="1.4" stroke-dasharray="5 5" opacity=".7"/>`;
+        } else g += `<path d="${line(bal)}" fill="none" stroke="var(--nl-accent)" stroke-width="2.5"/>`;
         if(sb) g += `<path d="${line(sb)}" fill="none" stroke="var(--nlf-steel)" stroke-width="2" stroke-dasharray="5 4"/>`;
         if(wb) g += `<path d="${line(wb)}" fill="none" stroke="var(--nlf-steel)" stroke-width="2" stroke-dasharray="5 4"/>`;
         // Labels: start, end (or run-out), and the yearly draw.
@@ -923,9 +959,18 @@
     else if(!n.runoutAge) headline = n.coveragePct >= 100 && (n.gap || 0) > 0 ? 'Well funded, with plenty of room to spare.' : 'Well funded: your money never runs out.';
     else if(n.runoutAge >= le) headline = `Funded to ${le}, with nothing to spare.`;
     else headline = `Your money runs out at ${n.runoutAge}, ${le - n.runoutAge} years early.`;
-    const graphic = capbar(n.coveragePct, 'Covered', `${Math.round(n.coveragePct)}% of ${scName()} years, to age ${le}`);
+    let graphic = capbar(n.coveragePct, 'Covered', `${Math.round(n.coveragePct)}% of ${scName()} years, to age ${le}`);
     const groups = [];
     const chosen = NLP.chosen(P);
+    // How sure are we: 100 dots, the bad case, and what would make it surer.
+    const mc = (rx.length && n.totalExp) ? mcNow() : null;
+    if(mc && !chosen){
+      headline = `${mc.pct} of 100 futures last to ${le}. In a bad run of markets the money ${mc.badRunout ? `runs out at about ${mc.badRunout}` : 'still lasts'}.`;
+      graphic = `<div class="nlf-dots" aria-label="${mc.pct} of 100 futures last">${Array.from({ length:100 }, (_, i) => `<i class="${i >= mc.pct ? 's' : ''}"></i>`).join('')}</div><div class="nlp-small">Each dot is ${mc.runs / 100} of the ${mc.runs.toLocaleString('en-GB')} futures. Amber: the money runs out before ${le}.</div>`;
+      const on = U().wif || [];
+      const sure = mcSurer();
+      if(sure.length) groups.push({ title:'What would make it surer', rows:sure.map(x => ({ text:H(x.d.label), badge:{ text:`${x.pct}%`, kind:x.pct > mc.pct ? 'green' : 'grey' }, link:{ label:on.includes(x.d.key) ? 'Take it off the chart' : 'Try it', onclick:`NLF.wif('${x.d.key}')` } })) });
+    }
     if(chosen){
       const r = {
         spend:{ text:`${rx.length} spending line${rx.length === 1 ? '' : 's'} on ${scName()}`, badge:{ text:'After tax', kind:'steel' }, why:'Press the row again to change the lines.', link:{ label:U().open === 'spend' ? 'Close the lines' : 'Change the lines', onclick:U().open === 'spend' ? 'NLF.rxClose()' : 'NLF.rxOpen()' } },
@@ -935,8 +980,8 @@
       }[chosen];
       if(r) groups.push({ title:'This line', rows:[r] });
     }
-    const defs = wifDefs(), on = U().wif || [];
-    groups.push({ title:'Try a what-if, prepared not saved', rows:defs.slice(0, chosen ? 2 : 4).map(d => {
+    const defs = wifDefs().filter(d => !d.mc), on = U().wif || [];
+    if(!(mc && !chosen)) groups.push({ title:'Try a what-if, prepared not saved', rows:defs.slice(0, chosen ? 2 : 4).map(d => {
       const isOn = on.includes(d.key);
       return { text:H(d.long), badge:isOn ? { text:'On the chart', kind:'green' } : { text:'Preview', kind:'steel' }, link:{ label:isOn ? 'Take it off the chart' : 'Draw it on the chart', onclick:`NLF.wif('${d.key}')` } };
     }) });
@@ -949,6 +994,7 @@
     if(moved.length) groups.unshift({ title:'Away from your plan', rows:[{ text:`${moved.length} setting${moved.length === 1 ? '' : 's'} changed from your plan`, badge:{ text:'Changed', kind:'amber' }, link:{ label:'Make this my plan', onclick:'NLF.planKeep()' } }] });
     if(act.length) button = { label:'Use this in my plan', onclick:'NLF.wifKeep()' };
     else if(moved.length) button = { label:'Back to my plan', onclick:'NLF.planBack()' };
+    else if(mc && !chosen) button = { label:`Prepare saving ${M(3000)} more`, onclick:'NLF.prepareSaveMore()' };
     else if(defs.length) button = { label:`Preview: ${defs[0].label.toLowerCase()}`, onclick:`NLF.wif('${defs[0].key}')` };
     return { headline, graphic, groups, button,
       links:pageLinks([{ label:'Change expenses', short:'Expenses', onclick:'NLF.rxOpen()' }]) };
@@ -1104,6 +1150,10 @@ html.nl { --nlf-amber:#8A5A0A; --nlf-steel:#48639A; --nlf-ruby:#8F2A22; --nlf-c1
 #panel-nl-future .nlf-two { margin-bottom:12px; } #panel-nl-future .nlf-two .nl-cc { margin:0; min-width:0; }
 #panel-nl-future .nlf-nw-links { margin-top:6px; }
 #panel-nl-future .nlf-nwadd { margin-top:8px; }
+#panel-nl-future .nlf-fut { margin-bottom:12px; }
+html.nl .nlf-dots { display:grid; grid-template-columns:repeat(20,minmax(0,1fr)); gap:3px; margin:4px 0; }
+html.nl .nlf-dots i { aspect-ratio:1; border-radius:50%; background:var(--nl-accent); }
+html.nl .nlf-dots i.s { background:#D99A2B; }
 html.nl .nlf-nwbars { display:grid; grid-auto-flow:column; grid-auto-columns:minmax(0,1fr); gap:3px; align-items:end; height:56px; margin:4px 0 4px; }
 html.nl .nlf-nwbars i { display:block; border-radius:2px 2px 0 0; background:var(--nl-accent); }
 html.nl .nlf-nwbars i.d { background:#C77B70; }
