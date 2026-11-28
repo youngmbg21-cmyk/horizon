@@ -20490,6 +20490,8 @@ Retirement plan figures — computed under the ACTIVE ${scenLabelMap[activeScen]
 - Pre-retirement (accumulation) growth rate: ${state.growthRate||7}% nominal / ${Math.max(0,(state.growthRate||7)-state.inflationRate).toFixed(1)}% real — use this for savings growth projections before retirement
 - Post-retirement growth rate: ${state.retirementPostGrowth ?? 4}% nominal / ${realRate.toFixed(1)}% real — use this only for portfolio drawdown after retirement
 - Portfolio depletion age (from shared simulation): ${nums.runoutAge ? 'Age ' + nums.runoutAge : 'never depletes'}
+- Home and net worth: ${(() => { const h = state.home || {}, hist = (Array.isArray(state.nwHistory) ? state.nwHistory : []).filter(e => e && e.m).sort((a, b) => a.m.localeCompare(b.m)); const f = hist[0], l = hist[hist.length - 1];
+    return `home worth ${Math.round(+h.value || 0).toLocaleString()} kr${h.value ? '' : ' (not set)'}, mortgage still owed ${Math.round(+h.mortgage || 0).toLocaleString()} kr${h.mortgage ? '' : ' (not set)'}; net worth (savings + investments + home − mortgage) ${l ? Math.round(l.total).toLocaleString() + ' kr in ' + l.m : 'not recorded yet'}${f && l && f.m !== l.m ? `, from ${Math.round(f.total).toLocaleString()} kr in ${f.m}` : ''}. The home is NOT part of the money for retirement.`; })()}
 - Investment accounts (${investmentAccounts.length} total, balances in today's kr):
 ${investmentAccountLines || '    (none)'}
   NOTE: accounts with a custom growth rate use their own rate — do NOT apply the global pre-retirement rate to them. The global ${state.growthRate || 7}% is only the default for accounts without a custom rate.

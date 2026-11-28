@@ -72,7 +72,7 @@
     { id:'places', p:'nl-plans', tab:'places', words:['places to retire','places','retire abroad','cities','where to retire','compare cities','platser','pensionsort'] },
     { id:'future', p:'nl-future', tab:'runway', words:['future','framtid','framtiden'] },
     { id:'runway', p:'nl-future', tab:'runway', words:['runway','retirement','retirement plan','nest egg','drawdown','fire','pensionering','pensionsplan'] },
-    { id:'accounts', p:'nl-future', tab:'accounts', words:['accounts','investments','portfolio','net worth','assets','pensions','konton','investeringar','tillgangar','pensioner'] },
+    { id:'accounts', p:'nl-future', tab:'accounts', words:['accounts','investments','portfolio','net worth','net worth history','home value','house value','mortgage balance','assets','pensions','konton','investeringar','tillgangar','pensioner','nettoformogenhet','bostadens varde'] },
     { id:'wall', p:'nl-future', tab:'wall', words:['life wall','wall','bricks','livsvagg','vaggen'] },
     { id:'notebook', p:'nl-notebook', tab:'files', words:['notebook','anteckningsbok'] },
     { id:'files', p:'nl-notebook', tab:'files', words:['files','documents','uploads','docs','filer','dokument'] },
