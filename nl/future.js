@@ -165,6 +165,84 @@
   NLF.penSugDrop = () => { U().penSug = null; NLP.renderPage(P); NLP.toast('Suggested pension dropped'); };
   NLF.askPension = () => NLP.ask('I want to add my pension');
 
+  // ── What if one of us dies (asked of the assistant, never a page) ─────
+  // Works out, from the plan itself, what stops, what keeps running, the new
+  // month and the survivor's retirement. It changes nothing.
+  const wordIn = (name, who) => { const w = String(who || '').trim().toLowerCase(); return !!w && new RegExp('(^|[^\\p{L}])' + w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '([^\\p{L}]|$)', 'iu').test(String(name || '')); };
+  NLP.addTool({
+    def:{ name:'survivor_picture',
+      description:'Work out what happens to the household if one partner dies: whose income stops, which of their own costs end, what keeps running, the money left each month (with saving kept or paused), how long savings and any life insurance cover a gap, and the survivor\'s retirement. Read-only: nothing is saved. Amounts are SEK, a month. Use it for any question about a partner dying; ask the person for the optional facts afterwards and run it again with their answers.',
+      input_schema:{ type:'object', properties:{
+        person_name:{ type:'string', description:'The partner who dies, as their name appears in the budget lines (e.g. the income line "Young"). Lines containing this name are treated as theirs.' },
+        owner:{ type:'string', enum:['me','spouse'], description:'Which owner their accounts and pensions are filed under in Horizon (accounts say owner: me or spouse).' },
+        life_insurance_lump_sum:{ type:'number', description:'One-off payout to the survivor, SEK, if known.' },
+        survivor_pension_monthly:{ type:'number', description:'Survivor or family pension paid to the survivor, SEK a month after tax, if known.' },
+        survivor_pension_years:{ type:'number', description:'How many years that survivor pension is paid; leave out if unknown.' },
+        retirement_spending_share:{ type:'number', description:'Share of the couple\'s planned retirement spending one person needs. Default 0.65.' },
+        pause_saving:{ type:'boolean', description:'Whether the survivor stops the monthly saving. Default true.' },
+        survivor_age:{ type:'integer', description:'The survivor\'s age now, if not the age in Horizon.' }
+      }, required:['person_name','owner'], additionalProperties:false } },
+    label:() => 'Working out the picture',
+    run(input){
+      const who = String(input.person_name || '').trim(); if(!who) return { error:'person_name is needed' };
+      const own = input.owner === 'spouse' ? 'spouse' : 'me';
+      const share = Number.isFinite(+input.retirement_spending_share) && +input.retirement_spending_share > 0 && +input.retirement_spending_share <= 1.2 ? +input.retirement_spending_share : 0.65;
+      const pause = input.pause_saving !== false;
+      const lump = Math.max(0, Number(input.life_insurance_lump_sum) || 0);
+      const survPen = Math.max(0, Number(input.survivor_pension_monthly) || 0);
+      const e = getEffective(CY, CM);
+      const inc = e.incomeItems || [], exp = e.expenseItems || [], sav = Number(e.savings) || 0;
+      const r0 = v => Math.round(Number(v) || 0);
+      const incStops = inc.filter(i => wordIn(i.name, who)), incStays = inc.filter(i => !wordIn(i.name, who));
+      const expEnds = exp.filter(x => wordIn(x.name, who)), expStays = exp.filter(x => !wordIn(x.name, who));
+      const sum = a => a.reduce((t, x) => t + (Number(x.amount) || 0), 0);
+      const incNow = sum(inc), expNow = sum(exp);
+      const incAfter = sum(incStays) + survPen, expAfter = sum(expStays);
+      const leftNow = incNow - expNow - sav;
+      const leftKeep = incAfter - expAfter - sav, leftPaused = incAfter - expAfter;
+      const gap = Math.max(0, -(pause ? leftPaused : leftKeep));
+      const accounts = (getInvestmentAssets() || []).map(a => ({ name:a.name, owner:a.owner === 'spouse' ? 'spouse' : 'me', balance:r0(a.balance) }));
+      const cash = accounts.reduce((t, a) => t + a.balance, 0) + lump;
+      const pens = getPensionAssets() || [];
+      const pensStop = pens.filter(p => (p.owner === 'spouse' ? 'spouse' : 'me') === own);
+      const pensStay = pens.filter(p => (p.owner === 'spouse' ? 'spouse' : 'me') !== own);
+      const before = getRetirementNumbers();
+      const after = NLP.whatIf(st => {
+        st.externalAssets = (st.externalAssets || []).filter(a => !(a.assetType === 'pension' && (a.owner === 'spouse' ? 'spouse' : 'me') === own));
+        if(lump > 0) st.externalAssets.push({ id:'whatif-life-ins', name:'Life insurance payout', assetType:'investment', accountType:'standard', taxRate:0, balance:lump, monthlyContribution:0, growthRate:st.growthRate });
+        st.baseIncome = (st.baseIncome || []).filter(i => !wordIn(i.name, who));
+        st.baseExpenses = (st.baseExpenses || []).filter(x => !wordIn(x.name, who));
+        if(pause){ st.baseSavings = 0; Object.values(st.yearlyBases || {}).forEach(b => { if(b && b.savings != null) b.savings = 0; }); Object.values(st.monthlyOverrides || {}).forEach(o => { if(o && o.savings != null) o.savings = 0; }); }
+        st.retirementExpenses = (st.retirementExpenses || []).map(x => Object.assign({}, x, { amount:(Number(x.amount) || 0) * share }));
+        if(Number.isFinite(+input.survivor_age) && +input.survivor_age >= 18 && +input.survivor_age < (st.retirementAge || 65)) st.currentAge = Math.round(+input.survivor_age);
+      }, () => { const n = getRetirementNumbers(); return { runout:n.runoutAge || null, verdict:n.verdict, nestEgg:r0(n.nestEgg), incomeAfterTax:r0(n.totalRetirementIncome), spending:r0(n.totalExp) }; });
+      const unknowns = [];
+      if(!lump) unknowns.push('life insurance: is there a policy or group life cover (TGL) through work, how much does it pay, and who is the beneficiary');
+      if(!survPen) unknowns.push('survivor or family pension: does any pension have survivor cover (efterlevandeskydd / familjeskydd), and what does it pay');
+      unknowns.push('the home: is it owned jointly, and is there mortgage life insurance');
+      unknowns.push('a will, a prenuptial agreement (äktenskapsförord), and any children who would inherit');
+      if(!incStops.length) unknowns.push(`no income line contains "${who}": which income lines are theirs`);
+      return {
+        currency_note:'All amounts SEK; convert to the display currency before quoting.',
+        person:who,
+        income_stops:incStops.map(i => ({ line:i.name, monthly:r0(i.amount) })),
+        income_continues:incStays.map(i => ({ line:i.name, monthly:r0(i.amount) })).concat(survPen ? [{ line:'Survivor pension (given)', monthly:r0(survPen) }] : []),
+        own_costs_end:expEnds.map(x => ({ line:x.name, monthly:r0(x.amount) })),
+        costs_continue_total:r0(expAfter), costs_continue_biggest:expStays.slice().sort((a, b) => b.amount - a.amount).slice(0, 4).map(x => ({ line:x.name, monthly:r0(x.amount) })),
+        saving_now:r0(sav),
+        left_each_month:{ now:r0(leftNow), after_keep_saving:r0(leftKeep), after_pause_saving:r0(leftPaused) },
+        savings_available:r0(cash), accounts,
+        months_savings_cover_gap: gap > 0 ? Math.floor(cash / gap) : null,
+        pensions_that_stop:pensStop.map(p => ({ name:p.name, monthly_before_tax:r0(p.monthlyPayout), from_age:p.startAge ?? state.retirementAge })),
+        pensions_that_continue:pensStay.map(p => ({ name:p.name, monthly_before_tax:r0(p.monthlyPayout), from_age:p.startAge ?? state.retirementAge })),
+        retirement:{ couple_now:{ money_lasts_to:before.runoutAge || 'past ' + (state.lifeExp || 90), verdict:before.verdict, spending:r0(before.totalExp) },
+          survivor_alone:{ money_lasts_to:after.runout || 'past ' + (state.lifeExp || 90), verdict:after.verdict, spending:after.spending, spending_share:share, income_after_tax:after.incomeAfterTax } },
+        assumptions:[`Lines whose name contains "${who}" are theirs`, `Accounts and pensions with owner "${own}" are theirs; their accounts pass to the survivor; their pensions stop`, `Retirement spending for one person is ${Math.round(share * 100)}% of the couple's`, pause ? 'Monthly saving is paused' : 'Monthly saving continues', 'Only today\'s plan month is used for the monthly picture'],
+        still_unknown:unknowns,
+        note:'Present it gently and plainly: what stops, what continues, the new month, how long savings cover any gap, retirement, then who to contact and what to ask, then the still_unknown items as short numbered questions. Never write ID, account, policy or reference numbers. Offer to run it again with their answers.',
+      };
+    }
+  });
   // The assistant may PREPARE a pension; the person adds it with one press.
   NLP.addTool({
     def:{ name:'prepare_pension',
