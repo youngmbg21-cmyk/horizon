@@ -453,20 +453,66 @@ Amounts the person says are in ${state.currency || 'SEK'}.`;
     const parts = [s.autoSync === false ? 'On, by hand' : 'On'];
     return { on:true, err:s.lastError, text:parts.join('') + (s.email ? ' · ' + s.email : ''), detail:s.lastError ? 'Last try failed: ' + s.lastError : (s.lastSyncAt ? 'Last synced ' + ago(s.lastSyncAt) : 'Not synced yet') };
   }
-  // The new-look backup kept on this device (Phase 0). Its date is read from
-  // the New look menu, which refreshes it when the menu opens.
-  function backupInfo(){
-    const btn = document.getElementById('nl-restore-btn'), sub = document.getElementById('nl-restore-sub');
-    return { have:!!(btn && !btn.disabled), text:sub ? sub.textContent : '' };
+  // ── Automatic backups (kept by index.html in IndexedDB) ──────────────
+  // The list is read asynchronously; it is cached for a few seconds and the
+  // page redraws once it arrives.
+  let autoCache = null, autoAt = 0, autoLoading = false;
+  function autoList(){
+    if(!autoLoading && typeof window.nlAutoList === 'function' && (!autoCache || Date.now() - autoAt > 5000)){
+      autoLoading = true;
+      window.nlAutoList().then(l => { autoCache = l || []; }).catch(() => { autoCache = autoCache || []; }).finally(() => {
+        autoAt = Date.now(); autoLoading = false;
+        if(state.activePanel === SETTINGS && NLP.tabOf(SETTINGS, 'general') === 'sync') NLP.rerender();
+      });
+    }
+    return autoCache;
   }
-  let backupPoked = false;
-  function pokeBackup(){
-    if(backupPoked || typeof window.nlMenu !== 'function') return;
-    const m = document.getElementById('nl-menu'); if(!m || !m.hidden) return;
-    backupPoked = true;
-    window.nlMenu(); window.nlMenu();       // open + close in one frame: refreshes the backup date
-    setTimeout(() => { if(state.activePanel === SETTINGS) NLP.rerender(); }, 400);
+  const autoInfo = () => (typeof window.nlAutoInfo === 'function' ? window.nlAutoInfo() : { off:false, lastFile:null });
+  const dayDate = iso => { const d = new Date(iso || ''); return isNaN(d) ? '' : d; };
+  const copyWhen = iso => { const d = dayDate(iso); if(!d) return ''; const today = new Date(), y = new Date(Date.now() - 864e5);
+    const t = d.toLocaleTimeString('en-GB', { hour:'2-digit', minute:'2-digit' });
+    if(d.toDateString() === today.toDateString()) return 'Today, ' + t;
+    if(d.toDateString() === y.toDateString()) return 'Yesterday, ' + t;
+    return d.toLocaleDateString('en-GB', { day:'numeric', month:'short', ...(d.getFullYear() !== today.getFullYear() ? { year:'numeric' } : {}) }) + ', ' + t; };
+  const mb = n => n >= 1048576 ? (n / 1048576).toFixed(1) + ' MB' : Math.max(1, Math.round(n / 1024)) + ' KB';
+  const fileDue = () => { const lf = Date.parse(autoInfo().lastFile || ''); return !lf || Date.now() - lf > 30 * 864e5; };
+  const KIND = { daily:['Daily', 'green'], monthly:['Monthly', 'steel'], first:['Before the new look', 'grey'], before:['Before going back', 'amber'] };
+  function copiesTable(list){
+    if(list == null) return `<p class="nls-copies-h">Copies on this device</p><p class="nls-det">Looking for copies…</p>`;
+    if(!list.length) return `<p class="nls-copies-h">Copies on this device</p>` + NLP.empty('No copies yet. The first one is kept a few seconds after Horizon opens.');
+    const rows = list.map((c, i) => { const k = KIND[c.kind] || KIND.daily;
+      const sub = c.kind === 'first' ? 'Kept for good' : c.reason ? H(c.reason) : '';
+      return `<tr data-nl-row="copy-${H(c.id)}"><td class="mk">${i + 1}</td><td><span class="nm">${H(copyWhen(c.at))}</span>${sub ? `<span class="sub">${sub}</span>` : ''}</td><td>${NLP.badge(k[0], k[1])}</td><td class="r">${H(mb(c.size))}</td><td class="r"><span class="nls-copy-acts">${NLP.link('Go back to this', `nlAutoAskRestore('${H(c.id)}')`)}${NLP.link('Download', `nlAutoDownload('${H(c.id)}')`)}</span></td></tr>`; }).join('');
+    return `<p class="nls-copies-h">Copies on this device</p><div class="nl-tbl-wrap"><table class="nl-tbl nls-copies"><thead><tr><th></th><th>Copy</th><th>Kind</th><th class="r">Size</th><th class="r"></th></tr></thead><tbody>${rows}</tbody></table></div>`;
   }
+  function syncOverview(){
+    const list = autoList() || [], ai = autoInfo();
+    const autos = list.filter(c => c.kind !== 'first');
+    const today = autos.find(c => dayDate(c.at) && dayDate(c.at).toDateString() === new Date().toDateString());
+    const headline = ai.off ? 'Automatic backups are off on this device.'
+      : today ? `Horizon backed up your data today at ${dayDate(today.at).toLocaleTimeString('en-GB', { hour:'2-digit', minute:'2-digit' })}.`
+      : 'Horizon keeps today’s copy a few seconds after it opens.';
+    const days = [...Array(14)].map((_, i) => { const d = new Date(Date.now() - (13 - i) * 864e5).toDateString(); return autos.some(c => dayDate(c.at) && dayDate(c.at).toDateString() === d); });
+    const n = days.filter(Boolean).length;
+    const graphic = `<div class="nls-days" aria-label="Last 14 days, ${n} with a copy">${days.map(x => `<i class="${x ? 'on' : ''}"></i>`).join('')}</div><div class="nlp-small nls-days-t">${n} of the last 14 days have a copy. Days you didn’t open Horizon have none.</div>`;
+    const groups = [];
+    if(fileDue()) groups.push({ title:'Needs you', rows:[{ text:ai.lastFile ? 'No file saved in the last month' : 'No copy saved as a file yet', badge:{ text:'Due', kind:'amber' }, why:'If this browser is cleared, the copies here go too.', link:{ label:'Download a copy', onclick:"exportSlice('all')" } }] });
+    groups.push({ title:'Going back', rows:[{ text:'Choose a copy in the table, then press it again', badge:{ text:'How', kind:'grey' }, why:'Horizon keeps a copy of today first.' }] });
+    if(ai.off) groups.push({ title:'Automatic backups', rows:[{ text:'Off on this device', badge:{ text:'Off', kind:'grey' }, link:{ label:'Turn on', onclick:'nlAutoSetOff(false)' } }] });
+    return { headline, graphic, groups, button:{ label:'Download a copy now', onclick:"exportSlice('all')" }, links:[] };
+  }
+  NLP.css('nl-backups-css', `
+.nls-days { display:grid; grid-template-columns:repeat(14,minmax(0,1fr)); gap:4px; margin:4px 0 2px; }
+.nls-days i { height:14px; border-radius:3px; background:var(--nl-pill, #EDEDF0); }
+.nls-days i.on { background:var(--nl-accent); }
+.nls-days-t { margin-top:4px; }
+#panel-nl-settings .nls-copies-h { font:600 17px/1.3 var(--nl-serif); margin:22px 0 6px; }
+#panel-nl-settings .nls-copies .nm { display:block; font-weight:500; }
+#panel-nl-settings .nls-copies .sub { display:block; color:var(--nl-detail); font-size:13px; }
+#panel-nl-settings .nls-copy-acts { display:inline-flex; gap:12px; justify-content:flex-end; }
+/* The links show on the chosen row only (space kept so nothing jumps). */
+#panel-nl-settings .nls-copies tbody tr:not(.on) .nls-copy-acts { visibility:hidden; }
+`);
 
   // ── Exchange rates: the app fetches them; nothing changes until the person approves ──
   const FXC = () => (typeof FX_CURRENCIES !== 'undefined' ? FX_CURRENCIES : ['USD','EUR','KES']);
@@ -562,16 +608,20 @@ Amounts the person says are in ${state.currency || 'SEK'}.`;
     } else {
       const si = syncInfo();
       body += syncRows(si);
-      body += row('backup', 'Backup', `<div class="nls-val">A copy of everything as a file</div>` + det('Everything except your Claude key.'), NLP.link('Download a copy', "exportSlice('all')"));
-      const b = backupInfo();
-      body += row('nlbackup', 'Before the new look', `<div class="nls-val">${b.have ? 'Kept on this device' : 'No backup on this device'}</div>` + det(H(b.have ? b.text : 'Made the first time the new look is turned on.')), b.have ? `<span class="nls-acts">${NLP.link('Restore it', 'nlAskRestore()')}${NLP.link('Download it', 'nlDownloadBackup()')}</span>` : '');
-      pokeBackup();
+      const ai = autoInfo();
+      body += row('autobackup', 'Automatic backups', `<div class="nls-val">${ai.off ? 'Off on this device' : 'On, every day'}</div>` + det(ai.off ? 'Turn it on to keep a copy of everything each day you open Horizon.' : 'A copy of everything on this device each day you open Horizon. Keeps 14 days and 12 months. Never your Claude key.'),
+        ai.off ? `${NLP.badge('Off', 'grey')} ${NLP.link('Turn on', 'nlAutoSetOff(false)')}` : `${NLP.badge('On', 'green')} ${NLP.link('Turn off', 'nlAutoSetOff(true)')}`);
+      const lf = dayDate(ai.lastFile);
+      body += row('backup', 'Save to a file', `<div class="nls-val">Last file: ${lf ? H(lf.toLocaleDateString('en-GB', { day:'numeric', month:'short', year:'numeric' })) : 'never'}</div>` + det('Copies here go if this browser is cleared. Save one as a file each month.'),
+        `${fileDue() ? NLP.badge('Due', 'amber') + ' ' : ''}${NLP.link('Download a copy', "exportSlice('all')")}`);
+      body += copiesTable(autoList());
     }
     host.innerHTML = `<div class="nl-wrap nlst">${NLP.head({ title:'Settings', panel:SETTINGS, tabs:[
         { key:'general', label:'General', count:sugN(GEN) || null, on:tab === 'general' },
         { key:'assistant', label:'Assistant', on:tab === 'assistant' },
         { key:'sync', label:'Sync and backup', on:tab === 'sync' } ] })}
       <div class="nls-fields">${body}</div></div>`;
+    if(tab === 'sync') NLP.rows(host.querySelector('.nls-copies'), SETTINGS, id => { if(id.startsWith('copy-')) window.nlAutoAskRestore(id.slice(5)); });
     host.querySelectorAll('input[data-k]').forEach(i => i.addEventListener('change', () => {
       const v = Number(i.value), s = SET[i.dataset.k];
       if(i.value === '' || !isFinite(v) || v < s.min || v > s.max){ NLP.toast(`${s.label} should be between ${s.min} and ${s.max}.`, 'warn'); i.value = s.get(); return; }
@@ -587,6 +637,7 @@ Amounts the person says are in ${state.currency || 'SEK'}.`;
     });
   }
   function settingsOverview(){
+    if(NLP.tabOf(SETTINGS, 'general') === 'sync') return syncOverview();
     const miss = [];
     if(!onboardOK()) miss.push({ text:'About you is not finished', why:'Citizenship and home base are needed.', link:{ label:'Finish setup', onclick:"NLP.go('nl-setup')" }, btn:{ label:'Finish setup', onclick:"NLP.go('nl-setup')" } });
     if(!keyOk()) miss.push({ text:'The assistant needs your Claude key', why:'Without it you can still type everything yourself.', link:{ label:'Add your key', onclick:"nlSettingsKey()" }, btn:{ label:'Add your Claude key', onclick:'nlSettingsKey()' } });
