@@ -19658,6 +19658,7 @@ window.exportSlice=function(sliceKey){
     slice.fields.forEach(f => { if(state[f] !== undefined) payload[f] = state[f]; });
   }
   downloadJSON(`horizon-${slice.key}.json`, payload);
+  if(slice.fields === null && typeof window.nlMarkFileSaved === 'function') window.nlMarkFileSaved();
 };
 window.importSlice=function(input, sliceKey){
   const file=input.files[0]; if(!file) return;
@@ -25197,8 +25198,8 @@ class HZMobile {
   <div class="nl-sheet">
     <h2 id="nl-sheet-title">Restore the backup?</h2>
     <p id="nl-sheet-when">Your data goes back to how it was when you first turned on the new look.</p>
-    <p>Anything you changed since then is replaced. <a href="#" onclick="nlDownloadCurrent();return false">Download today's data first</a> if you might want it.</p>
-    <div class="nl-sheet-acts"><button class="nl-black" type="button" onclick="nlRestore()">Restore the backup</button><button class="nl-grey" type="button" onclick="nlCloseSheet()">Cancel</button></div>
+    <p id="nl-sheet-extra">Anything you changed since then is replaced. <a href="#" onclick="nlDownloadCurrent();return false">Download today's data first</a> if you might want it.</p>
+    <div class="nl-sheet-acts"><button class="nl-black" type="button" id="nl-sheet-go" onclick="nlSheetGo()">Restore the backup</button><button class="nl-grey" type="button" onclick="nlCloseSheet()">Cancel</button></div>
   </div>
 </div>
 <div class="nl-toast" id="nl-toast" role="status" aria-live="polite"></div>
@@ -25266,6 +25267,95 @@ class HZMobile {
     refreshBackupInfo();
   }
 
+  // ── Automatic backups: one copy a day, kept on this device ─────────────
+  // The first time Horizon opens each day it keeps a copy of everything
+  // (never the Claude key), in IndexedDB beside the one-time backup. It keeps
+  // every copy from the last 14 days it was opened, plus the first copy of
+  // each of the last 12 months. Two device settings live in localStorage, not
+  // in the data, so restoring a copy never changes them: whether automatic
+  // backups are off, and when a full copy was last saved as a file.
+  const AUTO_DAYS = 14, AUTO_MONTHS = 12, LSK = (typeof STORAGE_KEY !== 'undefined' ? STORAGE_KEY : 'horizon-finance-os-v1');
+  const lsGet = k => { try { return localStorage.getItem(LSK + ':' + k); } catch(_){ return null; } };
+  const lsSet = (k, v) => { try { if(v == null) localStorage.removeItem(LSK + ':' + k); else localStorage.setItem(LSK + ':' + k, v); } catch(_){} };
+  async function idbDel(key){ const db = await idb(); return new Promise((res, rej) => { const t = db.transaction('kv','readwrite'); t.objectStore('kv').delete(key); t.oncomplete = () => res(); t.onerror = () => rej(t.error); }); }
+  const dayOf = iso => { const d = new Date(iso); return isNaN(d) ? '' : d.toLocaleDateString('sv-SE'); };   // YYYY-MM-DD, local
+  function autoKinds(idx){
+    // idx newest first. Daily: the last AUTO_DAYS distinct days. Monthly: the
+    // first copy of each of the last AUTO_MONTHS months not already kept.
+    const days = [...new Set(idx.map(e => dayOf(e.at)))].slice(0, AUTO_DAYS);
+    const keep = new Map();
+    idx.forEach(e => { if(days.includes(dayOf(e.at))) keep.set(e.id, 'daily'); });
+    const months = [...new Set(idx.map(e => dayOf(e.at).slice(0, 7)))].slice(0, AUTO_MONTHS);
+    months.forEach(m => { const first = idx.filter(e => dayOf(e.at).startsWith(m)).slice(-1)[0]; if(first && !keep.has(first.id)) keep.set(first.id, 'monthly'); });
+    return keep;
+  }
+  let autoBusy = null;
+  async function autoBackup(reason){
+    if(!reason && lsGet('autoBackup') === 'off') return null;
+    if(autoBusy) await autoBusy;
+    autoBusy = (async () => {
+      let idx; try { idx = (await idbGet('autoIndex')) || []; } catch(_){ return null; }
+      if(!reason && idx.some(e => dayOf(e.at) === dayOf(new Date().toISOString()))) return null;
+      const at = new Date().toISOString(), id = 'a' + Date.now().toString(36), data = fullPayload();
+      try { await idbSet('auto:' + id, { at, data }); } catch(_){ return null; }
+      idx.unshift({ id, at, size:JSON.stringify(data).length, reason:reason || '' });
+      idx.sort((a, b) => String(b.at).localeCompare(String(a.at)));
+      const keep = autoKinds(idx), gone = idx.filter(e => !keep.has(e.id));
+      idx = idx.filter(e => keep.has(e.id));
+      await idbSet('autoIndex', idx);
+      for(const e of gone){ try { await idbDel('auto:' + e.id); } catch(_){} }
+      return id;
+    })();
+    try { return await autoBusy; } finally { autoBusy = null; }
+  }
+  // List for Settings: the automatic copies, then the one from before the new look.
+  window.nlAutoList = async function(){
+    let idx = []; try { idx = (await idbGet('autoIndex')) || []; } catch(_){}
+    const kinds = autoKinds(idx);
+    const out = idx.map(e => ({ id:e.id, at:e.at, size:e.size || 0, kind:e.reason ? 'before' : kinds.get(e.id) || 'daily', reason:e.reason || '' }));
+    let first = null; try { first = await idbGet('backup'); } catch(_){}
+    if(first && first.at) out.push({ id:'first', at:first.at, size:JSON.stringify(first.data || {}).length, kind:'first', reason:'' });
+    return out;
+  };
+  window.nlAutoInfo = () => ({ off:lsGet('autoBackup') === 'off', lastFile:lsGet('lastFileAt') });
+  window.nlAutoSetOff = function(off){ lsSet('autoBackup', off ? 'off' : null); if(!off) autoBackup(); toast(off ? 'Automatic backups are off on this device.' : 'Automatic backups are on. Today’s copy is kept.'); };
+  window.nlMarkFileSaved = function(){ lsSet('lastFileAt', new Date().toISOString()); if(typeof bus !== 'undefined') bus.emit('state:changed', { panel:state.activePanel }); };
+  window.nlAutoBackupNow = () => autoBackup();
+  async function copyOf(id){ if(id === 'first') return idbGet('backup'); return idbGet('auto:' + id); }
+  window.nlAutoDownload = async function(id){
+    let c = null; try { c = await copyOf(id); } catch(_){}
+    if(!c || !c.data){ toast('That copy is no longer on this device.', 'warn'); return; }
+    downloadJSON('horizon-backup-' + String(c.at).slice(0, 10) + '.json', c.data);
+    window.nlMarkFileSaved();
+  };
+  let pendingCopy = null;
+  const shortDay = iso => { const d = new Date(iso); return isNaN(d) ? '' : d.toLocaleDateString(state.lang === 'sv' ? 'sv-SE' : 'en-GB', { day:'numeric', month:'short' }); };
+  window.nlAutoAskRestore = async function(id){
+    let c = null; try { c = await copyOf(id); } catch(_){}
+    if(!c || !c.data){ toast('That copy is no longer on this device.', 'warn'); return; }
+    pendingCopy = id;
+    const t = document.getElementById('nl-sheet-title'), w = document.getElementById('nl-sheet-when'), x = document.getElementById('nl-sheet-extra'), btn = document.getElementById('nl-sheet-go');
+    if(t) t.textContent = 'Go back to ' + shortDay(c.at) + '?';
+    if(w) w.textContent = 'Your data goes back to how it was on ' + whenText(c.at) + '.';
+    if(x) x.textContent = 'Horizon keeps a copy of today first, so you can change your mind.';
+    if(btn) btn.textContent = 'Go back to ' + shortDay(c.at);
+    document.getElementById('nl-sheet-back').classList.add('on');
+    setTimeout(() => btn?.focus(), 0);
+  };
+  window.nlSheetGo = async function(){
+    if(pendingCopy == null) return nlRestore();
+    const id = pendingCopy; pendingCopy = null;
+    nlCloseSheet();
+    let c = null; try { c = await copyOf(id); } catch(_){}
+    if(!c || !c.data){ toast('That copy is no longer on this device.', 'warn'); return; }
+    await autoBackup('Before going back to ' + shortDay(c.at));
+    try {
+      _restoreFullBackup(JSON.parse(JSON.stringify(c.data)));
+      invalidateSelectors(); save(); renderAll(); syncBar();
+      toast('Back to ' + shortDay(c.at) + '. Today’s data is kept as a copy.');
+    } catch(err){ toast('That copy could not be restored: ' + err.message, 'warn'); }
+  };
+
   // ── Toasts and the sheet ──
   function toast(msg, kind){
     const t = document.getElementById('nl-toast'); if(!t) return;
@@ -25275,11 +25365,16 @@ class HZMobile {
   window.nlAskRestore = function(){
     closeMenu();
     const w = document.getElementById('nl-sheet-when');
+    pendingCopy = null;
+    const t = document.getElementById('nl-sheet-title'), x = document.getElementById('nl-sheet-extra'), btn = document.getElementById('nl-sheet-go');
+    if(t) t.textContent = 'Restore the backup?';
+    if(btn) btn.textContent = 'Restore the backup';
+    if(x) x.innerHTML = 'Anything you changed since then is replaced. <a href="#" onclick="nlDownloadCurrent();return false">Download today\'s data first</a> if you might want it.';
     if(w) w.textContent = 'Your data goes back to how it was on ' + whenText(backupAt) + ', when you first turned on the new look.';
     document.getElementById('nl-sheet-back').classList.add('on');
     setTimeout(() => document.querySelector('#nl-sheet-back .nl-black')?.focus(), 0);
   };
-  window.nlCloseSheet = function(){ document.getElementById('nl-sheet-back').classList.remove('on'); };
+  window.nlCloseSheet = function(){ document.getElementById('nl-sheet-back').classList.remove('on'); pendingCopy = null; };
   window.nlRestore = async function(){
     const b = await refreshBackupInfo();
     nlCloseSheet();
@@ -25293,11 +25388,11 @@ class HZMobile {
   window.nlDownloadBackup = async function(){
     closeMenu();
     const b = await refreshBackupInfo();
-    if(b && b.data) downloadJSON('horizon-backup-' + String(b.at).slice(0,10) + '.json', b.data);
+    if(b && b.data){ downloadJSON('horizon-backup-' + String(b.at).slice(0,10) + '.json', b.data); window.nlMarkFileSaved(); }
   };
   // For the new Settings page: when the one-time backup was made (or null).
   window.nlBackupInfo = async function(){ const b = await refreshBackupInfo(); return b && b.at ? { at:b.at } : null; };
-  window.nlDownloadCurrent = function(){ downloadJSON('horizon-today-' + new Date().toISOString().slice(0,10) + '.json', fullPayload()); };
+  window.nlDownloadCurrent = function(){ downloadJSON('horizon-today-' + new Date().toISOString().slice(0,10) + '.json', fullPayload()); window.nlMarkFileSaved(); };
 
   // ── The New look menu: closes on a second press, Esc, or a press outside ──
   function closeMenu(){ const m = document.getElementById('nl-menu'); if(m) m.hidden = true; document.getElementById('nl-menu-btn')?.setAttribute('aria-expanded','false'); }
@@ -25407,6 +25502,9 @@ class HZMobile {
   window.addEventListener('hashchange', () => setTimeout(syncBar, 0));
   // The first time the new look opens on this device (now by default), keep a backup.
   if(isOn()){ apply(true); ensureBackup(); }
+  // Today's automatic copy, a little after start so it never slows the first paint.
+  setTimeout(() => { autoBackup(); }, 4000);
+  setInterval(() => { autoBackup(); }, 60 * 60 * 1000);
   // Expose for checks.
   window.nlSyncBar = syncBar;
 })();
